@@ -242,14 +242,14 @@ export function LandingHeader() {
 export function HeroSection() {
   return (
     <section
-      className="relative isolate overflow-hidden rounded-b-[28px] bg-slate-950 pb-6 pt-1 text-white sm:rounded-none sm:pb-20 sm:pt-2 lg:min-h-[720px]"
+      className="relative isolate overflow-hidden rounded-b-[28px] bg-slate-950 pb-6 pt-1 text-white sm:rounded-none sm:pb-20 sm:pt-2 lg:min-h-180"
       style={{
         background:
           'radial-gradient(circle at top left, rgba(139, 92, 246, 0.42), transparent 32%), radial-gradient(circle at right, rgba(6, 182, 212, 0.24), transparent 30%), #0F172A',
       }}
     >
-      <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-indigo-950/60 to-transparent" />
-      <div className="absolute -left-24 bottom-20 hidden h-64 w-[680px] rounded-full border border-cyan-300/10 opacity-60 blur-sm lg:block" />
+      <div className="absolute inset-x-0 bottom-0 h-48 bg-linear-to-t from-indigo-950/60 to-transparent" />
+      <div className="absolute -left-24 bottom-20 hidden h-64 w-170 rounded-full border border-cyan-300/10 opacity-60 blur-sm lg:block" />
       <div className="absolute bottom-12 left-0 right-0 hidden h-px bg-cyan-300/20 shadow-[0_0_80px_24px_rgba(6,182,212,0.20)] lg:block" />
       <div className="pointer-events-none absolute right-2 top-32 flex h-24 w-44 items-center justify-center gap-1 opacity-50 sm:hidden">
         {waveformBars.slice(0, 18).map((height, index) => (
@@ -271,11 +271,11 @@ export function HeroSection() {
 
           <h1 className="max-w-xl text-[2rem] font-black leading-[1.08] sm:text-5xl lg:text-6xl">
             Đánh giá kỹ năng nói{' '}
-            <span className="block bg-gradient-to-r from-cyan-300 to-sky-400 bg-clip-text text-transparent">
+            <span className="block bg-linear-to-r from-cyan-300 to-sky-400 bg-clip-text text-transparent">
               thông minh hơn
             </span>
           </h1>
-          <p className="mt-4 max-w-[23rem] text-sm leading-6 text-slate-200 sm:mt-6 sm:max-w-xl sm:text-lg sm:leading-8">
+          <p className="mt-4 max-w-92 text-sm leading-6 text-slate-200 sm:mt-6 sm:max-w-xl sm:text-lg sm:leading-8">
             Nền tảng hỗ trợ nhà trường tổ chức, chấm điểm và quản lý bài thi
             nói tiếng Anh nhanh hơn, công bằng hơn và minh bạch hơn với trí tuệ
             nhân tạo.
@@ -283,7 +283,7 @@ export function HeroSection() {
 
           <div className="mt-6 flex min-w-0 flex-row gap-3 sm:mt-8 sm:flex-wrap">
             <a
-              className="inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-3 text-sm font-bold text-white shadow-xl shadow-indigo-500/30 transition hover:-translate-y-0.5 sm:flex-none sm:rounded-full sm:px-7"
+              className="inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-indigo-500 to-cyan-500 px-4 py-3 text-sm font-bold text-white shadow-xl shadow-indigo-500/30 transition hover:-translate-y-0.5 sm:flex-none sm:rounded-full sm:px-7"
               href="#features"
             >
               Khám phá ngay
@@ -324,7 +324,7 @@ export function HeroSection() {
 
 function HeroMockup() {
   return (
-    <div className="relative mx-auto mt-4 w-full min-w-0 max-w-[620px] sm:mt-0">
+    <div className="relative mx-auto mt-4 w-full min-w-0 max-w-155 sm:mt-0">
       <div className="absolute -right-1 -top-10 z-20 size-24 overflow-hidden rounded-full border-[3px] border-white bg-white shadow-2xl shadow-indigo-950/30 sm:top-4 sm:size-44 sm:border-4 lg:-right-7 lg:-top-8 lg:size-48">
         <img
           alt="Học sinh đang làm bài thi nói với tai nghe"
@@ -333,7 +333,7 @@ function HeroMockup() {
         />
       </div>
 
-      <div className="relative z-10 overflow-hidden rounded-[1.5rem] border border-white/30 bg-white/95 p-3 text-slate-950 shadow-2xl shadow-indigo-950/40 sm:overflow-visible sm:rounded-[2rem] sm:p-6">
+      <div className="relative z-10 overflow-hidden rounded-3xl border border-white/30 bg-white/95 p-3 text-slate-950 shadow-2xl shadow-indigo-950/40 sm:overflow-visible sm:rounded-4xl sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-base font-bold sm:text-lg">Bài thi nói</p>
@@ -460,7 +460,7 @@ export function FeatureSection() {
         <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-8 sm:grid-cols-2 sm:gap-4 xl:grid-cols-6">
           {featureItems.map((item, index) => (
             <article
-              className="flex min-h-[124px] min-w-0 gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-lg shadow-slate-200/60 transition hover:-translate-y-1 hover:shadow-xl sm:block sm:min-h-0 sm:rounded-3xl sm:p-6"
+              className="flex min-h-31 min-w-0 gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-lg shadow-slate-200/60 transition hover:-translate-y-1 hover:shadow-xl sm:block sm:min-h-0 sm:rounded-3xl sm:p-6"
               key={item.title}
             >
               <IconBadge
@@ -500,7 +500,7 @@ export function AudienceSection() {
         <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-8 sm:grid-cols-1 sm:gap-5 lg:grid-cols-3">
           {audienceItems.map((item, index) => (
             <article
-              className={`relative min-h-[164px] min-w-0 overflow-hidden rounded-2xl border border-slate-200 p-3 shadow-lg shadow-slate-200/70 sm:rounded-3xl sm:p-5 ${
+              className={`relative min-h-41 min-w-0 overflow-hidden rounded-2xl border border-slate-200 p-3 shadow-lg shadow-slate-200/70 sm:rounded-3xl sm:p-5 ${
                 index === 0
                   ? 'bg-indigo-50'
                   : index === 1
@@ -509,7 +509,7 @@ export function AudienceSection() {
               }`}
               key={item.title}
             >
-              <div className="grid gap-3 sm:min-h-[260px] sm:gap-4 sm:grid-cols-[1fr_150px]">
+              <div className="grid gap-3 sm:min-h-65 sm:gap-4 sm:grid-cols-[1fr_150px]">
                 <div className="relative z-10 max-w-[72%] sm:max-w-none">
                   <div className="mb-2 flex items-center gap-1.5 sm:mb-4 sm:gap-3">
                     <IconBadge
@@ -600,7 +600,7 @@ export function BenefitSection() {
         <div className="mt-5 grid grid-cols-4 gap-2 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
           {benefitItems.map((item) => (
             <article
-              className="flex min-h-[132px] min-w-0 flex-col items-center gap-2 overflow-hidden rounded-2xl border border-slate-100 bg-white p-2 text-center shadow-sm shadow-slate-200/70 sm:min-h-0 sm:flex-row sm:items-start sm:gap-4 sm:rounded-3xl sm:border-0 sm:p-4 sm:text-left sm:shadow-none"
+              className="flex min-h-33 min-w-0 flex-col items-center gap-2 overflow-hidden rounded-2xl border border-slate-100 bg-white p-2 text-center shadow-sm shadow-slate-200/70 sm:min-h-0 sm:flex-row sm:items-start sm:gap-4 sm:rounded-3xl sm:border-0 sm:p-4 sm:text-left sm:shadow-none"
               key={item.title}
             >
               <IconBadge className="size-10 rounded-2xl sm:size-14" icon={item.icon} />
@@ -608,7 +608,7 @@ export function BenefitSection() {
                 <h3 className="text-[11px] font-bold leading-4 text-indigo-900 sm:text-base sm:leading-normal">
                   {item.title}
                 </h3>
-                <p className="mt-1 line-clamp-3 text-[10px] leading-4 text-slate-600 sm:mt-2 sm:line-clamp-none sm:text-sm sm:leading-6">
+                <p className="mt-1 max-h-12 overflow-hidden text-[10px] leading-4 text-slate-600 sm:mt-2 sm:max-h-none sm:text-sm sm:leading-6">
                   {item.description}
                 </p>
               </div>
@@ -624,7 +624,7 @@ export function CTASection() {
   return (
     <section className="bg-white pb-0 pt-1 sm:pt-8">
       <Container>
-        <div className="overflow-hidden rounded-[24px] bg-gradient-to-r from-indigo-800 via-indigo-600 to-cyan-500 p-4 text-white shadow-2xl shadow-indigo-500/20 sm:rounded-3xl sm:p-8 lg:p-10">
+        <div className="overflow-hidden rounded-3xl bg-linear-to-r from-indigo-800 via-indigo-600 to-cyan-500 p-4 text-white shadow-2xl shadow-indigo-500/20 sm:rounded-3xl sm:p-8 lg:p-10">
           <div className="grid grid-cols-[1fr_auto] items-center gap-4 sm:grid-cols-1 sm:gap-8 lg:grid-cols-[1fr_auto]">
             <div>
               <h2 className="max-w-2xl text-xl font-black leading-tight sm:text-4xl">
