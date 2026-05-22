@@ -25,6 +25,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
+import logoImage from '@/assets/images/logo.png'
 import schoolImage from '@/assets/images/school.png'
 import studentSpeakingImage from '@/assets/images/student-speaking.png'
 import studentUseLaptopImage from '@/assets/images/student-use-lap.png'
@@ -108,38 +109,18 @@ function Container({
   return <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${className}`}>{children}</div>
 }
 
-function Logo({ dark = false }: { dark?: boolean }) {
+function Logo({ className = 'h-11 w-32' }: { className?: string }) {
   return (
     <Link
-      aria-label="vox home"
-      className={`inline-flex items-center gap-2 text-3xl font-black ${
-        dark ? 'text-slate-950' : 'text-white'
-      }`}
+      aria-label="vox"
+      className={`inline-flex shrink-0 items-center overflow-hidden ${className}`}
       to="/"
     >
-      <span>V</span>
-      <span
-        className={`relative inline-flex size-7 items-center justify-center rounded-full border-2 ${
-          dark ? 'border-indigo-600' : 'border-white'
-        }`}
-      >
-        <span
-          className={`h-3 w-0.5 rounded-full ${
-            dark ? 'bg-indigo-600' : 'bg-white'
-          }`}
-        />
-        <span
-          className={`mx-0.5 h-4 w-0.5 rounded-full ${
-            dark ? 'bg-indigo-600' : 'bg-white'
-          }`}
-        />
-        <span
-          className={`h-3 w-0.5 rounded-full ${
-            dark ? 'bg-indigo-600' : 'bg-white'
-          }`}
-        />
-      </span>
-      <span>X</span>
+      <img
+        alt="vox"
+        className="h-full w-full object-cover object-center"
+        src={logoImage}
+      />
     </Link>
   )
 }
@@ -276,15 +257,7 @@ export function HeroSection() {
       <Container className="relative grid items-center gap-10 pt-8 md:grid-cols-[0.95fr_1.05fr] md:pt-14 lg:gap-14">
         <div className="max-w-2xl text-left">
           <div className="mb-7 hidden sm:block">
-            <div className="inline-flex items-center gap-3 text-7xl font-black leading-none lg:text-8xl">
-              <span>V</span>
-              <span className="relative inline-flex size-20 items-center justify-center rounded-full border-[6px] border-white lg:size-24">
-                <span className="h-8 w-1 rounded-full bg-white" />
-                <span className="mx-1.5 h-12 w-1 rounded-full bg-white" />
-                <span className="h-8 w-1 rounded-full bg-white" />
-              </span>
-              <span>X</span>
-            </div>
+            <Logo className="h-24 w-72 sm:h-28 sm:w-80" />
           </div>
 
           <h1 className="max-w-xl text-4xl font-black leading-[1.08] sm:text-5xl lg:text-6xl">
@@ -343,7 +316,7 @@ export function HeroSection() {
 function HeroMockup() {
   return (
     <div className="relative mx-auto w-full max-w-[620px]">
-      <div className="absolute -right-1 top-4 hidden size-44 overflow-hidden rounded-full border-4 border-white bg-white shadow-2xl shadow-indigo-950/30 sm:block lg:-right-7 lg:-top-8 lg:size-48">
+      <div className="absolute -right-1 top-4 z-20 hidden size-44 overflow-hidden rounded-full border-4 border-white bg-white shadow-2xl shadow-indigo-950/30 sm:block lg:-right-7 lg:-top-8 lg:size-48">
         <img
           alt="Học sinh đang làm bài thi nói với tai nghe"
           className="h-full w-full object-cover"
@@ -351,7 +324,7 @@ function HeroMockup() {
         />
       </div>
 
-      <div className="relative rounded-[2rem] border border-white/30 bg-white/95 p-4 text-slate-950 shadow-2xl shadow-indigo-950/40 sm:p-6">
+      <div className="relative z-10 rounded-[2rem] border border-white/30 bg-white/95 p-4 text-slate-950 shadow-2xl shadow-indigo-950/40 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-lg font-bold">Bài thi nói</p>
@@ -436,7 +409,7 @@ function HeroMockup() {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-indigo-50 p-3 sm:hidden">
+        <div className="relative z-20 mt-4 flex items-center gap-3 rounded-2xl bg-indigo-50 p-3 sm:hidden">
           <img
             alt="Học sinh đang nói tiếng Anh"
             className="size-14 rounded-full object-cover"
@@ -649,7 +622,7 @@ export function LandingFooter() {
       <Container>
         <div className="grid gap-8 md:grid-cols-[1.4fr_2fr_1fr]">
           <div>
-            <Logo dark />
+            <Logo className="h-11 w-32 drop-shadow-[0_1px_2px_rgba(15,23,42,0.30)]" />
             <p className="mt-4 max-w-xs text-sm leading-6 text-slate-600">
               Nền tảng đánh giá bài thi nói tiếng Anh bằng trí tuệ nhân tạo.
             </p>
@@ -704,4 +677,3 @@ function SectionHeading({ title }: { title: React.ReactNode }) {
     </div>
   )
 }
-
