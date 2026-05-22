@@ -70,39 +70,50 @@ export const featureItems = [
     description:
       'Tạo đề thi, phân lịch, theo dõi trạng thái làm bài của học sinh.',
     icon: 'mic',
+    mobileDescription: 'Thiết lập, phân ca, giám sát dễ dàng',
     title: 'Tổ chức kỳ thi nói',
   },
   {
     description:
       'Đánh giá tự động theo nhiều tiêu chí với độ chính xác cao.',
     icon: 'brain',
+    mobileDescription: 'Đánh giá tự động với độ chính xác cao',
     title: 'Chấm điểm bằng AI',
   },
   {
     description:
       'Luyện tập theo chương trình học và nhận phản hồi tức thì.',
     icon: 'book',
+    mobileDescription: 'Luyện tập theo chủ đề và trình độ',
     title: 'Luyện nói cá nhân hóa',
   },
   {
     description:
       'Tạo và quản lý câu hỏi theo chủ đề, độ khó, kỹ năng đánh giá.',
     icon: 'folder',
+    mobileDescription: 'Kho câu hỏi đa dạng theo chủ đề, độ khó',
     title: 'Ngân hàng câu hỏi',
   },
   {
     description:
       'Xem báo cáo kết quả theo lớp, kỹ năng và tiến độ học tập.',
     icon: 'clock',
+    mobileDescription: 'Thống kê chi tiết, trực quan và dễ theo dõi',
     title: 'Báo cáo & thống kê',
   },
   {
     description:
       'Học sinh gửi yêu cầu, giáo viên xem lại và điều chỉnh khi cần.',
     icon: 'headphones',
+    mobileDescription: 'Hỗ trợ yêu cầu phúc khảo minh bạch, nhanh chóng',
     title: 'Phúc khảo bài thi',
   },
-] satisfies Array<{ description: string; icon: IconName; title: string }>
+] satisfies Array<{
+  description: string
+  icon: IconName
+  mobileDescription?: string
+  title: string
+}>
 
 export const audienceItems = [
   {
@@ -113,6 +124,7 @@ export const audienceItems = [
       'Gửi yêu cầu phúc khảo khi cần',
     ],
     image: 'student',
+    mobileBullets: ['Làm bài mọi lúc, mọi nơi.', 'Luyện nói hiệu quả.'],
     title: 'Học sinh',
   },
   {
@@ -123,6 +135,10 @@ export const audienceItems = [
       'Xử lý phúc khảo nhanh chóng',
     ],
     image: 'teacher',
+    mobileBullets: [
+      'Tạo đề thi, chấm điểm dễ dàng.',
+      'Xem kết quả và báo cáo tức thì.',
+    ],
     title: 'Giáo viên',
   },
   {
@@ -133,11 +149,13 @@ export const audienceItems = [
       'Báo cáo tổng quan, đề xuất dữ liệu',
     ],
     image: 'school',
+    mobileBullets: ['Quản lý kỳ thi tập trung.', 'Báo cáo tổng quan, dễ dàng.'],
     title: 'Nhà trường',
   },
 ] satisfies Array<{
   bullets: string[]
   image: AudienceImage
+  mobileBullets?: string[]
   title: string
 }>
 
@@ -178,4 +196,3 @@ export const footerColumns = [
     title: 'Công ty',
   },
 ]
-
