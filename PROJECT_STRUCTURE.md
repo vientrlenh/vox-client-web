@@ -28,6 +28,7 @@ src/
     home/           Example feature module
       api/          Feature-specific API hooks and queries
       pages/        Route-level pages
+      components/   components for page 
       index.ts      Public exports for the feature
 
   shared/

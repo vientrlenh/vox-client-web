@@ -7,7 +7,9 @@ describe('AppRoutes', () => {
     renderWithProviders(<AppRoutes />)
 
     expect(
-      await screen.findByRole('heading', { name: /vox client web/i }),
+      await screen.findByRole('heading', {
+        name: /đánh giá kỹ năng nói thông minh hơn/i,
+      }),
     ).toBeInTheDocument()
   })
 })

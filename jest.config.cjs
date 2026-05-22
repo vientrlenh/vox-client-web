@@ -9,10 +9,10 @@ module.exports = {
   ],
   moduleNameMapper: {
     '^@/shared/config/env$': '<rootDir>/src/test/mocks/env.ts',
-    '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(css|less|sass|scss)$': 'identity-obj-proxy',
     '\\.(png|jpg|jpeg|gif|svg|webp|avif)$':
       '<rootDir>/src/test/mocks/fileMock.ts',
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
   setupFilesAfterEnv: ['<rootDir>/src/test/setupTests.ts'],
   testEnvironment: 'jsdom',
