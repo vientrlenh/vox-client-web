@@ -11,7 +11,6 @@ import {
   GraduationCap,
   Headphones,
   Lock,
-  Mail,
   Menu,
   MessageSquareText,
   Mic,
@@ -26,16 +25,15 @@ import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import logoImage from '@/assets/images/logo.png'
-import footerLogoImage from '@/assets/images/logo-v2.png'
 import schoolImage from '@/assets/images/school.png'
 import studentSpeakingImage from '@/assets/images/student-speaking.png'
 import studentUseLaptopImage from '@/assets/images/student-use-lap.png'
 import teacherUseLaptopImage from '@/assets/images/teacher-use-lap.png'
+import { SiteFooter } from '@/shared/ui/SiteFooter'
 import {
   audienceItems,
   benefitItems,
   featureItems,
-  footerColumns,
   heroHighlights,
   navItems,
   problemItems,
@@ -682,58 +680,7 @@ export function CTASection() {
 }
 
 export function LandingFooter() {
-  return (
-    <footer className="bg-slate-50 py-10">
-      <Container>
-        <div className="grid gap-8 md:grid-cols-[1.4fr_2fr_1fr]">
-          <div>
-            <Logo
-              className="h-11 w-32 drop-shadow-[0_1px_2px_rgba(15,23,42,0.30)]"
-              src={footerLogoImage}
-            />
-            <p className="mt-4 max-w-xs text-sm leading-6 text-slate-600">
-              Nền tảng đánh giá bài thi nói tiếng Anh bằng trí tuệ nhân tạo.
-            </p>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-3">
-            {footerColumns.map((column) => (
-              <div key={column.title}>
-                <h3 className="text-sm font-bold text-slate-950">
-                  {column.title}
-                </h3>
-                <ul className="mt-3 grid gap-2 text-sm text-slate-600">
-                  {column.links.map((link) => (
-                    <li key={link}>
-                      <a className="hover:text-indigo-600" href="#features">
-                        {link}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-950">
-              Kết nối với chúng tôi
-            </h3>
-            <div className="mt-4 flex gap-3">
-              {[Users, CirclePlay, Mail].map((Icon, index) => (
-                <a
-                  aria-label={`Kênh liên hệ ${index + 1}`}
-                  className="inline-flex size-10 items-center justify-center rounded-full bg-indigo-900 text-white"
-                  href={routeLinks.contact}
-                  key={index}
-                >
-                  <Icon aria-hidden="true" className="size-5" />
-                </a>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Container>
-    </footer>
-  )
+  return <SiteFooter />
 }
 
 function SectionHeading({ title }: { title: React.ReactNode }) {

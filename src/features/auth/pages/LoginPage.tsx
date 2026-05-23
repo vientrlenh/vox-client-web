@@ -15,8 +15,9 @@ import {
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { Link } from 'react-router'
-import logoImage from '@/assets/images/logo-v2.png'
+import logoImage from '@/assets/images/logo.png'
 import studentSpeakingImage from '@/assets/images/student-speaking.png'
+import { SiteFooter } from '@/shared/ui/SiteFooter'
 import { validateMockLogin } from '../data/mockAuth'
 
 const waveformBars = [
@@ -66,80 +67,84 @@ function Waveform({ className = '' }: { className?: string }) {
 
 function ProductPreview() {
   return (
-    <div className="mt-10 hidden lg:block">
-      <div className="relative min-h-76">
-        <img
-          alt=""
-          className="absolute left-0 top-14 size-28 rounded-full border-4 border-white object-cover shadow-2xl shadow-blue-950/50"
-          src={studentSpeakingImage}
-        />
-        <div className="absolute left-26 top-24 inline-flex size-9 items-center justify-center rounded-full bg-violet-600 text-white ring-4 ring-white/80">
-          <Mic aria-hidden="true" className="size-5" />
+    <div className="mt-10 hidden lg:grid lg:grid-cols-[176px_minmax(0,1fr)] lg:items-end lg:gap-6">
+      <div className="grid gap-5">
+        <div className="relative mx-auto size-32">
+          <img
+            alt=""
+            className="size-32 rounded-full border-4 border-white object-cover shadow-2xl shadow-blue-950/50"
+            src={studentSpeakingImage}
+          />
+          <span className="absolute -right-2 bottom-5 inline-flex size-10 items-center justify-center rounded-full bg-violet-600 text-white ring-4 ring-white/80">
+            <Mic aria-hidden="true" className="size-5" />
+          </span>
         </div>
 
-        <div className="ml-40 rounded-2xl bg-white p-5 text-slate-950 shadow-2xl shadow-blue-950/40 ring-1 ring-white/40">
-          <div className="mb-4 flex items-center gap-3">
-            <span className="text-sm font-bold">Bài thi nói</span>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
-              Đã hoàn thành
-            </span>
+        <div className="rounded-2xl border border-white/20 bg-white/10 p-4 shadow-xl shadow-blue-950/30 backdrop-blur">
+          <div className="mb-3 inline-flex size-9 items-center justify-center rounded-lg bg-white/10 text-cyan-200">
+            <Sparkles aria-hidden="true" className="size-5" />
           </div>
-          <div className="mb-5 flex items-center gap-4 rounded-xl bg-slate-50 p-3">
-            <span className="inline-flex size-10 items-center justify-center rounded-full bg-blue-600 text-white">
-              <Play aria-hidden="true" className="ml-0.5 size-5 fill-current" />
-            </span>
-            <Waveform className="h-9 flex-1 scale-y-50 overflow-hidden" />
-            <div className="grid gap-1 text-[10px] text-slate-400">
-              <span>00:00</span>
-              <span>01:29</span>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-[0.95fr_1.05fr]">
-            <div className="rounded-xl bg-white p-4 shadow-lg shadow-slate-200/70 ring-1 ring-slate-100">
-              <p className="text-xs font-bold text-slate-700">Điểm tổng</p>
-              <div className="mt-4 flex items-end gap-1">
-                <span className="text-5xl font-black text-blue-950">85</span>
-                <span className="pb-1 text-sm font-semibold text-slate-500">/100</span>
-              </div>
-              <div className="mt-5 h-2 rounded-full bg-slate-100">
-                <div className="h-full w-[78%] rounded-full bg-emerald-400" />
-              </div>
-              <p className="mt-3 text-right text-sm font-semibold text-slate-600">Tốt</p>
-            </div>
-
-            <div className="rounded-xl bg-white p-4 shadow-lg shadow-slate-200/70 ring-1 ring-slate-100">
-              <p className="text-xs font-bold text-slate-700">Kết quả theo tiêu chí</p>
-              <div className="mt-4 grid gap-2">
-                {criteriaScores.map((item) => (
-                  <div className="grid grid-cols-[72px_1fr_24px] items-center gap-2" key={item.label}>
-                    <span className="text-[11px] font-medium text-slate-600">{item.label}</span>
-                    <span className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                      <span
-                        className="block h-full rounded-full bg-linear-to-r from-blue-500 to-violet-500"
-                        style={{ width: item.width }}
-                      />
-                    </span>
-                    <span className="text-right text-[11px] font-bold text-blue-950">{item.score}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="absolute left-0 top-44 max-w-44 rounded-xl border border-white/20 bg-white/7 p-4 shadow-xl shadow-blue-950/30 backdrop-blur">
-          <div className="mb-2 inline-flex size-8 items-center justify-center rounded-lg bg-white/10 text-cyan-200">
-            <Sparkles aria-hidden="true" className="size-4" />
-          </div>
-          <p className="text-sm font-semibold text-white">AI chấm điểm tự động</p>
-          <p className="mt-1 text-xs leading-5 text-blue-100">
+          <p className="text-base font-bold leading-6 text-white">
+            AI chấm điểm tự động
+          </p>
+          <p className="mt-2 text-xs leading-5 text-blue-100">
             Phân tích toàn diện 6 tiêu chí giúp đánh giá chính xác và công bằng.
           </p>
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-4 gap-5">
+      <div className="rounded-2xl bg-white p-5 text-slate-950 shadow-2xl shadow-blue-950/40 ring-1 ring-white/40">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="text-sm font-bold">Bài thi nói</span>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
+            Đã hoàn thành
+          </span>
+        </div>
+        <div className="mb-5 flex items-center gap-4 rounded-xl bg-slate-50 p-3">
+          <span className="inline-flex size-10 items-center justify-center rounded-full bg-blue-600 text-white">
+            <Play aria-hidden="true" className="ml-0.5 size-5 fill-current" />
+          </span>
+          <Waveform className="h-9 flex-1 scale-y-50 overflow-hidden" />
+          <div className="grid gap-1 text-[10px] text-slate-400">
+            <span>00:00</span>
+            <span>01:29</span>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-xl bg-white p-4 shadow-lg shadow-slate-200/70 ring-1 ring-slate-100">
+            <p className="text-xs font-bold text-slate-700">Điểm tổng</p>
+            <div className="mt-4 flex items-end gap-1">
+              <span className="text-5xl font-black text-blue-950">85</span>
+              <span className="pb-1 text-sm font-semibold text-slate-500">/100</span>
+            </div>
+            <div className="mt-5 h-2 rounded-full bg-slate-100">
+              <div className="h-full w-[78%] rounded-full bg-emerald-400" />
+            </div>
+            <p className="mt-3 text-right text-sm font-semibold text-slate-600">Tốt</p>
+          </div>
+
+          <div className="rounded-xl bg-white p-4 shadow-lg shadow-slate-200/70 ring-1 ring-slate-100">
+            <p className="text-xs font-bold text-slate-700">Kết quả theo tiêu chí</p>
+            <div className="mt-4 grid gap-2">
+              {criteriaScores.map((item) => (
+                <div className="grid grid-cols-[72px_1fr_24px] items-center gap-2" key={item.label}>
+                  <span className="text-[11px] font-medium text-slate-600">{item.label}</span>
+                  <span className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <span
+                      className="block h-full rounded-full bg-linear-to-r from-blue-500 to-violet-500"
+                      style={{ width: item.width }}
+                    />
+                  </span>
+                  <span className="text-right text-[11px] font-bold text-blue-950">{item.score}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 grid grid-cols-4 gap-5 lg:col-span-2">
         {trustItems.map(({ icon: Icon, label }) => (
           <div className="flex items-center gap-3 text-blue-100" key={label}>
             <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-cyan-200 ring-1 ring-white/15">
@@ -202,16 +207,17 @@ export function LoginPage() {
         : 'border-blue-200 bg-blue-50 text-blue-700'
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#06105f_0%,#07085f_45%,#5319dd_100%)] text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.06)_0_1px,transparent_1px_90px)] opacity-20" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-[linear-gradient(180deg,transparent,rgba(56,189,248,0.18))]" />
+    <main className="bg-slate-50">
+      <section className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#06105f_0%,#07085f_45%,#5319dd_100%)] text-white">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.06)_0_1px,transparent_1px_90px)] opacity-20" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-[linear-gradient(180deg,transparent,rgba(56,189,248,0.18))]" />
 
-      <section className="relative mx-auto grid min-h-screen w-full max-w-7xl items-center gap-8 px-5 py-5 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-12 lg:py-12">
+        <div className="relative mx-auto grid min-h-screen w-full max-w-7xl items-center gap-8 px-5 py-5 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-12 lg:py-12">
         <div className="min-w-0 lg:pb-8">
           <Link aria-label="Về trang chủ" className="inline-flex" to="/">
             <img
               alt="VOX"
-              className="h-auto w-24 brightness-0 invert sm:w-32 lg:w-24"
+              className="h-auto w-24 object-contain sm:w-32 lg:w-24"
               src={logoImage}
             />
           </Link>
@@ -367,7 +373,9 @@ export function LoginPage() {
             </p>
           </div>
         </div>
+        </div>
       </section>
+      <SiteFooter />
     </main>
   )
 }
