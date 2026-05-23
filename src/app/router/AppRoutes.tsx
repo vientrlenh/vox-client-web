@@ -6,11 +6,16 @@ const HomePage = lazy(() =>
   import('@/features/home').then((module) => ({ default: module.HomePage })),
 )
 
+const LoginPage = lazy(() =>
+  import('@/features/auth').then((module) => ({ default: module.LoginPage })),
+)
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route index element={<HomePage />} />
+        <Route path="login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
