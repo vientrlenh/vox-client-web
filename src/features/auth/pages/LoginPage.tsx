@@ -223,11 +223,11 @@ export function LoginPage() {
           </Link>
 
           <div className="relative mt-9 max-w-xl sm:mt-12 lg:mt-14">
-            <Waveform className="absolute -right-28 top-0 h-28 w-80 opacity-60 sm:-right-48 sm:w-110 lg:right-[-180px] lg:top-28 lg:h-32 lg:w-120" />
+            <Waveform className="absolute -right-28 top-0 h-28 w-80 opacity-60 sm:-right-48 sm:w-110 lg:-right-45 lg:top-28 lg:h-32 lg:w-120" />
             <h1 className="relative text-3xl font-black leading-tight tracking-normal sm:text-5xl lg:text-6xl">
               Chào mừng trở lại
             </h1>
-            <p className="relative mt-2 max-w-[22rem] text-base font-bold leading-6 text-white sm:max-w-md sm:text-2xl sm:leading-8 lg:text-2xl">
+            <p className="relative mt-2 max-w-88 text-base font-bold leading-6 text-white sm:max-w-md sm:text-2xl sm:leading-8 lg:text-2xl">
               Đăng nhập để tiếp tục quản lý và{' '}
               <span className="text-cyan-300">đánh giá bài thi nói với AI</span>
             </p>
@@ -240,7 +240,7 @@ export function LoginPage() {
           <ProductPreview />
         </div>
 
-        <div className="mx-auto flex w-full max-w-[460px] flex-col gap-5 lg:max-w-[520px]">
+        <div className="mx-auto flex w-full max-w-115 flex-col gap-5 lg:max-w-130">
           <form
             className="rounded-[22px] bg-white p-5 text-slate-950 shadow-2xl shadow-blue-950/40 ring-1 ring-white/50 sm:p-8 lg:rounded-[18px] lg:p-10"
             onSubmit={handleSubmit}
