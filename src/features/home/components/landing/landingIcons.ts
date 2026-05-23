@@ -1,0 +1,41 @@
+import {
+  BarChart3,
+  BookOpen,
+  Brain,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  FolderOpen,
+  GraduationCap,
+  Headphones,
+  Lock,
+  MessageSquareText,
+  Mic,
+  Scale,
+  School,
+  ShieldCheck,
+  Sparkles,
+  Users,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type { IconName } from '../../data/landingContent'
+
+export const iconMap: Record<IconName, LucideIcon> = {
+  barChart: BarChart3,
+  book: BookOpen,
+  brain: Brain,
+  calendar: CalendarDays,
+  check: CheckCircle2,
+  clock: Clock3,
+  folder: FolderOpen,
+  graduation: GraduationCap,
+  headphones: Headphones,
+  lock: Lock,
+  message: MessageSquareText,
+  mic: Mic,
+  scale: Scale,
+  school: School,
+  shield: ShieldCheck,
+  sparkles: Sparkles,
+  users: Users,
+}

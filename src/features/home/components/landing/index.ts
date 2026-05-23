@@ -1,0 +1,8 @@
+export { AudienceSection } from './AudienceSection'
+export { BenefitSection } from './BenefitSection'
+export { CTASection } from './CTASection'
+export { FeatureSection } from './FeatureSection'
+export { HeroSection } from './HeroSection'
+export { LandingFooter } from './LandingFooter'
+export { LandingHeader } from './LandingHeader'
+export { ProblemSection } from './ProblemSection'

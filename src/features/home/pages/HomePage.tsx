@@ -6,7 +6,7 @@ import {
   HeroSection,
   LandingFooter,
   ProblemSection,
-} from '../components/LandingSections'
+} from '../components/landing'
 
 export function HomePage() {
   return (
