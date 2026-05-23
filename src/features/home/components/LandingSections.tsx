@@ -26,6 +26,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import logoImage from '@/assets/images/logo.png'
+import footerLogoImage from '@/assets/images/logo-v2.png'
 import schoolImage from '@/assets/images/school.png'
 import studentSpeakingImage from '@/assets/images/student-speaking.png'
 import studentUseLaptopImage from '@/assets/images/student-use-lap.png'
@@ -109,7 +110,13 @@ function Container({
   return <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${className}`}>{children}</div>
 }
 
-function Logo({ className = 'h-11 w-32' }: { className?: string }) {
+function Logo({
+  className = 'h-11 w-32',
+  src = logoImage,
+}: {
+  className?: string
+  src?: string
+}) {
   return (
     <Link
       aria-label="vox"
@@ -119,7 +126,7 @@ function Logo({ className = 'h-11 w-32' }: { className?: string }) {
       <img
         alt="vox"
         className="h-full w-full object-cover object-center"
-        src={logoImage}
+        src={src}
       />
     </Link>
   )
@@ -136,6 +143,23 @@ function SmartLink({
   href: string
   onClick?: () => void
 }) {
+  if (href.startsWith('#')) {
+    const handleAnchorClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault()
+      document.getElementById(href.slice(1))?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+      onClick?.()
+    }
+
+    return (
+      <a className={className} href={href} onClick={handleAnchorClick}>
+        {children}
+      </a>
+    )
+  }
+
   if (href.startsWith('/')) {
     return (
       <Link className={className} onClick={onClick} to={href}>
@@ -663,7 +687,10 @@ export function LandingFooter() {
       <Container>
         <div className="grid gap-8 md:grid-cols-[1.4fr_2fr_1fr]">
           <div>
-            <Logo className="h-11 w-32 drop-shadow-[0_1px_2px_rgba(15,23,42,0.30)]" />
+            <Logo
+              className="h-11 w-32 drop-shadow-[0_1px_2px_rgba(15,23,42,0.30)]"
+              src={footerLogoImage}
+            />
             <p className="mt-4 max-w-xs text-sm leading-6 text-slate-600">
               Nền tảng đánh giá bài thi nói tiếng Anh bằng trí tuệ nhân tạo.
             </p>
