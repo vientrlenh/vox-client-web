@@ -7,16 +7,13 @@ import {
   FileText,
   LockKeyhole,
   Mail,
-  Mic,
-  Play,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import logoImage from '@/assets/images/logo.png'
-import studentSpeakingImage from '@/assets/images/student-speaking.png'
+// import studentSpeakingImage from '@/assets/images/student-speaking.png'
 import { SiteFooter } from '@/shared/ui/SiteFooter'
 import { validateMockLogin } from '../data/mockAuth'
 
@@ -25,14 +22,14 @@ const waveformBars = [
   54, 72, 44, 58, 32, 46, 24, 36,
 ]
 
-const criteriaScores = [
-  { label: 'Phát âm', score: 90, width: '90%' },
-  { label: 'Độ trôi chảy', score: 85, width: '85%' },
-  { label: 'Ngữ pháp', score: 82, width: '82%' },
-  { label: 'Từ vựng', score: 88, width: '88%' },
-  { label: 'Nội dung', score: 83, width: '83%' },
-  { label: 'Tương tác', score: 84, width: '84%' },
-]
+// const criteriaScores = [
+//   { label: 'Phát âm', score: 90, width: '90%' },
+//   { label: 'Độ trôi chảy', score: 85, width: '85%' },
+//   { label: 'Ngữ pháp', score: 82, width: '82%' },
+//   { label: 'Từ vựng', score: 88, width: '88%' },
+//   { label: 'Nội dung', score: 83, width: '83%' },
+//   { label: 'Tương tác', score: 84, width: '84%' },
+// ]
 
 const trustItems = [
   { icon: Brain, label: 'Chấm điểm chính xác' },
@@ -68,7 +65,7 @@ function Waveform({ className = '' }: { className?: string }) {
 function ProductPreview() {
   return (
     <div className="mt-10 hidden lg:grid lg:grid-cols-[176px_minmax(0,1fr)] lg:items-end lg:gap-6">
-      <div className="grid gap-5">
+      {/* <div className="grid gap-5">
         <div className="relative mx-auto size-32">
           <img
             alt=""
@@ -142,7 +139,7 @@ function ProductPreview() {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <div className="mt-8 grid grid-cols-4 gap-5 lg:col-span-2">
         {trustItems.map(({ icon: Icon, label }) => (
