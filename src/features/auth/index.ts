@@ -5,5 +5,6 @@ export type {
   AuthUser,
   LoginRequest,
   LoginResponse,
+  RegisterRequest,
   RoleCode,
 } from './types'

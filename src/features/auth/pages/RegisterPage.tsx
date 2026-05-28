@@ -11,13 +11,20 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import cartoonSchoolImage from '@/assets/images/cartoon-school.png'
 import logoImage from '@/assets/images/logo.png'
+import type { ApiError } from '@/shared/api'
 import { SiteFooter } from '@/shared/ui/SiteFooter'
+import { useRegisterMutation } from '../api/useRegisterMutation'
+import type { RegisterRequest } from '../types'
 
 type FieldProps = {
   autoComplete?: string
   className?: string
+  disabled?: boolean
   id: string
   label: string
+  maxLength?: number
+  min?: number
+  name: keyof RegisterRequest
   placeholder: string
   required?: boolean
   type?: string
@@ -28,12 +35,16 @@ const contactFields: FieldProps[] = [
     autoComplete: 'name',
     id: 'contact-name',
     label: 'Họ và tên liên hệ',
+    maxLength: 255,
+    name: 'contactFullName',
     placeholder: 'Nhập họ và tên đầy đủ',
     required: true,
   },
   {
     id: 'identifier-code',
     label: 'Mã định danh',
+    maxLength: 20,
+    name: 'identityNumber',
     placeholder: 'Nhập mã định danh',
     required: true,
   },
@@ -41,6 +52,8 @@ const contactFields: FieldProps[] = [
     autoComplete: 'tel',
     id: 'contact-phone',
     label: 'Số điện thoại liên hệ',
+    maxLength: 20,
+    name: 'contactPhone',
     placeholder: 'Nhập số điện thoại',
     required: true,
     type: 'tel',
@@ -49,6 +62,8 @@ const contactFields: FieldProps[] = [
     autoComplete: 'email',
     id: 'contact-email',
     label: 'Email liên hệ',
+    maxLength: 255,
+    name: 'contactEmail',
     placeholder: 'Nhập email',
     required: true,
     type: 'email',
@@ -59,6 +74,8 @@ const schoolFields: FieldProps[] = [
   {
     id: 'school-domain',
     label: 'Tên miền của trường',
+    maxLength: 100,
+    name: 'schoolDomain',
     placeholder: 'vd: ten-truong.edu.vn',
     required: true,
   },
@@ -66,6 +83,8 @@ const schoolFields: FieldProps[] = [
     autoComplete: 'organization',
     id: 'school-name',
     label: 'Tên trường',
+    maxLength: 255,
+    name: 'schoolName',
     placeholder: 'Nhập tên trường',
     required: true,
   },
@@ -99,8 +118,12 @@ function RequiredMark() {
 function TextField({
   autoComplete,
   className = '',
+  disabled,
   id,
   label,
+  maxLength,
+  min,
+  name,
   placeholder,
   required,
   type = 'text',
@@ -113,7 +136,11 @@ function TextField({
       <input
         autoComplete={autoComplete}
         className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+        disabled={disabled}
         id={id}
+        maxLength={maxLength}
+        min={min}
+        name={name}
         placeholder={placeholder}
         required={required}
         type={type}
@@ -122,7 +149,7 @@ function TextField({
   )
 }
 
-function DateField() {
+function DateField({ disabled }: { disabled?: boolean }) {
   return (
     <label className="block min-w-0" htmlFor="birth-date">
       <span className="mb-1.5 block text-xs font-bold leading-4 text-blue-950">
@@ -131,7 +158,9 @@ function DateField() {
       <span className="relative block">
         <input
           className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-xs font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          disabled={disabled}
           id="birth-date"
+          name="dateOfBirth"
           placeholder="dd/mm/yyyy"
           required
           type="text"
@@ -147,13 +176,17 @@ function DateField() {
 
 function SelectField({
   children,
+  disabled,
   id,
   label,
+  name,
   required,
 }: {
   children: ReactNode
+  disabled?: boolean
   id: string
   label: string
+  name: keyof RegisterRequest
   required?: boolean
 }) {
   return (
@@ -165,7 +198,9 @@ function SelectField({
         <select
           className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-xs font-medium text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
           defaultValue=""
+          disabled={disabled}
           id={id}
+          name={name}
           required={required}
         >
           {children}
@@ -177,6 +212,49 @@ function SelectField({
       </span>
     </label>
   )
+}
+
+type RegisterMessage = {
+  text: string
+  tone: 'error' | 'success'
+}
+
+function getStringValue(formData: FormData, key: keyof RegisterRequest) {
+  const value = formData.get(key)
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function getFirstValidationError(details: unknown) {
+  if (!details || typeof details !== 'object') {
+    return null
+  }
+
+  const maybeErrors = (details as { errors?: unknown }).errors
+
+  if (!maybeErrors || typeof maybeErrors !== 'object') {
+    return null
+  }
+
+  return (
+    Object.values(maybeErrors as Record<string, unknown>).find(
+      (value): value is string => typeof value === 'string' && value.trim() !== '',
+    ) ?? null
+  )
+}
+
+function getRegisterErrorMessage(error: unknown) {
+  const apiError = error as Partial<ApiError>
+  const validationError = getFirstValidationError(apiError.details)
+
+  if (validationError) {
+    return validationError
+  }
+
+  if (typeof apiError.message === 'string' && apiError.message.trim()) {
+    return apiError.message
+  }
+
+  return 'Gửi đơn đăng ký thất bại. Vui lòng thử lại.'
 }
 
 function FormSection({
@@ -213,12 +291,60 @@ function RegisterHeading({ className = '' }: { className?: string }) {
 }
 
 export function RegisterPage() {
-  const [submitted, setSubmitted] = useState(false)
+  const registerMutation = useRegisterMutation()
+  const [message, setMessage] = useState<RegisterMessage | null>(null)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setSubmitted(true)
+
+    const form = event.currentTarget
+    const formData = new FormData(form)
+    const studentCount = Number(getStringValue(formData, 'studentCount'))
+
+    if (!Number.isInteger(studentCount) || studentCount < 1) {
+      setMessage({
+        text: 'Số học sinh phải là số nguyên lớn hơn 0.',
+        tone: 'error',
+      })
+      return
+    }
+
+    const payload: RegisterRequest = {
+      contactAddress: getStringValue(formData, 'contactAddress'),
+      contactEmail: getStringValue(formData, 'contactEmail'),
+      contactFullName: getStringValue(formData, 'contactFullName'),
+      contactPhone: getStringValue(formData, 'contactPhone'),
+      dateOfBirth: getStringValue(formData, 'dateOfBirth'),
+      identityNumber: getStringValue(formData, 'identityNumber'),
+      position: getStringValue(formData, 'position'),
+      postalCode: getStringValue(formData, 'postalCode'),
+      schoolAddress: getStringValue(formData, 'schoolAddress'),
+      schoolDomain: getStringValue(formData, 'schoolDomain'),
+      schoolName: getStringValue(formData, 'schoolName'),
+      studentCount,
+    }
+
+    try {
+      setMessage(null)
+      const successMessage = await registerMutation.mutateAsync(payload)
+      form.reset()
+      setMessage({
+        text: successMessage,
+        tone: 'success',
+      })
+    } catch (error) {
+      setMessage({
+        text: getRegisterErrorMessage(error),
+        tone: 'error',
+      })
+    }
   }
+
+  const isSubmitting = registerMutation.isPending
+  const messageClassName =
+    message?.tone === 'success'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      : 'border-red-200 bg-red-50 text-red-700'
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -333,13 +459,20 @@ export function RegisterPage() {
                   <FormSection title="Thông tin liên hệ">
                     <div className="grid gap-3 sm:grid-cols-2">
                       {contactFields.map((field) => (
-                        <TextField key={field.id} {...field} />
+                        <TextField
+                          disabled={isSubmitting}
+                          key={field.id}
+                          {...field}
+                        />
                       ))}
-                      <DateField />
+                      <DateField disabled={isSubmitting} />
                       <TextField
                         autoComplete="street-address"
+                        disabled={isSubmitting}
                         id="contact-address"
                         label="Địa chỉ liên hệ"
+                        maxLength={512}
+                        name="contactAddress"
                         placeholder="Nhập địa chỉ liên hệ"
                         required
                       />
@@ -350,63 +483,81 @@ export function RegisterPage() {
                     <div className="grid gap-3">
                       <div className="grid gap-3 min-[390px]:grid-cols-2">
                         {schoolFields.map((field) => (
-                          <TextField key={field.id} {...field} />
+                          <TextField
+                            disabled={isSubmitting}
+                            key={field.id}
+                            {...field}
+                          />
                         ))}
                       </div>
                       <TextField
                         autoComplete="street-address"
+                        disabled={isSubmitting}
                         id="school-address"
                         label="Địa chỉ trường"
+                        maxLength={512}
+                        name="schoolAddress"
                         placeholder="Nhập địa chỉ trường"
                         required
                       />
                       <div className="grid gap-3 min-[390px]:grid-cols-2">
                         <TextField
+                          disabled={isSubmitting}
                           id="postal-code"
                           label="Mã bưu chính"
+                          maxLength={10}
+                          name="postalCode"
                           placeholder="Nhập mã bưu chính"
                           required
                         />
-                        <SelectField id="student-count" label="Số học sinh" required>
-                          <option value="" disabled>
-                            Nhập số học sinh của trường
-                          </option>
-                          <option value="under-500">Dưới 500 học sinh</option>
-                          <option value="500-1000">500 - 1.000 học sinh</option>
-                          <option value="over-1000">Trên 1.000 học sinh</option>
-                        </SelectField>
+                        <TextField
+                          disabled={isSubmitting}
+                          id="student-count"
+                          label="Số học sinh"
+                          min={1}
+                          name="studentCount"
+                          placeholder="Nhập số học sinh của trường"
+                          required
+                          type="number"
+                        />
                       </div>
                     </div>
                   </FormSection>
 
                   <FormSection title="Thông tin chức vụ">
-                    <SelectField id="position" label="Chức vụ" required>
+                    <SelectField
+                      disabled={isSubmitting}
+                      id="position"
+                      label="Chức vụ"
+                      name="position"
+                      required
+                    >
                       <option value="" disabled>
                         Nhập chức vụ của bạn
                       </option>
-                      <option value="principal">Hiệu trưởng</option>
-                      <option value="vice-principal">Phó hiệu trưởng</option>
-                      <option value="teacher">Giáo viên</option>
-                      <option value="admin">Quản trị viên</option>
+                      <option value="Hiệu trưởng">Hiệu trưởng</option>
+                      <option value="Phó hiệu trưởng">Phó hiệu trưởng</option>
+                      <option value="Giáo viên">Giáo viên</option>
+                      <option value="Quản trị viên">Quản trị viên</option>
                     </SelectField>
                   </FormSection>
                 </div>
 
-                {submitted ? (
+                {message ? (
                   <div
-                    className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-xs font-semibold text-cyan-800"
-                    role="status"
+                    className={`mt-4 rounded-lg border px-4 py-3 text-xs font-semibold ${messageClassName}`}
+                    role={message.tone === 'error' ? 'alert' : 'status'}
                   >
-                    Thông tin đã được ghi nhận ở giao diện. Kết nối BE sẽ được
-                    bổ sung sau khi màn hình được duyệt.
+                    {message.text}
                   </div>
                 ) : null}
 
                 <button
-                  className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-linear-to-r from-violet-600 to-cyan-500 text-sm font-black text-white transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-cyan-500/20"
+                  className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-linear-to-r from-violet-600 to-cyan-500 text-sm font-black text-white transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+                  disabled={isSubmitting}
                   type="submit"
                 >
-                  Đăng ký tài khoản
+                  {isSubmitting ? 'Đang gửi...' : 'Đăng ký tài khoản'}
                 </button>
 
                 <p className="mx-auto mt-5 max-w-xl text-center text-xs leading-5 text-slate-500">
