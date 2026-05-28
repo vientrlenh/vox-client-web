@@ -188,7 +188,7 @@ function FormSection({
 }) {
   return (
     <section className="border-t border-slate-200 pt-4">
-      <h2 className="mb-3 text-xs font-black text-blue-950">{title}</h2>
+      <h2 className="mb-3 text-sm font-black text-blue-950">{title}</h2>
       {children}
     </section>
   )
@@ -201,7 +201,7 @@ function RegisterHeading({ className = '' }: { className?: string }) {
         <UserRound aria-hidden="true" className="size-7" />
       </span>
       <div>
-        <h1 className="text-2xl font-black leading-tight tracking-normal text-blue-950">
+        <h1 className="text-3xl font-black leading-tight tracking-normal text-blue-950">
           Đăng ký tài khoản trường học
         </h1>
         <p className="mt-1 text-sm leading-6 text-slate-500">
@@ -235,14 +235,14 @@ export function RegisterPage() {
                 src={logoImage}
               />
             </Link>
-            <p className="-mt-2 text-sm font-semibold text-blue-100">
+            <p className="-mt-2 text-base font-semibold text-blue-100">
               Đánh giá kỹ năng nói thông minh hơn
             </p>
 
             <div className="relative mt-24 max-w-md">
               <div className="pointer-events-none absolute -right-40 top-4 h-72 w-72 rounded-full border border-violet-400/20" />
               <div className="pointer-events-none absolute -right-28 top-12 h-52 w-52 rounded-full border border-cyan-300/15" />
-              <h2 className="text-4xl font-black leading-tight tracking-normal">
+              <h2 className="text-5xl font-black leading-tight tracking-normal">
                 Tạo tài khoản trường học với{' '}
                 <span className="bg-linear-to-r from-cyan-300 to-violet-400 bg-clip-text text-transparent">
                   VOX
@@ -307,7 +307,7 @@ export function RegisterPage() {
               <span className="mx-auto inline-flex size-12 items-center justify-center rounded-full bg-linear-to-br from-violet-600 to-indigo-500 text-white shadow-lg shadow-violet-500/30">
                 <UserRound aria-hidden="true" className="size-6" />
               </span>
-              <p className="mt-4 text-xl font-black leading-tight tracking-normal">
+              <p className="mt-4 text-2xl font-black leading-tight tracking-normal">
                 Đăng ký tài khoản trường học
               </p>
               <p className="mx-auto mt-2 max-w-xs text-xs font-medium leading-5 text-blue-100">
