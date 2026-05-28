@@ -36,6 +36,16 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
+  it('renders the register route', async () => {
+    renderWithProviders(<AppRoutes />, { route: '/register' })
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /đăng ký tài khoản trường học/i,
+      }),
+    ).toBeInTheDocument()
+  })
+
   it('redirects unauthenticated users from the system admin dashboard to login', async () => {
     renderWithProviders(<AppRoutes />, { route: '/system-admin/dashboard' })
 
