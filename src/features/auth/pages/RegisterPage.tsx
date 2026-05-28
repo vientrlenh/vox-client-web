@@ -281,20 +281,26 @@ export function RegisterPage() {
           </div>
 
           <div className="flex min-h-screen flex-col lg:min-h-0">
-            <header className="flex h-12 items-center justify-between border-b border-white/15 px-3 lg:hidden">
-              <Link aria-label="Về trang chủ" className="inline-flex w-16" to="/">
-                <img
-                  alt="vox"
-                  className="h-auto w-full object-contain"
-                  src={logoImage}
-                />
-              </Link>
-              <Link
-                className="text-xs font-bold text-cyan-300 hover:text-cyan-200"
-                to="/login"
-              >
-                Đăng nhập
-              </Link>
+            <header className="relative z-10 px-4 pt-3 lg:hidden">
+              <div className="flex h-12 items-center justify-between rounded-2xl border border-white/15 bg-white/10 px-3 shadow-[0_12px_30px_rgba(2,6,23,0.24)] backdrop-blur-md">
+                <Link
+                  aria-label="Về trang chủ"
+                  className="inline-flex h-8 w-18 items-center overflow-hidden"
+                  to="/"
+                >
+                  <img
+                    alt="vox"
+                    className="h-full w-full object-contain object-left"
+                    src={logoImage}
+                  />
+                </Link>
+                <Link
+                  className="inline-flex h-8 items-center rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15 hover:text-white"
+                  to="/login"
+                >
+                  Đăng nhập
+                </Link>
+              </div>
             </header>
 
             <div className="px-4 pb-5 pt-6 text-center lg:hidden">
@@ -309,7 +315,7 @@ export function RegisterPage() {
               </p>
             </div>
 
-            <div className="relative w-full flex-1 lg:mx-auto lg:flex lg:max-w-197.5 lg:items-center">
+            <div className="relative w-full flex-1 px-4 pb-5 sm:px-6 lg:mx-auto lg:flex lg:max-w-197.5 lg:items-center lg:px-0 lg:pb-0">
               <div className="absolute right-0 -top-12.5 hidden text-xs font-semibold text-blue-100 lg:block">
                 Đã có tài khoản?{' '}
                 <Link className="text-cyan-300 hover:text-cyan-200" to="/login">
@@ -318,7 +324,7 @@ export function RegisterPage() {
               </div>
 
               <form
-                className="w-full rounded-t-[18px] bg-white px-4 pb-5 pt-4 text-slate-950 shadow-2xl shadow-blue-950/35 ring-1 ring-white/50 sm:px-6 lg:rounded-[22px] lg:px-16 lg:py-8"
+                className="w-full rounded-[18px] bg-white px-4 pb-5 pt-4 text-slate-950 shadow-2xl shadow-blue-950/35 ring-1 ring-white/50 sm:px-6 lg:rounded-[22px] lg:px-16 lg:py-8"
                 onSubmit={handleSubmit}
               >
                 <RegisterHeading className="sr-only lg:not-sr-only lg:mb-6 lg:flex" />
