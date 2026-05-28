@@ -1,5 +1,5 @@
 export const appConfig = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? '/api',
   enableQueryDevtools: import.meta.env.DEV,
-  graphqlPath: import.meta.env.VITE_GRAPHQL_PATH ?? '/graphql',
+  graphqlEndpoint: import.meta.env.VITE_GRAPHQL_ENDPOINT ?? '/graphql',
 } as const

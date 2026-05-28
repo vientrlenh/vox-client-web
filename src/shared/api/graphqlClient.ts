@@ -1,6 +1,8 @@
+import axios from 'axios'
 import { appConfig } from '@/shared/config/env'
 import type { ApiError } from './apiError'
-import { apiClient } from './apiClient'
+import { getAuthTokens } from './authTokenStorage'
+import { toApiError } from './apiError'
 
 type GraphQLErrorResponse = {
   extensions?: unknown
@@ -14,6 +16,27 @@ type GraphQLResponse<TData> = {
 }
 
 type GraphQLVariables = Record<string, unknown>
+
+export const graphqlApiClient = axios.create({
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+graphqlApiClient.interceptors.request.use((config) => {
+  const tokens = getAuthTokens()
+
+  if (tokens?.accessToken) {
+    config.headers.Authorization = `Bearer ${tokens.accessToken}`
+  }
+
+  return config
+})
+
+graphqlApiClient.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => Promise.reject(toApiError(error)),
+)
 
 function toGraphQLError(errors: GraphQLErrorResponse[]): ApiError {
   const message = errors
@@ -31,8 +54,8 @@ export async function graphQLRequest<
   TData,
   TVariables extends GraphQLVariables = GraphQLVariables,
 >(query: string, variables?: TVariables) {
-  const response = await apiClient.post<GraphQLResponse<TData>>(
-    appConfig.graphqlPath,
+  const response = await graphqlApiClient.post<GraphQLResponse<TData>>(
+    appConfig.graphqlEndpoint,
     {
       query,
       variables,

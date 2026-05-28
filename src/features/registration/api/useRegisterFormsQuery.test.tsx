@@ -1,18 +1,12 @@
 import { QueryClient } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
-import { apiClient } from '@/shared/api/apiClient'
+import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { createTestProviders } from '@/test/renderWithProviders'
 import { fetchRegisterForms } from './useRegisterFormsQuery'
 import { useRegisterFormQuery } from './useRegisterFormQuery'
 import type { RegisterForm, RegisterFormPage } from '../types'
 
-jest.mock('@/shared/api/apiClient', () => ({
-  apiClient: {
-    post: jest.fn(),
-  },
-}))
-
-const mockedPost = jest.mocked(apiClient.post)
+const mockedPost = jest.spyOn(graphqlApiClient, 'post')
 
 const mockRegisterForm: RegisterForm = {
   contactAddress: '27 test street',
