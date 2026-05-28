@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
+import { SystemAdminLayout } from '@/app/layouts/SystemAdminLayout'
 import { RequireRole } from './RequireRole'
 import { PageLoader } from '@/shared/ui/PageLoader'
 
@@ -21,6 +22,12 @@ const SystemAdminDashboardPage = lazy(() =>
   })),
 )
 
+const SystemAdminRegistrationsPage = lazy(() =>
+  import('@/features/system-admin').then((module) => ({
+    default: module.SystemAdminRegistrationsPage,
+  })),
+)
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -29,10 +36,16 @@ export function AppRoutes() {
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route element={<RequireRole role="SYSTEM_ADMIN" />}>
-          <Route
-            path="system-admin/dashboard"
-            element={<SystemAdminDashboardPage />}
-          />
+          <Route element={<SystemAdminLayout />}>
+            <Route
+              path="system-admin/dashboard"
+              element={<SystemAdminDashboardPage />}
+            />
+            <Route
+              path="system-admin/registrations"
+              element={<SystemAdminRegistrationsPage />}
+            />
+          </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
