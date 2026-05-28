@@ -86,6 +86,8 @@ describe('AppRoutes', () => {
     expect(
       screen.getByRole('searchbox', { name: /tìm kiếm hệ thống/i }),
     ).toBeInTheDocument()
+    expect(screen.getByText('admin@vox.edu.vn')).toBeInTheDocument()
+    expect(screen.getByText('SYSTEM_ADMIN')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /tổng quan/i })).toHaveAttribute(
       'aria-current',
       'page',
@@ -192,7 +194,7 @@ describe('AppRoutes', () => {
     })
     await user.click(
       screen.getByRole('button', {
-        name: /mở menu tài khoản system admin/i,
+        name: /mở menu tài khoản/i,
       }),
     )
     await user.click(screen.getByRole('menuitem', { name: /đăng xuất/i }))

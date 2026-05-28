@@ -14,9 +14,9 @@ import {
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
-import logoImage from '@/assets/images/logo-v2.png'
+import logoImage from '@/assets/images/logo.png'
 import { clearAuthState } from '@/app/store/authSlice'
-import { useAppDispatch } from '@/app/store/hooks'
+import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
 
 const navigationItems = [
@@ -47,6 +47,23 @@ const navigationItems = [
   },
 ]
 
+function getEmailInitials(email?: string) {
+  if (!email) {
+    return 'SA'
+  }
+
+  return email
+    .split('@')[0]
+    .split(/[._-]/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+    .padEnd(2, email[0].toUpperCase())
+    .slice(0, 2)
+}
+
 type SystemAdminSidebarProps = {
   onClose?: () => void
   onNavigate?: () => void
@@ -59,7 +76,7 @@ function SystemAdminSidebar({
   showCloseButton = false,
 }: SystemAdminSidebarProps) {
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-gradient-to-b from-blue-950 via-indigo-900 to-violet-900 px-6 py-7 text-white">
+    <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-blue-950 via-indigo-900 to-violet-900 px-6 py-7 text-white">
       <div className="flex items-center justify-between">
         <NavLink
           aria-label="VOX system admin"
@@ -69,7 +86,7 @@ function SystemAdminSidebar({
         >
           <img
             alt="VOX"
-            className="h-12 w-auto object-contain brightness-0 invert"
+            className="h-12 w-auto object-contain"
             src={logoImage}
           />
         </NavLink>
@@ -135,8 +152,12 @@ function SystemAdminSidebar({
 export function SystemAdminLayout() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const user = useAppSelector((state) => state.auth.user)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const adminEmail = user?.email ?? 'unknown'
+  const adminRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
+  const adminInitials = getEmailInitials(adminEmail)
 
   function handleLogout() {
     setIsMobileMenuOpen(false)
@@ -147,8 +168,8 @@ export function SystemAdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-blue-950 lg:pl-[280px]">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[280px] lg:block">
+    <div className="min-h-screen bg-slate-50 text-blue-950 lg:pl-70">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-70 lg:block">
         <SystemAdminSidebar />
       </aside>
 
@@ -163,7 +184,7 @@ export function SystemAdminLayout() {
           <aside
             aria-label="Menu system admin"
             aria-modal="true"
-            className="relative h-full w-[280px] max-w-[86vw]"
+            className="relative h-full w-70 max-w-[86vw]"
             role="dialog"
           >
             <SystemAdminSidebar
@@ -176,7 +197,7 @@ export function SystemAdminLayout() {
       ) : null}
 
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="flex min-h-[76px] items-center gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
             aria-label="Mở menu system admin"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-blue-950 transition hover:bg-slate-50 lg:hidden"
@@ -217,20 +238,20 @@ export function SystemAdminLayout() {
               <button
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
-                aria-label="Mở menu tài khoản System Admin"
+                aria-label="Mở menu tài khoản"
                 className="inline-flex items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50"
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
                 type="button"
               >
                 <span className="inline-flex size-11 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
-                  SA
+                  {adminInitials}
                 </span>
-                <span className="hidden sm:block">
-                  <span className="block text-sm font-bold text-blue-950">
-                    System Admin
+                <span className="hidden max-w-56 sm:block">
+                  <span className="block truncate text-sm font-bold text-blue-950">
+                    {adminEmail}
                   </span>
-                  <span className="block text-xs font-medium text-slate-500">
-                    Super Admin
+                  <span className="block truncate text-xs font-medium text-slate-500">
+                    {adminRoles}
                   </span>
                 </span>
                 <ChevronDown
