@@ -226,8 +226,8 @@ export function RegisterPage() {
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.06)_0_1px,transparent_1px_92px)] opacity-20" />
         <div className="pointer-events-none absolute -left-24 bottom-12 hidden h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl lg:block" />
 
-        <div className="relative mx-auto grid w-full max-w-[1440px] lg:min-h-screen lg:grid-cols-[minmax(0,0.78fr)_minmax(690px,1fr)] lg:items-center lg:gap-8 lg:px-8 lg:py-8 xl:px-12">
-          <div className="hidden min-h-[720px] flex-col lg:flex">
+        <div className="relative mx-auto grid w-full max-w-360 lg:min-h-screen lg:grid-cols-[minmax(0,0.78fr)_minmax(690px,1fr)] lg:items-center lg:gap-8 lg:px-8 lg:py-8 xl:px-12">
+          <div className="hidden min-h-180 flex-col lg:flex">
             <Link aria-label="Về trang chủ" className="inline-flex w-fit" to="/">
               <img
                 alt="vox"
@@ -275,7 +275,7 @@ export function RegisterPage() {
             <img
               alt=""
               aria-hidden="true"
-              className="mt-auto w-full max-w-[560px] object-contain opacity-95 mix-blend-screen"
+              className="mt-auto w-full max-w-140 object-contain opacity-95 mix-blend-screen"
               src={cartoonSchoolImage}
             />
           </div>
@@ -309,8 +309,8 @@ export function RegisterPage() {
               </p>
             </div>
 
-            <div className="relative w-full flex-1 lg:mx-auto lg:flex lg:max-w-[790px] lg:items-center">
-              <div className="absolute right-0 top-[-50px] hidden text-xs font-semibold text-blue-100 lg:block">
+            <div className="relative w-full flex-1 lg:mx-auto lg:flex lg:max-w-197.5 lg:items-center">
+              <div className="absolute right-0 -top-12.5 hidden text-xs font-semibold text-blue-100 lg:block">
                 Đã có tài khoản?{' '}
                 <Link className="text-cyan-300 hover:text-cyan-200" to="/login">
                   Đăng nhập
