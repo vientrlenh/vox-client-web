@@ -186,7 +186,7 @@ export function LoginPage() {
               <h2 className="relative text-5xl font-black leading-tight tracking-normal">
                 Chào mừng trở lại
               </h2>
-              <p className="relative mt-5 max-w-sm text-sm font-bold leading-7 text-blue-100">
+              <p className="relative mt-5 max-w-sm text-2xl font-bold leading-7 text-blue-100">
                 Đăng nhập để tiếp tục quản lý và{' '}
                 <span className="text-cyan-300">
                   đánh giá bài thi nói với AI
