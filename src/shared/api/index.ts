@@ -1,4 +1,5 @@
 export { apiClient } from './apiClient'
+export { graphQLRequest } from './graphqlClient'
 export {
   AUTH_TOKEN_STORAGE_KEYS,
   clearAuthTokens,
