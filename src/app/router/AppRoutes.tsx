@@ -17,13 +17,13 @@ const RegisterPage = lazy(() =>
 )
 
 const SystemAdminDashboardPage = lazy(() =>
-  import('@/features/system-admin').then((module) => ({
+  import('@/features/dashboard').then((module) => ({
     default: module.SystemAdminDashboardPage,
   })),
 )
 
 const SystemAdminRegistrationsPage = lazy(() =>
-  import('@/features/system-admin').then((module) => ({
+  import('@/features/registration').then((module) => ({
     default: module.SystemAdminRegistrationsPage,
   })),
 )

@@ -86,7 +86,7 @@ function SystemAdminSidebar({
         >
           <img
             alt="VOX"
-            className="h-12 w-auto object-contain"
+            className="h-25 w-auto object-contain"
             src={logoImage}
           />
         </NavLink>
