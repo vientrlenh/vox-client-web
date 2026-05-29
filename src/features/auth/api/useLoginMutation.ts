@@ -1,8 +1,19 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
-import type { ApiResponse, LoginRequest, LoginResponse } from '../types'
+import { getClientDevice } from '../session/authSession'
+import type {
+  ApiResponse,
+  LoginCredentials,
+  LoginRequest,
+  LoginResponse,
+} from '../types'
 
-export async function login(payload: LoginRequest) {
+export async function login(credentials: LoginCredentials) {
+  const payload: LoginRequest = {
+    ...credentials,
+    device: getClientDevice(),
+  }
+
   const response = await apiClient.post<ApiResponse<LoginResponse>>(
     '/v1/auth/login',
     payload,
@@ -12,7 +23,7 @@ export async function login(payload: LoginRequest) {
 }
 
 export function useLoginMutation() {
-  return useMutation({
+  return useMutation<LoginResponse, unknown, LoginCredentials>({
     mutationFn: login,
   })
 }

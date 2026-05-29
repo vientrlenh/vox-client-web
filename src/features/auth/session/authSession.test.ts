@@ -1,11 +1,15 @@
 import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import {
+  CLIENT_DEVICE_STORAGE_KEY,
   clearAuthTokens,
   decodeAccessToken,
+  getClientDevice,
   getAuthTokens,
   getStoredAuthUser,
   saveAuthTokens,
 } from './authSession'
+
+const originalUserAgent = globalThis.navigator.userAgent
 
 function createJwt(payload: Record<string, unknown>) {
   const encode = (value: Record<string, unknown>) =>
@@ -24,6 +28,10 @@ describe('authSession', () => {
 
   afterEach(() => {
     jest.restoreAllMocks()
+    Object.defineProperty(globalThis.navigator, 'userAgent', {
+      configurable: true,
+      value: originalUserAgent,
+    })
   })
 
   it('saves, reads, and clears auth tokens from localStorage', () => {
@@ -77,5 +85,36 @@ describe('authSession', () => {
 
     expect(getStoredAuthUser()).toBeNull()
     expect(getAuthTokens()).toBeNull()
+  })
+
+  it('persists one client device id and returns the WEB platform', () => {
+    const firstDevice = getClientDevice()
+    const secondDevice = getClientDevice()
+
+    expect(firstDevice.deviceId).toEqual(expect.any(String))
+    expect(secondDevice.deviceId).toBe(firstDevice.deviceId)
+    expect(firstDevice.platform).toBe('WEB')
+    expect(localStorage.getItem(CLIENT_DEVICE_STORAGE_KEY)).toBe(
+      firstDevice.deviceId,
+    )
+  })
+
+  it('uses a bounded user agent device name with a fallback', () => {
+    Object.defineProperty(globalThis.navigator, 'userAgent', {
+      configurable: true,
+      value: ' '.repeat(8),
+    })
+
+    expect(getClientDevice().deviceName).toBe('Web Browser')
+
+    Object.defineProperty(globalThis.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Chrome/'.padEnd(300, 'x'),
+    })
+
+    const device = getClientDevice()
+
+    expect(device.deviceName).toHaveLength(255)
+    expect(device.deviceName).toBe('Chrome/'.padEnd(255, 'x'))
   })
 })

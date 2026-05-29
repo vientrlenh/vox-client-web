@@ -36,6 +36,7 @@ function createLoginResponse(roles: string[]) {
       userId: 'user-1',
     }),
     refreshToken: 'refresh-token',
+    roles,
   }
 }
 
@@ -86,6 +87,11 @@ describe('LoginPage', () => {
     )
 
     expect(mockedPost).toHaveBeenCalledWith('/v1/auth/login', {
+      device: {
+        deviceId: expect.any(String),
+        deviceName: expect.any(String),
+        platform: 'WEB',
+      },
       login: 'admin@vox.edu.vn',
       password: 'secret',
     })

@@ -4,7 +4,7 @@ import {
   saveAuthTokens,
 } from '@/shared/api/authTokenStorage'
 import type { AuthTokens } from '@/shared/api/authTokenStorage'
-import type { AuthUser, RoleCode } from '../types'
+import type { AuthUser, ClientDevice, RoleCode } from '../types'
 
 type JwtPayload = {
   email?: unknown
@@ -13,14 +13,66 @@ type JwtPayload = {
   userId?: unknown
 }
 
+export const CLIENT_DEVICE_STORAGE_KEY = 'vox.deviceId'
+
 export { clearAuthTokens, getAuthTokens, saveAuthTokens }
 export type { AuthTokens }
+
+function getStorage() {
+  if (typeof globalThis.localStorage === 'undefined') {
+    return null
+  }
+
+  return globalThis.localStorage
+}
 
 function decodeBase64Url(value: string) {
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
   const padding = '='.repeat((4 - (base64.length % 4)) % 4)
 
   return globalThis.atob(`${base64}${padding}`)
+}
+
+function createDeviceId() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+
+  return `web-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`
+}
+
+function getDeviceId() {
+  const storage = getStorage()
+  const storedDeviceId = storage?.getItem(CLIENT_DEVICE_STORAGE_KEY)
+
+  if (storedDeviceId) {
+    return storedDeviceId
+  }
+
+  const deviceId = createDeviceId()
+  storage?.setItem(CLIENT_DEVICE_STORAGE_KEY, deviceId)
+
+  return deviceId
+}
+
+function getDeviceName() {
+  const userAgent =
+    typeof globalThis.navigator === 'undefined'
+      ? ''
+      : globalThis.navigator.userAgent
+  const normalized = userAgent.trim() || 'Web Browser'
+
+  return normalized.slice(0, 255)
+}
+
+export function getClientDevice(): ClientDevice {
+  return {
+    deviceId: getDeviceId(),
+    deviceName: getDeviceName(),
+    platform: 'WEB',
+  }
 }
 
 function isRoleCode(value: unknown): value is RoleCode {

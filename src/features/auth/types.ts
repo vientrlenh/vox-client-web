@@ -1,13 +1,24 @@
 export type RoleCode = 'SCHOOL_ADMIN' | 'STUDENT' | 'SYSTEM_ADMIN' | 'TEACHER'
 
-export type LoginRequest = {
+export type ClientDevice = {
+  deviceId: string
+  deviceName: string
+  platform: 'WEB'
+}
+
+export type LoginCredentials = {
   login: string
   password: string
+}
+
+export type LoginRequest = LoginCredentials & {
+  device: ClientDevice
 }
 
 export type LoginResponse = {
   accessToken: string
   refreshToken: string
+  roles: RoleCode[]
 }
 
 export type RegisterRequest = {
