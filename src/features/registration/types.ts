@@ -18,6 +18,24 @@ export type RegisterForm = {
   studentCount: number | null
 }
 
+export type ApproveRegisterFormRequest = {
+  contactAddress: string
+  contactEmail: string
+  contactFullName: string
+  contactPhone: string
+  dateOfBirth: string
+  description: string | null
+  schoolAddress: string
+  schoolCode: string
+  schoolDomain: string
+  schoolName: string
+  studentCount: number
+}
+
+export type RejectRegisterFormRequest = {
+  reason: string
+}
+
 export type RegisterFormPage = {
   content: RegisterForm[]
   page: number

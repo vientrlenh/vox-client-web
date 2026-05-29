@@ -8,19 +8,31 @@ type RegistrationTableProps = {
   errorMessage?: string
   footer?: ReactNode
   forms: RegisterForm[]
+  isActionPending?: boolean
   isError: boolean
   isLoading: boolean
+  onApprove: (form: RegisterForm) => void
+  onReject: (form: RegisterForm) => void
   onRetry: () => void
   onSelect: (id: string) => void
   selectedId: string | null
+}
+
+function canDecideRegisterForm(status?: string | null) {
+  const normalized = status?.trim().toUpperCase() ?? ''
+
+  return normalized === 'PENDING' || normalized === 'WAITING'
 }
 
 export function RegistrationTable({
   errorMessage,
   footer,
   forms,
+  isActionPending = false,
   isError,
   isLoading,
+  onApprove,
+  onReject,
   onRetry,
   onSelect,
   selectedId,
@@ -77,6 +89,11 @@ export function RegistrationTable({
             <tbody>
               {forms.map((form) => {
                 const isSelected = form.id === selectedId
+                const canDecide = canDecideRegisterForm(form.status)
+                const isDecisionDisabled = isActionPending || !canDecide
+                const disabledTitle = canDecide
+                  ? undefined
+                  : 'Chỉ có thể xử lý đơn đăng ký đang chờ duyệt'
 
                 return (
                   <tr
@@ -116,8 +133,9 @@ export function RegistrationTable({
                         </button>
                         <button
                           className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled
-                          title="Duyệt đơn đăng ký sẽ được triển khai sau"
+                          disabled={isDecisionDisabled}
+                          onClick={() => onApprove(form)}
+                          title={disabledTitle}
                           type="button"
                         >
                           <Check aria-hidden="true" className="size-4" />
@@ -125,8 +143,9 @@ export function RegistrationTable({
                         </button>
                         <button
                           className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled
-                          title="Từ chối đơn đăng ký sẽ được triển khai sau"
+                          disabled={isDecisionDisabled}
+                          onClick={() => onReject(form)}
+                          title={disabledTitle}
                           type="button"
                         >
                           <X aria-hidden="true" className="size-4" />

@@ -1,12 +1,25 @@
 import { QueryClient } from '@tanstack/react-query'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { AxiosResponse } from 'axios'
+import { apiClient } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { SystemAdminRegistrationsPage } from './SystemAdminRegistrationsPage'
-import type { RegisterForm, RegisterFormPage } from '../types'
+import type {
+  ApproveRegisterFormRequest,
+  RegisterForm,
+  RegisterFormPage,
+  RejectRegisterFormRequest,
+} from '../types'
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
+const mockedRestPost = jest.spyOn(apiClient, 'post')
+
+type ApiResponse<T> = {
+  data: T
+  message: string
+}
 
 function createQueryClient() {
   return new QueryClient({
@@ -98,9 +111,19 @@ function mockGraphQLSuccess(pages: Record<number, RegisterFormPage>) {
   return listCalls
 }
 
+function mockRestSuccess(message: string) {
+  mockedRestPost.mockResolvedValue({
+    data: {
+      data: null,
+      message,
+    },
+  } as AxiosResponse<ApiResponse<null>>)
+}
+
 describe('SystemAdminRegistrationsPage', () => {
   beforeEach(() => {
     mockedPost.mockReset()
+    mockedRestPost.mockReset()
   })
 
   it('renders the loading state', () => {
@@ -244,7 +267,7 @@ describe('SystemAdminRegistrationsPage', () => {
     })
   })
 
-  it('keeps unsupported controls and action buttons disabled in v1', async () => {
+  it('keeps unsupported controls disabled and enables pending decision actions', async () => {
     mockGraphQLSuccess({
       1: createRegisterFormPage([createRegisterForm()]),
     })
@@ -259,8 +282,176 @@ describe('SystemAdminRegistrationsPage', () => {
     expect(
       screen.getByRole('button', { name: /01\/05\/2024 - 31\/05\/2024/i }),
     ).toBeDisabled()
-    expect(screen.getByRole('button', { name: /xuất dữ liệu/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /^duyệt$/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /từ chối/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^duyệt$/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /^từ chối$/i })).toBeEnabled()
+  })
+
+  it('disables decision actions for processed register forms', async () => {
+    const approvedForm = createRegisterForm({
+      contactFullName: 'Approved Contact',
+      id: 'form-approved',
+      status: 'APPROVED',
+    })
+    const rejectedForm = createRegisterForm({
+      contactFullName: 'Rejected Contact',
+      id: 'form-rejected',
+      status: 'REJECTED',
+    })
+
+    mockGraphQLSuccess({
+      1: createRegisterFormPage([approvedForm, rejectedForm], {
+        totalElements: 2,
+      }),
+    })
+
+    renderPage()
+
+    await screen.findByText('Approved Contact')
+
+    const approvedRow = screen.getByText('Approved Contact').closest('tr')
+    const rejectedRow = screen.getByText('Rejected Contact').closest('tr')
+
+    if (!approvedRow || !rejectedRow) {
+      throw new Error('Expected processed registration rows to render')
+    }
+
+    expect(
+      within(approvedRow).getByRole('button', { name: /^duyệt$/i }),
+    ).toBeDisabled()
+    expect(
+      within(approvedRow).getByRole('button', { name: /^từ chối$/i }),
+    ).toBeDisabled()
+    expect(
+      within(rejectedRow).getByRole('button', { name: /^duyệt$/i }),
+    ).toBeDisabled()
+    expect(
+      within(rejectedRow).getByRole('button', { name: /^từ chối$/i }),
+    ).toBeDisabled()
+  })
+
+  it('rejects a pending register form after confirmation', async () => {
+    const successMessage = 'Đơn đăng ký đã từ chối thành công'
+    const listCalls = mockGraphQLSuccess({
+      1: createRegisterFormPage([createRegisterForm()]),
+    })
+    mockRestSuccess(successMessage)
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await screen.findByText('Tran Chan Quang Thien')
+    await user.click(screen.getByRole('button', { name: /^từ chối$/i }))
+
+    const dialog = screen.getByRole('dialog', {
+      name: /từ chối đơn đăng ký/i,
+    })
+
+    await user.type(
+      within(dialog).getByLabelText(/lý do từ chối/i),
+      'Thông tin chưa đủ để xác minh',
+    )
+    await user.click(
+      within(dialog).getByRole('button', { name: /tiếp tục từ chối/i }),
+    )
+    await user.click(
+      within(dialog).getByRole('button', { name: /xác nhận từ chối/i }),
+    )
+
+    await waitFor(() => {
+      expect(mockedRestPost).toHaveBeenCalledWith(
+        '/v1/register-forms/form-1/reject',
+        {
+          reason: 'Thông tin chưa đủ để xác minh',
+        } satisfies RejectRegisterFormRequest,
+      )
+    })
+    expect(await screen.findByText(successMessage)).toBeInTheDocument()
+    expect(listCalls.length).toBeGreaterThan(1)
+  })
+
+  it('approves a pending register form with editable payload after confirmation', async () => {
+    const successMessage = 'Đơn đăng ký đã được phê duyệt'
+    const listCalls = mockGraphQLSuccess({
+      1: createRegisterFormPage([createRegisterForm()]),
+    })
+    mockRestSuccess(successMessage)
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await screen.findByText('Tran Chan Quang Thien')
+    await user.click(screen.getByRole('button', { name: /^duyệt$/i }))
+
+    const dialog = screen.getByRole('dialog', {
+      name: /duyệt đơn đăng ký/i,
+    })
+    const schoolNameInput = within(dialog).getByLabelText(/^tên trường/i)
+
+    expect(schoolNameInput).toHaveValue('test-school-1')
+
+    await user.type(within(dialog).getByLabelText(/mã trường/i), 'VOX001')
+    await user.clear(schoolNameInput)
+    await user.type(schoolNameInput, 'VOX School')
+    await user.click(
+      within(dialog).getByRole('button', { name: /tiếp tục duyệt/i }),
+    )
+    await user.click(
+      within(dialog).getByRole('button', { name: /xác nhận duyệt/i }),
+    )
+
+    await waitFor(() => {
+      expect(mockedRestPost).toHaveBeenCalledWith(
+        '/v1/register-forms/form-1/approve',
+        expect.any(Object),
+      )
+    })
+
+    const payload = mockedRestPost.mock
+      .calls[0][1] as ApproveRegisterFormRequest
+
+    expect(payload).toEqual({
+      contactAddress: '27 test street',
+      contactEmail: 'gocthanh9799@gmail.com',
+      contactFullName: 'Tran Chan Quang Thien',
+      contactPhone: '0355906225',
+      dateOfBirth: '2004-09-05',
+      description: null,
+      schoolAddress: '27 test street',
+      schoolCode: 'VOX001',
+      schoolDomain: 'testschool.edu.vn',
+      schoolName: 'VOX School',
+      studentCount: 3000,
+    })
+    expect(await screen.findByText(successMessage)).toBeInTheDocument()
+    expect(listCalls.length).toBeGreaterThan(1)
+  })
+
+  it('does not move to confirmation when approve validation fails', async () => {
+    mockGraphQLSuccess({
+      1: createRegisterFormPage([createRegisterForm()]),
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await screen.findByText('Tran Chan Quang Thien')
+    await user.click(screen.getByRole('button', { name: /^duyệt$/i }))
+
+    const dialog = screen.getByRole('dialog', {
+      name: /duyệt đơn đăng ký/i,
+    })
+
+    await user.type(within(dialog).getByLabelText(/mã trường/i), '   ')
+    await user.click(
+      within(dialog).getByRole('button', { name: /tiếp tục duyệt/i }),
+    )
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(
+      /mã trường không được để trống/i,
+    )
+    expect(
+      within(dialog).queryByRole('button', { name: /xác nhận duyệt/i }),
+    ).not.toBeInTheDocument()
+    expect(mockedRestPost).not.toHaveBeenCalled()
   })
 })
