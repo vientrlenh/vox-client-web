@@ -320,7 +320,7 @@ function SummaryRow({
   return (
     <div className="grid grid-cols-[120px_1fr] gap-3 text-sm">
       <dt className="font-semibold text-slate-500">{label}</dt>
-      <dd className="min-w-0 break-words font-bold text-blue-950">
+      <dd className="min-w-0 wrap-break-word font-bold text-blue-950">
         {value ?? '-'}
       </dd>
     </div>
