@@ -1,4 +1,4 @@
-import { Calendar, ChevronDown, Download, Filter, RefreshCw } from 'lucide-react'
+import { Calendar, ChevronDown, Filter, RefreshCw } from 'lucide-react'
 
 type RegistrationPageHeaderProps = {
   isRefreshing: boolean
@@ -62,14 +62,7 @@ export function RegistrationPageHeader({
           Làm mới
         </button>
 
-        <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
-          disabled
-          type="button"
-        >
-          <Download aria-hidden="true" className="size-4" />
-          Xuất dữ liệu
-        </button>
+        
       </div>
     </div>
   )

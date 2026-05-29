@@ -89,7 +89,7 @@ export function RegistrationTable({
                     <td className="px-6 py-5 font-bold">
                       {formatNullableText(form.contactFullName)}
                     </td>
-                    <td className="max-w-44 break-words px-4 py-5">
+                    <td className="max-w-44 wrap-break-word px-4 py-5">
                       {formatNullableText(form.contactEmail)}
                     </td>
                     <td className="px-4 py-5">
