@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Check, Eye, X } from 'lucide-react'
+import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import type { RegisterForm } from '../types'
 import { formatNullableText } from '../types'
 import { RegistrationStatusBadge } from './RegistrationStatusBadge'
@@ -38,7 +39,7 @@ export function RegistrationTable({
   selectedId,
 }: RegistrationTableProps) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-6 py-5">
         <h2 className="text-lg font-black text-blue-950">
           Danh sách đơn đăng ký
@@ -46,13 +47,13 @@ export function RegistrationTable({
       </div>
 
       {isLoading ? (
-        <div className="flex min-h-80 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
+        <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
           Đang tải danh sách đơn đăng ký...
         </div>
       ) : null}
 
       {isError ? (
-        <div className="flex min-h-80 flex-col items-center justify-center px-6 py-12 text-center">
+        <div className="flex min-h-80 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
           <p className="text-sm font-bold text-red-600">
             {errorMessage ?? 'Không thể tải danh sách đơn đăng ký.'}
           </p>
@@ -67,13 +68,13 @@ export function RegistrationTable({
       ) : null}
 
       {!isLoading && !isError && forms.length === 0 ? (
-        <div className="flex min-h-80 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
+        <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
           Chưa có đơn đăng ký
         </div>
       ) : null}
 
       {!isLoading && !isError && forms.length > 0 ? (
-        <div className="min-h-80 overflow-x-auto">
+        <div className="min-h-80 flex-1 overflow-x-auto">
           <table className="w-full min-w-210 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
@@ -90,10 +91,11 @@ export function RegistrationTable({
               {forms.map((form) => {
                 const isSelected = form.id === selectedId
                 const canDecide = canDecideRegisterForm(form.status)
-                const isDecisionDisabled = isActionPending || !canDecide
-                const disabledTitle = canDecide
-                  ? undefined
-                  : 'Chỉ có thể xử lý đơn đăng ký đang chờ duyệt'
+                const decisionDisabledReason = isActionPending
+                  ? 'Đang xử lý thao tác trước đó'
+                  : canDecide
+                    ? undefined
+                    : 'Chỉ có thể xử lý đơn đăng ký đang chờ duyệt'
 
                 return (
                   <tr
@@ -122,35 +124,39 @@ export function RegistrationTable({
                       <RegistrationStatusBadge status={form.status} />
                     </td>
                     <td className="px-4 py-4">
-                      <div className="grid min-w-36 gap-2">
-                        <button
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-300 bg-white px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
-                          onClick={() => onSelect(form.id)}
-                          type="button"
-                        >
-                          <Eye aria-hidden="true" className="size-4" />
-                          Xem chi tiết
-                        </button>
-                        <button
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={isDecisionDisabled}
-                          onClick={() => onApprove(form)}
-                          title={disabledTitle}
-                          type="button"
-                        >
-                          <Check aria-hidden="true" className="size-4" />
-                          Duyệt
-                        </button>
-                        <button
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={isDecisionDisabled}
-                          onClick={() => onReject(form)}
-                          title={disabledTitle}
-                          type="button"
-                        >
-                          <X aria-hidden="true" className="size-4" />
-                          Từ chối
-                        </button>
+                      <div className="flex justify-center">
+                        <ActionMenuButton
+                          ariaLabel={`Mở hành động cho ${formatNullableText(
+                            form.contactFullName,
+                          )}`}
+                          items={[
+                            {
+                              icon: Eye,
+                              id: 'view',
+                              label: 'Xem chi tiết',
+                              onSelect: () => onSelect(form.id),
+                              tone: 'primary',
+                            },
+                            {
+                              disabled: Boolean(decisionDisabledReason),
+                              disabledReason: decisionDisabledReason,
+                              icon: Check,
+                              id: 'approve',
+                              label: 'Duyệt',
+                              onSelect: () => onApprove(form),
+                              tone: 'success',
+                            },
+                            {
+                              disabled: Boolean(decisionDisabledReason),
+                              disabledReason: decisionDisabledReason,
+                              icon: X,
+                              id: 'reject',
+                              label: 'Từ chối',
+                              onSelect: () => onReject(form),
+                              tone: 'danger',
+                            },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>

@@ -120,6 +120,12 @@ function mockRestSuccess(message: string) {
   } as AxiosResponse<ApiResponse<null>>)
 }
 
+async function openRowActionMenu(user: ReturnType<typeof userEvent.setup>, row: HTMLElement) {
+  await user.click(
+    within(row).getByRole('button', { name: /mở hành động/i }),
+  )
+}
+
 describe('SystemAdminRegistrationsPage', () => {
   beforeEach(() => {
     mockedPost.mockReset()
@@ -206,9 +212,8 @@ describe('SystemAdminRegistrationsPage', () => {
       throw new Error('Expected the second registration row to render')
     }
 
-    await user.click(
-      within(secondRow).getByRole('button', { name: /xem chi tiết/i }),
-    )
+    await openRowActionMenu(user, secondRow)
+    await user.click(screen.getByRole('menuitem', { name: /xem chi tiết/i }))
 
     expect(await screen.findByText('456 school street')).toBeInTheDocument()
   })
@@ -271,10 +276,16 @@ describe('SystemAdminRegistrationsPage', () => {
     mockGraphQLSuccess({
       1: createRegisterFormPage([createRegisterForm()]),
     })
+    const user = userEvent.setup()
 
     renderPage()
 
     await screen.findByText('Tran Chan Quang Thien')
+    const row = screen.getByText('Tran Chan Quang Thien').closest('tr')
+
+    if (!row) {
+      throw new Error('Expected the registration row to render')
+    }
 
     expect(
       screen.getByRole('button', { name: /tất cả trạng thái/i }),
@@ -282,8 +293,12 @@ describe('SystemAdminRegistrationsPage', () => {
     expect(
       screen.getByRole('button', { name: /01\/05\/2024 - 31\/05\/2024/i }),
     ).toBeDisabled()
-    expect(screen.getByRole('button', { name: /^duyệt$/i })).toBeEnabled()
-    expect(screen.getByRole('button', { name: /^từ chối$/i })).toBeEnabled()
+
+    await openRowActionMenu(user, row)
+
+    expect(screen.getByRole('menuitem', { name: /xem chi tiết/i })).toBeEnabled()
+    expect(screen.getByRole('menuitem', { name: /^duyệt$/i })).toBeEnabled()
+    expect(screen.getByRole('menuitem', { name: /^từ chối$/i })).toBeEnabled()
   })
 
   it('disables decision actions for processed register forms', async () => {
@@ -303,6 +318,7 @@ describe('SystemAdminRegistrationsPage', () => {
         totalElements: 2,
       }),
     })
+    const user = userEvent.setup()
 
     renderPage()
 
@@ -315,18 +331,22 @@ describe('SystemAdminRegistrationsPage', () => {
       throw new Error('Expected processed registration rows to render')
     }
 
+    await openRowActionMenu(user, approvedRow)
+
+    expect(screen.getByRole('menuitem', { name: /^duyệt/i })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: /^từ chối/i })).toBeDisabled()
     expect(
-      within(approvedRow).getByRole('button', { name: /^duyệt$/i }),
-    ).toBeDisabled()
+      screen.getAllByText('Chỉ có thể xử lý đơn đăng ký đang chờ duyệt').length,
+    ).toBeGreaterThan(0)
+
+    await user.keyboard('{Escape}')
+    await openRowActionMenu(user, rejectedRow)
+
+    expect(screen.getByRole('menuitem', { name: /^duyệt/i })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: /^từ chối/i })).toBeDisabled()
     expect(
-      within(approvedRow).getByRole('button', { name: /^từ chối$/i }),
-    ).toBeDisabled()
-    expect(
-      within(rejectedRow).getByRole('button', { name: /^duyệt$/i }),
-    ).toBeDisabled()
-    expect(
-      within(rejectedRow).getByRole('button', { name: /^từ chối$/i }),
-    ).toBeDisabled()
+      screen.getAllByText('Chỉ có thể xử lý đơn đăng ký đang chờ duyệt').length,
+    ).toBeGreaterThan(0)
   })
 
   it('rejects a pending register form after confirmation', async () => {
@@ -340,7 +360,14 @@ describe('SystemAdminRegistrationsPage', () => {
     renderPage()
 
     await screen.findByText('Tran Chan Quang Thien')
-    await user.click(screen.getByRole('button', { name: /^từ chối$/i }))
+    const row = screen.getByText('Tran Chan Quang Thien').closest('tr')
+
+    if (!row) {
+      throw new Error('Expected the registration row to render')
+    }
+
+    await openRowActionMenu(user, row)
+    await user.click(screen.getByRole('menuitem', { name: /^từ chối$/i }))
 
     const dialog = screen.getByRole('dialog', {
       name: /từ chối đơn đăng ký/i,
@@ -380,7 +407,14 @@ describe('SystemAdminRegistrationsPage', () => {
     renderPage()
 
     await screen.findByText('Tran Chan Quang Thien')
-    await user.click(screen.getByRole('button', { name: /^duyệt$/i }))
+    const row = screen.getByText('Tran Chan Quang Thien').closest('tr')
+
+    if (!row) {
+      throw new Error('Expected the registration row to render')
+    }
+
+    await openRowActionMenu(user, row)
+    await user.click(screen.getByRole('menuitem', { name: /^duyệt$/i }))
 
     const dialog = screen.getByRole('dialog', {
       name: /duyệt đơn đăng ký/i,
@@ -435,7 +469,14 @@ describe('SystemAdminRegistrationsPage', () => {
     renderPage()
 
     await screen.findByText('Tran Chan Quang Thien')
-    await user.click(screen.getByRole('button', { name: /^duyệt$/i }))
+    const row = screen.getByText('Tran Chan Quang Thien').closest('tr')
+
+    if (!row) {
+      throw new Error('Expected the registration row to render')
+    }
+
+    await openRowActionMenu(user, row)
+    await user.click(screen.getByRole('menuitem', { name: /^duyệt$/i }))
 
     const dialog = screen.getByRole('dialog', {
       name: /duyệt đơn đăng ký/i,
