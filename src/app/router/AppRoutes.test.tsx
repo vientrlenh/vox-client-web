@@ -62,6 +62,17 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
+  it('renders the setup password route', async () => {
+    renderWithProviders(<AppRoutes />, {
+      route:
+        '/setup-password?userId=f8635b2c-8770-49a0-9cf7-b6581a1bdc22&token=GPa444LUenTtdkEd8CsQCtmPd8S3xGrW',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: /thiết lập mật khẩu/i }),
+    ).toBeInTheDocument()
+  })
+
   it('redirects unauthenticated users from the system admin dashboard to login', async () => {
     renderWithProviders(<AppRoutes />, { route: '/system-admin/dashboard' })
 

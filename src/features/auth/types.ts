@@ -25,6 +25,12 @@ export type RegisterRequest = {
   studentCount: number
 }
 
+export type SetUpPasswordRequest = {
+  password: string
+  token: string
+  userId: string
+}
+
 export type ApiResponse<T> = {
   data: T
   message: string

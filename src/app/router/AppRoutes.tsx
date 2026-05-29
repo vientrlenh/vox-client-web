@@ -16,6 +16,12 @@ const RegisterPage = lazy(() =>
   import('@/features/auth').then((module) => ({ default: module.RegisterPage })),
 )
 
+const SetupPasswordPage = lazy(() =>
+  import('@/features/auth').then((module) => ({
+    default: module.SetupPasswordPage,
+  })),
+)
+
 const SystemAdminDashboardPage = lazy(() =>
   import('@/features/dashboard').then((module) => ({
     default: module.SystemAdminDashboardPage,
@@ -35,6 +41,7 @@ export function AppRoutes() {
         <Route index element={<HomePage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
+        <Route path="setup-password" element={<SetupPasswordPage />} />
         <Route element={<RequireRole role="SYSTEM_ADMIN" />}>
           <Route element={<SystemAdminLayout />}>
             <Route
