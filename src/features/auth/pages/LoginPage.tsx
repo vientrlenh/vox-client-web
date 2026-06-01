@@ -316,12 +316,12 @@ export function LoginPage() {
               </div>
 
               <div className="mt-4 flex justify-end text-xs sm:text-sm">
-                <a
+                <Link
                   className="font-bold text-violet-600 hover:text-violet-700"
-                  href="#forgot-password"
+                  to="/reset-password"
                 >
                   Quên mật khẩu?
-                </a>
+                </Link>
               </div>
 
               {message ? (

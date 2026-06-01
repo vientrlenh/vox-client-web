@@ -36,6 +36,7 @@ function createLoginResponse(roles: string[]) {
       userId: 'user-1',
     }),
     refreshToken: 'refresh-token',
+    roles,
   }
 }
 
@@ -59,6 +60,9 @@ describe('LoginPage', () => {
     expect(
       screen.getByRole('button', { name: /đăng nhập bằng google/i }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /quên mật khẩu/i }),
+    ).toHaveAttribute('href', '/reset-password')
   })
 
   it('stores tokens and authenticates a SYSTEM_ADMIN login', async () => {
@@ -86,6 +90,11 @@ describe('LoginPage', () => {
     )
 
     expect(mockedPost).toHaveBeenCalledWith('/v1/auth/login', {
+      device: {
+        deviceId: expect.any(String),
+        deviceName: expect.any(String),
+        platform: 'WEB',
+      },
       login: 'admin@vox.edu.vn',
       password: 'secret',
     })

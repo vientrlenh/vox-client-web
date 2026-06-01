@@ -62,6 +62,14 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
+  it('renders the reset password route', async () => {
+    renderWithProviders(<AppRoutes />, { route: '/reset-password' })
+
+    expect(
+      await screen.findByRole('heading', { name: /đặt lại mật khẩu/i }),
+    ).toBeInTheDocument()
+  })
+
   it('renders the setup password route', async () => {
     renderWithProviders(<AppRoutes />, {
       route:

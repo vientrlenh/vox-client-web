@@ -17,6 +17,7 @@ describe('useLoginMutation', () => {
     const responseData: LoginResponse = {
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
+      roles: ['SYSTEM_ADMIN'],
     }
 
     mockedPost.mockResolvedValue({
@@ -39,6 +40,11 @@ describe('useLoginMutation', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
     expect(mockedPost).toHaveBeenCalledWith('/v1/auth/login', {
+      device: {
+        deviceId: expect.any(String),
+        deviceName: expect.any(String),
+        platform: 'WEB',
+      },
       login: 'admin@vox.edu.vn',
       password: 'secret',
     })

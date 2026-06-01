@@ -5,7 +5,10 @@ import { Provider as ReduxProvider } from 'react-redux'
 import { BrowserRouter } from 'react-router'
 import { queryClient } from '@/app/query/queryClient'
 import { store } from '@/app/store/store'
+import { installAuthRefreshInterceptor } from '@/features/auth/session/authRefreshInterceptor'
 import { appConfig } from '@/shared/config/env'
+
+installAuthRefreshInterceptor(store)
 
 export function AppProviders({ children }: PropsWithChildren) {
   return (
