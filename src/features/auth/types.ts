@@ -21,6 +21,16 @@ export type LoginResponse = {
   roles: RoleCode[]
 }
 
+export type RefreshRequest = {
+  deviceId: string
+  token: string
+}
+
+export type RefreshResponse = {
+  accessToken: string
+  refreshToken: string
+}
+
 export type RegisterRequest = {
   contactAddress: string
   contactEmail: string

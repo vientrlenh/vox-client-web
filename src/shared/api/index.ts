@@ -1,4 +1,4 @@
-export { apiClient } from './apiClient'
+export { addApiClientRawErrorInterceptor, apiClient } from './apiClient'
 export { graphQLRequest } from './graphqlClient'
 export {
   AUTH_TOKEN_STORAGE_KEYS,
