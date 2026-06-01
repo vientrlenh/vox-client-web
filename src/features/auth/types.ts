@@ -52,6 +52,16 @@ export type SetUpPasswordRequest = {
   userId: string
 }
 
+export type SendResetPasswordOtpRequest = {
+  email: string
+}
+
+export type ResetPasswordRequest = {
+  email: string
+  otp: string
+  password: string
+}
+
 export type ApiResponse<T> = {
   data: T
   message: string

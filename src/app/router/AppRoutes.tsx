@@ -16,6 +16,12 @@ const RegisterPage = lazy(() =>
   import('@/features/auth').then((module) => ({ default: module.RegisterPage })),
 )
 
+const ResetPasswordPage = lazy(() =>
+  import('@/features/auth').then((module) => ({
+    default: module.ResetPasswordPage,
+  })),
+)
+
 const SetupPasswordPage = lazy(() =>
   import('@/features/auth').then((module) => ({
     default: module.SetupPasswordPage,
@@ -41,6 +47,7 @@ export function AppRoutes() {
         <Route index element={<HomePage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
         <Route path="setup-password" element={<SetupPasswordPage />} />
         <Route element={<RequireRole role="SYSTEM_ADMIN" />}>
           <Route element={<SystemAdminLayout />}>

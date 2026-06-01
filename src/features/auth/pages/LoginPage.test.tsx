@@ -60,6 +60,9 @@ describe('LoginPage', () => {
     expect(
       screen.getByRole('button', { name: /đăng nhập bằng google/i }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /quên mật khẩu/i }),
+    ).toHaveAttribute('href', '/reset-password')
   })
 
   it('stores tokens and authenticates a SYSTEM_ADMIN login', async () => {
