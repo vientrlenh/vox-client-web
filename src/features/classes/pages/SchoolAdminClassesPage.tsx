@@ -9,6 +9,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import { useNavigate } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import {
   useCreateSchoolClassMutation,
@@ -374,6 +375,7 @@ type ClassTableProps = {
   onDelete: (schoolClass: SchoolClass) => void
   onEdit: (schoolClass: SchoolClass) => void
   onRetry: () => void
+  onView: (schoolClass: SchoolClass) => void
 }
 
 function ClassTable({
@@ -384,6 +386,7 @@ function ClassTable({
   onDelete,
   onEdit,
   onRetry,
+  onView,
 }: ClassTableProps) {
   if (isLoading) {
     return (
@@ -477,6 +480,13 @@ function ClassTable({
                         ariaLabel={`Mở thao tác lớp ${schoolClass.code}`}
                         items={[
                           {
+                            icon: Search,
+                            id: 'view',
+                            label: 'Xem chi tiết',
+                            onSelect: () => onView(schoolClass),
+                            tone: 'primary',
+                          },
+                          {
                             icon: Edit,
                             id: 'edit',
                             label: 'Sửa lớp',
@@ -562,6 +572,7 @@ function Pagination({
 }
 
 export function SchoolAdminClassesPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(DEFAULT_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
@@ -609,6 +620,10 @@ export function SchoolAdminClassesPage() {
     setClassDialogTargetId(schoolClass.id)
     setClassDialogError(null)
     setClassDialogMode('edit')
+  }
+
+  function openClassDetail(schoolClass: SchoolClass) {
+    navigate(`/school-admin/classes/${schoolClass.id}`)
   }
 
   function closeClassDialog() {
@@ -849,6 +864,7 @@ export function SchoolAdminClassesPage() {
           onRetry={() => {
             void classesQuery.refetch()
           }}
+          onView={openClassDetail}
         />
         <Pagination
           isDisabled={classesQuery.isLoading || classesQuery.isError}

@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AxiosResponse } from 'axios'
+import { useLocation } from 'react-router'
 import { apiClient } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { appConfig } from '@/shared/config/env'
@@ -75,6 +76,25 @@ function renderPage() {
   return renderWithProviders(<SchoolAdminClassesPage />, {
     queryClient: createQueryClient(),
   })
+}
+
+function LocationProbe() {
+  const location = useLocation()
+
+  return <span data-testid="current-path">{location.pathname}</span>
+}
+
+function renderPageWithLocationProbe() {
+  return renderWithProviders(
+    <>
+      <SchoolAdminClassesPage />
+      <LocationProbe />
+    </>,
+    {
+      queryClient: createQueryClient(),
+      route: '/school-admin/classes',
+    },
+  )
 }
 
 function mockGraphQLSuccess(pages: Record<number, PageResult<SchoolClass>>) {
@@ -395,5 +415,25 @@ describe('SchoolAdminClassesPage', () => {
         `/v1/schools/${schoolId}/classes/class-1`,
       )
     })
+  })
+
+  it('navigates to the class detail page from the action menu', async () => {
+    mockGraphQLSuccess({
+      1: createClassPage([createClass()]),
+    })
+    const user = userEvent.setup()
+
+    renderPageWithLocationProbe()
+
+    await screen.findByText('Tiếng Anh 6A')
+    const menu = await openClassActionMenu(user)
+
+    await user.click(
+      within(menu).getByRole('menuitem', { name: /xem chi tiết/i }),
+    )
+
+    expect(screen.getByTestId('current-path')).toHaveTextContent(
+      '/school-admin/classes/class-1',
+    )
   })
 })

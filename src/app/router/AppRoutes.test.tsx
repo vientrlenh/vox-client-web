@@ -62,6 +62,47 @@ function mockClassManagementGraphql() {
   })
 }
 
+function mockClassDetailGraphql() {
+  mockedGraphqlPost.mockImplementation((_path, body) => {
+    const request = body as { query: string }
+
+    if (request.query.includes('schoolClassUsers')) {
+      return Promise.resolve({
+        data: {
+          data: {
+            schoolClassUsers: {
+              content: [],
+              page: 1,
+              size: 10,
+              totalElements: 0,
+              totalPages: 0,
+            },
+          },
+        },
+      })
+    }
+
+    return Promise.resolve({
+      data: {
+        data: {
+          schoolClass: {
+            code: 'ENG-6A',
+            createdAt: '2026-06-01T00:00:00Z',
+            description: 'Lớp buổi sáng',
+            id: 'class-1',
+            languageId: '01890f44-0c7a-7cc1-bc3b-2e7f4f001234',
+            name: 'Tiếng Anh 6A',
+            schoolGradeId: '11111111-1111-0111-0111-111111111111',
+            schoolId: '33333333-3333-4333-8333-333333333333',
+            status: 'ACTIVE',
+            updatedAt: '2026-06-02T00:00:00Z',
+          },
+        },
+      },
+    })
+  })
+}
+
 describe('AppRoutes', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -131,6 +172,16 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
+  it('redirects unauthenticated users from school admin class detail to login', async () => {
+    renderWithProviders(<AppRoutes />, {
+      route: '/school-admin/classes/class-1',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: /chào mừng trở lại/i }),
+    ).toBeInTheDocument()
+  })
+
   it('redirects unauthenticated users from school admin dashboard to login', async () => {
     renderWithProviders(<AppRoutes />, { route: '/school-admin/dashboard' })
 
@@ -146,6 +197,18 @@ describe('AppRoutes', () => {
 
     expect(
       await screen.findByRole('heading', { name: /đăng nhập/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('redirects non-school-admin users from school admin class detail to login', async () => {
+    saveSystemAdminSession()
+
+    renderWithProviders(<AppRoutes />, {
+      route: '/school-admin/classes/class-1',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: /chào mừng trở lại/i }),
     ).toBeInTheDocument()
   })
 
@@ -217,6 +280,30 @@ describe('AppRoutes', () => {
     expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: /quản lý lớp học/i }),
+    ).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('renders the school admin class detail route inside the school admin layout', async () => {
+    saveSchoolAdminSession()
+    mockClassDetailGraphql()
+
+    renderWithProviders(<AppRoutes />, {
+      route: '/school-admin/classes/class-1',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: /tiếng anh 6a/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('navigation', { name: /school admin/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('school-admin@vox.edu.vn')).toBeInTheDocument()
+    expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('navigation', { name: /school admin/i })).getByRole(
+        'link',
+        { name: /quản lý lớp học/i },
+      ),
     ).toHaveAttribute('aria-current', 'page')
   })
 
