@@ -106,6 +106,38 @@ describe('LoginPage', () => {
     )
   })
 
+  it('stores tokens and authenticates a SCHOOL_ADMIN login', async () => {
+    const user = userEvent.setup()
+    const responseData = createLoginResponse(['SCHOOL_ADMIN'])
+    jest.mocked(apiClient.post).mockResolvedValue({
+      data: {
+        data: responseData,
+        message: 'ÄÄƒng nháº­p thÃ nh cÃ´ng',
+      },
+    } as AxiosResponse<ApiResponse<LoginResponse>>)
+
+    const { store } = renderWithProviders(<LoginPage />)
+
+    await user.type(
+      screen.getByLabelText(/email hoặc số điện thoại/i),
+      'school-admin@vox.edu.vn',
+    )
+    await user.type(screen.getByLabelText(/^mật khẩu$/i), 'secret')
+    await user.click(screen.getByRole('button', { name: /^đăng nhập$/i }))
+
+    await waitFor(() =>
+      expect(store.getState().auth.status).toBe('authenticated'),
+    )
+
+    expect(store.getState().auth.user?.roles).toContain('SCHOOL_ADMIN')
+    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBe(
+      responseData.accessToken,
+    )
+    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)).toBe(
+      responseData.refreshToken,
+    )
+  })
+
   it('shows an error and does not call the API when required fields are missing', async () => {
     const user = userEvent.setup()
     renderWithProviders(<LoginPage />)

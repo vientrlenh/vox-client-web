@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
+import { SchoolAdminLayout } from '@/app/layouts/SchoolAdminLayout'
 import { SystemAdminLayout } from '@/app/layouts/SystemAdminLayout'
 import { RequireRole } from './RequireRole'
 import { PageLoader } from '@/shared/ui/PageLoader'
@@ -34,9 +35,21 @@ const SystemAdminDashboardPage = lazy(() =>
   })),
 )
 
+const SchoolAdminDashboardPage = lazy(() =>
+  import('@/features/dashboard').then((module) => ({
+    default: module.SchoolAdminDashboardPage,
+  })),
+)
+
 const SystemAdminRegistrationsPage = lazy(() =>
   import('@/features/registration').then((module) => ({
     default: module.SystemAdminRegistrationsPage,
+  })),
+)
+
+const SchoolAdminClassesPage = lazy(() =>
+  import('@/features/classes').then((module) => ({
+    default: module.SchoolAdminClassesPage,
   })),
 )
 
@@ -58,6 +71,18 @@ export function AppRoutes() {
             <Route
               path="system-admin/registrations"
               element={<SystemAdminRegistrationsPage />}
+            />
+          </Route>
+        </Route>
+        <Route element={<RequireRole role="SCHOOL_ADMIN" />}>
+          <Route element={<SchoolAdminLayout />}>
+            <Route
+              path="school-admin/dashboard"
+              element={<SchoolAdminDashboardPage />}
+            />
+            <Route
+              path="school-admin/classes"
+              element={<SchoolAdminClassesPage />}
             />
           </Route>
         </Route>
