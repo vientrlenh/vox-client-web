@@ -9,6 +9,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import {
   useCreateSchoolClassMutation,
   useDeleteSchoolClassMutation,
@@ -25,7 +26,7 @@ import type {
   SchoolClassStatus,
   UpdateSchoolClassRequest,
 } from '../types'
-import { getClassStatusDisplay } from '../types'
+import { formatClassDate, getClassStatusDisplay } from '../types'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
@@ -69,7 +70,7 @@ function getErrorMessage(error: unknown) {
     typeof error.message === 'string'
   ) {
     if (error.message.includes('Missing VITE_SCHOOL_ID')) {
-      return 'Chưa cấu hình VITE_SCHOOL_ID. Vui lòng cấu hình mã trường trước khi thay đổi lớp học.'
+      return 'Chưa xác định được trường học hiện tại. Vui lòng thử lại sau.'
     }
 
     return error.message
@@ -93,7 +94,7 @@ function toEditForm(schoolClass: SchoolClass): ClassFormState {
 }
 
 function isUuidLike(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     value.trim(),
   )
 }
@@ -181,7 +182,7 @@ function ClassDialog({
             <p className="mt-1 text-sm font-medium text-slate-500">
               {isEdit
                 ? 'Cập nhật tên lớp, mô tả và trạng thái lớp học.'
-                : 'Tạo lớp học mới cho trường đang cấu hình.'}
+                : 'Nhập thông tin để tạo lớp học mới.'}
             </p>
           </div>
           <button
@@ -228,7 +229,7 @@ function ClassDialog({
             label="ID ngôn ngữ"
             name="languageId"
             onChange={onChange}
-            placeholder="UUID"
+            placeholder="Dán ID ngôn ngữ"
             required={!isEdit}
             value={form.languageId}
           />
@@ -237,7 +238,7 @@ function ClassDialog({
             label="ID khối lớp"
             name="schoolGradeId"
             onChange={onChange}
-            placeholder="UUID"
+            placeholder="Dán ID khối lớp"
             required={!isEdit}
             value={form.schoolGradeId}
           />
@@ -327,8 +328,8 @@ function DeleteDialog({
             Xóa lớp học
           </h2>
           <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-            Lớp {schoolClass.code} sẽ được chuyển sang trạng thái lưu trữ. Dữ
-            liệu hiện có vẫn được giữ lại theo cơ chế soft-delete của hệ thống.
+            Lớp {schoolClass.code} sẽ được chuyển sang trạng thái lưu trữ. Bạn
+            vẫn có thể lọc trạng thái lưu trữ để xem lại lớp học này.
           </p>
         </div>
 
@@ -433,9 +434,9 @@ function ClassTable({
           <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">Lớp học</th>
+              <th className="px-4 py-3">ID lớp</th>
               <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Ngôn ngữ</th>
-              <th className="px-4 py-3">Khối lớp</th>
+              <th className="px-4 py-3">Ngày tạo</th>
               <th className="px-4 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -455,6 +456,11 @@ function ClassTable({
                       </span>
                     </div>
                   </td>
+                  <td className="max-w-64 px-4 py-4">
+                    <span className="block truncate font-mono text-xs font-semibold text-slate-600">
+                      {schoolClass.id}
+                    </span>
+                  </td>
                   <td className="px-4 py-4">
                     <span
                       className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${status.className}`}
@@ -462,30 +468,30 @@ function ClassTable({
                       {status.label}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-600">
-                    {schoolClass.languageId}
-                  </td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-600">
-                    {schoolClass.schoolGradeId}
+                  <td className="px-4 py-4 text-sm font-semibold text-slate-600">
+                    {formatClassDate(schoolClass.createdAt)}
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        aria-label={`Sửa lớp ${schoolClass.code}`}
-                        className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
-                        onClick={() => onEdit(schoolClass)}
-                        type="button"
-                      >
-                        <Edit aria-hidden="true" className="size-4" />
-                      </button>
-                      <button
-                        aria-label={`Xóa lớp ${schoolClass.code}`}
-                        className="inline-flex size-9 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50"
-                        onClick={() => onDelete(schoolClass)}
-                        type="button"
-                      >
-                        <Trash2 aria-hidden="true" className="size-4" />
-                      </button>
+                    <div className="flex justify-end">
+                      <ActionMenuButton
+                        ariaLabel={`Mở thao tác lớp ${schoolClass.code}`}
+                        items={[
+                          {
+                            icon: Edit,
+                            id: 'edit',
+                            label: 'Sửa lớp',
+                            onSelect: () => onEdit(schoolClass),
+                            tone: 'primary',
+                          },
+                          {
+                            icon: Trash2,
+                            id: 'delete',
+                            label: 'Xóa lớp',
+                            onSelect: () => onDelete(schoolClass),
+                            tone: 'danger',
+                          },
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -632,11 +638,12 @@ export function SchoolAdminClassesPage() {
         return 'Mã lớp là bắt buộc.'
       }
 
-      if (
-        !isUuidLike(classForm.languageId) ||
-        !isUuidLike(classForm.schoolGradeId)
-      ) {
-        return 'ID ngôn ngữ và ID khối lớp phải là UUID hợp lệ.'
+      if (!isUuidLike(classForm.languageId)) {
+        return 'ID ngôn ngữ không hợp lệ.'
+      }
+
+      if (!isUuidLike(classForm.schoolGradeId)) {
+        return 'ID khối lớp không hợp lệ.'
       }
     }
 
@@ -739,7 +746,6 @@ export function SchoolAdminClassesPage() {
           </h1>
           <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
             Tạo, cập nhật, lọc và quản lý trạng thái các lớp học trong trường.
-            Trang chi tiết lớp học sẽ được tách riêng ở bước tiếp theo.
           </p>
         </div>
         <div className="flex gap-3">
@@ -815,7 +821,7 @@ export function SchoolAdminClassesPage() {
             onChange={(event) =>
               handleFilterChange('languageId', event.target.value)
             }
-            placeholder="UUID tùy chọn"
+            placeholder="ID ngôn ngữ"
             value={filters.languageId}
           />
         </label>
@@ -826,7 +832,7 @@ export function SchoolAdminClassesPage() {
             onChange={(event) =>
               handleFilterChange('schoolGradeId', event.target.value)
             }
-            placeholder="UUID tùy chọn"
+            placeholder="ID khối lớp"
             value={filters.schoolGradeId}
           />
         </label>

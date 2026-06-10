@@ -7,6 +7,7 @@ import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { appConfig } from '@/shared/config/env'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { PageResult, SchoolClass } from '../types'
+import { formatClassDate } from '../types'
 import { SchoolAdminClassesPage } from './SchoolAdminClassesPage'
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
@@ -22,8 +23,8 @@ type ApiResponse<T> = {
   message: string
 }
 
-const languageId = '11111111-1111-4111-8111-111111111111'
-const gradeId = '22222222-2222-4222-8222-222222222222'
+const languageId = '01890f44-0c7a-7cc1-bc3b-2e7f4f001234'
+const gradeId = '11111111-1111-0111-0111-111111111111'
 const schoolId = '33333333-3333-4333-8333-333333333333'
 
 function setSchoolId(value: string) {
@@ -117,6 +118,14 @@ function mockGraphQLSuccess(pages: Record<number, PageResult<SchoolClass>>) {
   })
 }
 
+async function openClassActionMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(
+    screen.getByRole('button', { name: /mở thao tác lớp eng-6a/i }),
+  )
+
+  return screen.findByRole('menu')
+}
+
 describe('SchoolAdminClassesPage', () => {
   beforeEach(() => {
     mockedPost.mockReset()
@@ -150,9 +159,11 @@ describe('SchoolAdminClassesPage', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('renders the class list without requesting class detail or users', async () => {
+  it('renders the class list with id and created date columns only', async () => {
+    const schoolClass = createClass()
+
     mockGraphQLSuccess({
-      1: createClassPage([createClass()]),
+      1: createClassPage([schoolClass]),
     })
 
     renderPage()
@@ -161,7 +172,17 @@ describe('SchoolAdminClassesPage', () => {
       await screen.findByRole('heading', { name: /danh sách lớp học/i }),
     ).toBeInTheDocument()
     expect(await screen.findByText('Tiếng Anh 6A')).toBeInTheDocument()
+    expect(screen.getByText('class-1')).toBeInTheDocument()
+    expect(screen.getByText(formatClassDate(schoolClass.createdAt))).toBeInTheDocument()
     expect(screen.getAllByText('Đang hoạt động').length).toBeGreaterThan(0)
+    expect(screen.getByRole('columnheader', { name: /id lớp/i })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /ngày tạo/i })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('columnheader', { name: /ngôn ngữ/i }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('columnheader', { name: /khối lớp/i }),
+    ).not.toBeInTheDocument()
 
     const queries = mockedPost.mock.calls.map((call) => {
       const request = call[1] as { query: string }
@@ -178,6 +199,20 @@ describe('SchoolAdminClassesPage', () => {
           query.includes('schoolClass(') && !query.includes('schoolClasses'),
       ),
     ).toBe(false)
+  })
+
+  it('does not show future-update copy on the page', async () => {
+    mockGraphQLSuccess({
+      1: createClassPage([createClass()]),
+    })
+
+    renderPage()
+
+    await screen.findByText('Tiếng Anh 6A')
+
+    expect(screen.queryByText(/cập nhật tiếp theo/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/bước tiếp theo/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/soft-delete/i)).not.toBeInTheDocument()
   })
 
   it('sends filters in the class list query and resets to page one', async () => {
@@ -219,7 +254,7 @@ describe('SchoolAdminClassesPage', () => {
     })
   })
 
-  it('shows a Vietnamese error when creating without VITE_SCHOOL_ID', async () => {
+  it('shows a user-facing error when creating without a configured school', async () => {
     setSchoolId('')
     mockGraphQLSuccess({
       1: createClassPage([]),
@@ -242,12 +277,15 @@ describe('SchoolAdminClassesPage', () => {
     )
 
     expect(
-      await within(dialog).findByText(/chưa cấu hình vite_school_id/i),
+      await within(dialog).findByText(
+        /chưa xác định được trường học hiện tại/i,
+      ),
     ).toBeInTheDocument()
+    expect(within(dialog).queryByText(/vite_school_id/i)).not.toBeInTheDocument()
     expect(mockedRestPost).not.toHaveBeenCalled()
   })
 
-  it('creates a class and invalidates the list', async () => {
+  it('creates a class with relaxed uuid validation and invalidates the list', async () => {
     mockGraphQLSuccess({
       1: createClassPage([]),
     })
@@ -289,7 +327,7 @@ describe('SchoolAdminClassesPage', () => {
     expect(await screen.findByText('Đã tạo lớp học')).toBeInTheDocument()
   })
 
-  it('edits and deletes a class from the list', async () => {
+  it('edits and deletes a class from the action menu', async () => {
     mockGraphQLSuccess({
       1: createClassPage([createClass()]),
     })
@@ -309,7 +347,8 @@ describe('SchoolAdminClassesPage', () => {
     renderPage()
 
     await screen.findByText('Tiếng Anh 6A')
-    await user.click(screen.getByRole('button', { name: /sửa lớp eng-6a/i }))
+    let menu = await openClassActionMenu(user)
+    await user.click(within(menu).getByRole('menuitem', { name: /sửa lớp/i }))
 
     const editDialog = screen.getByRole('dialog', {
       name: /cập nhật lớp học/i,
@@ -341,10 +380,12 @@ describe('SchoolAdminClassesPage', () => {
       })
     })
 
-    await user.click(screen.getByRole('button', { name: /xóa lớp eng-6a/i }))
+    menu = await openClassActionMenu(user)
+    await user.click(within(menu).getByRole('menuitem', { name: /xóa lớp/i }))
 
     const deleteDialog = screen.getByRole('dialog', { name: /xóa lớp học/i })
 
+    expect(screen.queryByText(/soft-delete/i)).not.toBeInTheDocument()
     await user.click(
       within(deleteDialog).getByRole('button', { name: /xóa lớp/i }),
     )
