@@ -205,18 +205,18 @@ describe('AppRoutes', () => {
     renderWithProviders(<AppRoutes />, { route: '/school-admin/classes' })
 
     expect(
-      await screen.findByRole('heading', { name: /manage school classes/i }),
+      await screen.findByRole('heading', { name: /danh sách lớp học/i }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('navigation', { name: /school admin/i }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('searchbox', { name: /tim kiem lop hoc/i }),
+      screen.getByRole('searchbox', { name: /tìm kiếm lớp học/i }),
     ).toBeInTheDocument()
     expect(screen.getByText('school-admin@vox.edu.vn')).toBeInTheDocument()
     expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: /quan ly lop hoc/i }),
+      screen.getByRole('link', { name: /quản lý lớp học/i }),
     ).toHaveAttribute('aria-current', 'page')
   })
 
@@ -237,7 +237,7 @@ describe('AppRoutes', () => {
     expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
     expect(screen.getByText('Total classes')).toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: /tong quan/i }),
+      screen.getByRole('link', { name: /tổng quan/i }),
     ).toHaveAttribute('aria-current', 'page')
     expect(
       screen.getByRole('link', { name: /manage classes/i }),

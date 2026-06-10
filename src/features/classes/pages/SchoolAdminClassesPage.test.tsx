@@ -6,13 +6,12 @@ import { apiClient } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { appConfig } from '@/shared/config/env'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import type { ClassUser, PageResult, SchoolClass } from '../types'
+import type { PageResult, SchoolClass } from '../types'
 import { SchoolAdminClassesPage } from './SchoolAdminClassesPage'
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
 const mockedRestPost = jest.spyOn(apiClient, 'post')
 const mockedRestDelete = jest.spyOn(apiClient, 'delete')
-const mockedRestPatch = jest.spyOn(apiClient, 'patch')
 
 type MutableConfig = {
   schoolId: string
@@ -26,7 +25,6 @@ type ApiResponse<T> = {
 const languageId = '11111111-1111-4111-8111-111111111111'
 const gradeId = '22222222-2222-4222-8222-222222222222'
 const schoolId = '33333333-3333-4333-8333-333333333333'
-const userId = '44444444-4444-4444-8444-444444444444'
 
 function setSchoolId(value: string) {
   ;(appConfig as unknown as MutableConfig).schoolId = value
@@ -46,10 +44,10 @@ function createClass(overrides: Partial<SchoolClass> = {}): SchoolClass {
   return {
     code: 'ENG-6A',
     createdAt: '2026-06-01T00:00:00Z',
-    description: 'Morning class',
+    description: 'Lớp buổi sáng',
     id: 'class-1',
     languageId,
-    name: 'English 6A',
+    name: 'Tiếng Anh 6A',
     schoolGradeId: gradeId,
     schoolId,
     status: 'ACTIVE',
@@ -72,77 +70,38 @@ function createClassPage(
   }
 }
 
-function createClassUser(overrides: Partial<ClassUser> = {}): ClassUser {
-  return {
-    assignedBy: null,
-    id: 'class-user-1',
-    isActive: true,
-    joinedAt: '2026-06-03T00:00:00Z',
-    leftAt: null,
-    schoolClassId: 'class-1',
-    user: {
-      email: 'student@vox.edu.vn',
-      fullName: 'Student One',
-      id: userId,
-      phone: '0900000000',
-    },
-    userId,
-    ...overrides,
-  }
-}
-
 function renderPage() {
   return renderWithProviders(<SchoolAdminClassesPage />, {
     queryClient: createQueryClient(),
   })
 }
 
-function mockGraphQLSuccess(
-  pages: Record<number, PageResult<SchoolClass>>,
-  users: PageResult<ClassUser> = {
-    content: [createClassUser()],
-    page: 1,
-    size: 6,
-    totalElements: 1,
-    totalPages: 1,
-  },
-) {
+function mockGraphQLSuccess(pages: Record<number, PageResult<SchoolClass>>) {
   mockedPost.mockImplementation((_path, body) => {
     const request = body as {
       query: string
       variables?: Record<string, unknown>
     }
     const page = Number(request.variables?.page ?? 1)
-    const classId = String(request.variables?.id ?? request.variables?.schoolClassId ?? '')
-    const allClasses = Object.values(pages).flatMap(
-      (pageData) => pageData.content,
-    )
 
     if (request.query.includes('schoolClassUsers')) {
-      return Promise.resolve({
-        data: {
-          data: {
-            schoolClassUsers: users,
-          },
-        },
-      })
+      throw new Error('SchoolAdminClassesPage must not request class users')
     }
 
-    if (request.query.includes('schoolClasses')) {
-      return Promise.resolve({
-        data: {
-          data: {
-            schoolClasses: pages[page] ?? createClassPage([]),
-          },
-        },
-      })
+    if (
+      request.query.includes('schoolClass(') &&
+      !request.query.includes('schoolClasses')
+    ) {
+      throw new Error('SchoolAdminClassesPage must not request class detail')
     }
 
     if (request.query.includes('updateSchoolClass')) {
       return Promise.resolve({
         data: {
           data: {
-            updateSchoolClass: { schoolClassId: classId },
+            updateSchoolClass: {
+              schoolClassId: request.variables?.id,
+            },
           },
         },
       })
@@ -151,9 +110,7 @@ function mockGraphQLSuccess(
     return Promise.resolve({
       data: {
         data: {
-          schoolClass:
-            allClasses.find((schoolClass) => schoolClass.id === classId) ??
-            null,
+          schoolClasses: pages[page] ?? createClassPage([]),
         },
       },
     })
@@ -165,32 +122,35 @@ describe('SchoolAdminClassesPage', () => {
     mockedPost.mockReset()
     mockedRestPost.mockReset()
     mockedRestDelete.mockReset()
-    mockedRestPatch.mockReset()
     setSchoolId(schoolId)
   })
 
-  it('renders the loading state', () => {
+  it('renders the loading state in Vietnamese', () => {
     mockedPost.mockReturnValue(new Promise(() => {}))
 
     renderPage()
 
-    expect(screen.getByText(/loading classes/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/đang tải danh sách lớp học/i),
+    ).toBeInTheDocument()
   })
 
-  it('renders the empty state', async () => {
+  it('renders the empty state without a detail panel', async () => {
     mockGraphQLSuccess({
       1: createClassPage([]),
     })
 
     renderPage()
 
-    expect(await screen.findByText(/no classes found/i)).toBeInTheDocument()
+    expect(await screen.findByText(/chưa có lớp học/i)).toBeInTheDocument()
+    expect(screen.queryByText(/class detail/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/class users/i)).not.toBeInTheDocument()
     expect(
-      screen.getByText(/select a class to view details/i),
-    ).toBeInTheDocument()
+      screen.queryByText(/select a class to view details/i),
+    ).not.toBeInTheDocument()
   })
 
-  it('renders classes, selected detail, and users', async () => {
+  it('renders the class list without requesting class detail or users', async () => {
     mockGraphQLSuccess({
       1: createClassPage([createClass()]),
     })
@@ -198,11 +158,26 @@ describe('SchoolAdminClassesPage', () => {
     renderPage()
 
     expect(
-      await screen.findByRole('heading', { name: /manage school classes/i }),
+      await screen.findByRole('heading', { name: /danh sách lớp học/i }),
     ).toBeInTheDocument()
-    expect((await screen.findAllByText('English 6A')).length).toBeGreaterThan(0)
-    expect(screen.getByText('Morning class')).toBeInTheDocument()
-    expect(await screen.findByText('Student One')).toBeInTheDocument()
+    expect(await screen.findByText('Tiếng Anh 6A')).toBeInTheDocument()
+    expect(screen.getAllByText('Đang hoạt động').length).toBeGreaterThan(0)
+
+    const queries = mockedPost.mock.calls.map((call) => {
+      const request = call[1] as { query: string }
+
+      return request.query
+    })
+
+    expect(queries.some((query) => query.includes('schoolClassUsers'))).toBe(
+      false,
+    )
+    expect(
+      queries.some(
+        (query) =>
+          query.includes('schoolClass(') && !query.includes('schoolClasses'),
+      ),
+    ).toBe(false)
   })
 
   it('sends filters in the class list query and resets to page one', async () => {
@@ -211,24 +186,30 @@ describe('SchoolAdminClassesPage', () => {
         totalElements: 2,
         totalPages: 2,
       }),
-      2: createClassPage([createClass({ id: 'class-2', name: 'Page Two' })], {
-        page: 2,
-        totalElements: 2,
-        totalPages: 2,
-      }),
+      2: createClassPage(
+        [createClass({ id: 'class-2', name: 'Trang Hai' })],
+        {
+          page: 2,
+          totalElements: 2,
+          totalPages: 2,
+        },
+      ),
     })
     const user = userEvent.setup()
 
     renderPage()
 
-    await screen.findAllByText('English 6A')
-    await user.click(screen.getByRole('button', { name: /next/i }))
-    await screen.findAllByText('Page Two')
-    await user.type(screen.getByLabelText(/search/i), 'abc')
+    await screen.findByText('Tiếng Anh 6A')
+    await user.click(screen.getByRole('button', { name: /sau/i }))
+    await screen.findByText('Trang Hai')
+    await user.type(screen.getByLabelText(/tìm kiếm/i), 'abc')
 
     await waitFor(() => {
       const listRequests = mockedPost.mock.calls
-        .map((call) => call[1] as { query: string; variables: Record<string, unknown> })
+        .map(
+          (call) =>
+            call[1] as { query: string; variables: Record<string, unknown> },
+        )
         .filter((request) => request.query.includes('schoolClasses'))
 
       expect(listRequests.at(-1)?.variables).toMatchObject({
@@ -238,7 +219,7 @@ describe('SchoolAdminClassesPage', () => {
     })
   })
 
-  it('shows a clear error when creating without VITE_SCHOOL_ID', async () => {
+  it('shows a Vietnamese error when creating without VITE_SCHOOL_ID', async () => {
     setSchoolId('')
     mockGraphQLSuccess({
       1: createClassPage([]),
@@ -247,19 +228,21 @@ describe('SchoolAdminClassesPage', () => {
 
     renderPage()
 
-    await screen.findByText(/no classes found/i)
-    await user.click(screen.getByRole('button', { name: /new class/i }))
+    await screen.findByText(/chưa có lớp học/i)
+    await user.click(screen.getByRole('button', { name: /tạo lớp/i }))
 
-    const dialog = screen.getByRole('dialog', { name: /create class/i })
+    const dialog = screen.getByRole('dialog', { name: /tạo lớp học/i })
 
-    await user.type(within(dialog).getByLabelText(/class code/i), 'ENG-6A')
-    await user.type(within(dialog).getByLabelText(/class name/i), 'English 6A')
-    await user.type(within(dialog).getByLabelText(/language id/i), languageId)
-    await user.type(within(dialog).getByLabelText(/school grade id/i), gradeId)
-    await user.click(within(dialog).getByRole('button', { name: /save class/i }))
+    await user.type(within(dialog).getByLabelText(/mã lớp/i), 'ENG-6A')
+    await user.type(within(dialog).getByLabelText(/tên lớp/i), 'Tiếng Anh 6A')
+    await user.type(within(dialog).getByLabelText(/id ngôn ngữ/i), languageId)
+    await user.type(within(dialog).getByLabelText(/id khối lớp/i), gradeId)
+    await user.click(
+      within(dialog).getByRole('button', { name: /lưu lớp học/i }),
+    )
 
     expect(
-      await within(dialog).findByText(/missing vite_school_id/i),
+      await within(dialog).findByText(/chưa cấu hình vite_school_id/i),
     ).toBeInTheDocument()
     expect(mockedRestPost).not.toHaveBeenCalled()
   })
@@ -271,23 +254,25 @@ describe('SchoolAdminClassesPage', () => {
     mockedRestPost.mockResolvedValue({
       data: {
         data: { schoolClassId: 'class-1' },
-        message: 'Created',
+        message: 'Đã tạo lớp học',
       },
     } as AxiosResponse<ApiResponse<{ schoolClassId: string }>>)
     const user = userEvent.setup()
 
     renderPage()
 
-    await screen.findByText(/no classes found/i)
-    await user.click(screen.getByRole('button', { name: /new class/i }))
+    await screen.findByText(/chưa có lớp học/i)
+    await user.click(screen.getByRole('button', { name: /tạo lớp/i }))
 
-    const dialog = screen.getByRole('dialog', { name: /create class/i })
+    const dialog = screen.getByRole('dialog', { name: /tạo lớp học/i })
 
-    await user.type(within(dialog).getByLabelText(/class code/i), 'ENG-6A')
-    await user.type(within(dialog).getByLabelText(/class name/i), 'English 6A')
-    await user.type(within(dialog).getByLabelText(/language id/i), languageId)
-    await user.type(within(dialog).getByLabelText(/school grade id/i), gradeId)
-    await user.click(within(dialog).getByRole('button', { name: /save class/i }))
+    await user.type(within(dialog).getByLabelText(/mã lớp/i), 'ENG-6A')
+    await user.type(within(dialog).getByLabelText(/tên lớp/i), 'Tiếng Anh 6A')
+    await user.type(within(dialog).getByLabelText(/id ngôn ngữ/i), languageId)
+    await user.type(within(dialog).getByLabelText(/id khối lớp/i), gradeId)
+    await user.click(
+      within(dialog).getByRole('button', { name: /lưu lớp học/i }),
+    )
 
     await waitFor(() => {
       expect(mockedRestPost).toHaveBeenCalledWith(
@@ -296,68 +281,77 @@ describe('SchoolAdminClassesPage', () => {
           code: 'ENG-6A',
           description: null,
           languageId,
-          name: 'English 6A',
+          name: 'Tiếng Anh 6A',
           schoolGradeId: gradeId,
         },
       )
     })
-    expect(await screen.findByText('Created')).toBeInTheDocument()
+    expect(await screen.findByText('Đã tạo lớp học')).toBeInTheDocument()
   })
 
-  it('updates, deletes, and manages class users', async () => {
+  it('edits and deletes a class from the list', async () => {
     mockGraphQLSuccess({
       1: createClassPage([createClass()]),
     })
     mockedRestDelete.mockResolvedValue({
       data: {
-        data: { schoolClassId: 'class-1' },
-        message: 'Removed',
-      },
-    } as AxiosResponse<ApiResponse<unknown>>)
-    mockedRestPatch.mockResolvedValue({
-      data: {
-        data: { schoolClassId: 'class-1' },
-        message: 'User updated',
-      },
-    } as AxiosResponse<ApiResponse<unknown>>)
-    mockedRestPost.mockResolvedValue({
-      data: {
-        data: { schoolClassUserId: 'class-user-2' },
-        message: 'User added',
+        data: {
+          deleteType: 'SOFT',
+          id: 'class-1',
+          status: 'ARCHIVED',
+          updatedAt: '2026-06-10T00:00:00Z',
+        },
+        message: 'Đã xóa lớp học',
       },
     } as AxiosResponse<ApiResponse<unknown>>)
     const user = userEvent.setup()
 
     renderPage()
 
-    await screen.findByText('Student One')
-    await user.click(screen.getByRole('button', { name: /deactivate/i }))
+    await screen.findByText('Tiếng Anh 6A')
+    await user.click(screen.getByRole('button', { name: /sửa lớp eng-6a/i }))
 
-    await waitFor(() => {
-      expect(mockedRestPatch).toHaveBeenCalledWith(
-        `/v1/schools/${schoolId}/classes/class-1/users/${userId}/status`,
-        { isActive: false },
-      )
+    const editDialog = screen.getByRole('dialog', {
+      name: /cập nhật lớp học/i,
     })
 
-    await user.click(screen.getByRole('button', { name: /remove/i }))
+    await user.clear(within(editDialog).getByLabelText(/tên lớp/i))
+    await user.type(
+      within(editDialog).getByLabelText(/tên lớp/i),
+      'Tiếng Anh 6A mới',
+    )
+    await user.click(
+      within(editDialog).getByRole('button', { name: /lưu lớp học/i }),
+    )
+
+    await waitFor(() => {
+      const mutationRequest = mockedPost.mock.calls
+        .map(
+          (call) =>
+            call[1] as { query: string; variables: Record<string, unknown> },
+        )
+        .find((request) => request.query.includes('updateSchoolClass'))
+
+      expect(mutationRequest?.variables).toMatchObject({
+        id: 'class-1',
+        input: {
+          name: 'Tiếng Anh 6A mới',
+          status: 'ACTIVE',
+        },
+      })
+    })
+
+    await user.click(screen.getByRole('button', { name: /xóa lớp eng-6a/i }))
+
+    const deleteDialog = screen.getByRole('dialog', { name: /xóa lớp học/i })
+
+    await user.click(
+      within(deleteDialog).getByRole('button', { name: /xóa lớp/i }),
+    )
 
     await waitFor(() => {
       expect(mockedRestDelete).toHaveBeenCalledWith(
-        `/v1/schools/${schoolId}/classes/class-1/users/${userId}`,
-      )
-    })
-
-    await user.click(screen.getByRole('button', { name: /^add$/i }))
-    const addDialog = screen.getByRole('dialog', { name: /add user to class/i })
-
-    await user.type(within(addDialog).getByLabelText(/user id/i), userId)
-    await user.click(within(addDialog).getByRole('button', { name: /add user/i }))
-
-    await waitFor(() => {
-      expect(mockedRestPost).toHaveBeenCalledWith(
-        `/v1/schools/${schoolId}/classes/class-1/users`,
-        { userId },
+        `/v1/schools/${schoolId}/classes/class-1`,
       )
     })
   })

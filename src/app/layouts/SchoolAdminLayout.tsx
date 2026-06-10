@@ -20,17 +20,17 @@ import { clearAuthTokens } from '@/features/auth/session/authSession'
 const navigationItems = [
   {
     icon: Home,
-    label: 'Tong quan',
+    label: 'Tổng quan',
     to: '/school-admin/dashboard',
   },
   {
     icon: BookOpen,
-    label: 'Quan ly lop hoc',
+    label: 'Quản lý lớp học',
     to: '/school-admin/classes',
   },
   {
     icon: Users,
-    label: 'Hoc vien',
+    label: 'Học viên',
     to: '/school-admin/students',
   },
 ]
@@ -81,7 +81,7 @@ function SchoolAdminSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Dong menu school admin"
+            aria-label="Đóng menu school admin"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -120,9 +120,9 @@ function SchoolAdminSidebar({
         <div className="inline-flex size-11 items-center justify-center rounded-lg bg-white text-cyan-700">
           <ShieldCheck aria-hidden="true" className="size-6" />
         </div>
-        <p className="mt-4 text-sm font-bold leading-6">Quan tri lop hoc</p>
+        <p className="mt-4 text-sm font-bold leading-6">Quản trị lớp học</p>
         <p className="mt-2 text-xs leading-5 text-cyan-50/80">
-          Theo doi lop, hoc vien va trang thai tham gia trong truong.
+          Theo dõi lớp, học viên và trạng thái tham gia trong trường.
         </p>
       </div>
     </div>
@@ -156,7 +156,7 @@ export function SchoolAdminLayout() {
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Dong menu school admin bang lop phu"
+            aria-label="Đóng menu school admin bằng lớp phủ"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
@@ -179,7 +179,7 @@ export function SchoolAdminLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mo menu school admin"
+            aria-label="Mở menu school admin"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-slate-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
@@ -193,9 +193,9 @@ export function SchoolAdminLayout() {
               className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500"
             />
             <input
-              aria-label="Tim kiem lop hoc"
+              aria-label="Tìm kiếm lớp học"
               className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              placeholder="Tim theo ma lop, ten lop, hoc vien..."
+              placeholder="Tìm theo mã lớp, tên lớp, học viên..."
               readOnly
               type="search"
             />
@@ -203,7 +203,7 @@ export function SchoolAdminLayout() {
 
           <div className="ml-auto flex items-center gap-3">
             <button
-              aria-label="Thong bao"
+              aria-label="Thông báo"
               className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-slate-950 transition hover:border-slate-200 hover:bg-slate-50"
               type="button"
             >
@@ -215,7 +215,7 @@ export function SchoolAdminLayout() {
               <button
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
-                aria-label="Mo menu tai khoan"
+                aria-label="Mở menu tài khoản"
                 className="inline-flex items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50"
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
                 type="button"
@@ -249,7 +249,7 @@ export function SchoolAdminLayout() {
                     type="button"
                   >
                     <LogOut aria-hidden="true" className="size-4" />
-                    Dang xuat
+                    Đăng xuất
                   </button>
                 </div>
               ) : null}

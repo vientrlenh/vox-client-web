@@ -7,40 +7,28 @@ import {
   RefreshCw,
   Search,
   Trash2,
-  UserPlus,
   X,
 } from 'lucide-react'
 import {
-  useAddClassUserMutation,
   useCreateSchoolClassMutation,
   useDeleteSchoolClassMutation,
-  useRemoveClassUserMutation,
-  useUpdateClassUserStatusMutation,
   useUpdateSchoolClassMutation,
 } from '../api/useSchoolClassMutations'
-import { useSchoolClassQuery } from '../api/useSchoolClassQuery'
-import { useSchoolClassUsersQuery } from '../api/useSchoolClassUsersQuery'
 import {
   classManagementQueryKeys,
   useSchoolClassesQuery,
 } from '../api/useSchoolClassesQuery'
 import type {
   ClassFilters,
-  ClassUser,
   CreateSchoolClassRequest,
   SchoolClass,
   SchoolClassStatus,
   UpdateSchoolClassRequest,
 } from '../types'
-import {
-  formatClassDate,
-  formatNullableText,
-  getClassStatusDisplay,
-} from '../types'
+import { getClassStatusDisplay } from '../types'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
-const DEFAULT_USER_PAGE_SIZE = 6
 const EMPTY_FILTERS: ClassFilters = {
   languageId: '',
   schoolGradeId: '',
@@ -80,6 +68,10 @@ function getErrorMessage(error: unknown) {
     'message' in error &&
     typeof error.message === 'string'
   ) {
+    if (error.message.includes('Missing VITE_SCHOOL_ID')) {
+      return 'Chưa cấu hình VITE_SCHOOL_ID. Vui lòng cấu hình mã trường trước khi thay đổi lớp học.'
+    }
+
     return error.message
   }
 
@@ -165,7 +157,7 @@ function ClassDialog({
   }
 
   const isEdit = mode === 'edit'
-  const title = isEdit ? 'Edit class' : 'Create class'
+  const title = isEdit ? 'Cập nhật lớp học' : 'Tạo lớp học'
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6">
@@ -188,12 +180,12 @@ function ClassDialog({
             </h2>
             <p className="mt-1 text-sm font-medium text-slate-500">
               {isEdit
-                ? 'Update class name, description, and status.'
-                : 'Create a class for the configured school.'}
+                ? 'Cập nhật tên lớp, mô tả và trạng thái lớp học.'
+                : 'Tạo lớp học mới cho trường đang cấu hình.'}
             </p>
           </div>
           <button
-            aria-label="Close class dialog"
+            aria-label="Đóng hộp thoại lớp học"
             className="inline-flex size-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
             disabled={isSubmitting}
             onClick={onClose}
@@ -215,7 +207,7 @@ function ClassDialog({
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldInput
             disabled={isEdit || isSubmitting}
-            label="Class code"
+            label="Mã lớp"
             name="code"
             onChange={onChange}
             placeholder="ENG-6A"
@@ -224,16 +216,16 @@ function ClassDialog({
           />
           <FieldInput
             disabled={isSubmitting}
-            label="Class name"
+            label="Tên lớp"
             name="name"
             onChange={onChange}
-            placeholder="English 6A"
+            placeholder="Tiếng Anh 6A"
             required
             value={form.name}
           />
           <FieldInput
             disabled={isEdit || isSubmitting}
-            label="Language ID"
+            label="ID ngôn ngữ"
             name="languageId"
             onChange={onChange}
             placeholder="UUID"
@@ -242,7 +234,7 @@ function ClassDialog({
           />
           <FieldInput
             disabled={isEdit || isSubmitting}
-            label="School grade ID"
+            label="ID khối lớp"
             name="schoolGradeId"
             onChange={onChange}
             placeholder="UUID"
@@ -252,28 +244,28 @@ function ClassDialog({
         </div>
 
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Description
+          Mô tả
           <textarea
             className="min-h-28 rounded-lg border border-slate-200 px-3 py-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
             disabled={isSubmitting}
             onChange={(event) => onChange('description', event.target.value)}
-            placeholder="Optional class description"
+            placeholder="Mô tả ngắn về lớp học"
             value={form.description}
           />
         </label>
 
         {isEdit ? (
           <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Status
+            Trạng thái
             <select
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
               disabled={isSubmitting}
               onChange={(event) => onChange('status', event.target.value)}
               value={form.status}
             >
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-              <option value="ARCHIVED">Archived</option>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="INACTIVE">Tạm dừng</option>
+              <option value="ARCHIVED">Đã lưu trữ</option>
             </select>
           </label>
         ) : null}
@@ -285,7 +277,7 @@ function ClassDialog({
             onClick={onClose}
             type="button"
           >
-            Cancel
+            Hủy
           </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
@@ -293,7 +285,7 @@ function ClassDialog({
             type="submit"
           >
             <CheckCircle2 aria-hidden="true" className="size-4" />
-            {isSubmitting ? 'Saving...' : 'Save class'}
+            {isSubmitting ? 'Đang lưu...' : 'Lưu lớp học'}
           </button>
         </div>
       </form>
@@ -332,11 +324,11 @@ function DeleteDialog({
             className="text-xl font-black tracking-0 text-slate-950"
             id="delete-class-title"
           >
-            Delete class
+            Xóa lớp học
           </h2>
           <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-            This will archive class {schoolClass.code}. Existing records are
-            kept by the backend soft-delete flow.
+            Lớp {schoolClass.code} sẽ được chuyển sang trạng thái lưu trữ. Dữ
+            liệu hiện có vẫn được giữ lại theo cơ chế soft-delete của hệ thống.
           </p>
         </div>
 
@@ -356,7 +348,7 @@ function DeleteDialog({
             onClick={onClose}
             type="button"
           >
-            Cancel
+            Hủy
           </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-70"
@@ -365,100 +357,10 @@ function DeleteDialog({
             type="button"
           >
             <Trash2 aria-hidden="true" className="size-4" />
-            {isSubmitting ? 'Deleting...' : 'Delete'}
+            {isSubmitting ? 'Đang xóa...' : 'Xóa lớp'}
           </button>
         </div>
       </div>
-    </div>
-  )
-}
-
-type AddUserDialogProps = {
-  errorMessage?: string
-  isSubmitting: boolean
-  onChange: (value: string) => void
-  onClose: () => void
-  onSubmit: () => void
-  open: boolean
-  value: string
-}
-
-function AddUserDialog({
-  errorMessage,
-  isSubmitting,
-  onChange,
-  onClose,
-  onSubmit,
-  open,
-  value,
-}: AddUserDialogProps) {
-  if (!open) {
-    return null
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6">
-      <form
-        aria-labelledby="add-user-title"
-        className="grid w-full max-w-md gap-5 rounded-lg bg-white p-6 shadow-xl shadow-slate-950/20"
-        onSubmit={(event) => {
-          event.preventDefault()
-          onSubmit()
-        }}
-        role="dialog"
-      >
-        <div>
-          <h2
-            className="text-xl font-black tracking-0 text-slate-950"
-            id="add-user-title"
-          >
-            Add user to class
-          </h2>
-          <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-            Enter an existing user UUID to enroll them in this class.
-          </p>
-        </div>
-
-        {errorMessage ? (
-          <div
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
-            role="alert"
-          >
-            {errorMessage}
-          </div>
-        ) : null}
-
-        <label className="grid gap-2 text-sm font-bold text-slate-700">
-          User ID
-          <input
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            disabled={isSubmitting}
-            onChange={(event) => onChange(event.target.value)}
-            placeholder="UUID"
-            required
-            value={value}
-          />
-        </label>
-
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button
-            className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-70"
-            disabled={isSubmitting}
-            onClick={onClose}
-            type="button"
-          >
-            Cancel
-          </button>
-          <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:opacity-70"
-            disabled={isSubmitting}
-            type="submit"
-          >
-            <UserPlus aria-hidden="true" className="size-4" />
-            {isSubmitting ? 'Adding...' : 'Add user'}
-          </button>
-        </div>
-      </form>
     </div>
   )
 }
@@ -471,8 +373,6 @@ type ClassTableProps = {
   onDelete: (schoolClass: SchoolClass) => void
   onEdit: (schoolClass: SchoolClass) => void
   onRetry: () => void
-  onSelect: (id: string) => void
-  selectedId: string | null
 }
 
 function ClassTable({
@@ -483,8 +383,6 @@ function ClassTable({
   onDelete,
   onEdit,
   onRetry,
-  onSelect,
-  selectedId,
 }: ClassTableProps) {
   if (isLoading) {
     return (
@@ -492,7 +390,7 @@ function ClassTable({
         className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600"
         role="status"
       >
-        Loading classes...
+        Đang tải danh sách lớp học...
       </div>
     )
   }
@@ -503,13 +401,13 @@ function ClassTable({
         className="grid gap-4 rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700"
         role="alert"
       >
-        <span>{errorMessage ?? 'Could not load classes.'}</span>
+        <span>{errorMessage ?? 'Không thể tải danh sách lớp học.'}</span>
         <button
           className="inline-flex h-10 w-fit items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-bold text-white"
           onClick={onRetry}
           type="button"
         >
-          Retry
+          Thử lại
         </button>
       </div>
     )
@@ -518,9 +416,11 @@ function ClassTable({
   if (!classes.length) {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
-        <p className="text-base font-black text-slate-950">No classes found</p>
+        <p className="text-base font-black text-slate-950">
+          Chưa có lớp học
+        </p>
         <p className="mt-2 text-sm font-medium text-slate-500">
-          Adjust filters or create the first class.
+          Điều chỉnh bộ lọc hoặc tạo lớp học đầu tiên.
         </p>
       </div>
     )
@@ -532,36 +432,28 @@ function ClassTable({
         <table className="min-w-full divide-y divide-slate-200 text-left">
           <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">Class</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Language</th>
-              <th className="px-4 py-3">Grade</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3">Lớp học</th>
+              <th className="px-4 py-3">Trạng thái</th>
+              <th className="px-4 py-3">Ngôn ngữ</th>
+              <th className="px-4 py-3">Khối lớp</th>
+              <th className="px-4 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {classes.map((schoolClass) => {
               const status = getClassStatusDisplay(schoolClass.status)
-              const isSelected = schoolClass.id === selectedId
 
               return (
-                <tr
-                  className={isSelected ? 'bg-cyan-50/70' : 'bg-white'}
-                  key={schoolClass.id}
-                >
+                <tr className="bg-white" key={schoolClass.id}>
                   <td className="px-4 py-4">
-                    <button
-                      className="grid text-left"
-                      onClick={() => onSelect(schoolClass.id)}
-                      type="button"
-                    >
+                    <div className="grid text-left">
                       <span className="text-sm font-black text-slate-950">
                         {schoolClass.name}
                       </span>
                       <span className="mt-1 text-xs font-bold text-slate-500">
                         {schoolClass.code}
                       </span>
-                    </button>
+                    </div>
                   </td>
                   <td className="px-4 py-4">
                     <span
@@ -579,7 +471,7 @@ function ClassTable({
                   <td className="px-4 py-4">
                     <div className="flex justify-end gap-2">
                       <button
-                        aria-label={`Edit ${schoolClass.code}`}
+                        aria-label={`Sửa lớp ${schoolClass.code}`}
                         className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
                         onClick={() => onEdit(schoolClass)}
                         type="button"
@@ -587,7 +479,7 @@ function ClassTable({
                         <Edit aria-hidden="true" className="size-4" />
                       </button>
                       <button
-                        aria-label={`Delete ${schoolClass.code}`}
+                        aria-label={`Xóa lớp ${schoolClass.code}`}
                         className="inline-flex size-9 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50"
                         onClick={() => onDelete(schoolClass)}
                         type="button"
@@ -628,11 +520,11 @@ function Pagination({
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 sm:flex-row sm:items-center sm:justify-between">
       <span>
-        {totalElements} classes, page {totalPages ? page : 0} of {totalPages}
+        {totalElements} lớp học, trang {totalPages ? page : 0}/{totalPages}
       </span>
       <div className="flex items-center gap-2">
         <select
-          aria-label="Rows per page"
+          aria-label="Số dòng mỗi trang"
           className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
           disabled={isDisabled}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
@@ -648,7 +540,7 @@ function Pagination({
           onClick={() => onPageChange(page - 1)}
           type="button"
         >
-          Prev
+          Trước
         </button>
         <button
           className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700 disabled:opacity-50"
@@ -656,213 +548,10 @@ function Pagination({
           onClick={() => onPageChange(page + 1)}
           type="button"
         >
-          Next
+          Sau
         </button>
       </div>
     </div>
-  )
-}
-
-type DetailPanelProps = {
-  classUsers: ClassUser[]
-  detail: SchoolClass | null
-  detailError?: string
-  isDetailError: boolean
-  isDetailLoading: boolean
-  isMutatingUser: boolean
-  isUsersError: boolean
-  isUsersLoading: boolean
-  onAddUser: () => void
-  onRemoveUser: (userId: string) => void
-  onRetryDetail: () => void
-  onRetryUsers: () => void
-  onToggleUserStatus: (user: ClassUser) => void
-  usersError?: string
-}
-
-function DetailPanel({
-  classUsers,
-  detail,
-  detailError,
-  isDetailError,
-  isDetailLoading,
-  isMutatingUser,
-  isUsersError,
-  isUsersLoading,
-  onAddUser,
-  onRemoveUser,
-  onRetryDetail,
-  onRetryUsers,
-  onToggleUserStatus,
-  usersError,
-}: DetailPanelProps) {
-  if (!detail && !isDetailLoading) {
-    return (
-      <aside className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm font-semibold text-slate-500">
-        Select a class to view details.
-      </aside>
-    )
-  }
-
-  return (
-    <aside className="grid h-fit gap-4 rounded-lg border border-slate-200 bg-white p-5">
-      {isDetailLoading ? (
-        <div className="text-sm font-semibold text-slate-600" role="status">
-          Loading class detail...
-        </div>
-      ) : null}
-
-      {isDetailError ? (
-        <div
-          className="grid gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700"
-          role="alert"
-        >
-          <span>{detailError ?? 'Could not load class detail.'}</span>
-          <button
-            className="inline-flex h-10 w-fit items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-bold text-white"
-            onClick={onRetryDetail}
-            type="button"
-          >
-            Retry
-          </button>
-        </div>
-      ) : null}
-
-      {detail ? (
-        <>
-          <div>
-            <p className="text-xs font-black uppercase text-cyan-700">
-              Class detail
-            </p>
-            <h2 className="mt-2 text-2xl font-black tracking-0 text-slate-950">
-              {detail.name}
-            </h2>
-            <p className="mt-1 text-sm font-bold text-slate-500">
-              {detail.code}
-            </p>
-          </div>
-
-          <dl className="grid gap-3 text-sm">
-            <div className="rounded-lg bg-slate-50 p-3">
-              <dt className="text-xs font-black uppercase text-slate-500">
-                Description
-              </dt>
-              <dd className="mt-1 font-semibold text-slate-800">
-                {formatNullableText(detail.description)}
-              </dd>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg bg-slate-50 p-3">
-                <dt className="text-xs font-black uppercase text-slate-500">
-                  Created
-                </dt>
-                <dd className="mt-1 font-semibold text-slate-800">
-                  {formatClassDate(detail.createdAt)}
-                </dd>
-              </div>
-              <div className="rounded-lg bg-slate-50 p-3">
-                <dt className="text-xs font-black uppercase text-slate-500">
-                  Updated
-                </dt>
-                <dd className="mt-1 font-semibold text-slate-800">
-                  {formatClassDate(detail.updatedAt)}
-                </dd>
-              </div>
-            </div>
-          </dl>
-
-          <div className="border-t border-slate-200 pt-4">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-base font-black text-slate-950">
-                Class users
-              </h3>
-              <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-3 text-sm font-bold text-white transition hover:bg-cyan-700"
-                onClick={onAddUser}
-                type="button"
-              >
-                <UserPlus aria-hidden="true" className="size-4" />
-                Add
-              </button>
-            </div>
-
-            {isUsersLoading ? (
-              <div
-                className="mt-4 text-sm font-semibold text-slate-600"
-                role="status"
-              >
-                Loading class users...
-              </div>
-            ) : null}
-
-            {isUsersError ? (
-              <div
-                className="mt-4 grid gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700"
-                role="alert"
-              >
-                <span>{usersError ?? 'Could not load class users.'}</span>
-                <button
-                  className="inline-flex h-10 w-fit items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-bold text-white"
-                  onClick={onRetryUsers}
-                  type="button"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : null}
-
-            {!isUsersLoading && !isUsersError && !classUsers.length ? (
-              <p className="mt-4 rounded-lg border border-dashed border-slate-300 p-4 text-sm font-semibold text-slate-500">
-                No users in this class yet.
-              </p>
-            ) : null}
-
-            <div className="mt-4 grid gap-3">
-              {classUsers.map((classUser) => {
-                const displayName =
-                  classUser.user?.fullName ||
-                  classUser.user?.email ||
-                  classUser.userId
-
-                return (
-                  <div
-                    className="grid gap-3 rounded-lg border border-slate-200 p-3"
-                    key={classUser.id}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-slate-950">
-                        {displayName}
-                      </p>
-                      <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                        {classUser.user?.email ?? classUser.userId}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-                        disabled={isMutatingUser}
-                        onClick={() => onToggleUserStatus(classUser)}
-                        type="button"
-                      >
-                        {classUser.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
-                      <button
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-black text-red-600 transition hover:bg-red-50 disabled:opacity-60"
-                        disabled={isMutatingUser}
-                        onClick={() => onRemoveUser(classUser.userId)}
-                        type="button"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </>
-      ) : null}
-    </aside>
   )
 }
 
@@ -870,73 +559,49 @@ export function SchoolAdminClassesPage() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(DEFAULT_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [userPage] = useState(DEFAULT_PAGE)
   const [filters, setFilters] = useState<ClassFilters>(EMPTY_FILTERS)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
   const [classDialogMode, setClassDialogMode] =
     useState<ClassDialogMode | null>(null)
+  const [classDialogTargetId, setClassDialogTargetId] = useState<string | null>(
+    null,
+  )
   const [classForm, setClassForm] = useState<ClassFormState>(emptyClassForm)
   const [classDialogError, setClassDialogError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [isAddUserOpen, setIsAddUserOpen] = useState(false)
-  const [addUserId, setAddUserId] = useState('')
-  const [userMutationError, setUserMutationError] = useState<string | null>(
-    null,
-  )
 
   const classesQuery = useSchoolClassesQuery(page, pageSize, filters)
   const classes = classesQuery.data?.content ?? []
-  const selectedListClass =
-    classes.find((schoolClass) => schoolClass.id === selectedId) ??
-    classes[0] ??
-    null
-  const effectiveSelectedId = selectedListClass?.id ?? null
-  const detailQuery = useSchoolClassQuery(effectiveSelectedId)
-  const detailClass = detailQuery.data ?? selectedListClass
-  const usersQuery = useSchoolClassUsersQuery(
-    effectiveSelectedId,
-    userPage,
-    DEFAULT_USER_PAGE_SIZE,
-  )
   const createMutation = useCreateSchoolClassMutation()
   const updateMutation = useUpdateSchoolClassMutation()
   const deleteMutation = useDeleteSchoolClassMutation()
-  const addUserMutation = useAddClassUserMutation()
-  const removeUserMutation = useRemoveClassUserMutation()
-  const updateUserStatusMutation = useUpdateClassUserStatusMutation()
   const isSavingClass = createMutation.isPending || updateMutation.isPending
-  const isMutatingUser =
-    addUserMutation.isPending ||
-    removeUserMutation.isPending ||
-    updateUserStatusMutation.isPending
 
   function handleFilterChange(name: keyof ClassFilters, value: string) {
     setFilters((current) => ({
       ...current,
       [name]: value,
     }))
-    setSelectedId(null)
     setPage(DEFAULT_PAGE)
   }
 
   function handlePageSizeChange(nextPageSize: number) {
-    setSelectedId(null)
     setPage(DEFAULT_PAGE)
     setPageSize(nextPageSize)
   }
 
   function openCreateDialog() {
     setClassForm(emptyClassForm)
+    setClassDialogTargetId(null)
     setClassDialogError(null)
     setClassDialogMode('create')
   }
 
   function openEditDialog(schoolClass: SchoolClass) {
     setClassForm(toEditForm(schoolClass))
+    setClassDialogTargetId(schoolClass.id)
     setClassDialogError(null)
-    setSelectedId(schoolClass.id)
     setClassDialogMode('edit')
   }
 
@@ -947,6 +612,7 @@ export function SchoolAdminClassesPage() {
 
     setClassDialogError(null)
     setClassDialogMode(null)
+    setClassDialogTargetId(null)
   }
 
   function handleClassFormChange(name: keyof ClassFormState, value: string) {
@@ -958,19 +624,19 @@ export function SchoolAdminClassesPage() {
 
   function validateClassForm() {
     if (!classForm.name.trim()) {
-      return 'Class name is required.'
+      return 'Tên lớp là bắt buộc.'
     }
 
     if (classDialogMode === 'create') {
       if (!classForm.code.trim()) {
-        return 'Class code is required.'
+        return 'Mã lớp là bắt buộc.'
       }
 
       if (
         !isUuidLike(classForm.languageId) ||
         !isUuidLike(classForm.schoolGradeId)
       ) {
-        return 'Language ID and school grade ID must be valid UUID values.'
+        return 'ID ngôn ngữ và ID khối lớp phải là UUID hợp lệ.'
       }
     }
 
@@ -998,20 +664,18 @@ export function SchoolAdminClassesPage() {
         }
         const result = await createMutation.mutateAsync({ payload })
 
-        setSelectedId(result.data.schoolClassId)
         setPageMessage({ text: result.message, tone: 'success' })
-      } else if (classDialogMode === 'edit' && effectiveSelectedId) {
+      } else if (classDialogMode === 'edit' && classDialogTargetId) {
         const payload: UpdateSchoolClassRequest = {
           description: classForm.description.trim() || null,
           name: classForm.name.trim(),
           status: classForm.status,
         }
         const result = await updateMutation.mutateAsync({
-          id: effectiveSelectedId,
+          id: classDialogTargetId,
           payload,
         })
 
-        setSelectedId(result.data.schoolClassId)
         setPageMessage({ text: result.message, tone: 'success' })
       }
 
@@ -1019,9 +683,10 @@ export function SchoolAdminClassesPage() {
         queryKey: classManagementQueryKeys.all,
       })
       setClassDialogMode(null)
+      setClassDialogTargetId(null)
     } catch (error) {
       setClassDialogError(
-        getErrorMessage(error) ?? 'Could not save class. Try again.',
+        getErrorMessage(error) ?? 'Không thể lưu lớp học. Vui lòng thử lại.',
       )
     }
   }
@@ -1045,106 +710,12 @@ export function SchoolAdminClassesPage() {
       await queryClient.invalidateQueries({
         queryKey: classManagementQueryKeys.all,
       })
-      setSelectedId(null)
       setDeleteTarget(null)
       setPageMessage({ text: result.message, tone: 'success' })
     } catch (error) {
       setDeleteError(
-        getErrorMessage(error) ?? 'Could not delete class. Try again.',
+        getErrorMessage(error) ?? 'Không thể xóa lớp học. Vui lòng thử lại.',
       )
-    }
-  }
-
-  async function handleAddUserSubmit() {
-    if (!effectiveSelectedId) {
-      return
-    }
-
-    if (!isUuidLike(addUserId)) {
-      setUserMutationError('User ID must be a valid UUID value.')
-      return
-    }
-
-    try {
-      setUserMutationError(null)
-      const result = await addUserMutation.mutateAsync({
-        classId: effectiveSelectedId,
-        userId: addUserId.trim(),
-      })
-
-      await queryClient.invalidateQueries({
-        queryKey: classManagementQueryKeys.classUsers(
-          effectiveSelectedId,
-          userPage,
-          DEFAULT_USER_PAGE_SIZE,
-        ),
-      })
-      setAddUserId('')
-      setIsAddUserOpen(false)
-      setPageMessage({ text: result.message, tone: 'success' })
-    } catch (error) {
-      setUserMutationError(
-        getErrorMessage(error) ?? 'Could not add user to class. Try again.',
-      )
-    }
-  }
-
-  async function handleRemoveUser(userId: string) {
-    if (!effectiveSelectedId) {
-      return
-    }
-
-    try {
-      setUserMutationError(null)
-      const result = await removeUserMutation.mutateAsync({
-        classId: effectiveSelectedId,
-        userId,
-      })
-
-      await queryClient.invalidateQueries({
-        queryKey: classManagementQueryKeys.classUsers(
-          effectiveSelectedId,
-          userPage,
-          DEFAULT_USER_PAGE_SIZE,
-        ),
-      })
-      setPageMessage({ text: result.message, tone: 'success' })
-    } catch (error) {
-      setPageMessage({
-        text: getErrorMessage(error) ?? 'Could not remove user. Try again.',
-        tone: 'error',
-      })
-    }
-  }
-
-  async function handleToggleUserStatus(classUser: ClassUser) {
-    if (!effectiveSelectedId) {
-      return
-    }
-
-    try {
-      setUserMutationError(null)
-      const result = await updateUserStatusMutation.mutateAsync({
-        classId: effectiveSelectedId,
-        isActive: !classUser.isActive,
-        userId: classUser.userId,
-      })
-
-      await queryClient.invalidateQueries({
-        queryKey: classManagementQueryKeys.classUsers(
-          effectiveSelectedId,
-          userPage,
-          DEFAULT_USER_PAGE_SIZE,
-        ),
-      })
-      setPageMessage({ text: result.message, tone: 'success' })
-    } catch (error) {
-      setPageMessage({
-        text:
-          getErrorMessage(error) ??
-          'Could not update user status. Try again.',
-        tone: 'error',
-      })
     }
   }
 
@@ -1158,16 +729,17 @@ export function SchoolAdminClassesPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-black uppercase text-cyan-700">
-            Class management
+            Quản lý lớp học
           </p>
           <h1
             className="mt-2 text-3xl font-black tracking-0 text-slate-950"
             id="school-admin-classes-title"
           >
-            Manage school classes
+            Danh sách lớp học
           </h1>
           <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-            Create classes, review class details, and manage enrolled users.
+            Tạo, cập nhật, lọc và quản lý trạng thái các lớp học trong trường.
+            Trang chi tiết lớp học sẽ được tách riêng ở bước tiếp theo.
           </p>
         </div>
         <div className="flex gap-3">
@@ -1180,7 +752,7 @@ export function SchoolAdminClassesPage() {
             type="button"
           >
             <RefreshCw aria-hidden="true" className="size-4" />
-            Refresh
+            Làm mới
           </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700"
@@ -1188,7 +760,7 @@ export function SchoolAdminClassesPage() {
             type="button"
           >
             <Plus aria-hidden="true" className="size-4" />
-            New class
+            Tạo lớp
           </button>
         </div>
       </div>
@@ -1204,7 +776,7 @@ export function SchoolAdminClassesPage() {
 
       <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[minmax(180px,1fr)_180px_minmax(180px,1fr)_minmax(180px,1fr)]">
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Search
+          Tìm kiếm
           <span className="relative">
             <Search
               aria-hidden="true"
@@ -1215,14 +787,14 @@ export function SchoolAdminClassesPage() {
               onChange={(event) =>
                 handleFilterChange('search', event.target.value)
               }
-              placeholder="Code or name"
+              placeholder="Mã lớp hoặc tên lớp"
               type="search"
               value={filters.search}
             />
           </span>
         </label>
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Status
+          Trạng thái
           <select
             className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
             onChange={(event) =>
@@ -1230,88 +802,56 @@ export function SchoolAdminClassesPage() {
             }
             value={filters.status}
           >
-            <option value="">All</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-            <option value="ARCHIVED">Archived</option>
+            <option value="">Tất cả</option>
+            <option value="ACTIVE">Đang hoạt động</option>
+            <option value="INACTIVE">Tạm dừng</option>
+            <option value="ARCHIVED">Đã lưu trữ</option>
           </select>
         </label>
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Language ID
+          ID ngôn ngữ
           <input
             className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
             onChange={(event) =>
               handleFilterChange('languageId', event.target.value)
             }
-            placeholder="Optional UUID"
+            placeholder="UUID tùy chọn"
             value={filters.languageId}
           />
         </label>
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          School grade ID
+          ID khối lớp
           <input
             className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
             onChange={(event) =>
               handleFilterChange('schoolGradeId', event.target.value)
             }
-            placeholder="Optional UUID"
+            placeholder="UUID tùy chọn"
             value={filters.schoolGradeId}
           />
         </label>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="grid h-fit gap-4">
-          <ClassTable
-            classes={classes}
-            errorMessage={getErrorMessage(classesQuery.error)}
-            isError={classesQuery.isError}
-            isLoading={classesQuery.isLoading}
-            onDelete={openDeleteDialog}
-            onEdit={openEditDialog}
-            onRetry={() => {
-              void classesQuery.refetch()
-            }}
-            onSelect={setSelectedId}
-            selectedId={effectiveSelectedId}
-          />
-          <Pagination
-            isDisabled={classesQuery.isLoading || classesQuery.isError}
-            onPageChange={setPage}
-            onPageSizeChange={handlePageSizeChange}
-            page={page}
-            pageSize={pageSize}
-            totalElements={classesQuery.data?.totalElements ?? 0}
-            totalPages={classesQuery.data?.totalPages ?? 0}
-          />
-        </div>
-
-        <DetailPanel
-          classUsers={usersQuery.data?.content ?? []}
-          detail={detailClass}
-          detailError={getErrorMessage(detailQuery.error)}
-          isDetailError={detailQuery.isError}
-          isDetailLoading={Boolean(effectiveSelectedId) && detailQuery.isLoading}
-          isMutatingUser={isMutatingUser}
-          isUsersError={usersQuery.isError}
-          isUsersLoading={Boolean(effectiveSelectedId) && usersQuery.isLoading}
-          onAddUser={() => {
-            setUserMutationError(null)
-            setIsAddUserOpen(true)
+      <div className="grid h-fit gap-4">
+        <ClassTable
+          classes={classes}
+          errorMessage={getErrorMessage(classesQuery.error)}
+          isError={classesQuery.isError}
+          isLoading={classesQuery.isLoading}
+          onDelete={openDeleteDialog}
+          onEdit={openEditDialog}
+          onRetry={() => {
+            void classesQuery.refetch()
           }}
-          onRemoveUser={(userId) => {
-            void handleRemoveUser(userId)
-          }}
-          onRetryDetail={() => {
-            void detailQuery.refetch()
-          }}
-          onRetryUsers={() => {
-            void usersQuery.refetch()
-          }}
-          onToggleUserStatus={(classUser) => {
-            void handleToggleUserStatus(classUser)
-          }}
-          usersError={getErrorMessage(usersQuery.error)}
+        />
+        <Pagination
+          isDisabled={classesQuery.isLoading || classesQuery.isError}
+          onPageChange={setPage}
+          onPageSizeChange={handlePageSizeChange}
+          page={page}
+          pageSize={pageSize}
+          totalElements={classesQuery.data?.totalElements ?? 0}
+          totalPages={classesQuery.data?.totalPages ?? 0}
         />
       </div>
 
@@ -1338,22 +878,6 @@ export function SchoolAdminClassesPage() {
           void handleDeleteConfirm()
         }}
         schoolClass={deleteTarget}
-      />
-      <AddUserDialog
-        errorMessage={userMutationError ?? undefined}
-        isSubmitting={addUserMutation.isPending}
-        onChange={setAddUserId}
-        onClose={() => {
-          if (!addUserMutation.isPending) {
-            setUserMutationError(null)
-            setIsAddUserOpen(false)
-          }
-        }}
-        onSubmit={() => {
-          void handleAddUserSubmit()
-        }}
-        open={isAddUserOpen}
-        value={addUserId}
       />
     </section>
   )
