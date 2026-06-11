@@ -88,6 +88,29 @@ export type ClassFilters = {
   status: '' | SchoolClassStatus
 }
 
+export type PreviewSchoolClassImportResponse = {
+  expiresAt: string | null
+  fileName: string
+  importSessionId: string
+  originalHeaders: string[]
+  sampleRows: Record<string, string | null | undefined>[]
+  suggestedMapping: Record<string, string | null | undefined>
+  totalRows: number
+}
+
+export type AcceptSchoolClassImportRequest = {
+  confirmedMapping: Record<string, string>
+}
+
+export type AcceptSchoolClassImportResponse = {
+  importSessionId: string
+  importedRows: number
+  invalidRows: number
+  skippedRows: number
+  status: string
+  totalRows: number
+}
+
 export type ClassStatusDisplay = {
   className: string
   label: string

@@ -5,6 +5,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Upload,
   Trash2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
@@ -494,6 +495,14 @@ export function SchoolAdminClassesPage() {
           </p>
         </div>
         <div className="flex gap-3">
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
+            onClick={() => navigate('/school-admin/classes/import')}
+            type="button"
+          >
+            <Upload aria-hidden="true" className="size-4" />
+            Tạo lớp số lượng lớn
+          </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
             disabled={classesQuery.isFetching}

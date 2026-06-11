@@ -1,6 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient, graphQLRequest } from '@/shared/api'
-import { getStoredAuthUser } from '@/features/auth/session/authSession'
 import type {
   ClassUserMutationResponse,
   CreateClassUserResponse,
@@ -9,11 +8,11 @@ import type {
   DeleteSchoolClassResponse,
   UpdateSchoolClassRequest,
 } from '../types'
-
-type ApiResponse<T> = {
-  data: T
-  message: string
-}
+import {
+  type ApiResponse,
+  type MutationResult,
+  requireSchoolId,
+} from './schoolClassApiUtils'
 
 type CreateSchoolClassInput = {
   payload: CreateSchoolClassRequest
@@ -44,11 +43,6 @@ type UpdateClassUserStatusInput = {
   userId: string
 }
 
-type MutationResult<TData> = {
-  data: TData
-  message: string
-}
-
 const UPDATE_SCHOOL_CLASS_MUTATION = `
   mutation UpdateSchoolClass($id: ID!, $input: UpdateSchoolClassInput!) {
     updateSchoolClass(id: $id, input: $input) {
@@ -61,18 +55,6 @@ type UpdateSchoolClassMutationData = {
   updateSchoolClass: {
     schoolClassId: string
   }
-}
-
-function requireSchoolId() {
-  const schoolId = getStoredAuthUser()?.schoolId?.trim()
-
-  if (!schoolId) {
-    throw {
-      message: 'Missing schoolId in access token.',
-    }
-  }
-
-  return schoolId
 }
 
 export async function createSchoolClass({

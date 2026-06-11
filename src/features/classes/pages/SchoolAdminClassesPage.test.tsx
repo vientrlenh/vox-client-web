@@ -301,7 +301,7 @@ describe('SchoolAdminClassesPage', () => {
     renderPage()
 
     await screen.findByText(/chưa có lớp học/i)
-    await user.click(screen.getByRole('button', { name: /tạo lớp/i }))
+    await user.click(screen.getByRole('button', { name: /^tạo lớp$/i }))
 
     const dialog = screen.getByRole('dialog', { name: /tạo lớp học/i })
 
@@ -337,7 +337,7 @@ describe('SchoolAdminClassesPage', () => {
     renderPage()
 
     await screen.findByText(/chưa có lớp học/i)
-    await user.click(screen.getByRole('button', { name: /tạo lớp/i }))
+    await user.click(screen.getByRole('button', { name: /^tạo lớp$/i }))
 
     const dialog = screen.getByRole('dialog', { name: /tạo lớp học/i })
 
@@ -451,6 +451,24 @@ describe('SchoolAdminClassesPage', () => {
 
     expect(screen.getByTestId('current-path')).toHaveTextContent(
       '/school-admin/classes/class-1',
+    )
+  })
+
+  it('navigates to the bulk class import page', async () => {
+    mockGraphQLSuccess({
+      1: createClassPage([]),
+    })
+    const user = userEvent.setup()
+
+    renderPageWithLocationProbe()
+
+    await screen.findByText(/chưa có lớp học/i)
+    await user.click(
+      screen.getByRole('button', { name: /tạo lớp số lượng lớn/i }),
+    )
+
+    expect(screen.getByTestId('current-path')).toHaveTextContent(
+      '/school-admin/classes/import',
     )
   })
 })
