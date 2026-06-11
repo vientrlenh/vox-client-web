@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import type { AxiosResponse } from 'axios'
 import { Route, Routes } from 'react-router'
 import { apiClient } from '@/shared/api'
+import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
-import { appConfig } from '@/shared/config/env'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { ClassUser, PageResult, SchoolClass } from '../types'
 import { formatClassDate } from '../types'
@@ -16,10 +16,6 @@ const mockedRestPost = jest.spyOn(apiClient, 'post')
 const mockedRestDelete = jest.spyOn(apiClient, 'delete')
 const mockedRestPatch = jest.spyOn(apiClient, 'patch')
 
-type MutableConfig = {
-  schoolId: string
-}
-
 type ApiResponse<T> = {
   data: T
   message: string
@@ -28,8 +24,28 @@ type ApiResponse<T> = {
 const classId = 'class-1'
 const schoolId = '33333333-3333-4333-8333-333333333333'
 
-function setSchoolId(value: string) {
-  ;(appConfig as unknown as MutableConfig).schoolId = value
+function createJwt(payload: Record<string, unknown>) {
+  const encode = (value: Record<string, unknown>) =>
+    btoa(JSON.stringify(value))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '')
+
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.signature`
+}
+
+function saveSession(nextSchoolId: string | null = schoolId) {
+  localStorage.setItem(
+    AUTH_TOKEN_STORAGE_KEYS.accessToken,
+    createJwt({
+      email: 'school-admin@vox.edu.vn',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      roles: ['SCHOOL_ADMIN'],
+      ...(nextSchoolId ? { schoolId: nextSchoolId } : {}),
+      userId: 'school-admin-1',
+    }),
+  )
+  localStorage.setItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken, 'refresh-token')
 }
 
 function createQueryClient() {
@@ -165,11 +181,12 @@ async function openUserActionMenu(user: ReturnType<typeof userEvent.setup>) {
 
 describe('SchoolAdminClassDetailPage', () => {
   beforeEach(() => {
+    localStorage.clear()
     mockedPost.mockReset()
     mockedRestPost.mockReset()
     mockedRestDelete.mockReset()
     mockedRestPatch.mockReset()
-    setSchoolId(schoolId)
+    saveSession()
   })
 
   it('renders the loading state', () => {
@@ -416,7 +433,7 @@ describe('SchoolAdminClassDetailPage', () => {
   })
 
   it('shows a user-facing error when school id is missing', async () => {
-    setSchoolId('')
+    saveSession(null)
     mockGraphQLSuccess({ usersPage: createUserPage([]) })
     const user = userEvent.setup()
 
@@ -427,7 +444,9 @@ describe('SchoolAdminClassDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /thêm học viên/i }))
 
     expect(
-      await screen.findByText(/chưa xác định được trường học hiện tại/i),
+      await screen.findByText(
+        /chưa xác định được trường học hiện tại.*đăng nhập lại/i,
+      ),
     ).toBeInTheDocument()
     expect(mockedRestPost).not.toHaveBeenCalled()
   })

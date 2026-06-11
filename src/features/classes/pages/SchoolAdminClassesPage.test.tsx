@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import type { AxiosResponse } from 'axios'
 import { useLocation } from 'react-router'
 import { apiClient } from '@/shared/api'
+import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
-import { appConfig } from '@/shared/config/env'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { PageResult, SchoolClass } from '../types'
 import { formatClassDate } from '../types'
@@ -14,10 +14,6 @@ import { SchoolAdminClassesPage } from './SchoolAdminClassesPage'
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
 const mockedRestPost = jest.spyOn(apiClient, 'post')
 const mockedRestDelete = jest.spyOn(apiClient, 'delete')
-
-type MutableConfig = {
-  schoolId: string
-}
 
 type ApiResponse<T> = {
   data: T
@@ -28,8 +24,28 @@ const languageId = '01890f44-0c7a-7cc1-bc3b-2e7f4f001234'
 const gradeId = '11111111-1111-0111-0111-111111111111'
 const schoolId = '33333333-3333-4333-8333-333333333333'
 
-function setSchoolId(value: string) {
-  ;(appConfig as unknown as MutableConfig).schoolId = value
+function createJwt(payload: Record<string, unknown>) {
+  const encode = (value: Record<string, unknown>) =>
+    btoa(JSON.stringify(value))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '')
+
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.signature`
+}
+
+function saveSession(nextSchoolId: string | null = schoolId) {
+  localStorage.setItem(
+    AUTH_TOKEN_STORAGE_KEYS.accessToken,
+    createJwt({
+      email: 'school-admin@vox.edu.vn',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      roles: ['SCHOOL_ADMIN'],
+      ...(nextSchoolId ? { schoolId: nextSchoolId } : {}),
+      userId: 'school-admin-1',
+    }),
+  )
+  localStorage.setItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken, 'refresh-token')
 }
 
 function createQueryClient() {
@@ -148,10 +164,11 @@ async function openClassActionMenu(user: ReturnType<typeof userEvent.setup>) {
 
 describe('SchoolAdminClassesPage', () => {
   beforeEach(() => {
+    localStorage.clear()
     mockedPost.mockReset()
     mockedRestPost.mockReset()
     mockedRestDelete.mockReset()
-    setSchoolId(schoolId)
+    saveSession()
   })
 
   it('renders the loading state in Vietnamese', () => {
@@ -274,8 +291,8 @@ describe('SchoolAdminClassesPage', () => {
     })
   })
 
-  it('shows a user-facing error when creating without a configured school', async () => {
-    setSchoolId('')
+  it('shows a user-facing error when creating without school id in the token', async () => {
+    saveSession(null)
     mockGraphQLSuccess({
       1: createClassPage([]),
     })
@@ -298,7 +315,7 @@ describe('SchoolAdminClassesPage', () => {
 
     expect(
       await within(dialog).findByText(
-        /chưa xác định được trường học hiện tại/i,
+        /chưa xác định được trường học hiện tại.*đăng nhập lại/i,
       ),
     ).toBeInTheDocument()
     expect(within(dialog).queryByText(/vite_school_id/i)).not.toBeInTheDocument()

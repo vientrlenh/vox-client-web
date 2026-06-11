@@ -1,7 +1,7 @@
 import type { AxiosResponse } from 'axios'
 import { apiClient } from '@/shared/api'
+import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
-import { appConfig } from '@/shared/config/env'
 import type { CreateSchoolClassRequest } from '../types'
 import {
   addClassUser,
@@ -22,10 +22,6 @@ jest.mock('@/shared/api/apiClient', () => ({
   },
 }))
 
-type MutableConfig = {
-  schoolId: string
-}
-
 type ApiResponse<T> = {
   data: T
   message: string
@@ -40,17 +36,38 @@ const payload: CreateSchoolClassRequest = {
   schoolGradeId: '22222222-2222-4222-8222-222222222222',
 }
 
-function setSchoolId(value: string) {
-  ;(appConfig as unknown as MutableConfig).schoolId = value
+function createJwt(payload: Record<string, unknown>) {
+  const encode = (value: Record<string, unknown>) =>
+    btoa(JSON.stringify(value))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '')
+
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.signature`
+}
+
+function saveSession(nextSchoolId: string | null = schoolId) {
+  localStorage.setItem(
+    AUTH_TOKEN_STORAGE_KEYS.accessToken,
+    createJwt({
+      email: 'school-admin@vox.edu.vn',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      roles: ['SCHOOL_ADMIN'],
+      ...(nextSchoolId ? { schoolId: nextSchoolId } : {}),
+      userId: 'user-1',
+    }),
+  )
+  localStorage.setItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken, 'refresh-token')
 }
 
 describe('class management mutations', () => {
   beforeEach(() => {
+    localStorage.clear()
     jest.mocked(apiClient.post).mockReset()
     jest.mocked(apiClient.delete).mockReset()
     jest.mocked(apiClient.patch).mockReset()
     mockedGraphqlPost.mockReset()
-    setSchoolId(schoolId)
+    saveSession()
   })
 
   it('creates a class and unwraps the REST API response', async () => {
@@ -73,11 +90,10 @@ describe('class management mutations', () => {
   })
 
   it('blocks REST mutations when school id is missing', async () => {
-    setSchoolId('')
+    saveSession(null)
 
     await expect(createSchoolClass({ payload })).rejects.toMatchObject({
-      message:
-        'Missing VITE_SCHOOL_ID. Configure a school id before changing classes.',
+      message: 'Missing schoolId in access token.',
     })
     expect(apiClient.post).not.toHaveBeenCalled()
   })

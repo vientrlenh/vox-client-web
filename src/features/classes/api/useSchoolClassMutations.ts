@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient, graphQLRequest } from '@/shared/api'
-import { appConfig } from '@/shared/config/env'
+import { getStoredAuthUser } from '@/features/auth/session/authSession'
 import type {
   ClassUserMutationResponse,
   CreateClassUserResponse,
@@ -64,12 +64,11 @@ type UpdateSchoolClassMutationData = {
 }
 
 function requireSchoolId() {
-  const schoolId = appConfig.schoolId.trim()
+  const schoolId = getStoredAuthUser()?.schoolId?.trim()
 
   if (!schoolId) {
     throw {
-      message:
-        'Missing VITE_SCHOOL_ID. Configure a school id before changing classes.',
+      message: 'Missing schoolId in access token.',
     }
   }
 

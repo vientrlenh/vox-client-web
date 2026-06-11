@@ -27,12 +27,16 @@ function createJwt(payload: Record<string, unknown>) {
   return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.signature`
 }
 
-function createLoginResponse(roles: string[]) {
+function createLoginResponse(
+  roles: string[],
+  extraPayload: Record<string, unknown> = {},
+) {
   return {
     accessToken: createJwt({
       email: 'admin@vox.edu.vn',
       exp: Math.floor(Date.now() / 1000) + 3600,
       roles,
+      ...extraPayload,
       userId: 'user-1',
     }),
     refreshToken: 'refresh-token',
@@ -108,7 +112,9 @@ describe('LoginPage', () => {
 
   it('stores tokens and authenticates a SCHOOL_ADMIN login', async () => {
     const user = userEvent.setup()
-    const responseData = createLoginResponse(['SCHOOL_ADMIN'])
+    const responseData = createLoginResponse(['SCHOOL_ADMIN'], {
+      schoolId: '33333333-3333-4333-8333-333333333333',
+    })
     jest.mocked(apiClient.post).mockResolvedValue({
       data: {
         data: responseData,
@@ -130,6 +136,9 @@ describe('LoginPage', () => {
     )
 
     expect(store.getState().auth.user?.roles).toContain('SCHOOL_ADMIN')
+    expect(store.getState().auth.user?.schoolId).toBe(
+      '33333333-3333-4333-8333-333333333333',
+    )
     expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBe(
       responseData.accessToken,
     )

@@ -51,8 +51,11 @@ function getErrorMessage(error: unknown) {
     'message' in error &&
     typeof error.message === 'string'
   ) {
-    if (error.message.includes('Missing VITE_SCHOOL_ID')) {
-      return 'Chưa xác định được trường học hiện tại. Vui lòng thử lại sau.'
+    if (
+      error.message.includes('Missing schoolId in access token') ||
+      error.message.includes('Missing VITE_SCHOOL_ID')
+    ) {
+      return 'Chưa xác định được trường học hiện tại. Vui lòng đăng nhập lại.'
     }
 
     return error.message
