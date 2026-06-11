@@ -58,9 +58,9 @@ function toEditForm(schoolClass: SchoolClass): ClassFormState {
   return {
     code: schoolClass.code,
     description: schoolClass.description ?? '',
-    languageId: schoolClass.languageId,
+    languageId: schoolClass.languageId ?? schoolClass.language?.id ?? '',
     name: schoolClass.name,
-    schoolGradeId: schoolClass.schoolGradeId,
+    schoolGradeId: schoolClass.schoolGradeId ?? schoolClass.schoolGrade?.id ?? '',
     status:
       schoolClass.status === 'ARCHIVED' || schoolClass.status === 'INACTIVE'
         ? schoolClass.status

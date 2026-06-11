@@ -64,8 +64,23 @@ function createClass(overrides: Partial<SchoolClass> = {}): SchoolClass {
     createdAt: '2026-06-01T00:00:00Z',
     description: 'Lớp buổi sáng',
     id: classId,
+    language: {
+      code: 'EN',
+      id: '01890f44-0c7a-7cc1-bc3b-2e7f4f001234',
+      name: 'Tiếng Anh',
+    },
     languageId: '01890f44-0c7a-7cc1-bc3b-2e7f4f001234',
     name: 'Tiếng Anh 6A',
+    school: {
+      code: 'VOX',
+      id: schoolId,
+      name: 'Trường VOX',
+    },
+    schoolGrade: {
+      code: 'G6',
+      id: '11111111-1111-0111-0111-111111111111',
+      name: 'Khối 6',
+    },
     schoolGradeId: '11111111-1111-0111-0111-111111111111',
     schoolId,
     status: 'ACTIVE',
@@ -232,9 +247,68 @@ describe('SchoolAdminClassDetailPage', () => {
     expect(screen.getAllByText(classId).length).toBeGreaterThan(0)
     expect(screen.getAllByText('ENG-6A').length).toBeGreaterThan(0)
     expect(screen.getByText('Lớp buổi sáng')).toBeInTheDocument()
+    expect(screen.getByText('Trường VOX')).toBeInTheDocument()
+    expect(screen.getByText('Tiếng Anh')).toBeInTheDocument()
+    expect(screen.getByText('Khối 6')).toBeInTheDocument()
+    expect(screen.queryByText(schoolId)).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('01890f44-0c7a-7cc1-bc3b-2e7f4f001234'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('11111111-1111-0111-0111-111111111111'),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('ID trường')).not.toBeInTheDocument()
+    expect(screen.queryByText('ID ngôn ngữ')).not.toBeInTheDocument()
+    expect(screen.queryByText('ID khối lớp')).not.toBeInTheDocument()
     expect(screen.getAllByText(formatClassDate(schoolClass.createdAt)).length).toBeGreaterThan(0)
     expect(screen.getAllByText(formatClassDate(schoolClass.updatedAt)).length).toBeGreaterThan(0)
     expect(screen.getAllByText('Đang hoạt động').length).toBeGreaterThan(0)
+  })
+
+  it('renders related object fallback when related data is missing', async () => {
+    mockGraphQLSuccess({
+      schoolClass: createClass({
+        language: null,
+        school: null,
+        schoolGrade: null,
+      }),
+    })
+
+    renderPage()
+
+    expect(
+      await screen.findByRole('heading', { name: /tiếng anh 6a/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Trường học')).toBeInTheDocument()
+    expect(screen.getByText('Ngôn ngữ')).toBeInTheDocument()
+    expect(screen.getByText('Khối lớp')).toBeInTheDocument()
+    expect(screen.getAllByText('Chưa có dữ liệu').length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('prefills edit ids from related objects when legacy id fields are missing', async () => {
+    mockGraphQLSuccess({
+      schoolClass: createClass({
+        languageId: undefined as unknown as string,
+        schoolGradeId: undefined as unknown as string,
+      }),
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await screen.findByRole('heading', { name: /tiếng anh 6a/i })
+    await user.click(screen.getByRole('button', { name: /chỉnh sửa/i }))
+
+    const dialog = screen.getByRole('dialog', {
+      name: /cập nhật lớp học/i,
+    })
+
+    expect(
+      within(dialog).getByDisplayValue('01890f44-0c7a-7cc1-bc3b-2e7f4f001234'),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByDisplayValue('11111111-1111-0111-0111-111111111111'),
+    ).toBeInTheDocument()
   })
 
   it('updates the class from the edit dialog', async () => {

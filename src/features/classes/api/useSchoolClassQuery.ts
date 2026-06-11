@@ -16,6 +16,21 @@ const SCHOOL_CLASS_QUERY = `
       status
       createdAt
       updatedAt
+      school {
+        id
+        name
+        code
+      }
+      language {
+        id
+        name
+        code
+      }
+      schoolGrade {
+        id
+        name
+        code
+      }
     }
   }
 `

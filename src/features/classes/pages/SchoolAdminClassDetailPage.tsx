@@ -27,7 +27,12 @@ import {
 import { useSchoolClassQuery } from '../api/useSchoolClassQuery'
 import { useSchoolClassUsersQuery } from '../api/useSchoolClassUsersQuery'
 import { classManagementQueryKeys } from '../api/useSchoolClassesQuery'
-import type { ClassUser, SchoolClass, UpdateSchoolClassRequest } from '../types'
+import type {
+  ClassUser,
+  RelatedClassObject,
+  SchoolClass,
+  UpdateSchoolClassRequest,
+} from '../types'
 import {
   formatClassDate,
   formatNullableText,
@@ -161,6 +166,34 @@ function CopyableId({ value }: CopyableIdProps) {
   )
 }
 
+type RelatedObjectRowProps = {
+  label: string
+  value?: RelatedClassObject | null
+}
+
+function getRelatedObjectTitle(value?: RelatedClassObject | null) {
+  return value?.name?.trim() || value?.code?.trim() || 'Chưa có dữ liệu'
+}
+
+function RelatedObjectRow({ label, value }: RelatedObjectRowProps) {
+  const title = getRelatedObjectTitle(value)
+  const code = value?.name?.trim() ? value?.code?.trim() : null
+
+  return (
+    <DetailRow
+      label={label}
+      value={
+        <div className="grid min-w-0 gap-2">
+          <span>{title}</span>
+          {code ? (
+            <span className="text-xs font-bold text-slate-500">Mã: {code}</span>
+          ) : null}
+        </div>
+      }
+    />
+  )
+}
+
 type ClassInfoTabProps = {
   schoolClass: SchoolClass
 }
@@ -186,22 +219,22 @@ function ClassInfoTab({ schoolClass }: ClassInfoTabProps) {
           />
         </DetailCard>
 
-        <DetailCard icon={Link2} title="Thông tin liên kết hệ thống">
+        <DetailCard icon={Link2} title="Thông tin liên quan">
           <DetailRow
             label="ID lớp"
             value={<CopyableId value={schoolClass.id} />}
           />
-          <DetailRow
-            label="ID trường"
-            value={<CopyableId value={schoolClass.schoolId} />}
+          <RelatedObjectRow
+            label="Trường học"
+            value={schoolClass.school}
           />
-          <DetailRow
-            label="ID ngôn ngữ"
-            value={<CopyableId value={schoolClass.languageId} />}
+          <RelatedObjectRow
+            label="Ngôn ngữ"
+            value={schoolClass.language}
           />
-          <DetailRow
-            label="ID khối lớp"
-            value={<CopyableId value={schoolClass.schoolGradeId} />}
+          <RelatedObjectRow
+            label="Khối lớp"
+            value={schoolClass.schoolGrade}
           />
         </DetailCard>
       </div>

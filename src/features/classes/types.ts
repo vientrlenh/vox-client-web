@@ -13,12 +13,21 @@ export type SchoolClass = {
   createdAt: string | null
   description: string | null
   id: string
+  language?: RelatedClassObject | null
   languageId: string
   name: string
+  school?: RelatedClassObject | null
+  schoolGrade?: RelatedClassObject | null
   schoolGradeId: string
   schoolId: string
   status: SchoolClassStatus | string
   updatedAt: string | null
+}
+
+export type RelatedClassObject = {
+  code?: string | null
+  id: string
+  name?: string | null
 }
 
 export type ClassUser = {
