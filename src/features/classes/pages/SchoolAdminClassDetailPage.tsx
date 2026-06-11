@@ -17,15 +17,17 @@ import {
 } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
+import { SchoolClassFormDialog } from '../components/SchoolClassFormDialog'
 import {
   useAddClassUserMutation,
   useRemoveClassUserMutation,
+  useUpdateSchoolClassMutation,
   useUpdateClassUserStatusMutation,
 } from '../api/useSchoolClassMutations'
 import { useSchoolClassQuery } from '../api/useSchoolClassQuery'
 import { useSchoolClassUsersQuery } from '../api/useSchoolClassUsersQuery'
 import { classManagementQueryKeys } from '../api/useSchoolClassesQuery'
-import type { ClassUser, SchoolClass } from '../types'
+import type { ClassUser, SchoolClass, UpdateSchoolClassRequest } from '../types'
 import {
   formatClassDate,
   formatNullableText,
@@ -645,9 +647,46 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
 
 export function SchoolAdminClassDetailPage() {
   const { classId } = useParams()
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<ActiveTab>('info')
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
   const schoolClassQuery = useSchoolClassQuery(classId ?? null)
+  const updateMutation = useUpdateSchoolClassMutation()
   const schoolClass = schoolClassQuery.data
+
+  function closeEditDialog() {
+    if (updateMutation.isPending) {
+      return
+    }
+
+    setEditError(null)
+    setIsEditDialogOpen(false)
+  }
+
+  async function handleUpdateClass(
+    id: string,
+    payload: UpdateSchoolClassRequest,
+  ) {
+    try {
+      setEditError(null)
+      const result = await updateMutation.mutateAsync({
+        id,
+        payload,
+      })
+
+      await queryClient.invalidateQueries({
+        queryKey: classManagementQueryKeys.all,
+      })
+      setIsEditDialogOpen(false)
+      setPageMessage({ text: result.message, tone: 'success' })
+    } catch (error) {
+      setEditError(
+        getErrorMessage(error) ?? 'Không thể lưu lớp học. Vui lòng thử lại.',
+      )
+    }
+  }
 
   if (!classId) {
     return (
@@ -779,6 +818,10 @@ export function SchoolAdminClassDetailPage() {
           </Link>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-5 text-sm font-black text-white shadow-sm shadow-cyan-950/20 transition hover:bg-cyan-700"
+            onClick={() => {
+              setEditError(null)
+              setIsEditDialogOpen(true)
+            }}
             type="button"
           >
             <Pencil aria-hidden="true" className="size-4" />
@@ -820,6 +863,15 @@ export function SchoolAdminClassDetailPage() {
         </div>
       </div>
 
+      {pageMessage ? (
+        <div
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700"
+          role="status"
+        >
+          {pageMessage.text}
+        </div>
+      ) : null}
+
       <div className="rounded-lg border border-slate-200 bg-white p-1">
         <div aria-label="Chi tiết lớp học" className="flex gap-1" role="tablist">
           <button
@@ -858,6 +910,19 @@ export function SchoolAdminClassDetailPage() {
       ) : (
         <ClassUsersTab classId={classId} />
       )}
+
+      <SchoolClassFormDialog
+        errorMessage={editError ?? undefined}
+        isOpen={isEditDialogOpen}
+        isSubmitting={updateMutation.isPending}
+        mode="edit"
+        onClose={closeEditDialog}
+        onCreate={() => undefined}
+        onUpdate={(id, payload) => {
+          void handleUpdateClass(id, payload)
+        }}
+        schoolClass={schoolClass}
+      />
     </section>
   )
 }

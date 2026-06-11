@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  CheckCircle2,
   Edit,
   Plus,
   RefreshCw,
   Search,
   Trash2,
-  X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
+import {
+  SchoolClassFormDialog,
+  type SchoolClassFormMode,
+} from '../components/SchoolClassFormDialog'
 import {
   useCreateSchoolClassMutation,
   useDeleteSchoolClassMutation,
@@ -24,7 +26,6 @@ import type {
   ClassFilters,
   CreateSchoolClassRequest,
   SchoolClass,
-  SchoolClassStatus,
   UpdateSchoolClassRequest,
 } from '../types'
 import { formatClassDate, getClassStatusDisplay } from '../types'
@@ -43,26 +44,6 @@ type PageMessage = {
   tone: 'error' | 'success'
 }
 
-type ClassDialogMode = 'create' | 'edit'
-
-type ClassFormState = {
-  code: string
-  description: string
-  languageId: string
-  name: string
-  schoolGradeId: string
-  status: SchoolClassStatus
-}
-
-const emptyClassForm: ClassFormState = {
-  code: '',
-  description: '',
-  languageId: '',
-  name: '',
-  schoolGradeId: '',
-  status: 'ACTIVE',
-}
-
 function getErrorMessage(error: unknown) {
   if (
     error &&
@@ -78,221 +59,6 @@ function getErrorMessage(error: unknown) {
   }
 
   return undefined
-}
-
-function toEditForm(schoolClass: SchoolClass): ClassFormState {
-  return {
-    code: schoolClass.code,
-    description: schoolClass.description ?? '',
-    languageId: schoolClass.languageId,
-    name: schoolClass.name,
-    schoolGradeId: schoolClass.schoolGradeId,
-    status:
-      schoolClass.status === 'ARCHIVED' || schoolClass.status === 'INACTIVE'
-        ? schoolClass.status
-        : 'ACTIVE',
-  }
-}
-
-function isUuidLike(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    value.trim(),
-  )
-}
-
-type FieldInputProps = {
-  disabled?: boolean
-  label: string
-  name: keyof ClassFormState
-  onChange: (name: keyof ClassFormState, value: string) => void
-  placeholder?: string
-  required?: boolean
-  value: string
-}
-
-function FieldInput({
-  disabled = false,
-  label,
-  name,
-  onChange,
-  placeholder,
-  required = false,
-  value,
-}: FieldInputProps) {
-  return (
-    <label className="grid gap-2 text-sm font-bold text-slate-700">
-      {label}
-      <input
-        className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 disabled:bg-slate-100 disabled:text-slate-500"
-        disabled={disabled}
-        name={name}
-        onChange={(event) => onChange(name, event.target.value)}
-        placeholder={placeholder}
-        required={required}
-        value={value}
-      />
-    </label>
-  )
-}
-
-type ClassDialogProps = {
-  errorMessage?: string
-  form: ClassFormState
-  isSubmitting: boolean
-  mode: ClassDialogMode | null
-  onChange: (name: keyof ClassFormState, value: string) => void
-  onClose: () => void
-  onSubmit: () => void
-}
-
-function ClassDialog({
-  errorMessage,
-  form,
-  isSubmitting,
-  mode,
-  onChange,
-  onClose,
-  onSubmit,
-}: ClassDialogProps) {
-  if (!mode) {
-    return null
-  }
-
-  const isEdit = mode === 'edit'
-  const title = isEdit ? 'Cập nhật lớp học' : 'Tạo lớp học'
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6">
-      <form
-        aria-labelledby="class-dialog-title"
-        className="grid max-h-[92vh] w-full max-w-2xl gap-5 overflow-y-auto rounded-lg bg-white p-6 shadow-xl shadow-slate-950/20"
-        onSubmit={(event) => {
-          event.preventDefault()
-          onSubmit()
-        }}
-        role="dialog"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2
-              className="text-xl font-black tracking-0 text-slate-950"
-              id="class-dialog-title"
-            >
-              {title}
-            </h2>
-            <p className="mt-1 text-sm font-medium text-slate-500">
-              {isEdit
-                ? 'Cập nhật tên lớp, mô tả và trạng thái lớp học.'
-                : 'Nhập thông tin để tạo lớp học mới.'}
-            </p>
-          </div>
-          <button
-            aria-label="Đóng hộp thoại lớp học"
-            className="inline-flex size-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
-            disabled={isSubmitting}
-            onClick={onClose}
-            type="button"
-          >
-            <X aria-hidden="true" className="size-5" />
-          </button>
-        </div>
-
-        {errorMessage ? (
-          <div
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
-            role="alert"
-          >
-            {errorMessage}
-          </div>
-        ) : null}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FieldInput
-            disabled={isEdit || isSubmitting}
-            label="Mã lớp"
-            name="code"
-            onChange={onChange}
-            placeholder="ENG-6A"
-            required={!isEdit}
-            value={form.code}
-          />
-          <FieldInput
-            disabled={isSubmitting}
-            label="Tên lớp"
-            name="name"
-            onChange={onChange}
-            placeholder="Tiếng Anh 6A"
-            required
-            value={form.name}
-          />
-          <FieldInput
-            disabled={isEdit || isSubmitting}
-            label="ID ngôn ngữ"
-            name="languageId"
-            onChange={onChange}
-            placeholder="Dán ID ngôn ngữ"
-            required={!isEdit}
-            value={form.languageId}
-          />
-          <FieldInput
-            disabled={isEdit || isSubmitting}
-            label="ID khối lớp"
-            name="schoolGradeId"
-            onChange={onChange}
-            placeholder="Dán ID khối lớp"
-            required={!isEdit}
-            value={form.schoolGradeId}
-          />
-        </div>
-
-        <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Mô tả
-          <textarea
-            className="min-h-28 rounded-lg border border-slate-200 px-3 py-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            disabled={isSubmitting}
-            onChange={(event) => onChange('description', event.target.value)}
-            placeholder="Mô tả ngắn về lớp học"
-            value={form.description}
-          />
-        </label>
-
-        {isEdit ? (
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Trạng thái
-            <select
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              disabled={isSubmitting}
-              onChange={(event) => onChange('status', event.target.value)}
-              value={form.status}
-            >
-              <option value="ACTIVE">Đang hoạt động</option>
-              <option value="INACTIVE">Tạm dừng</option>
-              <option value="ARCHIVED">Đã lưu trữ</option>
-            </select>
-          </label>
-        ) : null}
-
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button
-            className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-            disabled={isSubmitting}
-            onClick={onClose}
-            type="button"
-          >
-            Hủy
-          </button>
-          <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
-            disabled={isSubmitting}
-            type="submit"
-          >
-            <CheckCircle2 aria-hidden="true" className="size-4" />
-            {isSubmitting ? 'Đang lưu...' : 'Lưu lớp học'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
 }
 
 type DeleteDialogProps = {
@@ -579,11 +345,9 @@ export function SchoolAdminClassesPage() {
   const [filters, setFilters] = useState<ClassFilters>(EMPTY_FILTERS)
   const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
   const [classDialogMode, setClassDialogMode] =
-    useState<ClassDialogMode | null>(null)
-  const [classDialogTargetId, setClassDialogTargetId] = useState<string | null>(
-    null,
-  )
-  const [classForm, setClassForm] = useState<ClassFormState>(emptyClassForm)
+    useState<SchoolClassFormMode | null>(null)
+  const [classDialogTarget, setClassDialogTarget] =
+    useState<SchoolClass | null>(null)
   const [classDialogError, setClassDialogError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -609,15 +373,13 @@ export function SchoolAdminClassesPage() {
   }
 
   function openCreateDialog() {
-    setClassForm(emptyClassForm)
-    setClassDialogTargetId(null)
+    setClassDialogTarget(null)
     setClassDialogError(null)
     setClassDialogMode('create')
   }
 
   function openEditDialog(schoolClass: SchoolClass) {
-    setClassForm(toEditForm(schoolClass))
-    setClassDialogTargetId(schoolClass.id)
+    setClassDialogTarget(schoolClass)
     setClassDialogError(null)
     setClassDialogMode('edit')
   }
@@ -633,79 +395,44 @@ export function SchoolAdminClassesPage() {
 
     setClassDialogError(null)
     setClassDialogMode(null)
-    setClassDialogTargetId(null)
+    setClassDialogTarget(null)
   }
 
-  function handleClassFormChange(name: keyof ClassFormState, value: string) {
-    setClassForm((current) => ({
-      ...current,
-      [name]: value,
-    }))
-  }
-
-  function validateClassForm() {
-    if (!classForm.name.trim()) {
-      return 'Tên lớp là bắt buộc.'
-    }
-
-    if (classDialogMode === 'create') {
-      if (!classForm.code.trim()) {
-        return 'Mã lớp là bắt buộc.'
-      }
-
-      if (!isUuidLike(classForm.languageId)) {
-        return 'ID ngôn ngữ không hợp lệ.'
-      }
-
-      if (!isUuidLike(classForm.schoolGradeId)) {
-        return 'ID khối lớp không hợp lệ.'
-      }
-    }
-
-    return null
-  }
-
-  async function handleClassSubmit() {
-    const validationError = validateClassForm()
-
-    if (validationError) {
-      setClassDialogError(validationError)
-      return
-    }
-
+  async function handleCreateClass(payload: CreateSchoolClassRequest) {
     try {
       setClassDialogError(null)
+      const result = await createMutation.mutateAsync({ payload })
 
-      if (classDialogMode === 'create') {
-        const payload: CreateSchoolClassRequest = {
-          code: classForm.code.trim(),
-          description: classForm.description.trim() || null,
-          languageId: classForm.languageId.trim(),
-          name: classForm.name.trim(),
-          schoolGradeId: classForm.schoolGradeId.trim(),
-        }
-        const result = await createMutation.mutateAsync({ payload })
-
-        setPageMessage({ text: result.message, tone: 'success' })
-      } else if (classDialogMode === 'edit' && classDialogTargetId) {
-        const payload: UpdateSchoolClassRequest = {
-          description: classForm.description.trim() || null,
-          name: classForm.name.trim(),
-          status: classForm.status,
-        }
-        const result = await updateMutation.mutateAsync({
-          id: classDialogTargetId,
-          payload,
-        })
-
-        setPageMessage({ text: result.message, tone: 'success' })
-      }
-
+      setPageMessage({ text: result.message, tone: 'success' })
       await queryClient.invalidateQueries({
         queryKey: classManagementQueryKeys.all,
       })
       setClassDialogMode(null)
-      setClassDialogTargetId(null)
+      setClassDialogTarget(null)
+    } catch (error) {
+      setClassDialogError(
+        getErrorMessage(error) ?? 'Không thể lưu lớp học. Vui lòng thử lại.',
+      )
+    }
+  }
+
+  async function handleUpdateClass(
+    id: string,
+    payload: UpdateSchoolClassRequest,
+  ) {
+    try {
+      setClassDialogError(null)
+      const result = await updateMutation.mutateAsync({
+        id,
+        payload,
+      })
+
+      setPageMessage({ text: result.message, tone: 'success' })
+      await queryClient.invalidateQueries({
+        queryKey: classManagementQueryKeys.all,
+      })
+      setClassDialogMode(null)
+      setClassDialogTarget(null)
     } catch (error) {
       setClassDialogError(
         getErrorMessage(error) ?? 'Không thể lưu lớp học. Vui lòng thử lại.',
@@ -877,16 +604,19 @@ export function SchoolAdminClassesPage() {
         />
       </div>
 
-      <ClassDialog
+      <SchoolClassFormDialog
         errorMessage={classDialogError ?? undefined}
-        form={classForm}
+        isOpen={Boolean(classDialogMode)}
         isSubmitting={isSavingClass}
-        mode={classDialogMode}
-        onChange={handleClassFormChange}
+        mode={classDialogMode ?? 'create'}
         onClose={closeClassDialog}
-        onSubmit={() => {
-          void handleClassSubmit()
+        onCreate={(payload) => {
+          void handleCreateClass(payload)
         }}
+        onUpdate={(id, payload) => {
+          void handleUpdateClass(id, payload)
+        }}
+        schoolClass={classDialogTarget}
       />
       <DeleteDialog
         errorMessage={deleteError ?? undefined}

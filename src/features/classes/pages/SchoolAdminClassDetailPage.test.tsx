@@ -114,13 +114,25 @@ function mockGraphQLSuccess({
   usersPage?: PageResult<ClassUser>
 } = {}) {
   mockedPost.mockImplementation((_path, body) => {
-    const request = body as { query: string }
+    const request = body as { query: string; variables?: Record<string, unknown> }
 
     if (request.query.includes('schoolClassUsers')) {
       return Promise.resolve({
         data: {
           data: {
             schoolClassUsers: usersPage,
+          },
+        },
+      })
+    }
+
+    if (request.query.includes('updateSchoolClass')) {
+      return Promise.resolve({
+        data: {
+          data: {
+            updateSchoolClass: {
+              schoolClassId: request.variables?.id,
+            },
           },
         },
       })
@@ -206,6 +218,89 @@ describe('SchoolAdminClassDetailPage', () => {
     expect(screen.getAllByText(formatClassDate(schoolClass.createdAt)).length).toBeGreaterThan(0)
     expect(screen.getAllByText(formatClassDate(schoolClass.updatedAt)).length).toBeGreaterThan(0)
     expect(screen.getAllByText('Đang hoạt động').length).toBeGreaterThan(0)
+  })
+
+  it('updates the class from the edit dialog', async () => {
+    mockGraphQLSuccess()
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await screen.findByRole('heading', { name: /tiếng anh 6a/i })
+    await user.click(screen.getByRole('button', { name: /chỉnh sửa/i }))
+
+    const dialog = screen.getByRole('dialog', {
+      name: /cập nhật lớp học/i,
+    })
+
+    expect(within(dialog).getByDisplayValue('Tiếng Anh 6A')).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue('Lớp buổi sáng')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/trạng thái/i)).toHaveValue('ACTIVE')
+
+    await user.clear(within(dialog).getByLabelText(/tên lớp/i))
+    await user.type(
+      within(dialog).getByLabelText(/tên lớp/i),
+      'Tiếng Anh 6A mới',
+    )
+    await user.click(
+      within(dialog).getByRole('button', { name: /lưu lớp học/i }),
+    )
+
+    await waitFor(() => {
+      const mutationRequest = mockedPost.mock.calls
+        .map(
+          (call) =>
+            call[1] as { query: string; variables: Record<string, unknown> },
+        )
+        .find((request) => request.query.includes('updateSchoolClass'))
+
+      expect(mutationRequest?.variables).toMatchObject({
+        id: classId,
+        input: {
+          description: 'Lớp buổi sáng',
+          name: 'Tiếng Anh 6A mới',
+          status: 'ACTIVE',
+        },
+      })
+    })
+    expect(
+      screen.queryByRole('dialog', { name: /cập nhật lớp học/i }),
+    ).not.toBeInTheDocument()
+    expect(await screen.findByText('Class updated successfully.')).toBeInTheDocument()
+  })
+
+  it('shows update errors inside the edit dialog', async () => {
+    mockedPost.mockImplementation((_path, body) => {
+      const request = body as { query: string }
+
+      if (request.query.includes('updateSchoolClass')) {
+        return Promise.reject(new Error('Update failed'))
+      }
+
+      return Promise.resolve({
+        data: {
+          data: {
+            schoolClass: createClass(),
+          },
+        },
+      })
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await screen.findByRole('heading', { name: /tiếng anh 6a/i })
+    await user.click(screen.getByRole('button', { name: /chỉnh sửa/i }))
+
+    const dialog = screen.getByRole('dialog', {
+      name: /cập nhật lớp học/i,
+    })
+
+    await user.click(
+      within(dialog).getByRole('button', { name: /lưu lớp học/i }),
+    )
+
+    expect(await within(dialog).findByText('Update failed')).toBeInTheDocument()
   })
 
   it('renders the empty class users tab', async () => {
