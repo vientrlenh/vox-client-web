@@ -4,6 +4,7 @@ import {
   saveAuthTokens,
 } from '@/shared/api/authTokenStorage'
 import type { AuthTokens } from '@/shared/api/authTokenStorage'
+import { QUESTION_MODULE_DEFAULT_SCHOOL_ID } from '@/features/question/constants'
 import type { AuthUser, ClientDevice, RoleCode } from '../types'
 
 type JwtPayload = {
@@ -15,7 +16,7 @@ type JwtPayload = {
 }
 
 export const CLIENT_DEVICE_STORAGE_KEY = 'vox.deviceId'
-export const FALLBACK_SCHOOL_ID = '33333333-3333-4333-8333-333333333333'
+export const FALLBACK_SCHOOL_ID = QUESTION_MODULE_DEFAULT_SCHOOL_ID
 
 export { clearAuthTokens, getAuthTokens, saveAuthTokens }
 export type { AuthTokens }

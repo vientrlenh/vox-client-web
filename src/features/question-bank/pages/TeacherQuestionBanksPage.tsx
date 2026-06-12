@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
+import { QUESTION_MODULE_DEFAULT_LANGUAGE_ID } from '@/features/question/constants'
 import {
   useCreateQuestionBankMutation,
   useDeleteQuestionBankMutation,
@@ -35,7 +36,6 @@ import type {
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
-const FIXED_LANGUAGE_ID = '01890f44-0c7a-7cc1-bc3b-2e7f4f001234'
 
 function getErrorMessage(error: unknown) {
   if (
@@ -152,7 +152,7 @@ function QuestionBanksPage({
         const payload: CreateQuestionBankRequest = {
           code: values.code,
           description: values.description || null,
-          languageId: FIXED_LANGUAGE_ID,
+          languageId: QUESTION_MODULE_DEFAULT_LANGUAGE_ID,
           name: values.bankName,
           ...(scope === 'school' ? { schoolId: user?.schoolId } : {}),
         }
