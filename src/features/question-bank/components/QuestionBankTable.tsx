@@ -13,7 +13,7 @@ type QuestionBankTableProps = {
   footer?: ReactNode
   isError: boolean
   isLoading: boolean
-  onEdit: (bank: QuestionBankDto) => void
+  onEdit?: (bank: QuestionBankDto) => void
   onRetry: () => void
   onSelect: (id: string) => void
   onViewTopics: (bank: QuestionBankDto) => void
@@ -122,9 +122,7 @@ export function QuestionBankTable({
                     <td className="px-4 py-4">
                       <div className="flex justify-center">
                         <ActionMenuButton
-                          ariaLabel={`Mở hành động cho ${formatNullableText(
-                            bank.bankName,
-                          )}`}
+                          ariaLabel={`Mở hành động cho ${formatNullableText(bank.bankName)}`}
                           items={[
                             {
                               icon: Eye,
@@ -140,13 +138,17 @@ export function QuestionBankTable({
                               onSelect: () => onViewTopics(bank),
                               tone: 'default',
                             },
-                            {
-                              icon: Pencil,
-                              id: 'edit',
-                              label: 'Chỉnh sửa',
-                              onSelect: () => onEdit(bank),
-                              tone: 'default',
-                            },
+                            ...(onEdit
+                              ? [
+                                  {
+                                    icon: Pencil,
+                                    id: 'edit',
+                                    label: 'Chỉnh sửa',
+                                    onSelect: () => onEdit(bank),
+                                    tone: 'default' as const,
+                                  },
+                                ]
+                              : []),
                           ]}
                         />
                       </div>

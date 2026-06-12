@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import {
   Bell,
-  BookOpen,
   ChevronDown,
+  FileQuestion,
+  FolderTree,
   Home,
   LogOut,
   Menu,
@@ -11,11 +12,20 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { NavLink, Outlet, useNavigate } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import logoImage from '@/assets/images/logo.png'
 import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
+
+type NavigationGroup = {
+  icon: typeof Home
+  label: string
+  items: Array<{
+    label: string
+    to: string
+  }>
+}
 
 const navigationItems = [
   {
@@ -24,14 +34,40 @@ const navigationItems = [
     to: '/school-admin/dashboard',
   },
   {
-    icon: BookOpen,
+    icon: Users,
     label: 'Quản lý lớp học',
     to: '/school-admin/classes',
   },
+]
+
+const navigationGroups: NavigationGroup[] = [
   {
-    icon: Users,
-    label: 'Học viên',
-    to: '/school-admin/students',
+    icon: FolderTree,
+    label: 'Question bank',
+    items: [
+      {
+        label: 'Ngân hàng câu hỏi',
+        to: '/school-admin/question-banks',
+      },
+      {
+        label: 'Chủ đề câu hỏi',
+        to: '/school-admin/question-topics',
+      },
+    ],
+  },
+  {
+    icon: FileQuestion,
+    label: 'Question',
+    items: [
+      {
+        label: 'Question tổng',
+        to: '/school-admin/questions/all',
+      },
+      {
+        label: 'Duyệt question',
+        to: '/school-admin/questions/review',
+      },
+    ],
   },
 ]
 
@@ -63,6 +99,8 @@ function SchoolAdminSidebar({
   onNavigate,
   showCloseButton = false,
 }: SchoolAdminSidebarProps) {
+  const location = useLocation()
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-cyan-950 via-blue-900 to-indigo-900 px-6 py-7 text-white">
       <div className="flex items-center justify-between">
@@ -95,7 +133,7 @@ function SchoolAdminSidebar({
         School Admin
       </p>
 
-      <nav aria-label="School admin" className="mt-6 grid gap-2">
+      <nav aria-label="School admin" className="mt-6 grid gap-3">
         {navigationItems.map(({ icon: Icon, label, to }) => (
           <NavLink
             className={({ isActive }) =>
@@ -106,7 +144,7 @@ function SchoolAdminSidebar({
                   : 'text-cyan-50/90 hover:bg-white/10 hover:text-white',
               ].join(' ')
             }
-            key={`${label}-${to}`}
+            key={to}
             onClick={onNavigate}
             to={to}
           >
@@ -114,6 +152,47 @@ function SchoolAdminSidebar({
             <span>{label}</span>
           </NavLink>
         ))}
+
+        {navigationGroups.map(({ icon: Icon, items, label }) => {
+          const isGroupActive = items.some(({ to }) =>
+            location.pathname.startsWith(to),
+          )
+
+          return (
+            <div className="grid gap-2" key={label}>
+              <div
+                className={[
+                  'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
+                  isGroupActive
+                    ? 'bg-white/10 text-white'
+                    : 'text-cyan-50/90',
+                ].join(' ')}
+              >
+                <Icon aria-hidden="true" className="size-5 shrink-0" />
+                <span>{label}</span>
+              </div>
+              <div className="ml-4 grid gap-2 border-l border-white/10 pl-4">
+                {items.map(({ label: itemLabel, to }) => (
+                  <NavLink
+                    className={({ isActive }) =>
+                      [
+                        'flex min-h-11 items-center rounded-lg px-4 py-2.5 text-sm font-bold transition',
+                        isActive
+                          ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20'
+                          : 'text-cyan-50/90 hover:bg-white/10 hover:text-white',
+                      ].join(' ')
+                    }
+                    key={to}
+                    onClick={onNavigate}
+                    to={to}
+                  >
+                    {itemLabel}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </nav>
 
       <div className="mt-auto rounded-lg border border-white/15 bg-white/10 p-5 text-white backdrop-blur">

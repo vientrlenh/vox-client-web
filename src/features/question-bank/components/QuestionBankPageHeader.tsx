@@ -1,15 +1,21 @@
 import { Plus, RefreshCw } from 'lucide-react'
 
 type QuestionBankPageHeaderProps = {
+  createLabel?: string
+  description?: string
   isRefreshing: boolean
-  onCreate: () => void
+  onCreate?: () => void
   onRefresh: () => void
+  title?: string
 }
 
 export function QuestionBankPageHeader({
+  createLabel = 'Tạo ngân hàng',
+  description = 'Theo dõi và quản lý ngân hàng câu hỏi theo quyền hiện tại.',
   isRefreshing,
   onCreate,
   onRefresh,
+  title = 'Ngân hàng câu hỏi',
 }: QuestionBankPageHeaderProps) {
   return (
     <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -18,11 +24,9 @@ export function QuestionBankPageHeader({
           className="text-2xl font-black text-blue-950 sm:text-3xl"
           id="teacher-question-banks-title"
         >
-          Ngân hàng câu hỏi
+          {title}
         </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Tạo và quản lý ngân hàng câu hỏi cho các kỳ thi đánh giá kỹ năng nói.
-        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -39,14 +43,16 @@ export function QuestionBankPageHeader({
           Làm mới
         </button>
 
-        <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-bold text-white transition hover:opacity-90"
-          onClick={onCreate}
-          type="button"
-        >
-          <Plus aria-hidden="true" className="size-4" />
-          Tạo ngân hàng
-        </button>
+        {onCreate ? (
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-bold text-white transition hover:opacity-90"
+            onClick={onCreate}
+            type="button"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            {createLabel}
+          </button>
+        ) : null}
       </div>
     </div>
   )

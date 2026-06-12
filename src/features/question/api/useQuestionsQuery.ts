@@ -1,29 +1,56 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
+import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import type { QuestionPage } from '../types'
+
+export type QuestionListView = 'all' | 'my' | 'review'
 
 const QUESTION_FIELDS = `
   id
-  topicId
+  questionTopicId
+  code
+  instructionText
   questionText
-  audioUrl
-  standardLevelId
-  standardLevelCode
-  frameworkCode
-  frameworkName
-  questionType
-  durationSeconds
-  isActive
+  promptText
+  preparationText
+  type
+  preparationTimeSeconds
+  minResponseSeconds
+  maxResponseSeconds
+  scope
+  visibility
+  sourceQuestionId
+  locked
+  status
   createdAt
-  topic {
+  updatedAt
+  questionTopic {
     id
-    topicName
+    questionBankId
+    code
+    name
   }
 `
 
-const QUESTIONS_QUERY = `
+function getQuestionListQuery(scope: QuestionModuleScope, view: QuestionListView) {
+  const queryName =
+    scope === 'teacher'
+      ? view === 'my'
+        ? 'teacherMyQuestions'
+        : view === 'review'
+          ? 'teacherReviewQueue'
+          : 'teacherQuestions'
+      : scope === 'school'
+        ? view === 'review'
+          ? 'schoolReviewQueue'
+          : 'schoolQuestions'
+        : view === 'review'
+          ? 'adminReviewQueue'
+          : 'adminQuestions'
+
+  return `
   query Questions($page: Int!, $size: Int!) {
-    questions(page: $page, size: $size) {
+    ${queryName}(page: $page, size: $size) {
       content {
         ${QUESTION_FIELDS}
       }
@@ -32,93 +59,182 @@ const QUESTIONS_QUERY = `
       totalElements
       totalPages
     }
-  }
-`
-
-const QUESTIONS_BY_TOPIC_QUERY = `
-  query QuestionsByTopic($topicId: ID!, $page: Int!, $size: Int!) {
-    questionsByTopic(topicId: $topicId, page: $page, size: $size) {
-      content {
-        ${QUESTION_FIELDS}
-      }
-      page
-      size
-      totalElements
-      totalPages
-    }
-  }
-`
-
-type QuestionsQueryData = {
-  questions: QuestionPage
+  }`
 }
 
-type QuestionsByTopicQueryData = {
-  questionsByTopic: QuestionPage
+function getTopicQuestionsQuery(scope: QuestionModuleScope) {
+  const queryName =
+    scope === 'teacher'
+      ? 'teacherTopicQuestions'
+      : scope === 'school'
+        ? 'schoolTopicQuestions'
+        : 'adminTopicQuestions'
+
+  return `
+  query TopicQuestions($bankId: ID!, $topicId: ID!, $page: Int!, $size: Int!) {
+    ${queryName}(bankId: $bankId, topicId: $topicId, page: $page, size: $size) {
+      content {
+        ${QUESTION_FIELDS}
+      }
+      page
+      size
+      totalElements
+      totalPages
+    }
+  }`
+}
+
+type QuestionsQueryData = {
+  teacherMyQuestions?: QuestionPage
+  teacherQuestions?: QuestionPage
+  teacherReviewQueue?: QuestionPage
+  schoolQuestions?: QuestionPage
+  schoolReviewQueue?: QuestionPage
+  adminQuestions?: QuestionPage
+  adminReviewQueue?: QuestionPage
+}
+
+type TopicQuestionsQueryData = {
+  teacherTopicQuestions?: QuestionPage
+  schoolTopicQuestions?: QuestionPage
+  adminTopicQuestions?: QuestionPage
 }
 
 type FetchQuestionsInput = {
   page: number
+  scope: QuestionModuleScope
   size: number
+  view: QuestionListView
 }
 
 type FetchQuestionsByTopicInput = {
-  topicId: string
+  bankId: string
   page: number
+  scope: QuestionModuleScope
   size: number
+  topicId: string
 }
 
 export const questionQueryKeys = {
   all: ['questions'] as const,
   question: (id: string | null) =>
     [...questionQueryKeys.all, 'detail', id] as const,
-  questions: (page: number, size: number) =>
-    [...questionQueryKeys.all, 'list', page, size] as const,
-  questionsByTopic: (topicId: string, page: number, size: number) =>
-    [...questionQueryKeys.all, 'by-topic', topicId, page, size] as const,
-}
-
-export async function fetchQuestions({ page, size }: FetchQuestionsInput) {
-  const data = await graphQLRequest<QuestionsQueryData>(QUESTIONS_QUERY, {
-    page,
-    size,
-  })
-
-  return data.questions
-}
-
-export async function fetchQuestionsByTopic({
-  topicId,
-  page,
-  size,
-}: FetchQuestionsByTopicInput) {
-  const data = await graphQLRequest<QuestionsByTopicQueryData>(
-    QUESTIONS_BY_TOPIC_QUERY,
-    {
+  questions: (
+    scope: QuestionModuleScope,
+    view: QuestionListView,
+    page: number,
+    size: number,
+  ) => [...questionQueryKeys.all, 'list', scope, view, page, size] as const,
+  questionsByTopic: (
+    scope: QuestionModuleScope,
+    bankId: string,
+    topicId: string,
+    page: number,
+    size: number,
+  ) =>
+    [
+      ...questionQueryKeys.all,
+      'by-topic',
+      scope,
+      bankId,
       topicId,
+      page,
+      size,
+    ] as const,
+}
+
+export async function fetchQuestions({
+  page,
+  scope,
+  size,
+  view,
+}: FetchQuestionsInput) {
+  const data = await graphQLRequest<QuestionsQueryData>(
+    getQuestionListQuery(scope, view),
+    {
       page,
       size,
     },
   )
 
-  return data.questionsByTopic
+  return (
+    data.teacherMyQuestions ??
+    data.teacherQuestions ??
+    data.teacherReviewQueue ??
+    data.schoolQuestions ??
+    data.schoolReviewQueue ??
+    data.adminQuestions ??
+    data.adminReviewQueue ??
+    {
+      content: [],
+      page,
+      size,
+      totalElements: 0,
+      totalPages: 0,
+    }
+  )
 }
 
-export function useQuestionsQuery(page: number, size: number) {
+export async function fetchQuestionsByTopic({
+  bankId,
+  page,
+  scope,
+  size,
+  topicId,
+}: FetchQuestionsByTopicInput) {
+  const data = await graphQLRequest<TopicQuestionsQueryData>(
+    getTopicQuestionsQuery(scope),
+    {
+      bankId,
+      page,
+      size,
+      topicId,
+    },
+  )
+
+  return (
+    data.teacherTopicQuestions ??
+    data.schoolTopicQuestions ??
+    data.adminTopicQuestions ??
+    {
+      content: [],
+      page,
+      size,
+      totalElements: 0,
+      totalPages: 0,
+    }
+  )
+}
+
+export function useQuestionsQuery(
+  scope: QuestionModuleScope,
+  view: QuestionListView,
+  page: number,
+  size: number,
+) {
   return useQuery({
-    queryFn: () => fetchQuestions({ page, size }),
-    queryKey: questionQueryKeys.questions(page, size),
+    enabled: !(scope !== 'teacher' && view === 'my'),
+    queryFn: () => fetchQuestions({ page, scope, size, view }),
+    queryKey: questionQueryKeys.questions(scope, view, page, size),
   })
 }
 
 export function useQuestionsByTopicQuery(
+  scope: QuestionModuleScope,
+  bankId: string,
   topicId: string,
   page: number,
   size: number,
 ) {
   return useQuery({
-    enabled: Boolean(topicId),
-    queryFn: () => fetchQuestionsByTopic({ topicId, page, size }),
-    queryKey: questionQueryKeys.questionsByTopic(topicId, page, size),
+    enabled: Boolean(bankId && topicId),
+    queryFn: () => fetchQuestionsByTopic({ bankId, page, scope, size, topicId }),
+    queryKey: questionQueryKeys.questionsByTopic(
+      scope,
+      bankId,
+      topicId,
+      page,
+      size,
+    ),
   })
 }

@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
 import { SchoolAdminLayout } from '@/app/layouts/SchoolAdminLayout'
 import { SystemAdminLayout } from '@/app/layouts/SystemAdminLayout'
+import { TeacherLayout } from '@/app/layouts/TeacherLayout'
 import { RequireRole } from './RequireRole'
 import { PageLoader } from '@/shared/ui/PageLoader'
 
@@ -65,6 +66,84 @@ const SchoolAdminClassImportPage = lazy(() =>
   })),
 )
 
+const TeacherQuestionBanksPage = lazy(() =>
+  import('@/features/question-bank').then((module) => ({
+    default: module.TeacherQuestionBanksPage,
+  })),
+)
+
+const SchoolAdminQuestionBanksPage = lazy(() =>
+  import('@/features/question-bank').then((module) => ({
+    default: module.SchoolAdminQuestionBanksPage,
+  })),
+)
+
+const SystemAdminQuestionBanksPage = lazy(() =>
+  import('@/features/question-bank').then((module) => ({
+    default: module.SystemAdminQuestionBanksPage,
+  })),
+)
+
+const TeacherQuestionTopicsPage = lazy(() =>
+  import('@/features/question-topic').then((module) => ({
+    default: module.TeacherQuestionTopicsPage,
+  })),
+)
+
+const SchoolAdminQuestionTopicsPage = lazy(() =>
+  import('@/features/question-topic').then((module) => ({
+    default: module.SchoolAdminQuestionTopicsPage,
+  })),
+)
+
+const SystemAdminQuestionTopicsPage = lazy(() =>
+  import('@/features/question-topic').then((module) => ({
+    default: module.SystemAdminQuestionTopicsPage,
+  })),
+)
+
+const TeacherMyQuestionsPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.TeacherMyQuestionsPage,
+  })),
+)
+
+const TeacherQuestionsPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.TeacherQuestionsPage,
+  })),
+)
+
+const TeacherReviewQuestionsPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.TeacherReviewQuestionsPage,
+  })),
+)
+
+const SchoolAdminQuestionsPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SchoolAdminQuestionsPage,
+  })),
+)
+
+const SchoolAdminReviewQuestionsPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SchoolAdminReviewQuestionsPage,
+  })),
+)
+
+const SystemAdminQuestionsPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SystemAdminQuestionsPage,
+  })),
+)
+
+const SystemAdminReviewQuestionsPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SystemAdminReviewQuestionsPage,
+  })),
+)
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -83,6 +162,22 @@ export function AppRoutes() {
             <Route
               path="system-admin/registrations"
               element={<SystemAdminRegistrationsPage />}
+            />
+            <Route
+              path="system-admin/question-banks"
+              element={<SystemAdminQuestionBanksPage />}
+            />
+            <Route
+              path="system-admin/question-topics"
+              element={<SystemAdminQuestionTopicsPage />}
+            />
+            <Route
+              path="system-admin/questions/all"
+              element={<SystemAdminQuestionsPage />}
+            />
+            <Route
+              path="system-admin/questions/review"
+              element={<SystemAdminReviewQuestionsPage />}
             />
           </Route>
         </Route>
@@ -103,6 +198,46 @@ export function AppRoutes() {
             <Route
               path="school-admin/classes/:classId"
               element={<SchoolAdminClassDetailPage />}
+            />
+            <Route
+              path="school-admin/question-banks"
+              element={<SchoolAdminQuestionBanksPage />}
+            />
+            <Route
+              path="school-admin/question-topics"
+              element={<SchoolAdminQuestionTopicsPage />}
+            />
+            <Route
+              path="school-admin/questions/all"
+              element={<SchoolAdminQuestionsPage />}
+            />
+            <Route
+              path="school-admin/questions/review"
+              element={<SchoolAdminReviewQuestionsPage />}
+            />
+          </Route>
+        </Route>
+        <Route element={<RequireRole role="TEACHER" />}>
+          <Route element={<TeacherLayout />}>
+            <Route
+              path="teacher/question-banks"
+              element={<TeacherQuestionBanksPage />}
+            />
+            <Route
+              path="teacher/question-topics"
+              element={<TeacherQuestionTopicsPage />}
+            />
+            <Route
+              path="teacher/questions/my"
+              element={<TeacherMyQuestionsPage />}
+            />
+            <Route
+              path="teacher/questions/all"
+              element={<TeacherQuestionsPage />}
+            />
+            <Route
+              path="teacher/questions/review"
+              element={<TeacherReviewQuestionsPage />}
             />
           </Route>
         </Route>

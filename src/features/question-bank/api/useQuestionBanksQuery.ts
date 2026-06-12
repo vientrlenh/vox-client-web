@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
 import type { QuestionBankPage } from '../types'
 
+export type QuestionModuleScope = 'teacher' | 'school' | 'admin'
+
 const QUESTION_BANK_FIELDS = `
   id
   bankName
@@ -13,9 +15,17 @@ const QUESTION_BANK_FIELDS = `
   updatedBy
 `
 
-const QUESTION_BANKS_QUERY = `
+function getQuestionBanksQuery(scope: QuestionModuleScope) {
+  const queryName =
+    scope === 'teacher'
+      ? 'teacherQuestionBanks'
+      : scope === 'school'
+        ? 'schoolQuestionBanks'
+        : 'adminQuestionBanks'
+
+  return `
   query QuestionBanks($page: Int!, $size: Int!) {
-    questionBanks(page: $page, size: $size) {
+    ${queryName}(page: $page, size: $size) {
       content {
         ${QUESTION_BANK_FIELDS}
       }
@@ -24,15 +34,18 @@ const QUESTION_BANKS_QUERY = `
       totalElements
       totalPages
     }
-  }
-`
+  }`
+}
 
 type QuestionBanksQueryData = {
-  questionBanks: QuestionBankPage
+  teacherQuestionBanks?: QuestionBankPage
+  schoolQuestionBanks?: QuestionBankPage
+  adminQuestionBanks?: QuestionBankPage
 }
 
 type FetchQuestionBanksInput = {
   page: number
+  scope: QuestionModuleScope
   size: number
 }
 
@@ -40,28 +53,44 @@ export const questionBankQueryKeys = {
   all: ['question-banks'] as const,
   questionBank: (id: string | null) =>
     [...questionBankQueryKeys.all, 'detail', id] as const,
-  questionBanks: (page: number, size: number) =>
-    [...questionBankQueryKeys.all, 'list', page, size] as const,
+  questionBanks: (scope: QuestionModuleScope, page: number, size: number) =>
+    [...questionBankQueryKeys.all, 'list', scope, page, size] as const,
 }
 
 export async function fetchQuestionBanks({
   page,
+  scope,
   size,
 }: FetchQuestionBanksInput) {
   const data = await graphQLRequest<QuestionBanksQueryData>(
-    QUESTION_BANKS_QUERY,
+    getQuestionBanksQuery(scope),
     {
       page,
       size,
     },
   )
 
-  return data.questionBanks
+  return (
+    data.teacherQuestionBanks ??
+    data.schoolQuestionBanks ??
+    data.adminQuestionBanks ??
+    {
+      content: [],
+      page,
+      size,
+      totalElements: 0,
+      totalPages: 0,
+    }
+  )
 }
 
-export function useQuestionBanksQuery(page: number, size: number) {
+export function useQuestionBanksQuery(
+  scope: QuestionModuleScope,
+  page: number,
+  size: number,
+) {
   return useQuery({
-    queryFn: () => fetchQuestionBanks({ page, size }),
-    queryKey: questionBankQueryKeys.questionBanks(page, size),
+    queryFn: () => fetchQuestionBanks({ page, scope, size }),
+    queryKey: questionBankQueryKeys.questionBanks(scope, page, size),
   })
 }

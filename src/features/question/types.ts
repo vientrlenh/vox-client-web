@@ -7,25 +7,41 @@ export type QuestionType =
 
 export type QuestionDto = {
   id: string
-  topicId: string
+  questionTopicId: string
+  topicId?: string
+  code: string
+  instructionText: string | null
   questionText: string
-  audioUrl: string | null
-  standardLevelId: string
-  standardLevelCode: string | null
-  frameworkCode: string | null
-  frameworkName: string | null
-  questionType: QuestionType
-  durationSeconds: number
-  isActive: boolean
-  createdAt: string
+  promptText: string | null
+  preparationText: string | null
+  type: QuestionType | string
+  questionType?: QuestionType | string
+  preparationTimeSeconds: number
+  minResponseSeconds: number
+  maxResponseSeconds: number
+  durationSeconds?: number
+  scope: string
+  visibility: string
+  sourceQuestionId: string | null
+  locked: boolean
+  status: string
+  isActive?: boolean
+  audioUrl?: string | null
+  standardLevelId?: string | null
+  standardLevelCode?: string | null
+  frameworkCode?: string | null
+  frameworkName?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  questionTopic?: QuestionTopicDto | null
   topic?: QuestionTopicDto | null
 }
 
 type QuestionTopicDto = {
   id: string
-  bankId: string
-  topicName: string
-  description: string | null
+  questionBankId: string
+  code: string
+  name: string
 }
 
 export type QuestionPage = {
@@ -37,22 +53,38 @@ export type QuestionPage = {
 }
 
 export type CreateQuestionRequest = {
-  topicId: string
+  questionTopicId?: string
+  topicId?: string
   questionText: string
-  audioUrl: string | null
-  standardLevelId: string | null
-  questionType: string
-  durationSeconds: number
+  instructionText?: string | null
+  promptText?: string | null
+  preparationText?: string | null
+  type?: string
+  questionType?: string
+  preparationTimeSeconds?: number
+  minResponseSeconds?: number
+  maxResponseSeconds?: number
+  durationSeconds?: number
+  audioUrl?: string | null
+  standardLevelId?: string | null
 }
 
 export type UpdateQuestionRequest = {
-  topicId: string
+  questionTopicId?: string
+  topicId?: string
   questionText: string
-  audioUrl: string | null
-  standardLevelId: string | null
-  questionType: string
-  durationSeconds: number
-  isActive: boolean
+  instructionText?: string | null
+  promptText?: string | null
+  preparationText?: string | null
+  type?: string
+  questionType?: string
+  preparationTimeSeconds?: number
+  minResponseSeconds?: number
+  maxResponseSeconds?: number
+  durationSeconds?: number
+  audioUrl?: string | null
+  standardLevelId?: string | null
+  isActive?: boolean
 }
 
 export function formatQuestionDate(value?: string | null) {
@@ -115,14 +147,68 @@ export function getQuestionTypeDisplay(type: QuestionType | string) {
   return map[type as QuestionType] ?? type ?? '-'
 }
 
-export function getActiveStatusDisplay(isActive: boolean) {
-  return isActive
-    ? {
+export function getQuestionStatusDisplay(status?: string | null) {
+  switch (status) {
+    case 'PUBLISHED':
+      return {
         className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        label: 'Hoạt động',
+        label: 'Đã xuất bản',
       }
-    : {
+    case 'DRAFT':
+      return {
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
+        label: 'Bản nháp',
+      }
+    case 'SUBMITTED_FOR_REVIEW':
+      return {
+        className: 'border-blue-200 bg-blue-50 text-blue-700',
+        label: 'Chờ duyệt',
+      }
+    case 'REVISION_REQUESTED':
+      return {
+        className: 'border-orange-200 bg-orange-50 text-orange-700',
+        label: 'Yêu cầu sửa',
+      }
+    case 'REJECTED':
+      return {
+        className: 'border-red-200 bg-red-50 text-red-700',
+        label: 'Bị từ chối',
+      }
+    case 'ARCHIVED':
+      return {
         className: 'border-slate-200 bg-slate-50 text-slate-500',
-        label: 'Ngừng hoạt động',
+        label: 'Lưu trữ',
       }
+    default:
+      return {
+        className: 'border-slate-200 bg-slate-50 text-slate-600',
+        label: status?.trim() || '-',
+      }
+  }
+}
+
+export function getQuestionScopeDisplay(scope?: string | null) {
+  switch (scope) {
+    case 'QUESTION_BANK':
+      return 'Ngân hàng'
+    case 'CLASSROOM_ASSESSMENT':
+      return 'Đánh giá lớp'
+    case 'CENTRAL_EXAM_DRAFT':
+      return 'Đề thi nháp'
+    case 'CENTRAL_EXAM_PAPER':
+      return 'Đề thi chính thức'
+    default:
+      return scope?.trim() || '-'
+  }
+}
+
+export function getQuestionVisibilityDisplay(visibility?: string | null) {
+  switch (visibility) {
+    case 'BANK_VISIBLE':
+      return 'Hiển thị trong ngân hàng'
+    case 'REVIEWER_ONLY':
+      return 'Chỉ reviewer'
+    default:
+      return visibility?.trim() || '-'
+  }
 }

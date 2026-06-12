@@ -1,1 +1,5 @@
-export { TeacherQuestionBanksPage } from './pages/TeacherQuestionBanksPage'
+export {
+  SchoolAdminQuestionBanksPage,
+  SystemAdminQuestionBanksPage,
+  TeacherQuestionBanksPage,
+} from './pages/TeacherQuestionBanksPage'

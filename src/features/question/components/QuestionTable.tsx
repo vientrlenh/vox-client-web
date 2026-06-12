@@ -6,8 +6,10 @@ import {
   formatDuration,
   formatNullableText,
   formatQuestionDate,
-  getActiveStatusDisplay,
+  getQuestionScopeDisplay,
+  getQuestionStatusDisplay,
   getQuestionTypeDisplay,
+  getQuestionVisibilityDisplay,
 } from '../types'
 
 type QuestionTableProps = {
@@ -15,15 +17,15 @@ type QuestionTableProps = {
   footer?: ReactNode
   isError: boolean
   isLoading: boolean
-  onEdit: (question: QuestionDto) => void
+  onEdit?: (question: QuestionDto) => void
   onRetry: () => void
   onSelect: (id: string) => void
   questions: QuestionDto[]
   selectedId: string | null
 }
 
-function ActiveStatusBadge({ isActive }: { isActive: boolean }) {
-  const display = getActiveStatusDisplay(isActive)
+function StatusBadge({ status }: { status?: string | null }) {
+  const display = getQuestionStatusDisplay(status)
 
   return (
     <span
@@ -51,9 +53,7 @@ export function QuestionTable({
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-6 py-5">
-        <h2 className="text-lg font-black text-blue-950">
-          Danh sách câu hỏi
-        </h2>
+        <h2 className="text-lg font-black text-blue-950">Danh sách câu hỏi</h2>
       </div>
 
       {isLoading ? (
@@ -85,15 +85,17 @@ export function QuestionTable({
 
       {!isLoading && !isError && questions.length > 0 ? (
         <div className="min-h-80 flex-1 overflow-x-auto">
-          <table className="w-full min-w-220 border-collapse text-left">
+          <table className="w-full min-w-280 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
-                <th className="px-6 py-4">Nội dung câu hỏi</th>
+                <th className="px-6 py-4">Câu hỏi</th>
+                <th className="px-4 py-4">Mã</th>
                 <th className="px-4 py-4">Loại</th>
-                <th className="px-4 py-4">Khung đánh giá</th>
-                <th className="px-4 py-4">Thời gian</th>
+                <th className="px-4 py-4">Scope</th>
+                <th className="px-4 py-4">Hiển thị</th>
+                <th className="px-4 py-4">Thời lượng</th>
                 <th className="px-4 py-4">Trạng thái</th>
-                <th className="px-4 py-4">Ngày tạo</th>
+                <th className="px-4 py-4">Cập nhật</th>
                 <th className="px-4 py-4 text-center">Hành động</th>
               </tr>
             </thead>
@@ -109,28 +111,41 @@ export function QuestionTable({
                     ].join(' ')}
                     key={question.id}
                   >
-                    <td className="max-w-60 wrap-break-word px-6 py-5 font-bold">
-                      {formatNullableText(question.questionText)}
+                    <td className="max-w-80 px-6 py-5">
+                      <div className="grid gap-1">
+                        <span className="font-bold">
+                          {formatNullableText(question.questionText)}
+                        </span>
+                        <span className="text-xs font-medium text-slate-500">
+                          Chủ đề: {formatNullableText(question.questionTopic?.name)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-5 font-mono text-xs font-semibold text-slate-600">
+                      {formatNullableText(question.code)}
                     </td>
                     <td className="px-4 py-5">
-                      {getQuestionTypeDisplay(question.questionType)}
+                      {getQuestionTypeDisplay(question.type)}
                     </td>
                     <td className="px-4 py-5">
-                      {formatNullableText(question.frameworkName)}
+                      {getQuestionScopeDisplay(question.scope)}
+                    </td>
+                    <td className="max-w-44 px-4 py-5">
+                      {getQuestionVisibilityDisplay(question.visibility)}
                     </td>
                     <td className="px-4 py-5">
-                      {formatDuration(question.durationSeconds)}
+                      {formatDuration(question.maxResponseSeconds)}
                     </td>
                     <td className="px-4 py-5">
-                      <ActiveStatusBadge isActive={question.isActive} />
+                      <StatusBadge status={question.status} />
                     </td>
                     <td className="px-4 py-5">
-                      {formatQuestionDate(question.createdAt)}
+                      {formatQuestionDate(question.updatedAt ?? question.createdAt)}
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex justify-center">
                         <ActionMenuButton
-                          ariaLabel={`Mở hành động cho câu hỏi`}
+                          ariaLabel="Mở hành động cho câu hỏi"
                           items={[
                             {
                               icon: Eye,
@@ -139,13 +154,17 @@ export function QuestionTable({
                               onSelect: () => onSelect(question.id),
                               tone: 'primary',
                             },
-                            {
-                              icon: Pencil,
-                              id: 'edit',
-                              label: 'Chỉnh sửa',
-                              onSelect: () => onEdit(question),
-                              tone: 'default',
-                            },
+                            ...(onEdit
+                              ? [
+                                  {
+                                    icon: Pencil,
+                                    id: 'edit',
+                                    label: 'Chỉnh sửa',
+                                    onSelect: () => onEdit(question),
+                                    tone: 'default' as const,
+                                  },
+                                ]
+                              : []),
                           ]}
                         />
                       </div>

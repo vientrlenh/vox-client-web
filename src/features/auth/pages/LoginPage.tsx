@@ -92,6 +92,10 @@ function getPostLoginPath(roles: string[]) {
     return '/school-admin/dashboard'
   }
 
+  if (roles.includes('TEACHER')) {
+    return '/teacher/question-banks'
+  }
+
   return null
 }
 

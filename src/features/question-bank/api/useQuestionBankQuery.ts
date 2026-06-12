@@ -1,11 +1,22 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
-import { questionBankQueryKeys } from './useQuestionBanksQuery'
+import {
+  type QuestionModuleScope,
+  questionBankQueryKeys,
+} from './useQuestionBanksQuery'
 import type { QuestionBankDto } from '../types'
 
-const QUESTION_BANK_DETAIL_QUERY = `
+function getQuestionBankDetailQuery(scope: QuestionModuleScope) {
+  const queryName =
+    scope === 'teacher'
+      ? 'teacherQuestionBank'
+      : scope === 'school'
+        ? 'schoolQuestionBank'
+        : 'adminQuestionBank'
+
+  return `
   query QuestionBank($id: ID!) {
-    questionBank(id: $id) {
+    ${queryName}(id: $id) {
       id
       bankName
       description
@@ -15,26 +26,36 @@ const QUESTION_BANK_DETAIL_QUERY = `
       createdBy
       updatedBy
     }
-  }
-`
-
-type QuestionBankDetailQueryData = {
-  questionBank: QuestionBankDto
+  }`
 }
 
-export async function fetchQuestionBank(id: string) {
+type QuestionBankDetailQueryData = {
+  teacherQuestionBank?: QuestionBankDto | null
+  schoolQuestionBank?: QuestionBankDto | null
+  adminQuestionBank?: QuestionBankDto | null
+}
+
+export async function fetchQuestionBank(scope: QuestionModuleScope, id: string) {
   const data = await graphQLRequest<QuestionBankDetailQueryData>(
-    QUESTION_BANK_DETAIL_QUERY,
+    getQuestionBankDetailQuery(scope),
     { id },
   )
 
-  return data.questionBank
+  return (
+    data.teacherQuestionBank ??
+    data.schoolQuestionBank ??
+    data.adminQuestionBank ??
+    null
+  )
 }
 
-export function useQuestionBankQuery(id: string | null) {
+export function useQuestionBankQuery(
+  scope: QuestionModuleScope,
+  id: string | null,
+) {
   return useQuery({
     enabled: Boolean(id),
-    queryFn: () => fetchQuestionBank(id!),
-    queryKey: questionBankQueryKeys.questionBank(id),
+    queryFn: () => fetchQuestionBank(scope, id!),
+    queryKey: [...questionBankQueryKeys.questionBank(id), scope],
   })
 }

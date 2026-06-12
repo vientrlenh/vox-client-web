@@ -7,17 +7,29 @@ const QUESTION_DETAIL_QUERY = `
   query Question($id: ID!) {
     question(id: $id) {
       id
-      topicId
+      questionTopicId
+      code
+      instructionText
       questionText
-      audioUrl
-      standardLevelId
-      standardLevelCode
-      frameworkCode
-      frameworkName
-      questionType
-      durationSeconds
-      isActive
+      promptText
+      preparationText
+      type
+      preparationTimeSeconds
+      minResponseSeconds
+      maxResponseSeconds
+      scope
+      visibility
+      sourceQuestionId
+      locked
+      status
       createdAt
+      updatedAt
+      questionTopic {
+        id
+        questionBankId
+        code
+        name
+      }
     }
   }
 `

@@ -2,18 +2,24 @@ import { ArrowLeft, Plus, RefreshCw } from 'lucide-react'
 
 type QuestionTopicPageHeaderProps = {
   bankName?: string
+  createLabel?: string
+  description?: string
   isRefreshing: boolean
   onBack: () => void
-  onCreate: () => void
+  onCreate?: () => void
   onRefresh: () => void
+  title?: string
 }
 
 export function QuestionTopicPageHeader({
   bankName,
+  createLabel = 'Tạo chủ đề',
+  description,
   isRefreshing,
   onBack,
   onCreate,
   onRefresh,
+  title = 'Chủ đề câu hỏi',
 }: QuestionTopicPageHeaderProps) {
   return (
     <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -30,12 +36,13 @@ export function QuestionTopicPageHeader({
           className="text-2xl font-black text-blue-950 sm:text-3xl"
           id="teacher-question-topics-title"
         >
-          Chủ đề câu hỏi
+          {title}
         </h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          {bankName
-            ? `Quản lý chủ đề cho ngân hàng: ${bankName}`
-            : 'Tạo và quản lý chủ đề câu hỏi trong ngân hàng.'}
+          {description ??
+            (bankName
+              ? `Theo dõi chủ đề thuộc ngân hàng: ${bankName}`
+              : 'Theo dõi và quản lý chủ đề câu hỏi theo quyền hiện tại.')}
         </p>
       </div>
 
@@ -53,14 +60,16 @@ export function QuestionTopicPageHeader({
           Làm mới
         </button>
 
-        <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-bold text-white transition hover:opacity-90"
-          onClick={onCreate}
-          type="button"
-        >
-          <Plus aria-hidden="true" className="size-4" />
-          Tạo chủ đề
-        </button>
+        {onCreate ? (
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-bold text-white transition hover:opacity-90"
+            onClick={onCreate}
+            type="button"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            {createLabel}
+          </button>
+        ) : null}
       </div>
     </div>
   )

@@ -2,14 +2,17 @@ import type { ReactNode } from 'react'
 import { Eye, HelpCircle, Pencil } from 'lucide-react'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import type { QuestionTopicDto } from '../types'
-import { formatNullableText } from '../types'
+import {
+  formatNullableText,
+  getQuestionTopicStatusDisplay,
+} from '../types'
 
 type QuestionTopicTableProps = {
   errorMessage?: string
   footer?: ReactNode
   isError: boolean
   isLoading: boolean
-  onEdit: (topic: QuestionTopicDto) => void
+  onEdit?: (topic: QuestionTopicDto) => void
   onRetry: () => void
   onSelect: (id: string) => void
   onViewQuestions: (topic: QuestionTopicDto) => void
@@ -32,9 +35,7 @@ export function QuestionTopicTable({
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-6 py-5">
-        <h2 className="text-lg font-black text-blue-950">
-          Danh sách chủ đề
-        </h2>
+        <h2 className="text-lg font-black text-blue-950">Danh sách chủ đề</h2>
       </div>
 
       {isLoading ? (
@@ -66,17 +67,20 @@ export function QuestionTopicTable({
 
       {!isLoading && !isError && questionTopics.length > 0 ? (
         <div className="min-h-80 flex-1 overflow-x-auto">
-          <table className="w-full min-w-180 border-collapse text-left">
+          <table className="w-full min-w-220 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
-                <th className="px-6 py-4">Tên chủ đề</th>
+                <th className="px-6 py-4">Chủ đề</th>
+                <th className="px-4 py-4">Mã</th>
                 <th className="px-4 py-4">Mô tả</th>
+                <th className="px-4 py-4">Trạng thái</th>
                 <th className="px-4 py-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody>
               {questionTopics.map((topic) => {
                 const isSelected = topic.id === selectedId
+                const status = getQuestionTopicStatusDisplay(topic.status)
 
                 return (
                   <tr
@@ -87,17 +91,25 @@ export function QuestionTopicTable({
                     key={topic.id}
                   >
                     <td className="px-6 py-5 font-bold">
-                      {formatNullableText(topic.topicName)}
+                      {formatNullableText(topic.name)}
                     </td>
-                    <td className="max-w-44 wrap-break-word px-4 py-5">
+                    <td className="px-4 py-5 font-mono text-xs font-semibold text-slate-600">
+                      {formatNullableText(topic.code)}
+                    </td>
+                    <td className="max-w-56 wrap-break-word px-4 py-5">
                       {formatNullableText(topic.description)}
+                    </td>
+                    <td className="px-4 py-5">
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${status.className}`}
+                      >
+                        {status.label}
+                      </span>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex justify-center">
                         <ActionMenuButton
-                          ariaLabel={`Mở hành động cho ${formatNullableText(
-                            topic.topicName,
-                          )}`}
+                          ariaLabel={`Mở hành động cho ${formatNullableText(topic.name)}`}
                           items={[
                             {
                               icon: Eye,
@@ -113,13 +125,17 @@ export function QuestionTopicTable({
                               onSelect: () => onViewQuestions(topic),
                               tone: 'default',
                             },
-                            {
-                              icon: Pencil,
-                              id: 'edit',
-                              label: 'Chỉnh sửa',
-                              onSelect: () => onEdit(topic),
-                              tone: 'default',
-                            },
+                            ...(onEdit
+                              ? [
+                                  {
+                                    icon: Pencil,
+                                    id: 'edit',
+                                    label: 'Chỉnh sửa',
+                                    onSelect: () => onEdit(topic),
+                                    tone: 'default' as const,
+                                  },
+                                ]
+                              : []),
                           ]}
                         />
                       </div>

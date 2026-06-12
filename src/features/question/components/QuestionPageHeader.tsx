@@ -1,21 +1,25 @@
 import { ArrowLeft, Plus, RefreshCw } from 'lucide-react'
 
 type QuestionPageHeaderProps = {
+  createLabel?: string
+  description?: string
   isCreateDisabled?: boolean
   isRefreshing: boolean
   onBack?: () => void
-  onCreate: () => void
+  onCreate?: () => void
   onRefresh: () => void
-  topicName?: string
+  title?: string
 }
 
 export function QuestionPageHeader({
+  createLabel = 'Tạo câu hỏi',
+  description = 'Quản lý và theo dõi danh sách câu hỏi theo quyền hiện tại.',
   isCreateDisabled = false,
   isRefreshing,
   onBack,
   onCreate,
   onRefresh,
-  topicName,
+  title = 'Câu hỏi',
 }: QuestionPageHeaderProps) {
   return (
     <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -34,13 +38,9 @@ export function QuestionPageHeader({
           className="text-2xl font-black text-blue-950 sm:text-3xl"
           id="teacher-questions-title"
         >
-          Câu hỏi
+          {title}
         </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          {topicName
-            ? `Quản lý câu hỏi cho chủ đề: ${topicName}`
-            : 'Tạo và quản lý câu hỏi cho các kỳ thi đánh giá kỹ năng nói.'}
-        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -57,16 +57,18 @@ export function QuestionPageHeader({
           Làm mới
         </button>
 
-        <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isCreateDisabled}
-          onClick={onCreate}
-          title={isCreateDisabled ? 'Chọn chủ đề trước khi tạo câu hỏi' : undefined}
-          type="button"
-        >
-          <Plus aria-hidden="true" className="size-4" />
-          Tạo câu hỏi
-        </button>
+        {onCreate ? (
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isCreateDisabled}
+            onClick={onCreate}
+            title={isCreateDisabled ? 'Chọn chủ đề trước khi tạo câu hỏi' : undefined}
+            type="button"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            {createLabel}
+          </button>
+        ) : null}
       </div>
     </div>
   )
