@@ -23,3 +23,17 @@ export function getQuestionBankActorRole(
 export function canManageQuestionBank(role: QuestionBankActorRole) {
   return role === 'SYSTEM_ADMIN' || role === 'SCHOOL_ADMIN'
 }
+
+export function getQuestionBankReviewActions(role: QuestionBankActorRole) {
+  if (!canManageQuestionBank(role)) {
+    return []
+  }
+
+  return [
+    { id: 'submit-review', label: 'Submit for review', status: 'SUBMITTED_FOR_REVIEW' },
+    { id: 'publish', label: 'Publish', status: 'PUBLISHED' },
+    { id: 'request-revision', label: 'Request revision', status: 'REVISION_REQUESTED' },
+    { id: 'reject', label: 'Reject', status: 'REJECTED' },
+    { id: 'archive', label: 'Archive', status: 'ARCHIVED' },
+  ]
+}

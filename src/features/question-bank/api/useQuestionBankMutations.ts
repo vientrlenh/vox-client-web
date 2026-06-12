@@ -3,6 +3,7 @@ import { apiClient } from '@/shared/api'
 import type {
   CreateQuestionBankRequest,
   QuestionBankDto,
+  ReviewQuestionBankRequest,
   UpdateQuestionBankRequest,
 } from '../types'
 
@@ -50,6 +51,18 @@ export async function deleteQuestionBank(id: string) {
   return response.data.message
 }
 
+export async function reviewQuestionBank(
+  id: string,
+  payload: ReviewQuestionBankRequest,
+) {
+  const response = await apiClient.patch<ApiResponse<QuestionBankDto>>(
+    `/v1/question-banks/${id}/review-actions`,
+    payload,
+  )
+
+  return response.data.message
+}
+
 export function useCreateQuestionBankMutation() {
   return useMutation({
     mutationFn: createQuestionBank,
@@ -71,5 +84,17 @@ export function useUpdateQuestionBankMutation() {
 export function useDeleteQuestionBankMutation() {
   return useMutation({
     mutationFn: (id: string) => deleteQuestionBank(id),
+  })
+}
+
+export function useReviewQuestionBankMutation() {
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string
+      payload: ReviewQuestionBankRequest
+    }) => reviewQuestionBank(id, payload),
   })
 }

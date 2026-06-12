@@ -5,6 +5,7 @@ import { useAppSelector } from '@/app/store/hooks'
 import {
   useCreateQuestionBankMutation,
   useDeleteQuestionBankMutation,
+  useReviewQuestionBankMutation,
   useUpdateQuestionBankMutation,
 } from '../api/useQuestionBankMutations'
 import {
@@ -21,7 +22,11 @@ import type {
 import { QuestionBankPageHeader } from '../components/QuestionBankPageHeader'
 import { QuestionBankPagination } from '../components/QuestionBankPagination'
 import { QuestionBankTable } from '../components/QuestionBankTable'
-import { canManageQuestionBank, getQuestionBankActorRole } from '../permissions'
+import {
+  canManageQuestionBank,
+  getQuestionBankActorRole,
+  getQuestionBankReviewActions,
+} from '../permissions'
 import type {
   CreateQuestionBankRequest,
   QuestionBankDto,
@@ -81,8 +86,12 @@ function QuestionBanksPage({
   const createMutation = useCreateQuestionBankMutation()
   const updateMutation = useUpdateQuestionBankMutation()
   const deleteMutation = useDeleteQuestionBankMutation()
+  const reviewMutation = useReviewQuestionBankMutation()
   const isSubmitting =
-    createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    reviewMutation.isPending
 
   function handlePageChange(nextPage: number) {
     setSelectedId(null)
@@ -200,6 +209,21 @@ function QuestionBanksPage({
     }
   }
 
+  async function handleReviewAction(bank: QuestionBankDto, targetStatus: string) {
+    try {
+      const message = await reviewMutation.mutateAsync({
+        id: bank.id,
+        payload: { targetStatus },
+      })
+      await refreshBanks()
+      setPageMessage(message)
+    } catch (error) {
+      setPageMessage(
+        getErrorMessage(error) ?? 'Khong the cap nhat trang thai question bank.',
+      )
+    }
+  }
+
   return (
     <section
       aria-labelledby="teacher-question-banks-title"
@@ -245,6 +269,19 @@ function QuestionBanksPage({
                   },
                   tone: 'danger',
                 },
+                ...getQuestionBankReviewActions(actorRole).map((action) => ({
+                  id: `${action.id}-${bank.id}`,
+                  label: action.label,
+                  onSelect: () => {
+                    void handleReviewAction(bank, action.status)
+                  },
+                  tone:
+                    action.status === 'PUBLISHED'
+                      ? ('success' as const)
+                      : action.status === 'REJECTED'
+                        ? ('danger' as const)
+                        : ('default' as const),
+                })),
               ]
             : undefined
         }

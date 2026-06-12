@@ -31,6 +31,10 @@ export type UpdateQuestionBankRequest = {
   isActive: boolean
 }
 
+export type ReviewQuestionBankRequest = {
+  targetStatus: string
+}
+
 export function formatQuestionBankDate(value?: string | null) {
   if (!value) {
     return '-'
