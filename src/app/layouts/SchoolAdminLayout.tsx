@@ -3,6 +3,7 @@ import {
   Bell,
   BookOpen,
   ChevronDown,
+  FileSpreadsheet,
   Home,
   LogOut,
   Menu,
@@ -27,6 +28,11 @@ const navigationItems = [
     icon: BookOpen,
     label: 'Quản lý lớp học',
     to: '/school-admin/classes',
+  },
+  {
+    icon: FileSpreadsheet,
+    label: 'Quản lý import',
+    to: '/school-admin/imports',
   },
   {
     icon: Users,

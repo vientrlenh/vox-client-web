@@ -65,6 +65,18 @@ const SchoolAdminClassImportPage = lazy(() =>
   })),
 )
 
+const SchoolAdminImportSessionsPage = lazy(() =>
+  import('@/features/imports').then((module) => ({
+    default: module.SchoolAdminImportSessionsPage,
+  })),
+)
+
+const SchoolAdminImportSessionDetailPage = lazy(() =>
+  import('@/features/imports').then((module) => ({
+    default: module.SchoolAdminImportSessionDetailPage,
+  })),
+)
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -99,6 +111,14 @@ export function AppRoutes() {
             <Route
               path="school-admin/classes/import"
               element={<SchoolAdminClassImportPage />}
+            />
+            <Route
+              path="school-admin/imports"
+              element={<SchoolAdminImportSessionsPage />}
+            />
+            <Route
+              path="school-admin/imports/:sessionId"
+              element={<SchoolAdminImportSessionDetailPage />}
             />
             <Route
               path="school-admin/classes/:classId"
