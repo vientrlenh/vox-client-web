@@ -30,6 +30,28 @@ const QUESTION_DETAIL_QUERY = `
         code
         name
       }
+      assets {
+        id
+        questionId
+        title
+        durationSeconds
+        altText
+        type
+        url
+        transcript
+        description
+        order
+      }
+      evaluationGuide {
+        id
+        questionId
+        expectedContent
+        keyPoints
+        acceptableResponses
+        offTopicExamples
+        scoringHints
+        commonMistakes
+      }
     }
   }
 `

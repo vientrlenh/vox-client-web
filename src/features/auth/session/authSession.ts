@@ -15,6 +15,7 @@ type JwtPayload = {
 }
 
 export const CLIENT_DEVICE_STORAGE_KEY = 'vox.deviceId'
+export const FALLBACK_SCHOOL_ID = '33333333-3333-4333-8333-333333333333'
 
 export { clearAuthTokens, getAuthTokens, saveAuthTokens }
 export type { AuthTokens }
@@ -113,7 +114,7 @@ export function decodeAccessToken(accessToken: string): AuthUser | null {
       schoolId:
         typeof parsed.schoolId === 'string' && parsed.schoolId.trim()
           ? parsed.schoolId
-          : undefined,
+          : FALLBACK_SCHOOL_ID,
       userId: parsed.userId,
     }
   } catch {

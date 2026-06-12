@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { useAppSelector } from '@/app/store/hooks'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionQuery } from '../api/useQuestionQuery'
 import {
@@ -10,6 +11,12 @@ import {
 import { QuestionPageHeader } from '../components/QuestionPageHeader'
 import { QuestionPagination } from '../components/QuestionPagination'
 import { QuestionTable } from '../components/QuestionTable'
+import {
+  canCreateQuestion,
+  canEditQuestion,
+  getQuestionActorRole,
+  getTeacherQuestionContext,
+} from '../permissions'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
@@ -67,6 +74,8 @@ function QuestionsPage({
   view,
 }: QuestionsPageProps) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const user = useAppSelector((state) => state.auth.user)
   const [searchParams] = useSearchParams()
   const bankId = searchParams.get('bankId') ?? ''
   const topicId = searchParams.get('topicId') ?? ''
@@ -80,6 +89,10 @@ function QuestionsPage({
   const topicQuery = useQuestionsByTopicQuery(scope, bankId, topicId, page, pageSize)
   const questionsQuery = isTopicView ? topicQuery : listQuery
   const questions = questionsQuery.data?.content ?? []
+  const flashMessage =
+    (location.state as { successMessage?: string } | null)?.successMessage ?? null
+  const actorRole = getQuestionActorRole(user?.roles)
+  const teacherContext = getTeacherQuestionContext(view)
   const selectedListQuestion =
     questions.find((question) => question.id === selectedId) ??
     questions[0] ??
@@ -96,6 +109,7 @@ function QuestionsPage({
     <section aria-labelledby="teacher-questions-title" className="grid gap-6">
       <QuestionPageHeader
         description={getQuestionViewDescription(view, topicName)}
+        isCreateDisabled={!isTopicView}
         isRefreshing={questionsQuery.isFetching}
         onBack={
           isTopicView
@@ -106,11 +120,26 @@ function QuestionsPage({
               }
             : undefined
         }
+        onCreate={
+          canCreateQuestion(actorRole)
+            ? () => {
+                navigate(
+                  `${basePath}/questions/create?bankId=${bankId}&topicId=${topicId}&topicName=${encodeURIComponent(topicName)}`,
+                )
+              }
+            : undefined
+        }
         onRefresh={() => {
           void questionsQuery.refetch()
         }}
         title={getQuestionViewTitle(view)}
       />
+
+      {flashMessage ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+          {flashMessage}
+        </div>
+      ) : null}
 
       <div className="rounded-lg border border-slate-200 bg-white p-1">
         <div className="flex flex-wrap gap-2">
@@ -156,6 +185,7 @@ function QuestionsPage({
       </div>
 
       <QuestionTable
+        canEdit={(question) => canEditQuestion(question, actorRole, teacherContext)}
         errorMessage={getErrorMessage(questionsQuery.error)}
         footer={
           <QuestionPagination
@@ -177,10 +207,20 @@ function QuestionsPage({
         }
         isError={questionsQuery.isError}
         isLoading={questionsQuery.isLoading}
+        onEdit={(question) => {
+          navigate(`${basePath}/questions/${question.id}/edit`, {
+            state: { fromView: view },
+          })
+        }}
         onRetry={() => {
           void questionsQuery.refetch()
         }}
-        onSelect={setSelectedId}
+        onSelect={(id) => {
+          setSelectedId(id)
+          navigate(`${basePath}/questions/${id}`, {
+            state: { fromView: view },
+          })
+        }}
         questions={questions}
         selectedId={effectiveSelectedId}
       />

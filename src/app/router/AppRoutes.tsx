@@ -114,6 +114,24 @@ const TeacherQuestionsPage = lazy(() =>
   })),
 )
 
+const TeacherCreateQuestionPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.TeacherCreateQuestionPage,
+  })),
+)
+
+const TeacherEditQuestionPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.TeacherEditQuestionPage,
+  })),
+)
+
+const TeacherQuestionDetailPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.TeacherQuestionDetailPage,
+  })),
+)
+
 const TeacherReviewQuestionsPage = lazy(() =>
   import('@/features/question').then((module) => ({
     default: module.TeacherReviewQuestionsPage,
@@ -126,6 +144,24 @@ const SchoolAdminQuestionsPage = lazy(() =>
   })),
 )
 
+const SchoolAdminCreateQuestionPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SchoolAdminCreateQuestionPage,
+  })),
+)
+
+const SchoolAdminEditQuestionPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SchoolAdminEditQuestionPage,
+  })),
+)
+
+const SchoolAdminQuestionDetailPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SchoolAdminQuestionDetailPage,
+  })),
+)
+
 const SchoolAdminReviewQuestionsPage = lazy(() =>
   import('@/features/question').then((module) => ({
     default: module.SchoolAdminReviewQuestionsPage,
@@ -135,6 +171,24 @@ const SchoolAdminReviewQuestionsPage = lazy(() =>
 const SystemAdminQuestionsPage = lazy(() =>
   import('@/features/question').then((module) => ({
     default: module.SystemAdminQuestionsPage,
+  })),
+)
+
+const SystemAdminCreateQuestionPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SystemAdminCreateQuestionPage,
+  })),
+)
+
+const SystemAdminEditQuestionPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SystemAdminEditQuestionPage,
+  })),
+)
+
+const SystemAdminQuestionDetailPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SystemAdminQuestionDetailPage,
   })),
 )
 
@@ -176,6 +230,18 @@ export function AppRoutes() {
               element={<SystemAdminQuestionsPage />}
             />
             <Route
+              path="system-admin/questions/create"
+              element={<SystemAdminCreateQuestionPage />}
+            />
+            <Route
+              path="system-admin/questions/:questionId"
+              element={<SystemAdminQuestionDetailPage />}
+            />
+            <Route
+              path="system-admin/questions/:questionId/edit"
+              element={<SystemAdminEditQuestionPage />}
+            />
+            <Route
               path="system-admin/questions/review"
               element={<SystemAdminReviewQuestionsPage />}
             />
@@ -212,6 +278,18 @@ export function AppRoutes() {
               element={<SchoolAdminQuestionsPage />}
             />
             <Route
+              path="school-admin/questions/create"
+              element={<SchoolAdminCreateQuestionPage />}
+            />
+            <Route
+              path="school-admin/questions/:questionId"
+              element={<SchoolAdminQuestionDetailPage />}
+            />
+            <Route
+              path="school-admin/questions/:questionId/edit"
+              element={<SchoolAdminEditQuestionPage />}
+            />
+            <Route
               path="school-admin/questions/review"
               element={<SchoolAdminReviewQuestionsPage />}
             />
@@ -234,6 +312,18 @@ export function AppRoutes() {
             <Route
               path="teacher/questions/all"
               element={<TeacherQuestionsPage />}
+            />
+            <Route
+              path="teacher/questions/create"
+              element={<TeacherCreateQuestionPage />}
+            />
+            <Route
+              path="teacher/questions/:questionId"
+              element={<TeacherQuestionDetailPage />}
+            />
+            <Route
+              path="teacher/questions/:questionId/edit"
+              element={<TeacherEditQuestionPage />}
             />
             <Route
               path="teacher/questions/review"

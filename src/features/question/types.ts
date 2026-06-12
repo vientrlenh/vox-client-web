@@ -5,6 +5,30 @@ export type QuestionType =
   | 'OPINION'
   | 'DESCRIPTION'
 
+export type QuestionAssetDto = {
+  id: string
+  questionId: string
+  title: string | null
+  durationSeconds: number | null
+  altText: string | null
+  type: string
+  url: string | null
+  transcript: string | null
+  description: string | null
+  order: number
+}
+
+export type QuestionEvaluationGuideDto = {
+  id: string
+  questionId: string
+  expectedContent: string | null
+  keyPoints: string | null
+  acceptableResponses: string | null
+  offTopicExamples: string | null
+  scoringHints: string | null
+  commonMistakes: string | null
+}
+
 export type QuestionDto = {
   id: string
   questionTopicId: string
@@ -35,6 +59,8 @@ export type QuestionDto = {
   updatedAt?: string | null
   questionTopic?: QuestionTopicDto | null
   topic?: QuestionTopicDto | null
+  assets?: QuestionAssetDto[] | null
+  evaluationGuide?: QuestionEvaluationGuideDto | null
 }
 
 type QuestionTopicDto = {
@@ -55,6 +81,7 @@ export type QuestionPage = {
 export type CreateQuestionRequest = {
   questionTopicId?: string
   topicId?: string
+  code?: string
   questionText: string
   instructionText?: string | null
   promptText?: string | null
@@ -85,6 +112,36 @@ export type UpdateQuestionRequest = {
   audioUrl?: string | null
   standardLevelId?: string | null
   isActive?: boolean
+}
+
+export type QuestionAssetInput = {
+  title: string | null
+  durationSeconds: number | null
+  altText: string | null
+  type: string
+  url: string | null
+  transcript: string | null
+  description: string | null
+  order: number
+}
+
+export type UpdateQuestionAssetsRequest = {
+  assets: QuestionAssetInput[]
+}
+
+export type UpdateQuestionEvaluationGuideRequest = {
+  expectedContent: string | null
+  keyPoints: string | null
+  acceptableResponses: string | null
+  offTopicExamples: string | null
+  scoringHints: string | null
+  commonMistakes: string | null
+}
+
+export type ReviewQuestionRequest = {
+  targetStatus: string
+  note: string | null
+  reason: string | null
 }
 
 export function formatQuestionDate(value?: string | null) {

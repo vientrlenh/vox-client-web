@@ -30,7 +30,7 @@ type FormState = {
 function createFormState(topic: QuestionTopicDto | null): FormState {
   return {
     description: topic?.description ?? '',
-    topicName: topic?.topicName ?? '',
+    topicName: topic?.topicName ?? topic?.name ?? '',
   }
 }
 
@@ -133,6 +133,7 @@ function QuestionTopicFormDialogContent({
       } satisfies CreateQuestionTopicRequest)
     } else {
       onSubmit('edit', {
+        bankId,
         description: values.description || null,
         topicName: values.topicName,
       } satisfies UpdateQuestionTopicRequest)

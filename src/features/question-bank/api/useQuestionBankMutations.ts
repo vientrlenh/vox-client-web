@@ -11,9 +11,19 @@ type ApiResponse<T> = {
   message: string
 }
 
-export async function createQuestionBank(payload: CreateQuestionBankRequest) {
+type CreateQuestionBankInput = {
+  payload: CreateQuestionBankRequest
+  scope: 'admin' | 'school'
+}
+
+export async function createQuestionBank({
+  payload,
+  scope,
+}: CreateQuestionBankInput) {
+  const endpoint =
+    scope === 'admin' ? '/v1/question-banks/system' : '/v1/question-banks/school'
   const response = await apiClient.post<ApiResponse<QuestionBankDto>>(
-    '/v1/question-banks',
+    endpoint,
     payload,
   )
 
@@ -24,9 +34,17 @@ export async function updateQuestionBank(
   id: string,
   payload: UpdateQuestionBankRequest,
 ) {
-  const response = await apiClient.put<ApiResponse<QuestionBankDto>>(
+  const response = await apiClient.patch<ApiResponse<QuestionBankDto>>(
     `/v1/question-banks/${id}`,
     payload,
+  )
+
+  return response.data.message
+}
+
+export async function deleteQuestionBank(id: string) {
+  const response = await apiClient.delete<ApiResponse<QuestionBankDto>>(
+    `/v1/question-banks/${id}`,
   )
 
   return response.data.message
@@ -47,5 +65,11 @@ export function useUpdateQuestionBankMutation() {
       id: string
       payload: UpdateQuestionBankRequest
     }) => updateQuestionBank(id, payload),
+  })
+}
+
+export function useDeleteQuestionBankMutation() {
+  return useMutation({
+    mutationFn: (id: string) => deleteQuestionBank(id),
   })
 }

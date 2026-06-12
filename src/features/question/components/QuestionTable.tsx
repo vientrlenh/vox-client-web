@@ -13,6 +13,7 @@ import {
 } from '../types'
 
 type QuestionTableProps = {
+  canEdit?: (question: QuestionDto) => boolean
   errorMessage?: string
   footer?: ReactNode
   isError: boolean
@@ -40,6 +41,7 @@ function StatusBadge({ status }: { status?: string | null }) {
 }
 
 export function QuestionTable({
+  canEdit,
   errorMessage,
   footer,
   isError,
@@ -154,7 +156,7 @@ export function QuestionTable({
                               onSelect: () => onSelect(question.id),
                               tone: 'primary',
                             },
-                            ...(onEdit
+                            ...(onEdit && (canEdit?.(question) ?? true)
                               ? [
                                   {
                                     icon: Pencil,

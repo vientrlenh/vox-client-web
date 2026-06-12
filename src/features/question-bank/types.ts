@@ -18,8 +18,11 @@ export type QuestionBankPage = {
 }
 
 export type CreateQuestionBankRequest = {
-  bankName: string
+  code: string
   description: string | null
+  languageId: string
+  name: string
+  schoolId?: string
 }
 
 export type UpdateQuestionBankRequest = {

@@ -40,10 +40,13 @@ export type CreateQuestionTopicRequest = {
 }
 
 export type UpdateQuestionTopicRequest = {
-  code?: string
-  name?: string
-  topicName?: string
+  bankId: string
   description: string | null
+  topicName: string
+}
+
+export type ReviewQuestionTopicRequest = {
+  targetStatus: string
 }
 
 export function formatNullableText(value?: string | null) {
