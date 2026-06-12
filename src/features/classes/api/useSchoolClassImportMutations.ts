@@ -50,6 +50,36 @@ export async function acceptSchoolClassImport({
   return response.data
 }
 
+export async function previewSchoolClassUserImport({
+  file,
+}: PreviewSchoolClassImportInput): Promise<
+  MutationResult<PreviewSchoolClassImportResponse>
+> {
+  const schoolId = requireSchoolId()
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await apiClient.post<
+    ApiResponse<PreviewSchoolClassImportResponse>
+  >(`/v1/schools/${schoolId}/classes/users/import/preview`, formData)
+
+  return response.data
+}
+
+export async function acceptSchoolClassUserImport({
+  payload,
+  sessionId,
+}: AcceptSchoolClassImportInput): Promise<
+  MutationResult<AcceptSchoolClassImportResponse>
+> {
+  const schoolId = requireSchoolId()
+  const response = await apiClient.post<
+    ApiResponse<AcceptSchoolClassImportResponse>
+  >(`/v1/schools/${schoolId}/classes/users/import/${sessionId}/accept`, payload)
+
+  return response.data
+}
+
 export function usePreviewSchoolClassImportMutation() {
   return useMutation({
     mutationFn: previewSchoolClassImport,
@@ -59,5 +89,17 @@ export function usePreviewSchoolClassImportMutation() {
 export function useAcceptSchoolClassImportMutation() {
   return useMutation({
     mutationFn: acceptSchoolClassImport,
+  })
+}
+
+export function usePreviewSchoolClassUserImportMutation() {
+  return useMutation({
+    mutationFn: previewSchoolClassUserImport,
+  })
+}
+
+export function useAcceptSchoolClassUserImportMutation() {
+  return useMutation({
+    mutationFn: acceptSchoolClassUserImport,
   })
 }

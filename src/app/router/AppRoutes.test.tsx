@@ -192,6 +192,16 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
+  it('redirects unauthenticated users from school admin class user import to login', async () => {
+    renderWithProviders(<AppRoutes />, {
+      route: '/school-admin/classes/class-1/users/import',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: /chào mừng trở lại/i }),
+    ).toBeInTheDocument()
+  })
+
   it('redirects unauthenticated users from school admin dashboard to login', async () => {
     renderWithProviders(<AppRoutes />, { route: '/school-admin/dashboard' })
 
@@ -227,6 +237,18 @@ describe('AppRoutes', () => {
 
     renderWithProviders(<AppRoutes />, {
       route: '/school-admin/classes/import',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: /chào mừng trở lại/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('redirects non-school-admin users from school admin class user import to login', async () => {
+    saveSystemAdminSession()
+
+    renderWithProviders(<AppRoutes />, {
+      route: '/school-admin/classes/class-1/users/import',
     })
 
     expect(
@@ -338,6 +360,30 @@ describe('AppRoutes', () => {
 
     expect(
       await screen.findByRole('heading', { name: /tạo lớp số lượng lớn/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('navigation', { name: /school admin/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('school-admin@vox.edu.vn')).toBeInTheDocument()
+    expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('navigation', { name: /school admin/i })).getByRole(
+        'link',
+        { name: /quản lý lớp học/i },
+      ),
+    ).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('renders the school admin class user import route inside the school admin layout', async () => {
+    saveSchoolAdminSession()
+    mockClassDetailGraphql()
+
+    renderWithProviders(<AppRoutes />, {
+      route: '/school-admin/classes/class-1/users/import',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: /import học viên vào lớp/i }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('navigation', { name: /school admin/i }),

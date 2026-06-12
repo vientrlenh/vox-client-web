@@ -13,9 +13,10 @@ import {
   RefreshCw,
   Rows3,
   Trash2,
+  Upload,
   UserPlus,
 } from 'lucide-react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import { SchoolClassFormDialog } from '../components/SchoolClassFormDialog'
 import {
@@ -317,6 +318,7 @@ type ClassUsersTabProps = {
 }
 
 function ClassUsersTab({ classId }: ClassUsersTabProps) {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(DEFAULT_USER_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_USER_PAGE_SIZE)
@@ -431,13 +433,26 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
 
   return (
     <section aria-labelledby="class-users-title" className="grid gap-4">
-      <div>
-        <h2 className="text-lg font-black text-slate-950" id="class-users-title">
-          Học viên trong lớp
-        </h2>
-        <p className="mt-1 text-sm font-medium text-slate-500">
-          Thêm, xóa và cập nhật trạng thái học viên đang tham gia lớp học.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2
+            className="text-lg font-black text-slate-950"
+            id="class-users-title"
+          >
+            Học viên trong lớp
+          </h2>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            Thêm, xóa và cập nhật trạng thái học viên đang tham gia lớp học.
+          </p>
+        </div>
+        <button
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
+          onClick={() => navigate(`/school-admin/classes/${classId}/users/import`)}
+          type="button"
+        >
+          <Upload aria-hidden="true" className="size-4" />
+          Import học viên
+        </button>
       </div>
 
       {message ? (

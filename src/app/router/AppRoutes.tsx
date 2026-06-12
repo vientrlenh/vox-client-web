@@ -65,6 +65,12 @@ const SchoolAdminClassImportPage = lazy(() =>
   })),
 )
 
+const SchoolAdminClassUserImportPage = lazy(() =>
+  import('@/features/classes').then((module) => ({
+    default: module.SchoolAdminClassUserImportPage,
+  })),
+)
+
 const SchoolAdminImportSessionsPage = lazy(() =>
   import('@/features/imports').then((module) => ({
     default: module.SchoolAdminImportSessionsPage,
@@ -111,6 +117,10 @@ export function AppRoutes() {
             <Route
               path="school-admin/classes/import"
               element={<SchoolAdminClassImportPage />}
+            />
+            <Route
+              path="school-admin/classes/:classId/users/import"
+              element={<SchoolAdminClassUserImportPage />}
             />
             <Route
               path="school-admin/imports"

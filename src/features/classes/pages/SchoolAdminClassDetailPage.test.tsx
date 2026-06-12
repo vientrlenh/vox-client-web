@@ -415,6 +415,34 @@ describe('SchoolAdminClassDetailPage', () => {
     })
   })
 
+  it('navigates to class user import from the class users tab', async () => {
+    mockGraphQLSuccess({ usersPage: createUserPage([]) })
+    const user = userEvent.setup()
+
+    renderWithProviders(
+      <Routes>
+        <Route
+          element={<SchoolAdminClassDetailPage />}
+          path="/school-admin/classes/:classId"
+        />
+        <Route
+          element={<h1>Import học viên route</h1>}
+          path="/school-admin/classes/:classId/users/import"
+        />
+      </Routes>,
+      {
+        queryClient: createQueryClient(),
+        route: `/school-admin/classes/${classId}`,
+      },
+    )
+    await openUsersTab(user)
+    await user.click(screen.getByRole('button', { name: /import học viên/i }))
+
+    expect(
+      await screen.findByRole('heading', { name: /import học viên route/i }),
+    ).toBeInTheDocument()
+  })
+
   it('renders populated class users', async () => {
     const classUser = createClassUser()
 
