@@ -62,6 +62,22 @@ function mockClassManagementGraphql() {
   })
 }
 
+function mockLanguageManagementGraphql() {
+  mockedGraphqlPost.mockResolvedValue({
+    data: {
+      data: {
+        supportedLanguages: {
+          content: [],
+          page: 1,
+          size: 10,
+          totalElements: 0,
+          totalPages: 0,
+        },
+      },
+    },
+  })
+}
+
 function mockClassDetailGraphql() {
   mockedGraphqlPost.mockImplementation((_path, body) => {
     const request = body as { query: string }
@@ -348,6 +364,22 @@ describe('AppRoutes', () => {
         'link',
         { name: /quản lý lớp học/i },
       ),
+    ).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('renders the language management route and active navigation item', async () => {
+    saveSystemAdminSession()
+    mockLanguageManagementGraphql()
+
+    renderWithProviders(<AppRoutes />, {
+      route: '/system-admin/languages',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: /quản lý ngôn ngữ/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /quản lý ngôn ngữ/i }),
     ).toHaveAttribute('aria-current', 'page')
   })
 

@@ -47,6 +47,12 @@ const SystemAdminRegistrationsPage = lazy(() =>
   })),
 )
 
+const SystemAdminLanguagesPage = lazy(() =>
+  import('@/features/languages').then((module) => ({
+    default: module.SystemAdminLanguagesPage,
+  })),
+)
+
 const SchoolAdminClassesPage = lazy(() =>
   import('@/features/classes').then((module) => ({
     default: module.SchoolAdminClassesPage,
@@ -101,6 +107,10 @@ export function AppRoutes() {
             <Route
               path="system-admin/registrations"
               element={<SystemAdminRegistrationsPage />}
+            />
+            <Route
+              path="system-admin/languages"
+              element={<SystemAdminLanguagesPage />}
             />
           </Route>
         </Route>
