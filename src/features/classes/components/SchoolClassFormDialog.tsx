@@ -6,6 +6,7 @@ import type {
   SchoolClassStatus,
   UpdateSchoolClassRequest,
 } from '../types'
+import type { SupportedLanguage } from '@/features/languages/types'
 
 export type SchoolClassFormMode = 'create' | 'edit'
 
@@ -30,7 +31,11 @@ const emptyClassForm: ClassFormState = {
 type SchoolClassFormDialogProps = {
   errorMessage?: string
   isOpen: boolean
+  isLanguagesError?: boolean
+  isLanguagesLoading?: boolean
   isSubmitting: boolean
+  languageErrorMessage?: string
+  languages?: SupportedLanguage[]
   mode: SchoolClassFormMode
   onClose: () => void
   onCreate: (payload: CreateSchoolClassRequest) => void
@@ -45,6 +50,18 @@ type FieldInputProps = {
   onChange: (name: keyof ClassFormState, value: string) => void
   placeholder?: string
   required?: boolean
+  value: string
+}
+
+type LanguageSelectProps = {
+  disabled: boolean
+  errorMessage?: string
+  isEdit: boolean
+  isError: boolean
+  isLoading: boolean
+  languages: SupportedLanguage[]
+  onChange: (value: string) => void
+  schoolClass?: SchoolClass | null
   value: string
 }
 
@@ -65,6 +82,37 @@ function toEditForm(schoolClass: SchoolClass): ClassFormState {
       schoolClass.status === 'ARCHIVED' || schoolClass.status === 'INACTIVE'
         ? schoolClass.status
         : 'ACTIVE',
+  }
+}
+
+function getLanguageLabel(language: Pick<SupportedLanguage, 'code' | 'name'>) {
+  const code = language.code?.trim()
+  const name = language.name?.trim()
+
+  if (code && name) {
+    return `${code} - ${name}`
+  }
+
+  return code || name || 'Ngôn ngữ không tên'
+}
+
+function createCurrentLanguageFallback(
+  schoolClass: SchoolClass | null | undefined,
+): SupportedLanguage | null {
+  const id = schoolClass?.languageId ?? schoolClass?.language?.id
+
+  if (!id) {
+    return null
+  }
+
+  return {
+    code: schoolClass?.language?.code ?? null,
+    createdAt: null,
+    description: null,
+    id,
+    isActive: true,
+    name: schoolClass?.language?.name ?? null,
+    updatedAt: null,
   }
 }
 
@@ -93,10 +141,73 @@ function FieldInput({
   )
 }
 
+function LanguageSelect({
+  disabled,
+  errorMessage,
+  isEdit,
+  isError,
+  isLoading,
+  languages,
+  onChange,
+  schoolClass,
+  value,
+}: LanguageSelectProps) {
+  const fallbackLanguage = createCurrentLanguageFallback(schoolClass)
+  const options = [...languages]
+
+  if (
+    fallbackLanguage &&
+    !options.some((language) => language.id === fallbackLanguage.id)
+  ) {
+    options.push(fallbackLanguage)
+  }
+
+  return (
+    <label className="grid gap-2 text-sm font-bold text-slate-700">
+      Ngôn ngữ
+      <select
+        className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 disabled:bg-slate-100 disabled:text-slate-500"
+        disabled={disabled || isLoading || (!isEdit && isError)}
+        onChange={(event) => onChange(event.target.value)}
+        required={!isEdit}
+        value={value}
+      >
+        <option value="">
+          {isLoading ? 'Đang tải ngôn ngữ...' : 'Chọn ngôn ngữ'}
+        </option>
+        {options.map((language) => (
+          <option key={language.id} value={language.id}>
+            {getLanguageLabel(language)}
+          </option>
+        ))}
+      </select>
+      {isLoading ? (
+        <span className="text-xs font-semibold text-slate-500">
+          Đang tải danh sách ngôn ngữ...
+        </span>
+      ) : null}
+      {isError ? (
+        <span className="text-xs font-semibold text-red-600">
+          {errorMessage ?? 'Không thể tải danh sách ngôn ngữ.'}
+        </span>
+      ) : null}
+      {isEdit ? (
+        <span className="text-xs font-semibold text-slate-500">
+          Không thể đổi ngôn ngữ khi cập nhật lớp.
+        </span>
+      ) : null}
+    </label>
+  )
+}
+
 export function SchoolClassFormDialog({
   errorMessage,
   isOpen,
+  isLanguagesError = false,
+  isLanguagesLoading = false,
   isSubmitting,
+  languageErrorMessage,
+  languages = [],
   mode,
   onClose,
   onCreate,
@@ -110,8 +221,12 @@ export function SchoolClassFormDialog({
   return (
     <SchoolClassFormDialogContent
       errorMessage={errorMessage}
+      isLanguagesError={isLanguagesError}
+      isLanguagesLoading={isLanguagesLoading}
       isSubmitting={isSubmitting}
       key={`${mode}-${schoolClass?.id ?? 'new'}`}
+      languageErrorMessage={languageErrorMessage}
+      languages={languages}
       mode={mode}
       onClose={onClose}
       onCreate={onCreate}
@@ -123,7 +238,11 @@ export function SchoolClassFormDialog({
 
 function SchoolClassFormDialogContent({
   errorMessage,
+  isLanguagesError = false,
+  isLanguagesLoading = false,
   isSubmitting,
+  languageErrorMessage,
+  languages = [],
   mode,
   onClose,
   onCreate,
@@ -153,8 +272,8 @@ function SchoolClassFormDialogContent({
         return 'Mã lớp là bắt buộc.'
       }
 
-      if (!isUuidLike(form.languageId)) {
-        return 'ID ngôn ngữ không hợp lệ.'
+      if (!form.languageId.trim()) {
+        return 'Vui lòng chọn ngôn ngữ.'
       }
 
       if (!isUuidLike(form.schoolGradeId)) {
@@ -195,6 +314,8 @@ function SchoolClassFormDialogContent({
 
   const title = isEdit ? 'Cập nhật lớp học' : 'Tạo lớp học'
   const displayedError = validationError ?? errorMessage
+  const isCreateBlockedByLanguages =
+    !isEdit && (isLanguagesLoading || isLanguagesError)
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6">
@@ -260,13 +381,15 @@ function SchoolClassFormDialogContent({
             required
             value={form.name}
           />
-          <FieldInput
+          <LanguageSelect
             disabled={isEdit || isSubmitting}
-            label="ID ngôn ngữ"
-            name="languageId"
-            onChange={handleChange}
-            placeholder="Dán ID ngôn ngữ"
-            required={!isEdit}
+            errorMessage={languageErrorMessage}
+            isEdit={isEdit}
+            isError={isLanguagesError}
+            isLoading={isLanguagesLoading}
+            languages={languages}
+            onChange={(value) => handleChange('languageId', value)}
+            schoolClass={schoolClass}
             value={form.languageId}
           />
           <FieldInput
@@ -318,7 +441,7 @@ function SchoolClassFormDialogContent({
           </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isCreateBlockedByLanguages}
             type="submit"
           >
             <CheckCircle2 aria-hidden="true" className="size-4" />

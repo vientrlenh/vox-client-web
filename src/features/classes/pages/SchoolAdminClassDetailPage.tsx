@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
+import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { SchoolClassFormDialog } from '../components/SchoolClassFormDialog'
 import {
   useAddClassUserMutation,
@@ -42,6 +43,10 @@ import {
 
 const DEFAULT_USER_PAGE = 1
 const DEFAULT_USER_PAGE_SIZE = 10
+const ACTIVE_LANGUAGE_FILTERS = {
+  isActive: 'active',
+  search: '',
+} as const
 
 type ActiveTab = 'info' | 'users'
 
@@ -704,6 +709,11 @@ export function SchoolAdminClassDetailPage() {
   const [editError, setEditError] = useState<string | null>(null)
   const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
   const schoolClassQuery = useSchoolClassQuery(classId ?? null)
+  const languagesQuery = useSupportedLanguagesQuery(
+    1,
+    100,
+    ACTIVE_LANGUAGE_FILTERS,
+  )
   const updateMutation = useUpdateSchoolClassMutation()
   const schoolClass = schoolClassQuery.data
 
@@ -965,7 +975,11 @@ export function SchoolAdminClassDetailPage() {
       <SchoolClassFormDialog
         errorMessage={editError ?? undefined}
         isOpen={isEditDialogOpen}
+        isLanguagesError={languagesQuery.isError}
+        isLanguagesLoading={languagesQuery.isLoading}
         isSubmitting={updateMutation.isPending}
+        languageErrorMessage={getErrorMessage(languagesQuery.error)}
+        languages={languagesQuery.data?.content ?? []}
         mode="edit"
         onClose={closeEditDialog}
         onCreate={() => undefined}

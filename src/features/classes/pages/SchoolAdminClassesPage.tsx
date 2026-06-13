@@ -10,6 +10,8 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
+import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
+import type { SupportedLanguage } from '@/features/languages/types'
 import {
   SchoolClassFormDialog,
   type SchoolClassFormMode,
@@ -39,6 +41,10 @@ const EMPTY_FILTERS: ClassFilters = {
   search: '',
   status: '',
 }
+const ACTIVE_LANGUAGE_FILTERS = {
+  isActive: 'active',
+  search: '',
+} as const
 
 type PageMessage = {
   text: string
@@ -63,6 +69,17 @@ function getErrorMessage(error: unknown) {
   }
 
   return undefined
+}
+
+function getLanguageLabel(language: SupportedLanguage) {
+  const code = language.code?.trim()
+  const name = language.name?.trim()
+
+  if (code && name) {
+    return `${code} - ${name}`
+  }
+
+  return code || name || 'Ngôn ngữ không tên'
 }
 
 type DeleteDialogProps = {
@@ -357,7 +374,13 @@ export function SchoolAdminClassesPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const classesQuery = useSchoolClassesQuery(page, pageSize, filters)
+  const languagesQuery = useSupportedLanguagesQuery(
+    1,
+    100,
+    ACTIVE_LANGUAGE_FILTERS,
+  )
   const classes = classesQuery.data?.content ?? []
+  const languages = languagesQuery.data?.content ?? []
   const createMutation = useCreateSchoolClassMutation()
   const updateMutation = useUpdateSchoolClassMutation()
   const deleteMutation = useDeleteSchoolClassMutation()
@@ -569,15 +592,29 @@ export function SchoolAdminClassesPage() {
           </select>
         </label>
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          ID ngôn ngữ
-          <input
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+          Ngôn ngữ
+          <select
+            aria-label="Lọc ngôn ngữ"
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 disabled:bg-slate-100 disabled:text-slate-500"
+            disabled={languagesQuery.isLoading || languagesQuery.isError}
             onChange={(event) =>
               handleFilterChange('languageId', event.target.value)
             }
-            placeholder="ID ngôn ngữ"
             value={filters.languageId}
-          />
+          >
+            <option value="">Tất cả ngôn ngữ</option>
+            {languages.map((language) => (
+              <option key={language.id} value={language.id}>
+                {getLanguageLabel(language)}
+              </option>
+            ))}
+          </select>
+          {languagesQuery.isError ? (
+            <span className="text-xs font-semibold text-red-600">
+              {getErrorMessage(languagesQuery.error) ??
+                'Không thể tải danh sách ngôn ngữ.'}
+            </span>
+          ) : null}
         </label>
         <label className="grid gap-2 text-sm font-bold text-slate-700">
           ID khối lớp
@@ -619,7 +656,11 @@ export function SchoolAdminClassesPage() {
       <SchoolClassFormDialog
         errorMessage={classDialogError ?? undefined}
         isOpen={Boolean(classDialogMode)}
+        isLanguagesError={languagesQuery.isError}
+        isLanguagesLoading={languagesQuery.isLoading}
         isSubmitting={isSavingClass}
+        languageErrorMessage={getErrorMessage(languagesQuery.error)}
+        languages={languages}
         mode={classDialogMode ?? 'create'}
         onClose={closeClassDialog}
         onCreate={(payload) => {

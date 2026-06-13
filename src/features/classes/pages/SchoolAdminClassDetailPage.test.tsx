@@ -7,6 +7,7 @@ import { apiClient } from '@/shared/api'
 import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
+import type { SupportedLanguage } from '@/features/languages/types'
 import type { ClassUser, PageResult, SchoolClass } from '../types'
 import { formatClassDate } from '../types'
 import { SchoolAdminClassDetailPage } from './SchoolAdminClassDetailPage'
@@ -89,6 +90,33 @@ function createClass(overrides: Partial<SchoolClass> = {}): SchoolClass {
   }
 }
 
+function createLanguage(
+  overrides: Partial<SupportedLanguage> = {},
+): SupportedLanguage {
+  return {
+    code: 'EN',
+    createdAt: '2026-06-01T00:00:00Z',
+    description: null,
+    id: '01890f44-0c7a-7cc1-bc3b-2e7f4f001234',
+    isActive: true,
+    name: 'Tiếng Anh',
+    updatedAt: '2026-06-02T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function createLanguagePage(
+  content: SupportedLanguage[],
+): PageResult<SupportedLanguage> {
+  return {
+    content,
+    page: 1,
+    size: 100,
+    totalElements: content.length,
+    totalPages: content.length ? 1 : 0,
+  }
+}
+
 function createClassUser(overrides: Partial<ClassUser> = {}): ClassUser {
   return {
     assignedBy: 'admin-user',
@@ -164,6 +192,16 @@ function mockGraphQLSuccess({
             updateSchoolClass: {
               schoolClassId: request.variables?.id,
             },
+          },
+        },
+      })
+    }
+
+    if (request.query.includes('supportedLanguages')) {
+      return Promise.resolve({
+        data: {
+          data: {
+            supportedLanguages: createLanguagePage([createLanguage()]),
           },
         },
       })
@@ -303,9 +341,10 @@ describe('SchoolAdminClassDetailPage', () => {
       name: /cập nhật lớp học/i,
     })
 
-    expect(
-      within(dialog).getByDisplayValue('01890f44-0c7a-7cc1-bc3b-2e7f4f001234'),
-    ).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/ngôn ngữ/i)).toHaveValue(
+      '01890f44-0c7a-7cc1-bc3b-2e7f4f001234',
+    )
+    expect(within(dialog).getByLabelText(/ngôn ngữ/i)).toBeDisabled()
     expect(
       within(dialog).getByDisplayValue('11111111-1111-0111-0111-111111111111'),
     ).toBeInTheDocument()
@@ -366,6 +405,16 @@ describe('SchoolAdminClassDetailPage', () => {
 
       if (request.query.includes('updateSchoolClass')) {
         return Promise.reject(new Error('Update failed'))
+      }
+
+      if (request.query.includes('supportedLanguages')) {
+        return Promise.resolve({
+          data: {
+            data: {
+              supportedLanguages: createLanguagePage([createLanguage()]),
+            },
+          },
+        })
       }
 
       return Promise.resolve({

@@ -7,6 +7,7 @@ import { apiClient } from '@/shared/api'
 import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
+import type { SupportedLanguage } from '@/features/languages/types'
 import type { PageResult, SchoolClass } from '../types'
 import { formatClassDate } from '../types'
 import { SchoolAdminClassesPage } from './SchoolAdminClassesPage'
@@ -74,6 +75,33 @@ function createClass(overrides: Partial<SchoolClass> = {}): SchoolClass {
   }
 }
 
+function createLanguage(
+  overrides: Partial<SupportedLanguage> = {},
+): SupportedLanguage {
+  return {
+    code: 'EN',
+    createdAt: '2026-06-01T00:00:00Z',
+    description: null,
+    id: languageId,
+    isActive: true,
+    name: 'Tiếng Anh',
+    updatedAt: '2026-06-02T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function createLanguagePage(
+  content: SupportedLanguage[],
+): PageResult<SupportedLanguage> {
+  return {
+    content,
+    page: 1,
+    size: 100,
+    totalElements: content.length,
+    totalPages: content.length ? 1 : 0,
+  }
+}
+
 function createClassPage(
   content: SchoolClass[],
   overrides: Partial<PageResult<SchoolClass>> = {},
@@ -113,7 +141,16 @@ function renderPageWithLocationProbe() {
   )
 }
 
-function mockGraphQLSuccess(pages: Record<number, PageResult<SchoolClass>>) {
+function mockGraphQLSuccess(
+  pages: Record<number, PageResult<SchoolClass>>,
+  {
+    failLanguages = false,
+    languages = [createLanguage()],
+  }: {
+    failLanguages?: boolean
+    languages?: SupportedLanguage[]
+  } = {},
+) {
   mockedPost.mockImplementation((_path, body) => {
     const request = body as {
       query: string
@@ -139,6 +176,24 @@ function mockGraphQLSuccess(pages: Record<number, PageResult<SchoolClass>>) {
             updateSchoolClass: {
               schoolClassId: request.variables?.id,
             },
+          },
+        },
+      })
+    }
+
+    if (request.query.includes('supportedLanguages')) {
+      if (failLanguages) {
+        return Promise.resolve({
+          data: {
+            errors: [{ message: 'Không thể tải ngôn ngữ' }],
+          },
+        })
+      }
+
+      return Promise.resolve({
+        data: {
+          data: {
+            supportedLanguages: createLanguagePage(languages),
           },
         },
       })
@@ -194,6 +249,23 @@ describe('SchoolAdminClassesPage', () => {
     expect(
       screen.queryByText(/select a class to view details/i),
     ).not.toBeInTheDocument()
+  })
+
+  it('shows an inline language filter error when languages cannot be loaded', async () => {
+    mockGraphQLSuccess(
+      {
+        1: createClassPage([createClass()]),
+      },
+      { failLanguages: true },
+    )
+
+    renderPage()
+
+    expect(await screen.findByText('Tiếng Anh 6A')).toBeInTheDocument()
+    expect(
+      screen.getByRole('combobox', { name: /lọc ngôn ngữ/i }),
+    ).toBeDisabled()
+    expect(screen.getByText('Không thể tải ngôn ngữ')).toBeInTheDocument()
   })
 
   it('renders the class list with id and created date columns only', async () => {
@@ -275,6 +347,10 @@ describe('SchoolAdminClassesPage', () => {
     await user.click(screen.getByRole('button', { name: /sau/i }))
     await screen.findByText('Trang Hai')
     await user.type(screen.getByLabelText(/tìm kiếm/i), 'abc')
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: /lọc ngôn ngữ/i }),
+      languageId,
+    )
 
     await waitFor(() => {
       const listRequests = mockedPost.mock.calls
@@ -285,6 +361,7 @@ describe('SchoolAdminClassesPage', () => {
         .filter((request) => request.query.includes('schoolClasses'))
 
       expect(listRequests.at(-1)?.variables).toMatchObject({
+        languageId,
         page: 1,
         search: 'abc',
       })
@@ -307,7 +384,7 @@ describe('SchoolAdminClassesPage', () => {
 
     await user.type(within(dialog).getByLabelText(/mã lớp/i), 'ENG-6A')
     await user.type(within(dialog).getByLabelText(/tên lớp/i), 'Tiếng Anh 6A')
-    await user.type(within(dialog).getByLabelText(/id ngôn ngữ/i), languageId)
+    await user.selectOptions(within(dialog).getByLabelText(/ngôn ngữ/i), languageId)
     await user.type(within(dialog).getByLabelText(/id khối lớp/i), gradeId)
     await user.click(
       within(dialog).getByRole('button', { name: /lưu lớp học/i }),
@@ -320,6 +397,29 @@ describe('SchoolAdminClassesPage', () => {
     ).toBeInTheDocument()
     expect(within(dialog).queryByText(/vite_school_id/i)).not.toBeInTheDocument()
     expect(mockedRestPost).not.toHaveBeenCalled()
+  })
+
+  it('prevents class creation while language options are unavailable', async () => {
+    mockGraphQLSuccess(
+      {
+        1: createClassPage([]),
+      },
+      { failLanguages: true },
+    )
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await screen.findByText(/chưa có lớp học/i)
+    await user.click(screen.getByRole('button', { name: /^tạo lớp$/i }))
+
+    const dialog = screen.getByRole('dialog', { name: /tạo lớp học/i })
+
+    expect(within(dialog).getByLabelText(/ngôn ngữ/i)).toBeDisabled()
+    expect(
+      within(dialog).getByRole('button', { name: /lưu lớp học/i }),
+    ).toBeDisabled()
+    expect(within(dialog).getByText('Không thể tải ngôn ngữ')).toBeInTheDocument()
   })
 
   it('creates a class with relaxed uuid validation and invalidates the list', async () => {
@@ -343,7 +443,7 @@ describe('SchoolAdminClassesPage', () => {
 
     await user.type(within(dialog).getByLabelText(/mã lớp/i), 'ENG-6A')
     await user.type(within(dialog).getByLabelText(/tên lớp/i), 'Tiếng Anh 6A')
-    await user.type(within(dialog).getByLabelText(/id ngôn ngữ/i), languageId)
+    await user.selectOptions(within(dialog).getByLabelText(/ngôn ngữ/i), languageId)
     await user.type(within(dialog).getByLabelText(/id khối lớp/i), gradeId)
     await user.click(
       within(dialog).getByRole('button', { name: /lưu lớp học/i }),
@@ -391,6 +491,7 @@ describe('SchoolAdminClassesPage', () => {
       name: /cập nhật lớp học/i,
     })
 
+    expect(within(editDialog).getByLabelText(/ngôn ngữ/i)).toBeDisabled()
     await user.clear(within(editDialog).getByLabelText(/tên lớp/i))
     await user.type(
       within(editDialog).getByLabelText(/tên lớp/i),
