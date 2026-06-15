@@ -84,6 +84,24 @@ const SystemAdminQuestionBanksPage = lazy(() =>
   })),
 )
 
+const TeacherQuestionBankDetailPage = lazy(() =>
+  import('@/features/question-bank').then((module) => ({
+    default: module.TeacherQuestionBankDetailPage,
+  })),
+)
+
+const SchoolAdminQuestionBankDetailPage = lazy(() =>
+  import('@/features/question-bank').then((module) => ({
+    default: module.SchoolAdminQuestionBankDetailPage,
+  })),
+)
+
+const SystemAdminQuestionBankDetailPage = lazy(() =>
+  import('@/features/question-bank').then((module) => ({
+    default: module.SystemAdminQuestionBankDetailPage,
+  })),
+)
+
 const TeacherQuestionTopicsPage = lazy(() =>
   import('@/features/question-topic').then((module) => ({
     default: module.TeacherQuestionTopicsPage,
@@ -99,6 +117,24 @@ const SchoolAdminQuestionTopicsPage = lazy(() =>
 const SystemAdminQuestionTopicsPage = lazy(() =>
   import('@/features/question-topic').then((module) => ({
     default: module.SystemAdminQuestionTopicsPage,
+  })),
+)
+
+const TeacherQuestionTopicDetailPage = lazy(() =>
+  import('@/features/question-topic').then((module) => ({
+    default: module.TeacherQuestionTopicDetailPage,
+  })),
+)
+
+const SchoolAdminQuestionTopicDetailPage = lazy(() =>
+  import('@/features/question-topic').then((module) => ({
+    default: module.SchoolAdminQuestionTopicDetailPage,
+  })),
+)
+
+const SystemAdminQuestionTopicDetailPage = lazy(() =>
+  import('@/features/question-topic').then((module) => ({
+    default: module.SystemAdminQuestionTopicDetailPage,
   })),
 )
 
@@ -222,8 +258,16 @@ export function AppRoutes() {
               element={<SystemAdminQuestionBanksPage />}
             />
             <Route
+              path="system-admin/question-banks/:bankId"
+              element={<SystemAdminQuestionBankDetailPage />}
+            />
+            <Route
               path="system-admin/question-topics"
               element={<SystemAdminQuestionTopicsPage />}
+            />
+            <Route
+              path="system-admin/question-topics/:topicId"
+              element={<SystemAdminQuestionTopicDetailPage />}
             />
             <Route
               path="system-admin/questions/all"
@@ -270,8 +314,16 @@ export function AppRoutes() {
               element={<SchoolAdminQuestionBanksPage />}
             />
             <Route
+              path="school-admin/question-banks/:bankId"
+              element={<SchoolAdminQuestionBankDetailPage />}
+            />
+            <Route
               path="school-admin/question-topics"
               element={<SchoolAdminQuestionTopicsPage />}
+            />
+            <Route
+              path="school-admin/question-topics/:topicId"
+              element={<SchoolAdminQuestionTopicDetailPage />}
             />
             <Route
               path="school-admin/questions/all"
@@ -302,8 +354,16 @@ export function AppRoutes() {
               element={<TeacherQuestionBanksPage />}
             />
             <Route
+              path="teacher/question-banks/:bankId"
+              element={<TeacherQuestionBankDetailPage />}
+            />
+            <Route
               path="teacher/question-topics"
               element={<TeacherQuestionTopicsPage />}
+            />
+            <Route
+              path="teacher/question-topics/:topicId"
+              element={<TeacherQuestionTopicDetailPage />}
             />
             <Route
               path="teacher/questions/my"

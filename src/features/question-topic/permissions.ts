@@ -50,9 +50,6 @@ export function getQuestionTopicReviewActions(
   handlers: {
     onArchive: () => void
     onPublish: () => void
-    onReject: () => void
-    onRequestRevision: () => void
-    onSubmitForReview: () => void
   },
 ) {
   if (!canManageQuestionTopic(role) || !topic) {
@@ -61,36 +58,13 @@ export function getQuestionTopicReviewActions(
 
   const items: ActionMenuItem[] = []
 
-  if (['DRAFT', 'REVISION_REQUESTED', 'REJECTED'].includes(topic.status)) {
+  if (topic.status === 'DRAFT') {
     items.push({
-      id: 'submit-review',
-      label: 'Submit for review',
-      onSelect: handlers.onSubmitForReview,
-      tone: 'primary',
+      id: 'publish',
+      label: 'Publish',
+      onSelect: handlers.onPublish,
+      tone: 'success',
     })
-  }
-
-  if (topic.status === 'SUBMITTED_FOR_REVIEW') {
-    items.push(
-      {
-        id: 'publish',
-        label: 'Publish',
-        onSelect: handlers.onPublish,
-        tone: 'success',
-      },
-      {
-        id: 'request-revision',
-        label: 'Request revision',
-        onSelect: handlers.onRequestRevision,
-        tone: 'default',
-      },
-      {
-        id: 'reject',
-        label: 'Reject',
-        onSelect: handlers.onReject,
-        tone: 'danger',
-      },
-    )
   }
 
   if (topic.status !== 'ARCHIVED') {

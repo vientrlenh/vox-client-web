@@ -110,6 +110,11 @@ function QuestionBanksPage({
     )
   }
 
+  function handleViewDetail(bankId: string) {
+    setSelectedId(bankId)
+    navigate(`${basePath}/question-banks/${bankId}`)
+  }
+
   function openCreateDialog() {
     setDialogError(null)
     setDialogTarget(null)
@@ -291,7 +296,7 @@ function QuestionBanksPage({
         onRetry={() => {
           void questionBanksQuery.refetch()
         }}
-        onSelect={setSelectedId}
+        onSelect={handleViewDetail}
         onViewTopics={(bank) => handleViewTopics(bank.id, bank.bankName)}
         questionBanks={questionBanks}
         selectedId={effectiveSelectedId}

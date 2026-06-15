@@ -108,8 +108,9 @@ function QuestionsPage({
   return (
     <section aria-labelledby="teacher-questions-title" className="grid gap-6">
       <QuestionPageHeader
+        createLabel={isTopicView ? 'Tao cau hoi' : 'Chon topic de tao'}
         description={getQuestionViewDescription(view, topicName)}
-        isCreateDisabled={!isTopicView}
+        isCreateDisabled={false}
         isRefreshing={questionsQuery.isFetching}
         onBack={
           isTopicView
@@ -123,6 +124,11 @@ function QuestionsPage({
         onCreate={
           canCreateQuestion(actorRole)
             ? () => {
+                if (!isTopicView) {
+                  navigate(`${basePath}/question-topics`)
+                  return
+                }
+
                 navigate(
                   `${basePath}/questions/create?bankId=${bankId}&topicId=${topicId}&topicName=${encodeURIComponent(topicName)}`,
                 )

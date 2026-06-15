@@ -6,6 +6,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { useAppSelector } from '@/app/store/hooks'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionQuery } from '../api/useQuestionQuery'
+import { useReviewQuestionMutation } from '../api/useQuestionReviewMutation'
 import { questionQueryKeys } from '../api/useQuestionsQuery'
 import {
   useCreateQuestionMutation,
@@ -26,6 +27,7 @@ import {
   canDeleteQuestionAssetsOrGuide,
   canEditQuestion,
   getQuestionActorRole,
+  getQuestionReviewActions,
   getTeacherQuestionContext,
 } from '../permissions'
 import type {
@@ -34,6 +36,7 @@ import type {
   QuestionDto,
   QuestionEvaluationGuideDto,
   QuestionType,
+  ReviewQuestionRequest,
   UpdateQuestionAssetsRequest,
   UpdateQuestionEvaluationGuideRequest,
   UpdateQuestionRequest,
@@ -48,7 +51,9 @@ type EditorFormState = {
   preparationTimeSeconds: string
   promptText: string
   questionText: string
+  scope: string
   type: QuestionType
+  visibility: string
 }
 
 type AssetFormState = {
@@ -81,6 +86,21 @@ const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: QuestionType }> = [
   { label: 'Mo ta', value: 'DESCRIPTION' },
 ]
 
+const QUESTION_SCOPE_OPTIONS = [
+  { label: 'Ngan hang cau hoi', value: 'QUESTION_BANK' },
+  { label: 'Danh gia lop', value: 'CLASSROOM_ASSESSMENT' },
+  { label: 'De thi nhap', value: 'CENTRAL_EXAM_DRAFT' },
+  { label: 'De thi chinh thuc', value: 'CENTRAL_EXAM_PAPER' },
+] as const
+
+const QUESTION_VISIBILITY_OPTIONS = [
+  { label: 'Hien trong ngan hang', value: 'BANK_VISIBLE' },
+  { label: 'Chi tac gia', value: 'AUTHOR_ONLY' },
+  { label: 'Chi reviewer', value: 'REVIEWER_ONLY' },
+  { label: 'Chi assessment', value: 'ASSESSMENT_ONLY' },
+  { label: 'Chi exam paper', value: 'EXAM_PAPER_ONLY' },
+] as const
+
 function getErrorMessage(error: unknown) {
   if (
     error &&
@@ -104,7 +124,9 @@ function createInitialForm(question: QuestionDto | null): EditorFormState {
     preparationTimeSeconds: String(question?.preparationTimeSeconds ?? ''),
     promptText: question?.promptText ?? '',
     questionText: question?.questionText ?? '',
+    scope: question?.scope ?? 'QUESTION_BANK',
     type: (question?.type as QuestionType) ?? 'READ_ALOUD',
+    visibility: question?.visibility ?? 'BANK_VISIBLE',
   }
 }
 
@@ -198,6 +220,7 @@ function QuestionEditorPage({
   const createMutation = useCreateQuestionMutation()
   const deleteQuestionMutation = useDeleteQuestionMutation()
   const updateMutation = useUpdateQuestionMutation()
+  const reviewMutation = useReviewQuestionMutation()
   const createAssetsMutation = useCreateQuestionAssetsMutation()
   const updateAssetsMutation = useUpdateQuestionAssetsMutation()
   const deleteAssetsMutation = useDeleteQuestionAssetsMutation()
@@ -217,6 +240,10 @@ function QuestionEditorPage({
   const [successMessage, setSuccessMessage] = useState<string | null>(
     (location.state as { successMessage?: string } | null)?.successMessage ?? null,
   )
+  const [reviewAction, setReviewAction] = useState('')
+  const [reviewNote, setReviewNote] = useState('')
+  const [reviewReason, setReviewReason] = useState('')
+  const [reviewError, setReviewError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!questionQuery.data) {
@@ -260,6 +287,7 @@ function QuestionEditorPage({
     createMutation.isPending ||
     deleteQuestionMutation.isPending ||
     updateMutation.isPending ||
+    reviewMutation.isPending ||
     createAssetsMutation.isPending ||
     updateAssetsMutation.isPending ||
     deleteAssetsMutation.isPending ||
@@ -288,6 +316,62 @@ function QuestionEditorPage({
     }
 
     return `${basePath}/questions/all`
+  }
+
+  const reviewActions =
+    mode === 'edit'
+      ? getQuestionReviewActions(questionQuery.data, actorRole, teacherContext)
+      : []
+  const hasExistingAssets = Boolean(questionQuery.data?.assets?.length)
+  const hasExistingGuide = Boolean(questionQuery.data?.evaluationGuide)
+  const canManageStatus = mode === 'edit' && reviewActions.length > 0
+  const isStatusOnlyMode = mode === 'edit' && !canEdit && canManageStatus
+
+  async function handleReviewSubmit() {
+    if (!questionId || !reviewAction) {
+      setReviewError('Vui long chon mot trang thai can cap nhat.')
+      return
+    }
+
+    const selectedReviewAction = reviewActions.find(
+      (item) => item.status === reviewAction,
+    )
+
+    if (selectedReviewAction?.requiresReason && !reviewReason.trim()) {
+      setReviewError('Hanh dong nay bat buoc nhap ly do.')
+      return
+    }
+
+    try {
+      setErrorMessage(null)
+      setReviewError(null)
+
+      const payload: ReviewQuestionRequest = {
+        note: reviewNote.trim() || null,
+        reason: reviewReason.trim() || null,
+        targetStatus: reviewAction,
+      }
+
+      const messageText = await reviewMutation.mutateAsync({
+        payload,
+        questionId,
+      })
+
+      await refreshQuestionDetail()
+      navigate(`${basePath}/questions/${questionId}`, {
+        replace: true,
+        state: {
+          fromView: teacherView,
+          successMessage: messageText,
+        },
+      })
+    } catch (error) {
+      setReviewError(
+        error && typeof error === 'object' && 'message' in error
+          ? String(error.message)
+          : 'Khong the cap nhat trang thai question.',
+      )
+    }
   }
 
   async function handleContentSubmit(event: FormEvent<HTMLFormElement>) {
@@ -336,7 +420,9 @@ function QuestionEditorPage({
       promptText: form.promptText.trim() || null,
       questionText: form.questionText.trim(),
       questionTopicId: resolvedTopicId,
+      scope: form.scope,
       type: form.type,
+      visibility: form.visibility,
     }
 
     try {
@@ -529,7 +615,7 @@ function QuestionEditorPage({
     )
   }
 
-  if (mode === 'edit' && !canEdit) {
+  if (mode === 'edit' && !canEdit && !canManageStatus) {
     return (
       <section className="grid gap-4 rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm font-semibold text-amber-800">
         <span>
@@ -571,7 +657,7 @@ function QuestionEditorPage({
           <p className="mt-2 text-sm font-medium text-slate-600">
             {mode === 'create'
               ? 'Buoc dau chi tao phan content cua cau hoi. Assets va evaluation guide se bo sung sau o trang cap nhat.'
-              : 'Cap nhat tung phan noi dung, assets va evaluation guide theo tab rieng.'}
+              : 'Cap nhat tung phan noi dung, assets, evaluation guide va status theo tab/noi dung rieng.'}
           </p>
         </div>
       </div>
@@ -579,6 +665,52 @@ function QuestionEditorPage({
       {errorMessage ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {errorMessage}
+        </div>
+      ) : null}
+
+      {isStatusOnlyMode ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          Question nay hien khong duoc sua content. Ban chi co the cap nhat status theo quyen hien tai.
+        </div>
+      ) : null}
+
+      {mode === 'edit' && (!hasExistingAssets || !hasExistingGuide) ? (
+        <div className="grid gap-4 rounded-lg border border-indigo-200 bg-indigo-50 p-5 md:grid-cols-2">
+          {!hasExistingAssets ? (
+            <div className="rounded-lg border border-indigo-100 bg-white p-4">
+              <h2 className="text-base font-black text-slate-950">Chua co asset</h2>
+              <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
+                Ban co the bo sung audio, hinh anh hoac transcript cho question nay.
+              </p>
+              <button
+                className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
+                onClick={() => setActiveTab('assets')}
+                type="button"
+              >
+                <Plus aria-hidden="true" className="size-4" />
+                Them asset
+              </button>
+            </div>
+          ) : null}
+
+          {!hasExistingGuide ? (
+            <div className="rounded-lg border border-indigo-100 bg-white p-4">
+              <h2 className="text-base font-black text-slate-950">
+                Chua co evaluation guide
+              </h2>
+              <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
+                Them huong dan danh gia de reviewer va he thong xu ly noi dung de hon.
+              </p>
+              <button
+                className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
+                onClick={() => setActiveTab('guide')}
+                type="button"
+              >
+                <Plus aria-hidden="true" className="size-4" />
+                Them guide
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -607,11 +739,87 @@ function QuestionEditorPage({
           className="grid gap-6 rounded-lg border border-slate-200 bg-white p-6"
           onSubmit={handleContentSubmit}
         >
+          {mode === 'edit' && reviewActions.length ? (
+            <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">
+                  Cap nhat status
+                </h2>
+                <p className="mt-1 text-sm font-medium text-slate-600">
+                  Cac lua chon trong dropdown da duoc loc theo role va trang thai hien tai.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm font-bold text-slate-700">
+                  Status action
+                  <select
+                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    disabled={isSubmitting}
+                    onChange={(event) => setReviewAction(event.target.value)}
+                    value={reviewAction}
+                  >
+                    <option value="">Chon action</option>
+                    {reviewActions.map((action) => (
+                      <option key={action.status} value={action.status}>
+                        {action.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm font-medium text-slate-700">
+                  {reviewAction
+                    ? reviewActions.find((item) => item.status === reviewAction)
+                        ?.description
+                    : 'Chon action de xem mo ta.'}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextareaField
+                  disabled={isSubmitting}
+                  label="Note"
+                  onChange={setReviewNote}
+                  value={reviewNote}
+                />
+                <TextareaField
+                  disabled={isSubmitting}
+                  label="Reason"
+                  onChange={setReviewReason}
+                  value={reviewReason}
+                />
+              </div>
+
+              {reviewError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  {reviewError}
+                </div>
+              ) : null}
+
+              <div className="flex justify-end">
+                <button
+                  className="inline-flex h-11 items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
+                  disabled={!reviewAction || isSubmitting}
+                  onClick={handleReviewSubmit}
+                  type="button"
+                >
+                  {reviewMutation.isPending ? 'Dang cap nhat...' : 'Luu status'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <label className="grid gap-2 text-sm font-bold text-slate-700">
             Ma cau hoi
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              disabled={isSubmitting || questionQuery.isLoading || mode === 'edit'}
+              disabled={
+                isSubmitting ||
+                questionQuery.isLoading ||
+                mode === 'edit' ||
+                isStatusOnlyMode
+              }
               onChange={(event) =>
                 setForm((current) => ({ ...current, code: event.target.value }))
               }
@@ -623,7 +831,7 @@ function QuestionEditorPage({
             Noi dung cau hoi
             <textarea
               className="min-h-28 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              disabled={isSubmitting || questionQuery.isLoading}
+              disabled={isSubmitting || questionQuery.isLoading || isStatusOnlyMode}
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
@@ -639,7 +847,7 @@ function QuestionEditorPage({
               Loai cau hoi
               <select
                 className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                disabled={isSubmitting || questionQuery.isLoading}
+                disabled={isSubmitting || questionQuery.isLoading || isStatusOnlyMode}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
@@ -657,10 +865,38 @@ function QuestionEditorPage({
             </label>
 
             <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Pham vi cau hoi
+              <select
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                disabled={
+                  isSubmitting ||
+                  questionQuery.isLoading ||
+                  isStatusOnlyMode ||
+                  (mode === 'edit' && questionQuery.data?.status !== 'DRAFT')
+                }
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    scope: event.target.value,
+                  }))
+                }
+                value={form.scope}
+              >
+                {QUESTION_SCOPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
               Huong dan
               <input
                 className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                disabled={isSubmitting || questionQuery.isLoading}
+                disabled={isSubmitting || questionQuery.isLoading || isStatusOnlyMode}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
@@ -669,6 +905,32 @@ function QuestionEditorPage({
                 }
                 value={form.instructionText}
               />
+            </label>
+
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Che do hien thi
+              <select
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                disabled={
+                  isSubmitting ||
+                  questionQuery.isLoading ||
+                  isStatusOnlyMode ||
+                  (mode === 'edit' && questionQuery.data?.status !== 'DRAFT')
+                }
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    visibility: event.target.value,
+                  }))
+                }
+                value={form.visibility}
+              >
+                {QUESTION_VISIBILITY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
@@ -750,7 +1012,7 @@ function QuestionEditorPage({
             </button>
             <button
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60"
-              disabled={isSubmitting || questionQuery.isLoading}
+              disabled={isSubmitting || questionQuery.isLoading || isStatusOnlyMode}
               type="submit"
             >
               <Save aria-hidden="true" className="size-4" />

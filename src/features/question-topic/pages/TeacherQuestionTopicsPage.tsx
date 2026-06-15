@@ -105,6 +105,13 @@ function QuestionTopicsPage({
     navigate(`${basePath}/question-banks`)
   }
 
+  function handleViewDetail(topicId: string) {
+    setSelectedId(topicId)
+    navigate(
+      `${basePath}/question-topics/${topicId}?bankId=${bankId}&bankName=${encodeURIComponent(bankName)}`,
+    )
+  }
+
   function openCreateDialog() {
     setDialogError(null)
     setDialogTarget(null)
@@ -266,15 +273,6 @@ function QuestionTopicsPage({
                   onPublish: () => {
                     void handleReviewAction(topic, 'PUBLISHED')
                   },
-                  onReject: () => {
-                    void handleReviewAction(topic, 'REJECTED')
-                  },
-                  onRequestRevision: () => {
-                    void handleReviewAction(topic, 'REVISION_REQUESTED')
-                  },
-                  onSubmitForReview: () => {
-                    void handleReviewAction(topic, 'SUBMITTED_FOR_REVIEW')
-                  },
                 }),
                 ...(canDeleteQuestionTopic(topic, actorRole)
                   ? [
@@ -305,7 +303,7 @@ function QuestionTopicsPage({
         onRetry={() => {
           void questionTopicsQuery.refetch()
         }}
-        onSelect={setSelectedId}
+        onSelect={handleViewDetail}
         onViewQuestions={(topic) => {
           navigate(
             `${basePath}/questions/all?bankId=${bankId}&topicId=${topic.id}&topicName=${encodeURIComponent(topic.name)}`,

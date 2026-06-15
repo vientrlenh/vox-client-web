@@ -7,7 +7,6 @@ const QUESTION_DETAIL_QUERY = `
   query Question($id: ID!) {
     question(id: $id) {
       id
-      questionTopicId
       code
       instructionText
       questionText

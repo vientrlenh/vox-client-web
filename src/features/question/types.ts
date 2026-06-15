@@ -31,7 +31,7 @@ export type QuestionEvaluationGuideDto = {
 
 export type QuestionDto = {
   id: string
-  questionTopicId: string
+  questionTopicId?: string
   topicId?: string
   code: string
   instructionText: string | null
@@ -83,6 +83,8 @@ export type CreateQuestionRequest = {
   topicId?: string
   code?: string
   questionText: string
+  scope?: string
+  visibility?: string
   instructionText?: string | null
   promptText?: string | null
   preparationText?: string | null
@@ -100,6 +102,8 @@ export type UpdateQuestionRequest = {
   questionTopicId?: string
   topicId?: string
   questionText: string
+  scope?: string
+  visibility?: string
   instructionText?: string | null
   promptText?: string | null
   preparationText?: string | null
@@ -206,6 +210,11 @@ export function getQuestionTypeDisplay(type: QuestionType | string) {
 
 export function getQuestionStatusDisplay(status?: string | null) {
   switch (status) {
+    case 'APPROVED':
+      return {
+        className: 'border-teal-200 bg-teal-50 text-teal-700',
+        label: 'Da duyet',
+      }
     case 'PUBLISHED':
       return {
         className: 'border-emerald-200 bg-emerald-50 text-emerald-700',

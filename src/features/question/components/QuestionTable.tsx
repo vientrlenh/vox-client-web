@@ -156,14 +156,17 @@ export function QuestionTable({
                               onSelect: () => onSelect(question.id),
                               tone: 'primary',
                             },
-                            ...(onEdit && (canEdit?.(question) ?? true)
+                            ...(onEdit
                               ? [
                                   {
                                     icon: Pencil,
                                     id: 'edit',
                                     label: 'Chỉnh sửa',
                                     onSelect: () => onEdit(question),
-                                    tone: 'default' as const,
+                                    tone:
+                                      canEdit?.(question) ?? true
+                                        ? ('default' as const)
+                                        : ('primary' as const),
                                   },
                                 ]
                               : []),

@@ -22,6 +22,17 @@ function isQuestionBankScope(question?: QuestionDto | null) {
   return question?.scope === 'QUESTION_BANK'
 }
 
+function isApprovedStatus(question?: QuestionDto | null) {
+  return question?.status === 'APPROVED'
+}
+
+function isReviewerQueue(question?: QuestionDto | null) {
+  return (
+    question?.status === 'SUBMITTED_FOR_REVIEW' &&
+    question.visibility === 'REVIEWER_ONLY'
+  )
+}
+
 export function getQuestionActorRole(
   roles?: RoleCode[] | null,
 ): QuestionActorRole {
@@ -68,7 +79,7 @@ export function canEditQuestion(
   }
 
   if (role === 'SYSTEM_ADMIN') {
-    return question.status !== 'ARCHIVED'
+    return true
   }
 
   if (role === 'SCHOOL_ADMIN') {
@@ -114,7 +125,7 @@ export function getQuestionReviewActions(
 
     if (isEditableStatus(question.status)) {
       actions.push({
-        description: 'Đẩy câu hỏi sang hàng đợi review.',
+        description: 'Gui cau hoi vao hang doi review.',
         status: 'SUBMITTED_FOR_REVIEW',
         title: 'Submit for review',
       })
@@ -123,18 +134,18 @@ export function getQuestionReviewActions(
     if (question.status === 'SUBMITTED_FOR_REVIEW') {
       actions.push(
         {
-          description: 'Duyệt và xuất bản câu hỏi.',
-          status: 'PUBLISHED',
-          title: 'Publish',
+          description: 'Duyet cau hoi, chuyen sang trang thai approved.',
+          status: 'APPROVED',
+          title: 'Approve',
         },
         {
-          description: 'Trả câu hỏi về cho người tạo chỉnh sửa.',
+          description: 'Tra cau hoi ve cho nguoi tao chinh sua.',
           requiresReason: true,
           status: 'REVISION_REQUESTED',
           title: 'Request revision',
         },
         {
-          description: 'Từ chối câu hỏi hiện tại.',
+          description: 'Tu choi cau hoi hien tai.',
           requiresReason: true,
           status: 'REJECTED',
           title: 'Reject',
@@ -142,9 +153,17 @@ export function getQuestionReviewActions(
       )
     }
 
+    if (isApprovedStatus(question)) {
+      actions.push({
+        description: 'Xuat ban cau hoi da duoc approved.',
+        status: 'PUBLISHED',
+        title: 'Publish',
+      })
+    }
+
     if (question.status !== 'ARCHIVED') {
       actions.push({
-        description: 'Chuyển câu hỏi sang lưu trữ.',
+        description: 'Chuyen cau hoi sang luu tru.',
         requiresReason: true,
         status: 'ARCHIVED',
         title: 'Archive',
@@ -159,7 +178,7 @@ export function getQuestionReviewActions(
 
     if (isEditableStatus(question.status)) {
       actions.push({
-        description: 'Đẩy câu hỏi sang hàng đợi review.',
+        description: 'Gui cau hoi vao hang doi review.',
         status: 'SUBMITTED_FOR_REVIEW',
         title: 'Submit for review',
       })
@@ -168,23 +187,48 @@ export function getQuestionReviewActions(
     if (question.status === 'SUBMITTED_FOR_REVIEW') {
       actions.push(
         {
-          description: 'Duyệt và xuất bản câu hỏi.',
-          status: 'PUBLISHED',
-          title: 'Publish',
+          description: 'Duyet cau hoi, chuyen sang trang thai approved.',
+          status: 'APPROVED',
+          title: 'Approve',
         },
         {
-          description: 'Trả câu hỏi về cho người tạo chỉnh sửa.',
+          description: 'Tra cau hoi ve cho nguoi tao chinh sua.',
           requiresReason: true,
           status: 'REVISION_REQUESTED',
           title: 'Request revision',
         },
         {
-          description: 'Từ chối câu hỏi hiện tại.',
+          description: 'Tu choi cau hoi hien tai.',
           requiresReason: true,
           status: 'REJECTED',
           title: 'Reject',
         },
       )
+    }
+
+    if (isApprovedStatus(question)) {
+      actions.push({
+        description: 'Xuat ban cau hoi da duoc approved.',
+        status: 'PUBLISHED',
+        title: 'Publish',
+      })
+    }
+
+    if (question.status !== 'ARCHIVED') {
+      actions.push({
+        description: 'Chuyen cau hoi sang luu tru.',
+        requiresReason: true,
+        status: 'ARCHIVED',
+        title: 'Archive',
+      })
+    }
+
+    if (question.status === 'ARCHIVED') {
+      actions.push({
+        description: 'Khoi phuc cau hoi ve trang thai draft.',
+        status: 'DRAFT',
+        title: 'Restore to draft',
+      })
     }
 
     return actions
@@ -194,25 +238,21 @@ export function getQuestionReviewActions(
     return []
   }
 
-  if (
-    teacherContext === 'reviewer' &&
-    question.status === 'SUBMITTED_FOR_REVIEW' &&
-    question.visibility === 'REVIEWER_ONLY'
-  ) {
+  if (teacherContext === 'reviewer' && isReviewerQueue(question)) {
     return [
       {
-        description: 'Duyệt và xuất bản câu hỏi.',
-        status: 'PUBLISHED',
-        title: 'Approve / publish',
+        description: 'Duyet cau hoi, chuyen sang trang thai approved.',
+        status: 'APPROVED',
+        title: 'Approve',
       },
       {
-        description: 'Yêu cầu người tạo chỉnh sửa thêm.',
+        description: 'Yeu cau nguoi tao chinh sua them.',
         requiresReason: true,
         status: 'REVISION_REQUESTED',
         title: 'Request revision',
       },
       {
-        description: 'Từ chối câu hỏi hiện tại.',
+        description: 'Tu choi cau hoi hien tai.',
         requiresReason: true,
         status: 'REJECTED',
         title: 'Reject',
@@ -223,9 +263,47 @@ export function getQuestionReviewActions(
   if (teacherContext === 'owner' && isEditableStatus(question.status)) {
     return [
       {
-        description: 'Gửi câu hỏi vào hàng đợi review.',
+        description: 'Gui cau hoi vao hang doi review.',
         status: 'SUBMITTED_FOR_REVIEW',
         title: 'Submit for review',
+      },
+      {
+        description: 'Chuyen cau hoi sang luu tru.',
+        requiresReason: true,
+        status: 'ARCHIVED',
+        title: 'Archive',
+      },
+    ]
+  }
+
+  if (teacherContext === 'owner' && isApprovedStatus(question)) {
+    return [
+      {
+        description: 'Xuat ban cau hoi sau khi da duoc approved.',
+        status: 'PUBLISHED',
+        title: 'Publish',
+      },
+      {
+        description: 'Chuyen cau hoi sang luu tru.',
+        requiresReason: true,
+        status: 'ARCHIVED',
+        title: 'Archive',
+      },
+    ]
+  }
+
+  if (
+    teacherContext === 'owner' &&
+    question.status &&
+    question.status !== 'ARCHIVED' &&
+    question.status !== 'PUBLISHED'
+  ) {
+    return [
+      {
+        description: 'Chuyen cau hoi sang luu tru.',
+        requiresReason: true,
+        status: 'ARCHIVED',
+        title: 'Archive',
       },
     ]
   }

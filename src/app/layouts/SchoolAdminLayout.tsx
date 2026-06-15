@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Bell,
   ChevronDown,
@@ -30,12 +30,12 @@ type NavigationGroup = {
 const navigationItems = [
   {
     icon: Home,
-    label: 'Tổng quan',
+    label: 'Tong quan',
     to: '/school-admin/dashboard',
   },
   {
     icon: Users,
-    label: 'Quản lý lớp học',
+    label: 'Quan ly lop hoc',
     to: '/school-admin/classes',
   },
 ]
@@ -46,12 +46,8 @@ const navigationGroups: NavigationGroup[] = [
     label: 'Question bank',
     items: [
       {
-        label: 'Ngân hàng câu hỏi',
+        label: 'Ngan hang cau hoi',
         to: '/school-admin/question-banks',
-      },
-      {
-        label: 'Chủ đề câu hỏi',
-        to: '/school-admin/question-topics',
       },
     ],
   },
@@ -60,11 +56,11 @@ const navigationGroups: NavigationGroup[] = [
     label: 'Question',
     items: [
       {
-        label: 'Question tổng',
+        label: 'Question tong',
         to: '/school-admin/questions/all',
       },
       {
-        label: 'Duyệt question',
+        label: 'Duyet question',
         to: '/school-admin/questions/review',
       },
     ],
@@ -94,13 +90,74 @@ type SchoolAdminSidebarProps = {
   showCloseButton?: boolean
 }
 
+function SchoolAdminNavigationGroup({
+  icon: Icon,
+  items,
+  label,
+  onNavigate,
+}: NavigationGroup & { onNavigate?: () => void }) {
+  const location = useLocation()
+  const isGroupActive = items.some(({ to }) => location.pathname.startsWith(to))
+  const [isOpen, setIsOpen] = useState(isGroupActive)
+
+  useEffect(() => {
+    if (isGroupActive) {
+      setIsOpen(true)
+    }
+  }, [isGroupActive])
+
+  return (
+    <div className="grid gap-2">
+      <button
+        aria-expanded={isOpen}
+        className={[
+          'flex min-h-12 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-bold transition',
+          isGroupActive ? 'bg-white/10 text-white' : 'text-cyan-50/90',
+        ].join(' ')}
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <Icon aria-hidden="true" className="size-5 shrink-0" />
+        <span className="flex-1">{label}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className={[
+            'size-4 shrink-0 transition-transform',
+            isOpen ? 'rotate-180' : '',
+          ].join(' ')}
+        />
+      </button>
+
+      {isOpen ? (
+        <div className="ml-4 grid gap-2 border-l border-white/10 pl-4">
+          {items.map(({ label: itemLabel, to }) => (
+            <NavLink
+              className={({ isActive }) =>
+                [
+                  'flex min-h-11 items-center rounded-lg px-4 py-2.5 text-sm font-bold transition',
+                  isActive
+                    ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20'
+                    : 'text-cyan-50/90 hover:bg-white/10 hover:text-white',
+                ].join(' ')
+              }
+              key={to}
+              onClick={onNavigate}
+              to={to}
+            >
+              {itemLabel}
+            </NavLink>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function SchoolAdminSidebar({
   onClose,
   onNavigate,
   showCloseButton = false,
 }: SchoolAdminSidebarProps) {
-  const location = useLocation()
-
   return (
     <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-cyan-950 via-blue-900 to-indigo-900 px-6 py-7 text-white">
       <div className="flex items-center justify-between">
@@ -119,7 +176,7 @@ function SchoolAdminSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Đóng menu school admin"
+            aria-label="Dong menu school admin"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -153,55 +210,22 @@ function SchoolAdminSidebar({
           </NavLink>
         ))}
 
-        {navigationGroups.map(({ icon: Icon, items, label }) => {
-          const isGroupActive = items.some(({ to }) =>
-            location.pathname.startsWith(to),
-          )
-
-          return (
-            <div className="grid gap-2" key={label}>
-              <div
-                className={[
-                  'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
-                  isGroupActive
-                    ? 'bg-white/10 text-white'
-                    : 'text-cyan-50/90',
-                ].join(' ')}
-              >
-                <Icon aria-hidden="true" className="size-5 shrink-0" />
-                <span>{label}</span>
-              </div>
-              <div className="ml-4 grid gap-2 border-l border-white/10 pl-4">
-                {items.map(({ label: itemLabel, to }) => (
-                  <NavLink
-                    className={({ isActive }) =>
-                      [
-                        'flex min-h-11 items-center rounded-lg px-4 py-2.5 text-sm font-bold transition',
-                        isActive
-                          ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20'
-                          : 'text-cyan-50/90 hover:bg-white/10 hover:text-white',
-                      ].join(' ')
-                    }
-                    key={to}
-                    onClick={onNavigate}
-                    to={to}
-                  >
-                    {itemLabel}
-                  </NavLink>
-                ))}
-              </div>
-            </div>
-          )
-        })}
+        {navigationGroups.map((group) => (
+          <SchoolAdminNavigationGroup
+            {...group}
+            key={group.label}
+            onNavigate={onNavigate}
+          />
+        ))}
       </nav>
 
       <div className="mt-auto rounded-lg border border-white/15 bg-white/10 p-5 text-white backdrop-blur">
         <div className="inline-flex size-11 items-center justify-center rounded-lg bg-white text-cyan-700">
           <ShieldCheck aria-hidden="true" className="size-6" />
         </div>
-        <p className="mt-4 text-sm font-bold leading-6">Quản trị lớp học</p>
+        <p className="mt-4 text-sm font-bold leading-6">Quan tri lop hoc</p>
         <p className="mt-2 text-xs leading-5 text-cyan-50/80">
-          Theo dõi lớp, học viên và trạng thái tham gia trong trường.
+          Theo doi lop, hoc vien va trang thai tham gia trong truong.
         </p>
       </div>
     </div>
@@ -235,7 +259,7 @@ export function SchoolAdminLayout() {
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Đóng menu school admin bằng lớp phủ"
+            aria-label="Dong menu school admin bang lop phu"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
@@ -258,7 +282,7 @@ export function SchoolAdminLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mở menu school admin"
+            aria-label="Mo menu school admin"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-slate-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
@@ -272,9 +296,9 @@ export function SchoolAdminLayout() {
               className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500"
             />
             <input
-              aria-label="Tìm kiếm lớp học"
+              aria-label="Tim kiem lop hoc"
               className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              placeholder="Tìm theo mã lớp, tên lớp, học viên..."
+              placeholder="Tim theo ma lop, ten lop, hoc vien..."
               readOnly
               type="search"
             />
@@ -282,7 +306,7 @@ export function SchoolAdminLayout() {
 
           <div className="ml-auto flex items-center gap-3">
             <button
-              aria-label="Thông báo"
+              aria-label="Thong bao"
               className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-slate-950 transition hover:border-slate-200 hover:bg-slate-50"
               type="button"
             >
@@ -294,7 +318,7 @@ export function SchoolAdminLayout() {
               <button
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
-                aria-label="Mở menu tài khoản"
+                aria-label="Mo menu tai khoan"
                 className="inline-flex items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50"
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
                 type="button"
@@ -328,7 +352,7 @@ export function SchoolAdminLayout() {
                     type="button"
                   >
                     <LogOut aria-hidden="true" className="size-4" />
-                    Đăng xuất
+                    Dang xuat
                   </button>
                 </div>
               ) : null}
