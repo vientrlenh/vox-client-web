@@ -6,7 +6,7 @@ import {
   Ban,
   CalendarDays,
   CheckCircle2,
-  Copy,
+  // Copy,
   Info,
   Link2,
   Pencil,
@@ -150,27 +150,27 @@ function DetailRow({ label, value }: DetailRowProps) {
   )
 }
 
-type CopyableIdProps = {
-  value: string
-}
+// type CopyableIdProps = {
+//   value: string
+// }
 
-function CopyableId({ value }: CopyableIdProps) {
-  return (
-    <span className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-600">
-      <span className="truncate">{value}</span>
-      <button
-        aria-label={`Sao chép ${value}`}
-        className="ml-auto inline-flex size-7 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-white hover:text-blue-700"
-        onClick={() => {
-          void navigator.clipboard?.writeText(value)
-        }}
-        type="button"
-      >
-        <Copy aria-hidden="true" className="size-4" />
-      </button>
-    </span>
-  )
-}
+// function CopyableId({ value }: CopyableIdProps) {
+//   return (
+//     <span className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-600">
+//       <span className="truncate">{value}</span>
+//       <button
+//         aria-label={`Sao chép ${value}`}
+//         className="ml-auto inline-flex size-7 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-white hover:text-blue-700"
+//         onClick={() => {
+//           void navigator.clipboard?.writeText(value)
+//         }}
+//         type="button"
+//       >
+//         <Copy aria-hidden="true" className="size-4" />
+//       </button>
+//     </span>
+//   )
+// }
 
 type RelatedObjectRowProps = {
   label: string
@@ -226,10 +226,6 @@ function ClassInfoTab({ schoolClass }: ClassInfoTabProps) {
         </DetailCard>
 
         <DetailCard icon={Link2} title="Thông tin liên quan">
-          <DetailRow
-            label="ID lớp"
-            value={<CopyableId value={schoolClass.id} />}
-          />
           <RelatedObjectRow
             label="Trường học"
             value={schoolClass.school}
@@ -543,13 +539,11 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
             <table className="min-w-full divide-y divide-slate-200 text-left">
               <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Học viên</th>
-                  <th className="px-4 py-3">ID học viên</th>
+                  <th className="px-4 py-3">Người dùng</th>
                   <th className="px-4 py-3">Số điện thoại</th>
                   <th className="px-4 py-3">Trạng thái</th>
                   <th className="px-4 py-3">Ngày tham gia</th>
                   <th className="px-4 py-3">Ngày rời lớp</th>
-                  <th className="px-4 py-3">Người thêm</th>
                   <th className="px-4 py-3 text-right">Thao tác</th>
                 </tr>
               </thead>
@@ -572,11 +566,6 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
                           </span>
                         </div>
                       </td>
-                      <td className="max-w-56 px-4 py-4">
-                        <span className="block truncate font-mono text-xs font-semibold text-slate-600">
-                          {classUser.userId}
-                        </span>
-                      </td>
                       <td className="px-4 py-4 text-sm font-semibold text-slate-600">
                         {formatNullableText(classUser.user?.phone)}
                       </td>
@@ -588,11 +577,6 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
                       </td>
                       <td className="px-4 py-4 text-sm font-semibold text-slate-600">
                         {formatClassDate(classUser.leftAt)}
-                      </td>
-                      <td className="max-w-48 px-4 py-4">
-                        <span className="block truncate text-sm font-semibold text-slate-600">
-                          {formatNullableText(classUser.assignedBy)}
-                        </span>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex justify-end">
