@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
 import {
   Bell,
-  Building2,
   ChevronDown,
-  ClipboardList,
   FileQuestion,
   FolderTree,
   Home,
   LogOut,
   Menu,
   Search,
-  Settings,
   ShieldCheck,
   Users,
   X,
@@ -21,12 +18,6 @@ import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
 
-type NavigationItem = {
-  icon: typeof Home
-  label: string
-  to: string
-}
-
 type NavigationGroup = {
   icon: typeof Home
   label: string
@@ -36,31 +27,16 @@ type NavigationGroup = {
   }>
 }
 
-const navigationItems: NavigationItem[] = [
+const navigationItems = [
   {
     icon: Home,
     label: 'Tong quan',
-    to: '/system-admin/dashboard',
-  },
-  {
-    icon: ClipboardList,
-    label: 'Quan ly don dang ky',
-    to: '/system-admin/registrations',
+    to: '/school-admin/dashboard',
   },
   {
     icon: Users,
-    label: 'Quan ly nguoi dung',
-    to: '/system-admin/users',
-  },
-  {
-    icon: Building2,
-    label: 'Quan ly truong hoc',
-    to: '/system-admin/schools',
-  },
-  {
-    icon: Settings,
-    label: 'Cai dat he thong',
-    to: '/system-admin/settings',
+    label: 'Quan ly lop hoc',
+    to: '/school-admin/classes',
   },
 ]
 
@@ -71,7 +47,7 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       {
         label: 'Ngan hang cau hoi',
-        to: '/system-admin/question-banks',
+        to: '/school-admin/question-banks',
       },
     ],
   },
@@ -81,11 +57,11 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       {
         label: 'Question tong',
-        to: '/system-admin/questions/all',
+        to: '/school-admin/questions/all',
       },
       {
         label: 'Duyet question',
-        to: '/system-admin/questions/review',
+        to: '/school-admin/questions/review',
       },
     ],
   },
@@ -108,13 +84,13 @@ function getEmailInitials(email?: string) {
     .slice(0, 2)
 }
 
-type SystemAdminSidebarProps = {
+type SchoolAdminSidebarProps = {
   onClose?: () => void
   onNavigate?: () => void
   showCloseButton?: boolean
 }
 
-function SystemAdminNavigationGroup({
+function SchoolAdminNavigationGroup({
   icon: Icon,
   items,
   label,
@@ -136,7 +112,7 @@ function SystemAdminNavigationGroup({
         aria-expanded={isOpen}
         className={[
           'flex min-h-12 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-bold transition',
-          isGroupActive ? 'bg-white/10 text-white' : 'text-indigo-50/90',
+          isGroupActive ? 'bg-white/10 text-white' : 'text-cyan-50/90',
         ].join(' ')}
         onClick={() => setIsOpen((current) => !current)}
         type="button"
@@ -160,8 +136,8 @@ function SystemAdminNavigationGroup({
                 [
                   'flex min-h-11 items-center rounded-lg px-4 py-2.5 text-sm font-bold transition',
                   isActive
-                    ? 'bg-violet-500 text-white shadow-sm shadow-violet-950/20'
-                    : 'text-indigo-50/90 hover:bg-white/10 hover:text-white',
+                    ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20'
+                    : 'text-cyan-50/90 hover:bg-white/10 hover:text-white',
                 ].join(' ')
               }
               key={to}
@@ -177,19 +153,19 @@ function SystemAdminNavigationGroup({
   )
 }
 
-function SystemAdminSidebar({
+function SchoolAdminSidebar({
   onClose,
   onNavigate,
   showCloseButton = false,
-}: SystemAdminSidebarProps) {
+}: SchoolAdminSidebarProps) {
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-blue-950 via-indigo-900 to-violet-900 px-6 py-7 text-white">
+    <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-cyan-950 via-blue-900 to-indigo-900 px-6 py-7 text-white">
       <div className="flex items-center justify-between">
         <NavLink
-          aria-label="VOX system admin"
+          aria-label="VOX school admin"
           className="inline-flex"
           onClick={onNavigate}
-          to="/system-admin/dashboard"
+          to="/school-admin/dashboard"
         >
           <img
             alt="VOX"
@@ -200,7 +176,7 @@ function SystemAdminSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Dong menu system admin"
+            aria-label="Dong menu school admin"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -210,19 +186,19 @@ function SystemAdminSidebar({
         ) : null}
       </div>
 
-      <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-indigo-100/80">
-        System Admin
+      <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-cyan-100/80">
+        School Admin
       </p>
 
-      <nav aria-label="System admin" className="mt-6 grid gap-3">
+      <nav aria-label="School admin" className="mt-6 grid gap-3">
         {navigationItems.map(({ icon: Icon, label, to }) => (
           <NavLink
             className={({ isActive }) =>
               [
                 'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
                 isActive
-                  ? 'bg-violet-500 text-white shadow-sm shadow-violet-950/20'
-                  : 'text-indigo-50/90 hover:bg-white/10 hover:text-white',
+                  ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20'
+                  : 'text-cyan-50/90 hover:bg-white/10 hover:text-white',
               ].join(' ')
             }
             key={to}
@@ -235,7 +211,7 @@ function SystemAdminSidebar({
         ))}
 
         {navigationGroups.map((group) => (
-          <SystemAdminNavigationGroup
+          <SchoolAdminNavigationGroup
             {...group}
             key={group.label}
             onNavigate={onNavigate}
@@ -244,27 +220,19 @@ function SystemAdminSidebar({
       </nav>
 
       <div className="mt-auto rounded-lg border border-white/15 bg-white/10 p-5 text-white backdrop-blur">
-        <div className="inline-flex size-11 items-center justify-center rounded-lg bg-white text-indigo-700">
+        <div className="inline-flex size-11 items-center justify-center rounded-lg bg-white text-cyan-700">
           <ShieldCheck aria-hidden="true" className="size-6" />
         </div>
-        <p className="mt-4 text-sm font-bold leading-6">
-          He thong an toan va bao mat
+        <p className="mt-4 text-sm font-bold leading-6">Quan tri lop hoc</p>
+        <p className="mt-2 text-xs leading-5 text-cyan-50/80">
+          Theo doi lop, hoc vien va trang thai tham gia trong truong.
         </p>
-        <p className="mt-2 text-xs leading-5 text-indigo-50/80">
-          Du lieu duoc ma hoa va bao ve theo tieu chuan quoc te.
-        </p>
-        <button
-          className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-white/35 text-sm font-bold text-white transition hover:bg-white/10"
-          type="button"
-        >
-          Xem chi tiet
-        </button>
       </div>
     </div>
   )
 }
 
-export function SystemAdminLayout() {
+export function SchoolAdminLayout() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const user = useAppSelector((state) => state.auth.user)
@@ -283,26 +251,26 @@ export function SystemAdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-blue-950 lg:pl-70">
+    <div className="min-h-screen bg-slate-50 text-slate-950 lg:pl-70">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-70 lg:block">
-        <SystemAdminSidebar />
+        <SchoolAdminSidebar />
       </aside>
 
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Dong menu system admin bang lop phu"
+            aria-label="Dong menu school admin bang lop phu"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />
           <aside
-            aria-label="Menu system admin"
+            aria-label="Menu school admin"
             aria-modal="true"
             className="relative h-full w-70 max-w-[86vw]"
             role="dialog"
           >
-            <SystemAdminSidebar
+            <SchoolAdminSidebar
               onClose={() => setIsMobileMenuOpen(false)}
               onNavigate={() => setIsMobileMenuOpen(false)}
               showCloseButton
@@ -314,8 +282,8 @@ export function SystemAdminLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mo menu system admin"
-            className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-blue-950 transition hover:bg-slate-50 lg:hidden"
+            aria-label="Mo menu school admin"
+            className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-slate-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
           >
@@ -325,24 +293,21 @@ export function SystemAdminLayout() {
           <div className="relative hidden max-w-2xl flex-1 md:block">
             <Search
               aria-hidden="true"
-              className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-blue-900/70"
+              className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500"
             />
             <input
-              aria-label="Tim kiem he thong"
-              className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-20 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              placeholder="Tim kiem theo ten truong, email, so dien thoai, ma don..."
+              aria-label="Tim kiem lop hoc"
+              className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              placeholder="Tim theo ma lop, ten lop, hoc vien..."
               readOnly
               type="search"
             />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-blue-900/70">
-              Ctrl K
-            </span>
           </div>
 
           <div className="ml-auto flex items-center gap-3">
             <button
               aria-label="Thong bao"
-              className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-blue-950 transition hover:border-slate-200 hover:bg-slate-50"
+              className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-slate-950 transition hover:border-slate-200 hover:bg-slate-50"
               type="button"
             >
               <Bell aria-hidden="true" className="size-5" />
@@ -358,11 +323,11 @@ export function SystemAdminLayout() {
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
                 type="button"
               >
-                <span className="inline-flex size-11 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
+                <span className="inline-flex size-11 items-center justify-center rounded-full bg-cyan-600 text-sm font-bold text-white">
                   {adminInitials}
                 </span>
                 <span className="hidden max-w-56 sm:block">
-                  <span className="block truncate text-sm font-bold text-blue-950">
+                  <span className="block truncate text-sm font-bold text-slate-950">
                     {adminEmail}
                   </span>
                   <span className="block truncate text-xs font-medium text-slate-500">
@@ -371,7 +336,7 @@ export function SystemAdminLayout() {
                 </span>
                 <ChevronDown
                   aria-hidden="true"
-                  className="hidden size-4 text-blue-950 sm:block"
+                  className="hidden size-4 text-slate-950 sm:block"
                 />
               </button>
 

@@ -4,16 +4,19 @@ import {
   saveAuthTokens,
 } from '@/shared/api/authTokenStorage'
 import type { AuthTokens } from '@/shared/api/authTokenStorage'
+import { QUESTION_MODULE_DEFAULT_SCHOOL_ID } from '@/features/question/constants'
 import type { AuthUser, ClientDevice, RoleCode } from '../types'
 
 type JwtPayload = {
   email?: unknown
   exp?: unknown
   roles?: unknown
+  schoolId?: unknown
   userId?: unknown
 }
 
 export const CLIENT_DEVICE_STORAGE_KEY = 'vox.deviceId'
+export const FALLBACK_SCHOOL_ID = QUESTION_MODULE_DEFAULT_SCHOOL_ID
 
 export { clearAuthTokens, getAuthTokens, saveAuthTokens }
 export type { AuthTokens }
@@ -109,6 +112,10 @@ export function decodeAccessToken(accessToken: string): AuthUser | null {
       email: parsed.email,
       exp: parsed.exp,
       roles,
+      schoolId:
+        typeof parsed.schoolId === 'string' && parsed.schoolId.trim()
+          ? parsed.schoolId
+          : FALLBACK_SCHOOL_ID,
       userId: parsed.userId,
     }
   } catch {

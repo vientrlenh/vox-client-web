@@ -83,6 +83,22 @@ function getLoginErrorMessage(error: unknown) {
   return 'Đăng nhập thất bại. Vui lòng thử lại.'
 }
 
+function getPostLoginPath(roles: string[]) {
+  if (roles.includes('SYSTEM_ADMIN')) {
+    return '/system-admin/dashboard'
+  }
+
+  if (roles.includes('SCHOOL_ADMIN')) {
+    return '/school-admin/dashboard'
+  }
+
+  if (roles.includes('TEACHER')) {
+    return '/teacher/question-banks'
+  }
+
+  return null
+}
+
 export function LoginPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
@@ -123,7 +139,9 @@ export function LoginPage() {
         return
       }
 
-      if (!user.roles.includes('SYSTEM_ADMIN')) {
+      const postLoginPath = getPostLoginPath(user.roles)
+
+      if (!postLoginPath) {
         clearAuthTokens()
         setMessage({
           text: 'Vai trò hiện chưa được hỗ trợ trong phiên bản này.',
@@ -137,7 +155,7 @@ export function LoginPage() {
         text: 'Đăng nhập thành công.',
         tone: 'success',
       })
-      navigate('/system-admin/dashboard', { replace: true })
+      navigate(postLoginPath, { replace: true })
     } catch (error) {
       clearAuthTokens()
       setMessage({

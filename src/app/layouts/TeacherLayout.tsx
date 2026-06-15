@@ -1,18 +1,14 @@
 import { useEffect, useState } from 'react'
 import {
   Bell,
-  Building2,
+  BookOpen,
   ChevronDown,
-  ClipboardList,
   FileQuestion,
   FolderTree,
-  Home,
   LogOut,
   Menu,
   Search,
-  Settings,
   ShieldCheck,
-  Users,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -21,48 +17,14 @@ import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
 
-type NavigationItem = {
-  icon: typeof Home
-  label: string
-  to: string
-}
-
 type NavigationGroup = {
-  icon: typeof Home
+  icon: typeof BookOpen
   label: string
   items: Array<{
     label: string
     to: string
   }>
 }
-
-const navigationItems: NavigationItem[] = [
-  {
-    icon: Home,
-    label: 'Tong quan',
-    to: '/system-admin/dashboard',
-  },
-  {
-    icon: ClipboardList,
-    label: 'Quan ly don dang ky',
-    to: '/system-admin/registrations',
-  },
-  {
-    icon: Users,
-    label: 'Quan ly nguoi dung',
-    to: '/system-admin/users',
-  },
-  {
-    icon: Building2,
-    label: 'Quan ly truong hoc',
-    to: '/system-admin/schools',
-  },
-  {
-    icon: Settings,
-    label: 'Cai dat he thong',
-    to: '/system-admin/settings',
-  },
-]
 
 const navigationGroups: NavigationGroup[] = [
   {
@@ -71,7 +33,7 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       {
         label: 'Ngan hang cau hoi',
-        to: '/system-admin/question-banks',
+        to: '/teacher/question-banks',
       },
     ],
   },
@@ -80,12 +42,16 @@ const navigationGroups: NavigationGroup[] = [
     label: 'Question',
     items: [
       {
+        label: 'My question',
+        to: '/teacher/questions/my',
+      },
+      {
         label: 'Question tong',
-        to: '/system-admin/questions/all',
+        to: '/teacher/questions/all',
       },
       {
         label: 'Duyet question',
-        to: '/system-admin/questions/review',
+        to: '/teacher/questions/review',
       },
     ],
   },
@@ -93,7 +59,7 @@ const navigationGroups: NavigationGroup[] = [
 
 function getEmailInitials(email?: string) {
   if (!email) {
-    return 'SA'
+    return 'TC'
   }
 
   return email
@@ -108,13 +74,13 @@ function getEmailInitials(email?: string) {
     .slice(0, 2)
 }
 
-type SystemAdminSidebarProps = {
+type TeacherSidebarProps = {
   onClose?: () => void
   onNavigate?: () => void
   showCloseButton?: boolean
 }
 
-function SystemAdminNavigationGroup({
+function TeacherNavigationGroup({
   icon: Icon,
   items,
   label,
@@ -177,19 +143,19 @@ function SystemAdminNavigationGroup({
   )
 }
 
-function SystemAdminSidebar({
+function TeacherSidebar({
   onClose,
   onNavigate,
   showCloseButton = false,
-}: SystemAdminSidebarProps) {
+}: TeacherSidebarProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-blue-950 via-indigo-900 to-violet-900 px-6 py-7 text-white">
       <div className="flex items-center justify-between">
         <NavLink
-          aria-label="VOX system admin"
+          aria-label="VOX teacher"
           className="inline-flex"
           onClick={onNavigate}
-          to="/system-admin/dashboard"
+          to="/teacher/question-banks"
         >
           <img
             alt="VOX"
@@ -200,7 +166,7 @@ function SystemAdminSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Dong menu system admin"
+            aria-label="Dong menu giao vien"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -211,31 +177,12 @@ function SystemAdminSidebar({
       </div>
 
       <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-indigo-100/80">
-        System Admin
+        Giao vien
       </p>
 
-      <nav aria-label="System admin" className="mt-6 grid gap-3">
-        {navigationItems.map(({ icon: Icon, label, to }) => (
-          <NavLink
-            className={({ isActive }) =>
-              [
-                'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
-                isActive
-                  ? 'bg-violet-500 text-white shadow-sm shadow-violet-950/20'
-                  : 'text-indigo-50/90 hover:bg-white/10 hover:text-white',
-              ].join(' ')
-            }
-            key={to}
-            onClick={onNavigate}
-            to={to}
-          >
-            <Icon aria-hidden="true" className="size-5 shrink-0" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-
+      <nav aria-label="Teacher" className="mt-6 grid gap-3">
         {navigationGroups.map((group) => (
-          <SystemAdminNavigationGroup
+          <TeacherNavigationGroup
             {...group}
             key={group.label}
             onNavigate={onNavigate}
@@ -264,15 +211,15 @@ function SystemAdminSidebar({
   )
 }
 
-export function SystemAdminLayout() {
+export function TeacherLayout() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const user = useAppSelector((state) => state.auth.user)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const adminEmail = user?.email ?? 'unknown'
-  const adminRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
-  const adminInitials = getEmailInitials(adminEmail)
+  const teacherEmail = user?.email ?? 'unknown'
+  const teacherRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
+  const teacherInitials = getEmailInitials(teacherEmail)
 
   function handleLogout() {
     setIsMobileMenuOpen(false)
@@ -285,24 +232,24 @@ export function SystemAdminLayout() {
   return (
     <div className="min-h-screen bg-slate-50 text-blue-950 lg:pl-70">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-70 lg:block">
-        <SystemAdminSidebar />
+        <TeacherSidebar />
       </aside>
 
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Dong menu system admin bang lop phu"
+            aria-label="Dong menu giao vien bang lop phu"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />
           <aside
-            aria-label="Menu system admin"
+            aria-label="Menu giao vien"
             aria-modal="true"
             className="relative h-full w-70 max-w-[86vw]"
             role="dialog"
           >
-            <SystemAdminSidebar
+            <TeacherSidebar
               onClose={() => setIsMobileMenuOpen(false)}
               onNavigate={() => setIsMobileMenuOpen(false)}
               showCloseButton
@@ -314,7 +261,7 @@ export function SystemAdminLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mo menu system admin"
+            aria-label="Mo menu giao vien"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-blue-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
@@ -328,9 +275,9 @@ export function SystemAdminLayout() {
               className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-blue-900/70"
             />
             <input
-              aria-label="Tim kiem he thong"
+              aria-label="Tim kiem"
               className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-20 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              placeholder="Tim kiem theo ten truong, email, so dien thoai, ma don..."
+              placeholder="Tim kiem ngan hang, cau hoi..."
               readOnly
               type="search"
             />
@@ -359,14 +306,14 @@ export function SystemAdminLayout() {
                 type="button"
               >
                 <span className="inline-flex size-11 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
-                  {adminInitials}
+                  {teacherInitials}
                 </span>
                 <span className="hidden max-w-56 sm:block">
                   <span className="block truncate text-sm font-bold text-blue-950">
-                    {adminEmail}
+                    {teacherEmail}
                   </span>
                   <span className="block truncate text-xs font-medium text-slate-500">
-                    {adminRoles}
+                    {teacherRoles}
                   </span>
                 </span>
                 <ChevronDown

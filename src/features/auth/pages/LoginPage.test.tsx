@@ -27,12 +27,16 @@ function createJwt(payload: Record<string, unknown>) {
   return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.signature`
 }
 
-function createLoginResponse(roles: string[]) {
+function createLoginResponse(
+  roles: string[],
+  extraPayload: Record<string, unknown> = {},
+) {
   return {
     accessToken: createJwt({
       email: 'admin@vox.edu.vn',
       exp: Math.floor(Date.now() / 1000) + 3600,
       roles,
+      ...extraPayload,
       userId: 'user-1',
     }),
     refreshToken: 'refresh-token',
@@ -98,6 +102,43 @@ describe('LoginPage', () => {
       login: 'admin@vox.edu.vn',
       password: 'secret',
     })
+    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBe(
+      responseData.accessToken,
+    )
+    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)).toBe(
+      responseData.refreshToken,
+    )
+  })
+
+  it('stores tokens and authenticates a SCHOOL_ADMIN login', async () => {
+    const user = userEvent.setup()
+    const responseData = createLoginResponse(['SCHOOL_ADMIN'], {
+      schoolId: '33333333-3333-4333-8333-333333333333',
+    })
+    jest.mocked(apiClient.post).mockResolvedValue({
+      data: {
+        data: responseData,
+        message: 'ÄÄƒng nháº­p thÃ nh cÃ´ng',
+      },
+    } as AxiosResponse<ApiResponse<LoginResponse>>)
+
+    const { store } = renderWithProviders(<LoginPage />)
+
+    await user.type(
+      screen.getByLabelText(/email hoặc số điện thoại/i),
+      'school-admin@vox.edu.vn',
+    )
+    await user.type(screen.getByLabelText(/^mật khẩu$/i), 'secret')
+    await user.click(screen.getByRole('button', { name: /^đăng nhập$/i }))
+
+    await waitFor(() =>
+      expect(store.getState().auth.status).toBe('authenticated'),
+    )
+
+    expect(store.getState().auth.user?.roles).toContain('SCHOOL_ADMIN')
+    expect(store.getState().auth.user?.schoolId).toBe(
+      '33333333-3333-4333-8333-333333333333',
+    )
     expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBe(
       responseData.accessToken,
     )

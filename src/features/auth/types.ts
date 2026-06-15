@@ -71,5 +71,6 @@ export type AuthUser = {
   email: string
   exp: number
   roles: RoleCode[]
+  schoolId?: string
   userId: string
 }
