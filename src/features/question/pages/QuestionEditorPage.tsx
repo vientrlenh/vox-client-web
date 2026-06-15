@@ -4,7 +4,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
+import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
+import { formatNullableText as formatBankNullableText } from '@/features/question-bank/types'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
+import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
+import { formatNullableText as formatTopicNullableText } from '@/features/question-topic/types'
 import { useQuestionQuery } from '../api/useQuestionQuery'
 import { useReviewQuestionMutation } from '../api/useQuestionReviewMutation'
 import { questionQueryKeys } from '../api/useQuestionsQuery'
@@ -28,7 +32,7 @@ import {
   canEditQuestion,
   getQuestionActorRole,
   getQuestionReviewActions,
-  getTeacherQuestionContext,
+  resolveTeacherQuestionContext,
 } from '../permissions'
 import type {
   CreateQuestionRequest,
@@ -57,6 +61,7 @@ type EditorFormState = {
 }
 
 type AssetFormState = {
+  id: string | null
   altText: string
   description: string
   durationSeconds: string
@@ -101,6 +106,15 @@ const QUESTION_VISIBILITY_OPTIONS = [
   { label: 'Chi exam paper', value: 'EXAM_PAPER_ONLY' },
 ] as const
 
+const QUESTION_ASSET_TYPE_OPTIONS = [
+  { label: 'Audio', value: 'AUDIO' },
+  { label: 'Image', value: 'IMAGE' },
+  { label: 'Video', value: 'VIDEO' },
+  { label: 'Text passage', value: 'TEXT_PASSAGE' },
+] as const
+
+const SELECTOR_PAGE_SIZE = 6
+
 function getErrorMessage(error: unknown) {
   if (
     error &&
@@ -132,6 +146,7 @@ function createInitialForm(question: QuestionDto | null): EditorFormState {
 
 function createAssetForm(asset?: QuestionAssetDto | null): AssetFormState {
   return {
+    id: asset?.id ?? null,
     altText: asset?.altText ?? '',
     description: asset?.description ?? '',
     durationSeconds:
@@ -209,9 +224,10 @@ function QuestionEditorPage({
   const params = useParams()
   const [searchParams] = useSearchParams()
   const questionId = params.questionId ?? null
-  const topicId = searchParams.get('topicId') ?? ''
-  const bankId = searchParams.get('bankId') ?? ''
-  const topicName = searchParams.get('topicName') ?? ''
+  const initialTopicId = searchParams.get('topicId') ?? ''
+  const initialBankId = searchParams.get('bankId') ?? ''
+  const initialTopicName = searchParams.get('topicName') ?? ''
+  const initialBankName = searchParams.get('bankName') ?? ''
   const teacherView =
     ((location.state as { fromView?: 'all' | 'my' | 'review' } | null)?.fromView ??
       null)
@@ -244,6 +260,26 @@ function QuestionEditorPage({
   const [reviewNote, setReviewNote] = useState('')
   const [reviewReason, setReviewReason] = useState('')
   const [reviewError, setReviewError] = useState<string | null>(null)
+  const [bankPage, setBankPage] = useState(1)
+  const [topicPage, setTopicPage] = useState(1)
+  const [selectedBankId, setSelectedBankId] = useState(initialBankId)
+  const [selectedBankName, setSelectedBankName] = useState(initialBankName)
+  const [selectedTopicId, setSelectedTopicId] = useState(initialTopicId)
+  const [selectedTopicName, setSelectedTopicName] = useState(initialTopicName)
+
+  const questionBanksQuery = useQuestionBanksQuery(
+    scope,
+    bankPage,
+    SELECTOR_PAGE_SIZE,
+    mode === 'create',
+  )
+  const questionTopicsByBankQuery = useQuestionTopicsQuery(
+    scope,
+    selectedBankId,
+    topicPage,
+    SELECTOR_PAGE_SIZE,
+    mode === 'create',
+  )
 
   useEffect(() => {
     if (!questionQuery.data) {
@@ -260,12 +296,19 @@ function QuestionEditorPage({
   }, [questionQuery.data])
 
   const actorRole = getQuestionActorRole(user?.roles)
-  const teacherContext = getTeacherQuestionContext(teacherView)
+  const teacherContext = resolveTeacherQuestionContext(
+    teacherView,
+    questionQuery.data,
+    user?.userId,
+  )
   const canCreate = canCreateQuestion(actorRole)
   const resolvedTopicId =
     mode === 'create'
-      ? topicId
-      : (questionQuery.data?.questionTopicId ?? questionQuery.data?.topicId ?? '')
+      ? selectedTopicId
+      : (questionQuery.data?.questionTopicId ??
+          questionQuery.data?.topicId ??
+          questionQuery.data?.questionTopic?.id ??
+          '')
   const canEdit =
     mode === 'create'
       ? canCreate
@@ -306,10 +349,10 @@ function QuestionEditorPage({
 
   function getReturnPath() {
     const targetBankId =
-      bankId || questionQuery.data?.questionTopic?.questionBankId || ''
+      selectedBankId || initialBankId || questionQuery.data?.questionTopic?.questionBankId || ''
     const targetTopicId = resolvedTopicId
     const targetTopicName =
-      topicName || questionQuery.data?.questionTopic?.name || ''
+      selectedTopicName || initialTopicName || questionQuery.data?.questionTopic?.name || ''
 
     if (targetBankId && targetTopicId) {
       return `${basePath}/questions/all?bankId=${targetBankId}&topicId=${targetTopicId}&topicName=${encodeURIComponent(targetTopicName)}`
@@ -474,6 +517,7 @@ function QuestionEditorPage({
 
     const payload: UpdateQuestionAssetsRequest = {
       assets: assetForm.map((asset, index) => ({
+        id: asset.id,
         altText: asset.altText.trim() || null,
         description: asset.description.trim() || null,
         durationSeconds: asset.durationSeconds.trim()
@@ -711,6 +755,128 @@ function QuestionEditorPage({
               </button>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {mode === 'create' ? (
+        <div className="grid gap-6 rounded-lg border border-slate-200 bg-white p-6">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">
+              Chon question bank va topic
+            </h2>
+            <p className="mt-1 text-sm font-medium text-slate-600">
+              Buoc 1: chon ngan hang cau hoi ban dang xem duoc. Buoc 2: chon topic de tao question.
+            </p>
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-2">
+            <div className="grid gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-black text-slate-950">
+                  Question bank
+                </h3>
+                <span className="text-xs font-bold text-slate-500">
+                  Trang {bankPage}/{Math.max(questionBanksQuery.data?.totalPages ?? 1, 1)}
+                </span>
+              </div>
+
+              <div className="grid gap-3">
+                {(questionBanksQuery.data?.content ?? []).map((bank) => (
+                  <button
+                    className={[
+                      'grid gap-2 rounded-lg border px-4 py-4 text-left transition',
+                      selectedBankId === bank.id
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50',
+                    ].join(' ')}
+                    key={bank.id}
+                    onClick={() => {
+                      setSelectedBankId(bank.id)
+                      setSelectedBankName(bank.bankName)
+                      setSelectedTopicId('')
+                      setSelectedTopicName('')
+                      setTopicPage(1)
+                    }}
+                    type="button"
+                  >
+                    <span className="text-sm font-black text-slate-950">
+                      {formatBankNullableText(bank.bankName)}
+                    </span>
+                    <span className="text-xs font-medium text-slate-500">
+                      {formatBankNullableText(bank.description)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <SelectorPagination
+                canNext={bankPage < (questionBanksQuery.data?.totalPages ?? 0)}
+                canPrevious={bankPage > 1}
+                onNext={() => setBankPage((current) => current + 1)}
+                onPrevious={() => setBankPage((current) => Math.max(1, current - 1))}
+              />
+            </div>
+
+            <div className="grid gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-black text-slate-950">Topic</h3>
+                <span className="text-xs font-bold text-slate-500">
+                  {selectedBankName
+                    ? `Trang ${topicPage}/${Math.max(questionTopicsByBankQuery.data?.totalPages ?? 1, 1)}`
+                    : 'Chon bank truoc'}
+                </span>
+              </div>
+
+              {selectedBankId ? (
+                <>
+                  <div className="grid gap-3">
+                    {(questionTopicsByBankQuery.data?.content ?? []).map((topic) => (
+                      <button
+                        className={[
+                          'grid gap-2 rounded-lg border px-4 py-4 text-left transition',
+                          selectedTopicId === topic.id
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50',
+                        ].join(' ')}
+                        key={topic.id}
+                        onClick={() => {
+                          setSelectedTopicId(topic.id)
+                          setSelectedTopicName(topic.name)
+                        }}
+                        type="button"
+                      >
+                        <span className="text-sm font-black text-slate-950">
+                          {formatTopicNullableText(topic.name)}
+                        </span>
+                        <span className="text-xs font-medium text-slate-500">
+                          {formatTopicNullableText(topic.description)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <SelectorPagination
+                    canNext={topicPage < (questionTopicsByBankQuery.data?.totalPages ?? 0)}
+                    canPrevious={topicPage > 1}
+                    onNext={() => setTopicPage((current) => current + 1)}
+                    onPrevious={() => setTopicPage((current) => Math.max(1, current - 1))}
+                  />
+                </>
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-semibold text-slate-500">
+                  Chon question bank de xem danh sach topic.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+            Dang chon:
+            {' '}
+            {selectedBankName ? selectedBankName : 'Chua chon bank'}
+            {' / '}
+            {selectedTopicName ? selectedTopicName : 'Chua chon topic'}
+          </div>
         </div>
       ) : null}
 
@@ -1061,18 +1227,29 @@ function QuestionEditorPage({
                   }
                   value={asset.title}
                 />
-                <InputField
-                  disabled={isSubmitting}
-                  label="Loai asset"
-                  onChange={(value) =>
-                    setAssetForm((current) =>
-                      current.map((item, itemIndex) =>
-                        itemIndex === index ? { ...item, type: value } : item,
-                      ),
-                    )
-                  }
-                  value={asset.type}
-                />
+                <label className="grid gap-2 text-sm font-bold text-slate-700">
+                  Loai asset
+                  <select
+                    className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    disabled={isSubmitting}
+                    onChange={(event) =>
+                      setAssetForm((current) =>
+                        current.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? { ...item, type: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                    value={asset.type}
+                  >
+                    {QUESTION_ASSET_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <InputField
                   disabled={isSubmitting}
                   label="URL"
@@ -1330,6 +1507,39 @@ function TextareaField({
         value={value}
       />
     </label>
+  )
+}
+
+function SelectorPagination({
+  canNext,
+  canPrevious,
+  onNext,
+  onPrevious,
+}: {
+  canNext: boolean
+  canPrevious: boolean
+  onNext: () => void
+  onPrevious: () => void
+}) {
+  return (
+    <div className="flex items-center justify-end gap-3">
+      <button
+        className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+        disabled={!canPrevious}
+        onClick={onPrevious}
+        type="button"
+      >
+        Truoc
+      </button>
+      <button
+        className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+        disabled={!canNext}
+        onClick={onNext}
+        type="button"
+      >
+        Sau
+      </button>
+    </div>
   )
 }
 

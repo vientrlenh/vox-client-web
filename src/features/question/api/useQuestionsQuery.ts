@@ -4,6 +4,13 @@ import type { QuestionModuleScope } from '@/features/question-bank/api/useQuesti
 import type { QuestionPage } from '../types'
 
 export type QuestionListView = 'all' | 'my' | 'review'
+export type QuestionQueryFilters = {
+  includeArchived?: boolean
+  keyword: string
+  scope: string
+  status: string
+  type: string
+}
 
 const QUESTION_FIELDS = `
   id
@@ -48,9 +55,23 @@ function getQuestionListQuery(scope: QuestionModuleScope, view: QuestionListView
           ? 'adminReviewQueue'
           : 'adminQuestions'
 
+  const filterVariableDefinitions =
+    view === 'all'
+      ? scope === 'admin'
+        ? ', $includeArchived: Boolean, $status: String, $keyword: String'
+        : ', $scope: String, $status: String, $type: String, $keyword: String'
+      : ''
+
+  const filterArguments =
+    view === 'all'
+      ? scope === 'admin'
+        ? ', includeArchived: $includeArchived, status: $status, keyword: $keyword'
+        : ', scope: $scope, status: $status, type: $type, keyword: $keyword'
+      : ''
+
   return `
-  query Questions($page: Int!, $size: Int!) {
-    ${queryName}(page: $page, size: $size) {
+  query Questions($page: Int!, $size: Int!${filterVariableDefinitions}) {
+    ${queryName}(page: $page, size: $size${filterArguments}) {
       content {
         ${QUESTION_FIELDS}
       }
@@ -70,9 +91,19 @@ function getTopicQuestionsQuery(scope: QuestionModuleScope) {
         ? 'schoolTopicQuestions'
         : 'adminTopicQuestions'
 
+  const filterVariableDefinitions =
+    scope === 'admin'
+      ? ', $includeArchived: Boolean, $scope: String, $status: String, $type: String, $keyword: String'
+      : ', $scope: String, $status: String, $type: String, $keyword: String'
+
+  const filterArguments =
+    scope === 'admin'
+      ? ', includeArchived: $includeArchived, scope: $scope, status: $status, type: $type, keyword: $keyword'
+      : ', scope: $scope, status: $status, type: $type, keyword: $keyword'
+
   return `
-  query TopicQuestions($bankId: ID!, $topicId: ID!, $page: Int!, $size: Int!) {
-    ${queryName}(bankId: $bankId, topicId: $topicId, page: $page, size: $size) {
+  query TopicQuestions($bankId: ID!, $topicId: ID!, $page: Int!, $size: Int!${filterVariableDefinitions}) {
+    ${queryName}(bankId: $bankId, topicId: $topicId, page: $page, size: $size${filterArguments}) {
       content {
         ${QUESTION_FIELDS}
       }
@@ -101,6 +132,7 @@ type TopicQuestionsQueryData = {
 }
 
 type FetchQuestionsInput = {
+  filters: QuestionQueryFilters
   page: number
   scope: QuestionModuleScope
   size: number
@@ -109,6 +141,7 @@ type FetchQuestionsInput = {
 
 type FetchQuestionsByTopicInput = {
   bankId: string
+  filters: QuestionQueryFilters
   page: number
   scope: QuestionModuleScope
   size: number
@@ -124,13 +157,16 @@ export const questionQueryKeys = {
     view: QuestionListView,
     page: number,
     size: number,
-  ) => [...questionQueryKeys.all, 'list', scope, view, page, size] as const,
+    filters: QuestionQueryFilters,
+  ) =>
+    [...questionQueryKeys.all, 'list', scope, view, page, size, filters] as const,
   questionsByTopic: (
     scope: QuestionModuleScope,
     bankId: string,
     topicId: string,
     page: number,
     size: number,
+    filters: QuestionQueryFilters,
   ) =>
     [
       ...questionQueryKeys.all,
@@ -140,21 +176,38 @@ export const questionQueryKeys = {
       topicId,
       page,
       size,
+      filters,
     ] as const,
 }
 
 export async function fetchQuestions({
+  filters,
   page,
   scope,
   size,
   view,
 }: FetchQuestionsInput) {
+  const variables: Record<string, boolean | number | string | undefined> = {
+    page,
+    size,
+  }
+
+  if (view === 'all') {
+    if (scope === 'admin') {
+      variables.includeArchived = filters.includeArchived
+      variables.keyword = filters.keyword || undefined
+      variables.status = filters.status || undefined
+    } else {
+      variables.keyword = filters.keyword || undefined
+      variables.scope = filters.scope || undefined
+      variables.status = filters.status || undefined
+      variables.type = filters.type || undefined
+    }
+  }
+
   const data = await graphQLRequest<QuestionsQueryData>(
     getQuestionListQuery(scope, view),
-    {
-      page,
-      size,
-    },
+    variables,
   )
 
   return (
@@ -177,19 +230,30 @@ export async function fetchQuestions({
 
 export async function fetchQuestionsByTopic({
   bankId,
+  filters,
   page,
   scope,
   size,
   topicId,
 }: FetchQuestionsByTopicInput) {
+  const variables: Record<string, boolean | number | string | undefined> = {
+    bankId,
+    keyword: filters.keyword || undefined,
+    page,
+    scope: filters.scope || undefined,
+    size,
+    status: filters.status || undefined,
+    topicId,
+    type: filters.type || undefined,
+  }
+
+  if (scope === 'admin') {
+    variables.includeArchived = filters.includeArchived
+  }
+
   const data = await graphQLRequest<TopicQuestionsQueryData>(
     getTopicQuestionsQuery(scope),
-    {
-      bankId,
-      page,
-      size,
-      topicId,
-    },
+    variables,
   )
 
   return (
@@ -211,11 +275,12 @@ export function useQuestionsQuery(
   view: QuestionListView,
   page: number,
   size: number,
+  filters: QuestionQueryFilters,
 ) {
   return useQuery({
     enabled: !(scope !== 'teacher' && view === 'my'),
-    queryFn: () => fetchQuestions({ page, scope, size, view }),
-    queryKey: questionQueryKeys.questions(scope, view, page, size),
+    queryFn: () => fetchQuestions({ filters, page, scope, size, view }),
+    queryKey: questionQueryKeys.questions(scope, view, page, size, filters),
   })
 }
 
@@ -225,16 +290,19 @@ export function useQuestionsByTopicQuery(
   topicId: string,
   page: number,
   size: number,
+  filters: QuestionQueryFilters,
 ) {
   return useQuery({
     enabled: Boolean(bankId && topicId),
-    queryFn: () => fetchQuestionsByTopic({ bankId, page, scope, size, topicId }),
+    queryFn: () =>
+      fetchQuestionsByTopic({ bankId, filters, page, scope, size, topicId }),
     queryKey: questionQueryKeys.questionsByTopic(
       scope,
       bankId,
       topicId,
       page,
       size,
+      filters,
     ),
   })
 }

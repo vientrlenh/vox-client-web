@@ -95,9 +95,10 @@ export function useQuestionTopicsQuery(
   bankId: string,
   page: number,
   size: number,
+  enabled = true,
 ) {
   return useQuery({
-    enabled: Boolean(bankId),
+    enabled: enabled && Boolean(bankId),
     queryFn: () => fetchQuestionTopics({ bankId, page, scope, size }),
     queryKey: questionTopicQueryKeys.questionTopics(scope, bankId, page, size),
   })

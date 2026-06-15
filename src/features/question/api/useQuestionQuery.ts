@@ -23,6 +23,8 @@ const QUESTION_DETAIL_QUERY = `
       status
       createdAt
       updatedAt
+      createdBy
+      updatedBy
       questionTopic {
         id
         questionBankId

@@ -88,8 +88,10 @@ export function useQuestionBanksQuery(
   scope: QuestionModuleScope,
   page: number,
   size: number,
+  enabled = true,
 ) {
   return useQuery({
+    enabled,
     queryFn: () => fetchQuestionBanks({ page, scope, size }),
     queryKey: questionBankQueryKeys.questionBanks(scope, page, size),
   })

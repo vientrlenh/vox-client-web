@@ -12,14 +12,10 @@ type ReviewActionOption = {
   title: string
 }
 
-const EDITABLE_STATUSES = ['DRAFT', 'REVISION_REQUESTED', 'REJECTED'] as const
+const EDITABLE_STATUSES = ['DRAFT', 'REJECTED'] as const
 
 function isEditableStatus(status?: string | null) {
   return EDITABLE_STATUSES.includes(status as (typeof EDITABLE_STATUSES)[number])
-}
-
-function isQuestionBankScope(question?: QuestionDto | null) {
-  return question?.scope === 'QUESTION_BANK'
 }
 
 function isApprovedStatus(question?: QuestionDto | null) {
@@ -65,6 +61,18 @@ export function getTeacherQuestionContext(
   return 'viewer'
 }
 
+export function resolveTeacherQuestionContext(
+  view: 'all' | 'my' | 'review' | null | undefined,
+  question: QuestionDto | null | undefined,
+  userId?: string | null,
+): TeacherQuestionContext {
+  if (question?.createdBy && userId && question.createdBy === userId) {
+    return 'owner'
+  }
+
+  return getTeacherQuestionContext(view)
+}
+
 export function canCreateQuestion(role: QuestionActorRole) {
   return role === 'SYSTEM_ADMIN' || role === 'SCHOOL_ADMIN' || role === 'TEACHER'
 }
@@ -74,7 +82,7 @@ export function canEditQuestion(
   role: QuestionActorRole,
   teacherContext: TeacherQuestionContext,
 ) {
-  if (!question || !isQuestionBankScope(question) || question.locked) {
+  if (!question || question.locked) {
     return false
   }
 
@@ -167,6 +175,14 @@ export function getQuestionReviewActions(
         requiresReason: true,
         status: 'ARCHIVED',
         title: 'Archive',
+      })
+    }
+
+    if (question.status === 'ARCHIVED') {
+      actions.push({
+        description: 'Khoi phuc cau hoi ve trang thai draft neu backend cho phep.',
+        status: 'DRAFT',
+        title: 'Restore to draft',
       })
     }
 
@@ -288,6 +304,16 @@ export function getQuestionReviewActions(
         requiresReason: true,
         status: 'ARCHIVED',
         title: 'Archive',
+      },
+    ]
+  }
+
+  if (teacherContext === 'owner' && question.status === 'ARCHIVED') {
+    return [
+      {
+        description: 'Khoi phuc cau hoi cua ban ve trang thai draft.',
+        status: 'DRAFT',
+        title: 'Restore to draft',
       },
     ]
   }

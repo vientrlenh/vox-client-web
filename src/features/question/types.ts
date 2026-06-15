@@ -49,6 +49,8 @@ export type QuestionDto = {
   sourceQuestionId: string | null
   locked: boolean
   status: string
+  createdBy?: string | null
+  updatedBy?: string | null
   isActive?: boolean
   audioUrl?: string | null
   standardLevelId?: string | null
@@ -119,6 +121,7 @@ export type UpdateQuestionRequest = {
 }
 
 export type QuestionAssetInput = {
+  id: string | null
   title: string | null
   durationSeconds: number | null
   altText: string | null

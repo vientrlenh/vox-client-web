@@ -7,7 +7,7 @@ import {
   canEditQuestion,
   getQuestionActorRole,
   getQuestionReviewActions,
-  getTeacherQuestionContext,
+  resolveTeacherQuestionContext,
 } from '../permissions'
 import {
   formatDuration,
@@ -82,7 +82,11 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
   const teacherView =
     ((location.state as { fromView?: TeacherView } | null)?.fromView ?? null)
   const primaryRole = getQuestionActorRole(user?.roles)
-  const teacherContext = getTeacherQuestionContext(teacherView)
+  const teacherContext = resolveTeacherQuestionContext(
+    teacherView,
+    question,
+    user?.userId,
+  )
   const canEdit = canEditQuestion(question, primaryRole, teacherContext)
   const canOpenEditor =
     canEdit ||
@@ -216,6 +220,14 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
               <DetailItem
                 label="Cap nhat"
                 value={formatQuestionDate(question.updatedAt)}
+              />
+              <DetailItem
+                label="Created by"
+                value={formatNullableText(question.createdBy)}
+              />
+              <DetailItem
+                label="Updated by"
+                value={formatNullableText(question.updatedBy)}
               />
             </div>
 
