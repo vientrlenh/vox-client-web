@@ -45,6 +45,13 @@ import type {
   UpdateQuestionEvaluationGuideRequest,
   UpdateQuestionRequest,
 } from '../types'
+import {
+  formatNullableText,
+  formatQuestionDate,
+  getQuestionScopeDisplay,
+  getQuestionTypeDisplay,
+  getQuestionVisibilityDisplay,
+} from '../types'
 
 type EditorFormState = {
   code: string
@@ -369,6 +376,23 @@ function QuestionEditorPage({
   const hasExistingGuide = Boolean(questionQuery.data?.evaluationGuide)
   const canManageStatus = mode === 'edit' && reviewActions.length > 0
   const isStatusOnlyMode = mode === 'edit' && !canEdit && canManageStatus
+  const isSchoolAdminReviewMode =
+    actorRole === 'SCHOOL_ADMIN' && mode === 'edit' && canManageStatus && !canEdit
+
+  if (mode === 'create' && !canCreate) {
+    return (
+      <section className="grid gap-4 rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm font-semibold text-amber-800">
+        <span>Role hien tai khong duoc tao question.</span>
+        <button
+          className="inline-flex h-10 w-fit items-center justify-center rounded-lg bg-amber-600 px-4 text-sm font-bold text-white"
+          onClick={() => navigate(`${basePath}/questions/all`)}
+          type="button"
+        >
+          Ve danh sach question
+        </button>
+      </section>
+    )
+  }
 
   async function handleReviewSubmit() {
     if (!questionId || !reviewAction) {
@@ -696,11 +720,17 @@ function QuestionEditorPage({
             Quay lai
           </button>
           <h1 className="text-3xl font-black text-blue-950">
-            {mode === 'create' ? 'Tao cau hoi' : 'Cap nhat cau hoi'}
+            {mode === 'create'
+              ? 'Tao cau hoi'
+              : isSchoolAdminReviewMode
+                ? 'Quan ly trang thai cau hoi'
+                : 'Cap nhat cau hoi'}
           </h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
             {mode === 'create'
               ? 'Buoc dau chi tao phan content cua cau hoi. Assets va evaluation guide se bo sung sau o trang cap nhat.'
+              : isSchoolAdminReviewMode
+                ? 'Trang nay chi dung de xem chi tiet question va cap nhat trang thai theo quyen review cua school admin.'
               : 'Cap nhat tung phan noi dung, assets, evaluation guide va status theo tab/noi dung rieng.'}
           </p>
         </div>
@@ -718,7 +748,7 @@ function QuestionEditorPage({
         </div>
       ) : null}
 
-      {mode === 'edit' && (!hasExistingAssets || !hasExistingGuide) ? (
+      {mode === 'edit' && !isSchoolAdminReviewMode && (!hasExistingAssets || !hasExistingGuide) ? (
         <div className="grid gap-4 rounded-lg border border-indigo-200 bg-indigo-50 p-5 md:grid-cols-2">
           {!hasExistingAssets ? (
             <div className="rounded-lg border border-indigo-100 bg-white p-4">
@@ -976,6 +1006,71 @@ function QuestionEditorPage({
             </div>
           ) : null}
 
+          {isSchoolAdminReviewMode && questionQuery.data ? (
+            <div className="grid gap-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <ReadOnlyItem label="Ma cau hoi" value={formatNullableText(questionQuery.data.code)} />
+                <ReadOnlyItem
+                  label="Loai cau hoi"
+                  value={getQuestionTypeDisplay(questionQuery.data.type)}
+                />
+                <ReadOnlyItem
+                  label="Scope"
+                  value={getQuestionScopeDisplay(questionQuery.data.scope)}
+                />
+                <ReadOnlyItem
+                  label="Hien thi"
+                  value={getQuestionVisibilityDisplay(questionQuery.data.visibility)}
+                />
+                <ReadOnlyItem
+                  label="Chu de"
+                  value={formatNullableText(questionQuery.data.questionTopic?.name)}
+                />
+                <ReadOnlyItem
+                  label="Trang thai"
+                  value={formatNullableText(questionQuery.data.status)}
+                />
+                <ReadOnlyItem
+                  label="Ngay tao"
+                  value={formatQuestionDate(questionQuery.data.createdAt)}
+                />
+                <ReadOnlyItem
+                  label="Cap nhat"
+                  value={formatQuestionDate(questionQuery.data.updatedAt)}
+                />
+              </div>
+
+              <ReadOnlyBlock
+                label="Noi dung cau hoi"
+                value={questionQuery.data.questionText}
+              />
+              <ReadOnlyBlock
+                label="Huong dan"
+                value={questionQuery.data.instructionText}
+              />
+              <ReadOnlyBlock label="Prompt" value={questionQuery.data.promptText} />
+              <ReadOnlyBlock
+                label="Noi dung chuan bi"
+                value={questionQuery.data.preparationText}
+              />
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <ReadOnlyItem
+                  label="Thoi gian chuan bi"
+                  value={`${questionQuery.data.preparationTimeSeconds ?? 0} giay`}
+                />
+                <ReadOnlyItem
+                  label="Phan hoi toi thieu"
+                  value={`${questionQuery.data.minResponseSeconds ?? 0} giay`}
+                />
+                <ReadOnlyItem
+                  label="Phan hoi toi da"
+                  value={`${questionQuery.data.maxResponseSeconds ?? 0} giay`}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
           <label className="grid gap-2 text-sm font-bold text-slate-700">
             Ma cau hoi
             <input
@@ -1185,10 +1280,43 @@ function QuestionEditorPage({
               {mode === 'create' ? 'Tao content' : 'Luu content'}
             </button>
           </div>
+            </>
+          )}
         </form>
       ) : null}
 
       {mode === 'edit' && activeTab === 'assets' ? (
+        isSchoolAdminReviewMode ? (
+          <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
+            {questionQuery.data?.assets?.length ? (
+              questionQuery.data.assets.map((asset) => (
+                <div className="grid gap-4 rounded-lg border border-slate-200 p-4" key={asset.id}>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <ReadOnlyItem label="Loai asset" value={formatNullableText(asset.type)} />
+                    <ReadOnlyItem label="Tieu de" value={formatNullableText(asset.title)} />
+                    <ReadOnlyItem label="URL" value={formatNullableText(asset.url)} />
+                    <ReadOnlyItem
+                      label="Thoi luong"
+                      value={
+                        asset.durationSeconds == null
+                          ? '-'
+                          : `${asset.durationSeconds} giay`
+                      }
+                    />
+                    <ReadOnlyItem label="Alt text" value={formatNullableText(asset.altText)} />
+                    <ReadOnlyItem label="Thu tu" value={String(asset.order)} />
+                  </div>
+                  <ReadOnlyBlock label="Mo ta" value={asset.description} />
+                  <ReadOnlyBlock label="Transcript" value={asset.transcript} />
+                </div>
+              ))
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">
+                Chua co asset nao cho cau hoi nay.
+              </div>
+            )}
+          </section>
+        ) : (
         <form
           className="grid gap-6 rounded-lg border border-slate-200 bg-white p-6"
           onSubmit={handleAssetsSubmit}
@@ -1368,9 +1496,46 @@ function QuestionEditorPage({
             </div>
           </div>
         </form>
+        )
       ) : null}
 
       {mode === 'edit' && activeTab === 'guide' ? (
+        isSchoolAdminReviewMode ? (
+          <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
+            {questionQuery.data?.evaluationGuide ? (
+              <>
+                <ReadOnlyBlock
+                  label="Expected content"
+                  value={questionQuery.data.evaluationGuide.expectedContent}
+                />
+                <ReadOnlyBlock
+                  label="Key points"
+                  value={questionQuery.data.evaluationGuide.keyPoints}
+                />
+                <ReadOnlyBlock
+                  label="Acceptable responses"
+                  value={questionQuery.data.evaluationGuide.acceptableResponses}
+                />
+                <ReadOnlyBlock
+                  label="Off-topic examples"
+                  value={questionQuery.data.evaluationGuide.offTopicExamples}
+                />
+                <ReadOnlyBlock
+                  label="Scoring hints"
+                  value={questionQuery.data.evaluationGuide.scoringHints}
+                />
+                <ReadOnlyBlock
+                  label="Common mistakes"
+                  value={questionQuery.data.evaluationGuide.commonMistakes}
+                />
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">
+                Chua co evaluation guide cho cau hoi nay.
+              </div>
+            )}
+          </section>
+        ) : (
         <form
           className="grid gap-6 rounded-lg border border-slate-200 bg-white p-6"
           onSubmit={handleGuideSubmit}
@@ -1454,8 +1619,39 @@ function QuestionEditorPage({
             </button>
           </div>
         </form>
+        )
       ) : null}
     </section>
+  )
+}
+
+function ReadOnlyItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-sm font-bold text-slate-950">{value}</p>
+    </div>
+  )
+}
+
+function ReadOnlyBlock({
+  label,
+  value,
+}: {
+  label: string
+  value?: string | null
+}) {
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+        {label}
+      </p>
+      <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-medium leading-6 text-slate-800">
+        {formatNullableText(value)}
+      </div>
+    </div>
   )
 }
 

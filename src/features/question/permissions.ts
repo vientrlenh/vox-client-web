@@ -74,7 +74,7 @@ export function resolveTeacherQuestionContext(
 }
 
 export function canCreateQuestion(role: QuestionActorRole) {
-  return role === 'SYSTEM_ADMIN' || role === 'SCHOOL_ADMIN' || role === 'TEACHER'
+  return role === 'SYSTEM_ADMIN' || role === 'TEACHER'
 }
 
 export function canEditQuestion(
@@ -88,10 +88,6 @@ export function canEditQuestion(
 
   if (role === 'SYSTEM_ADMIN') {
     return true
-  }
-
-  if (role === 'SCHOOL_ADMIN') {
-    return isEditableStatus(question.status)
   }
 
   if (role === 'TEACHER') {
