@@ -36,7 +36,7 @@ const navigationItems = [
   },
   {
     icon: Users,
-    label: 'Học viên',
+    label: 'Quản lý Người dùng',
     to: '/school-admin/students',
   },
 ]

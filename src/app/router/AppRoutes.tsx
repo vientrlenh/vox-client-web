@@ -77,6 +77,24 @@ const SchoolAdminClassUserImportPage = lazy(() =>
   })),
 )
 
+const SchoolAdminSchoolUsersPage = lazy(() =>
+  import('@/features/school-users').then((module) => ({
+    default: module.SchoolAdminSchoolUsersPage,
+  })),
+)
+
+const SchoolAdminSchoolUserDetailPage = lazy(() =>
+  import('@/features/school-users').then((module) => ({
+    default: module.SchoolAdminSchoolUserDetailPage,
+  })),
+)
+
+const SchoolAdminSchoolUserImportPage = lazy(() =>
+  import('@/features/school-users').then((module) => ({
+    default: module.SchoolAdminSchoolUserImportPage,
+  })),
+)
+
 const SchoolAdminImportSessionsPage = lazy(() =>
   import('@/features/imports').then((module) => ({
     default: module.SchoolAdminImportSessionsPage,
@@ -131,6 +149,18 @@ export function AppRoutes() {
             <Route
               path="school-admin/classes/:classId/users/import"
               element={<SchoolAdminClassUserImportPage />}
+            />
+            <Route
+              path="school-admin/students"
+              element={<SchoolAdminSchoolUsersPage />}
+            />
+            <Route
+              path="school-admin/students/import"
+              element={<SchoolAdminSchoolUserImportPage />}
+            />
+            <Route
+              path="school-admin/students/:userId"
+              element={<SchoolAdminSchoolUserDetailPage />}
             />
             <Route
               path="school-admin/imports"
