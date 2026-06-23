@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ClipboardList,
   Home,
+  Languages,
   LogOut,
   Menu,
   Search,
@@ -29,6 +30,11 @@ const navigationItems = [
     icon: ClipboardList,
     label: 'Quản lý đơn đăng ký',
     to: '/system-admin/registrations',
+  },
+  {
+    icon: Languages,
+    label: 'Quản lý ngôn ngữ',
+    to: '/system-admin/languages',
   },
   {
     icon: Users,

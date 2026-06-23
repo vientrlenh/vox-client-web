@@ -40,6 +40,7 @@ function createRegisterForm(
     contactFullName: 'Tran Chan Quang Thien',
     contactPhone: '0355906225',
     dateOfBirth: '2004-09-05',
+    documentUrls: null,
     id: 'form-1',
     identityNumber: '079384563728',
     position: 'Pho hieu truong',
@@ -50,6 +51,7 @@ function createRegisterForm(
     schoolName: 'test-school-1',
     status: 'PENDING',
     studentCount: 3000,
+    verificationMethod: null,
     ...overrides,
   }
 }

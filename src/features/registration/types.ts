@@ -1,11 +1,20 @@
 export type RegisterFormStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'WAITING'
 
+export type PageResult<T> = {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
 export type RegisterForm = {
   contactAddress: string | null
   contactEmail: string | null
   contactFullName: string | null
   contactPhone: string | null
   dateOfBirth: string | null
+  documentUrls: string[] | null
   id: string
   identityNumber: string | null
   position: string | null
@@ -16,6 +25,53 @@ export type RegisterForm = {
   schoolName: string | null
   status: RegisterFormStatus | string | null
   studentCount: number | null
+  verificationMethod: string | null
+}
+
+/**
+ * Một trường trong danh mục hệ thống mà người dùng có thể chọn khi đăng ký.
+ * Query `schoolDirectories` hiện là GIẢ ĐỊNH — cần BE xác nhận tên field.
+ */
+export type SchoolDirectory = {
+  address: string | null
+  district: string | null
+  domain: string | null
+  id: string
+  name: string
+  province: string | null
+  source: string | null
+}
+
+/** Thông tin liên hệ dùng chung cho cả hai loại đơn đăng ký. */
+export type RegisterContactInfo = {
+  contactAddress: string
+  contactEmail: string
+  contactFullName: string
+  contactPhone: string
+  dateOfBirth: string
+  identityNumber: string
+  position: string
+  postalCode: string
+  studentCount: number
+}
+
+export type RegisterSchoolDirectoryRequest = RegisterContactInfo & {
+  documentUrls?: string[]
+  schoolDirectoryId: string
+}
+
+export type RegisterSelfDeclaredRequest = RegisterContactInfo & {
+  documentUrls: string[]
+  schoolAddress: string
+  schoolDistrict: string
+  schoolDomain?: string
+  schoolName: string
+  schoolProvince: string
+}
+
+export type VerifyRegistrationRequest = {
+  email: string
+  otp: string
 }
 
 export type ApproveRegisterFormRequest = {
