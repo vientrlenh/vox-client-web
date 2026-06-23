@@ -21,6 +21,9 @@ const REGISTER_FORM_QUERY = `
       studentCount
       reason
       status
+      # TODO: uncomment when BE exposes these fields in RegisterForm schema
+      # verificationMethod
+      # documentUrls
     }
   }
 `

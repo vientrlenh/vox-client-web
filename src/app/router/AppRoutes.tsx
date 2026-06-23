@@ -14,7 +14,9 @@ const LoginPage = lazy(() =>
 )
 
 const RegisterPage = lazy(() =>
-  import('@/features/auth').then((module) => ({ default: module.RegisterPage })),
+  import('@/features/registration').then((module) => ({
+    default: module.RegisterPage,
+  })),
 )
 
 const ResetPasswordPage = lazy(() =>
