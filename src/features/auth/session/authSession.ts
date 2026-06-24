@@ -10,6 +10,7 @@ type JwtPayload = {
   email?: unknown
   exp?: unknown
   roles?: unknown
+  schoolId?: unknown
   userId?: unknown
 }
 
@@ -109,6 +110,10 @@ export function decodeAccessToken(accessToken: string): AuthUser | null {
       email: parsed.email,
       exp: parsed.exp,
       roles,
+      schoolId:
+        typeof parsed.schoolId === 'string' && parsed.schoolId.trim()
+          ? parsed.schoolId
+          : undefined,
       userId: parsed.userId,
     }
   } catch {

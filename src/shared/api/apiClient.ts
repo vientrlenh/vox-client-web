@@ -6,12 +6,13 @@ import { toApiError } from './apiError'
 
 export const apiClient = axios.create({
   baseURL: appConfig.apiBaseUrl,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 apiClient.interceptors.request.use((config) => {
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.setContentType(false)
+  }
+
   const tokens = getAuthTokens()
 
   if (tokens?.accessToken) {

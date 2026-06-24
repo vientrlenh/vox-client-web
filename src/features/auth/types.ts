@@ -31,21 +31,6 @@ export type RefreshResponse = {
   refreshToken: string
 }
 
-export type RegisterRequest = {
-  contactAddress: string
-  contactEmail: string
-  contactFullName: string
-  contactPhone: string
-  dateOfBirth: string
-  identityNumber: string
-  position: string
-  postalCode: string
-  schoolAddress: string
-  schoolDomain: string
-  schoolName: string
-  studentCount: number
-}
-
 export type SetUpPasswordRequest = {
   password: string
   token: string
@@ -71,5 +56,6 @@ export type AuthUser = {
   email: string
   exp: number
   roles: RoleCode[]
+  schoolId?: string
   userId: string
 }
