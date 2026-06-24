@@ -58,15 +58,15 @@ export function SchoolUserDetailDialog({ isOpen, onClose, schoolId, userId }: Sc
         aria-labelledby="user-detail-title"
         className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5"
       >
-        <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 to-indigo-600" />
+        <div className="h-1.5 w-full bg-linear-to-r from-indigo-500 to-indigo-600" />
 
         {isLoading ? (
-          <div className="flex min-h-[400px] flex-col items-center justify-center gap-3">
+          <div className="flex min-h-100 flex-col items-center justify-center gap-3">
             <Loader2 className="size-8 animate-spin text-indigo-600" />
             <p className="text-sm font-medium text-slate-500">Đang tải thông tin người dùng...</p>
           </div>
         ) : isError || !schoolUser || !schoolUser.user ? (
-          <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 p-6 text-center">
+          <div className="flex min-h-100 flex-col items-center justify-center gap-4 p-6 text-center">
             <UserIcon className="size-12 text-slate-300" />
             <p className="text-sm font-semibold text-red-600">Không thể tải dữ liệu người dùng. Vui lòng kiểm tra lại quyền truy cập hoặc kết nối mạng.</p>
             <button onClick={onClose} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-slate-50">Đóng</button>

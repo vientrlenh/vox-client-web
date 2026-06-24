@@ -1,17 +1,12 @@
 // src/features/school/pages/SystemAdminSchoolsPage.tsx
 
 import { useState } from "react";
-import {
-  Building2,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-  AlertTriangle,
-} from "lucide-react";
+import { Building2, RefreshCw, AlertTriangle } from "lucide-react";
 import { useSchoolsQuery } from "../api/useSchoolsQuery";
 import { useUpdateSchoolStatusMutation } from "../api/useUpdateSchoolStatusMutation";
 import { SchoolTable } from "../components/SchoolTable";
 import { SchoolDetailDialog } from "../components/SchoolDetailDialog";
+import { Pagination } from "@/shared/components/Pagination"; 
 import type { School } from "../types";
 
 const DEFAULT_PAGE = 1;
@@ -49,26 +44,30 @@ export function SystemAdminSchoolsPage() {
   }
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-6 p-4 sm:p-6 rounded-2xl bg-linear-to-br from-blue-500 via-white to-blue-100/80 min-h-[calc(100vh-6rem)]">
+      {/* Bọc toàn trang bằng gradient Xanh biển - Trắng mềm mại */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-blue-950 flex items-center gap-2">
-          <Building2 className="size-6 text-indigo-600" /> Quản lý trường học
+          <Building2 className="size-6 text-blue-600" /> Quản lý trường học
         </h1>
+        
+        {/* Nút làm mới tone-sur-tone màu xanh */}
         <button
           onClick={() => refetch()}
           aria-label="Làm mới danh sách"
           title="Làm mới"
-          className="inline-flex size-11 items-center justify-center rounded-lg border bg-white text-slate-600 hover:bg-slate-50"
+          className="inline-flex size-11 items-center justify-center rounded-lg border border-blue-500 bg-white text-blue-600 shadow-sm transition hover:bg-blue-50 hover:border-blue-300"
         >
           <RefreshCw className={`size-5 ${isFetching ? "animate-spin" : ""}`} />
         </button>
       </div>
 
+      {/* Khung Table pha nền trắng và xanh biển nhạt, đổ bóng xanh */}
       <div
-        className={`rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden transition ${isUpdatingStatus ? "opacity-60 pointer-events-none" : ""}`}
+        className={`rounded-xl border border-blue-100 bg-linear-to-b from-white to-blue-50/40 shadow-lg shadow-blue-900/5 overflow-hidden transition duration-300 ${isUpdatingStatus ? "opacity-60 pointer-events-none" : ""}`}
       >
         {isError ? (
-          <div className="p-10 text-center text-red-600 flex flex-col items-center gap-2">
+          <div className="p-10 text-center text-red-600 flex flex-col items-center gap-2 bg-white">
             <AlertTriangle className="size-10" />
             <p>
               Không thể tải danh sách trường. Vui lòng kiểm tra lại kết nối.
@@ -86,40 +85,13 @@ export function SystemAdminSchoolsPage() {
             />
 
             {!isLoading && !isError && schools.length > 0 && (
-              <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
-                <p className="text-xs font-medium text-slate-500">
-                  Tổng{" "}
-                  <span className="font-bold text-blue-950">
-                    {totalElements}
-                  </span>{" "}
-                  trường
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    aria-label="Trang trước"
-                    title="Trang trước"
-                    className="inline-flex size-9 items-center justify-center rounded-lg border disabled:opacity-40 hover:bg-slate-50 transition"
-                  >
-                    <ChevronLeft aria-hidden="true" className="size-4" />
-                  </button>
-                  <span className="text-xs font-bold text-blue-950">
-                    Trang {page} / {totalPages || 1}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages || totalPages === 0}
-                    aria-label="Trang tiếp theo"
-                    title="Trang tiếp theo"
-                    className="inline-flex size-9 items-center justify-center rounded-lg border disabled:opacity-40 hover:bg-slate-50 transition"
-                  >
-                    <ChevronRight aria-hidden="true" className="size-4" />
-                  </button>
-                </div>
-              </div>
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalElements={totalElements}
+                itemName="trường"
+                onPageChange={setPage}
+              />
             )}
           </>
         )}
