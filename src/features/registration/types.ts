@@ -1,5 +1,12 @@
 export type RegisterFormStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'WAITING'
 
+export type RegisterFormDocument = {
+  createdAt: string
+  id: string
+  regsiterFormId: string
+  url: string
+}
+
 export type PageResult<T> = {
   content: T[]
   page: number
@@ -14,7 +21,7 @@ export type RegisterForm = {
   contactFullName: string | null
   contactPhone: string | null
   dateOfBirth: string | null
-  documentUrls: string[] | null
+  documents: RegisterFormDocument[] | null
   id: string
   identityNumber: string | null
   position: string | null
@@ -30,16 +37,17 @@ export type RegisterForm = {
 
 /**
  * Một trường trong danh mục hệ thống mà người dùng có thể chọn khi đăng ký.
- * Query `schoolDirectories` hiện là GIẢ ĐỊNH — cần BE xác nhận tên field.
+ * Field khớp với query `schoolDirectoryCursorPage` theo spec School Directory API.
  */
 export type SchoolDirectory = {
   address: string | null
-  district: string | null
+  code: string | null
+  districtName: string | null
   domain: string | null
   id: string
-  name: string
-  province: string | null
-  source: string | null
+  name: string | null
+  provinceName: string | null
+  verified: boolean | null
 }
 
 /** Thông tin liên hệ dùng chung cho cả hai loại đơn đăng ký. */

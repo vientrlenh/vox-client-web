@@ -55,6 +55,18 @@ const SystemAdminLanguagesPage = lazy(() =>
   })),
 )
 
+const SystemAdminSchoolDirectoryPage = lazy(() =>
+  import('@/features/school-directory').then((module) => ({
+    default: module.SystemAdminSchoolDirectoryPage,
+  })),
+)
+
+const SystemAdminSchoolDirectoryImportPage = lazy(() =>
+  import('@/features/school-directory').then((module) => ({
+    default: module.SystemAdminSchoolDirectoryImportPage,
+  })),
+)
+
 const SchoolAdminClassesPage = lazy(() =>
   import('@/features/classes').then((module) => ({
     default: module.SchoolAdminClassesPage,
@@ -131,6 +143,14 @@ export function AppRoutes() {
             <Route
               path="system-admin/languages"
               element={<SystemAdminLanguagesPage />}
+            />
+            <Route
+              path="system-admin/school-directory"
+              element={<SystemAdminSchoolDirectoryPage />}
+            />
+            <Route
+              path="system-admin/school-directory/import"
+              element={<SystemAdminSchoolDirectoryImportPage />}
             />
           </Route>
         </Route>

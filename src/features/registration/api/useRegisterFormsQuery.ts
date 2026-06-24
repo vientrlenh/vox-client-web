@@ -18,6 +18,12 @@ const REGISTER_FORM_FIELDS = `
   studentCount
   reason
   status
+  documents {
+    id
+    regsiterFormId
+    url
+    createdAt
+  }
 `
 
 const REGISTER_FORMS_QUERY = `

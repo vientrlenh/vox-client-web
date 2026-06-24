@@ -1,73 +1,79 @@
-import { useQuery } from '@tanstack/react-query'
+import { type InfiniteData, useInfiniteQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
-import type { PageResult, SchoolDirectory } from '../types'
+import type { SchoolDirectory } from '../types'
 
-// ⚠️ GIẢ ĐỊNH: query `schoolDirectories` chưa được BE xác nhận.
-// Field-list theo type SchoolDirectory — cần đối chiếu schema thật khi BE sẵn sàng.
 const SCHOOL_DIRECTORY_FIELDS = `
   id
+  code
   name
+  provinceName
+  districtName
   domain
-  district
-  province
   address
-  source
+  verified
 `
 
-const SCHOOL_DIRECTORIES_QUERY = `
-  query SchoolDirectories($page: Int!, $size: Int!, $search: String) {
-    schoolDirectories(page: $page, size: $size, search: $search) {
+const SCHOOL_DIRECTORY_CURSOR_QUERY = `
+  query SchoolDirectoryCursorPage($cursor: ID, $limit: Int!) {
+    schoolDirectoryCursorPage(cursor: $cursor, limit: $limit) {
       content {
         ${SCHOOL_DIRECTORY_FIELDS}
       }
-      page
-      size
-      totalElements
-      totalPages
+      nextCursor
+      hasNext
     }
   }
 `
 
-type SchoolDirectoriesQueryData = {
-  schoolDirectories: PageResult<SchoolDirectory>
+type SchoolDirectoryCursorPage = {
+  content: SchoolDirectory[]
+  hasNext: boolean
+  nextCursor: string | null
 }
 
-type FetchSchoolDirectoriesInput = {
-  page: number
-  search: string
-  size: number
+type SchoolDirectoryCursorQueryData = {
+  schoolDirectoryCursorPage: SchoolDirectoryCursorPage
+}
+
+type FetchSchoolDirectoryCursorPageInput = {
+  cursor: string | null
+  limit: number
 }
 
 export const schoolDirectoryQueryKeys = {
   all: ['school-directories'] as const,
-  list: (page: number, size: number, search: string) =>
-    [...schoolDirectoryQueryKeys.all, 'list', page, size, search] as const,
+  cursor: (limit: number) =>
+    [...schoolDirectoryQueryKeys.all, 'cursor', limit] as const,
 }
 
-export async function fetchSchoolDirectories({
-  page,
-  search,
-  size,
-}: FetchSchoolDirectoriesInput) {
-  const data = await graphQLRequest<SchoolDirectoriesQueryData>(
-    SCHOOL_DIRECTORIES_QUERY,
+export async function fetchSchoolDirectoryCursorPage({
+  cursor,
+  limit,
+}: FetchSchoolDirectoryCursorPageInput) {
+  const data = await graphQLRequest<SchoolDirectoryCursorQueryData>(
+    SCHOOL_DIRECTORY_CURSOR_QUERY,
     {
-      page,
-      search: search.trim() || null,
-      size,
+      cursor,
+      limit,
     },
   )
 
-  return data.schoolDirectories
+  return data.schoolDirectoryCursorPage
 }
 
-export function useSchoolDirectoriesQuery(
-  page: number,
-  size: number,
-  search: string,
-) {
-  return useQuery({
-    queryFn: () => fetchSchoolDirectories({ page, search, size }),
-    queryKey: schoolDirectoryQueryKeys.list(page, size, search),
+export function useSchoolDirectoriesQuery(limit: number) {
+  return useInfiniteQuery<
+    SchoolDirectoryCursorPage,
+    Error,
+    InfiniteData<SchoolDirectoryCursorPage, string | null>,
+    ReturnType<typeof schoolDirectoryQueryKeys.cursor>,
+    string | null
+  >({
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? lastPage.nextCursor : undefined,
+    initialPageParam: null,
+    queryFn: ({ pageParam }) =>
+      fetchSchoolDirectoryCursorPage({ cursor: pageParam, limit }),
+    queryKey: schoolDirectoryQueryKeys.cursor(limit),
   })
 }
