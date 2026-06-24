@@ -11,6 +11,7 @@ import {
   FormSection,
   TextField,
 } from './RegistrationFormFields'
+import { ProvinceDistrictFields } from './ProvinceDistrictFields'
 import {
   getApiErrorMessage,
   getStringValue,
@@ -22,7 +23,7 @@ import {
   RegistrationSubmitButton,
 } from './RegistrationLayout'
 
-const schoolFields: FieldConfig[] = [
+const schoolInfoFields: FieldConfig[] = [
   {
     autoComplete: 'organization',
     id: 'school-name',
@@ -38,22 +39,6 @@ const schoolFields: FieldConfig[] = [
     maxLength: 100,
     name: 'schoolDomain',
     placeholder: 'vd: ten-truong.edu.vn',
-  },
-  {
-    id: 'school-district',
-    label: 'Quận / Huyện',
-    maxLength: 100,
-    name: 'schoolDistrict',
-    placeholder: 'Nhập quận/huyện',
-    required: true,
-  },
-  {
-    id: 'school-province',
-    label: 'Tỉnh / Thành phố',
-    maxLength: 100,
-    name: 'schoolProvince',
-    placeholder: 'Nhập tỉnh/thành phố',
-    required: true,
   },
 ]
 
@@ -149,10 +134,11 @@ export function SelfDeclaredStep({
         <FormSection title="Thông tin trường">
           <div className="grid gap-3">
             <div className="grid gap-3 sm:grid-cols-2">
-              {schoolFields.map((field) => (
+              {schoolInfoFields.map((field) => (
                 <TextField disabled={isSubmitting} key={field.id} {...field} />
               ))}
             </div>
+            <ProvinceDistrictFields disabled={isSubmitting} />
             <TextField
               autoComplete="street-address"
               disabled={isSubmitting}
