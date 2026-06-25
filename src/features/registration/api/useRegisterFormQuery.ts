@@ -23,7 +23,7 @@ const REGISTER_FORM_QUERY = `
       status
       documents {
         id
-        regsiterFormId
+        registerFormId
         url
         createdAt
       }

@@ -3,7 +3,7 @@ export type RegisterFormStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'WAITING'
 export type RegisterFormDocument = {
   createdAt: string
   id: string
-  regsiterFormId: string
+  registerFormId: string
   url: string
 }
 
@@ -83,17 +83,9 @@ export type VerifyRegistrationRequest = {
 }
 
 export type ApproveRegisterFormRequest = {
-  contactAddress: string
-  contactEmail: string
-  contactFullName: string
-  contactPhone: string
-  dateOfBirth: string
   description: string | null
-  schoolAddress: string
+  provinceCode: string
   schoolCode: string
-  schoolDomain: string
-  schoolName: string
-  studentCount: number
 }
 
 export type RejectRegisterFormRequest = {

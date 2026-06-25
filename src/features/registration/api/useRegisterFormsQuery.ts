@@ -20,7 +20,7 @@ const REGISTER_FORM_FIELDS = `
   status
   documents {
     id
-    regsiterFormId
+    registerFormId
     url
     createdAt
   }
