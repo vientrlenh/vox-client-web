@@ -1,15 +1,22 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowLeft,
-  CalendarDays,
+  Ban,
   CheckCircle2,
   FileSpreadsheet,
+  Loader2,
   RefreshCw,
   Rows3,
 } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import {
+  useAcceptImportSessionMutation,
+  useRejectImportSessionMutation,
+} from '../api/useImportSessionDecisionMutations'
+import {
+  importManagementQueryKeys,
   useImportRowsQuery,
   useImportSessionQuery,
 } from '../api/useImportSessionsQuery'
@@ -19,6 +26,8 @@ import {
   formatNullableText,
   getImportStatusDisplay,
   getImportTypeDisplay,
+  getImportUpdatedRows,
+  mappingEntriesToRecord,
 } from '../types'
 
 const DEFAULT_ROW_PAGE = 1
@@ -55,14 +64,27 @@ function StatusBadge({ status }: StatusBadgeProps) {
 
 type StatCardProps = {
   label: string
+  tone?: 'default' | 'danger' | 'success' | 'info'
   value: number
 }
 
-function StatCard({ label, value }: StatCardProps) {
+const statCardToneClassNames: Record<
+  NonNullable<StatCardProps['tone']>,
+  string
+> = {
+  danger: 'border-red-200 bg-red-50 text-red-700',
+  default: 'border-slate-200 bg-white text-slate-950',
+  info: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+  success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+}
+
+function StatCard({ label, tone = 'default', value }: StatCardProps) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
+    <div className={`rounded-lg border px-3 py-3 ${statCardToneClassNames[tone]}`}>
+      <p className="text-[11px] font-bold uppercase tracking-wide opacity-80">
+        {label}
+      </p>
+      <p className="mt-1 text-xl font-black">{value}</p>
     </div>
   )
 }
@@ -289,11 +311,21 @@ function Pagination({
   )
 }
 
+type DecisionMessage = {
+  text: string
+  tone: 'error' | 'success'
+}
+
 export function SchoolAdminImportSessionDetailPage() {
   const { sessionId } = useParams()
+  const queryClient = useQueryClient()
   const [rowPage, setRowPage] = useState(DEFAULT_ROW_PAGE)
   const [rowPageSize, setRowPageSize] = useState(DEFAULT_ROW_PAGE_SIZE)
   const [rowStatus, setRowStatus] = useState('')
+  const [pendingDecision, setPendingDecision] = useState<
+    'accept' | 'reject' | null
+  >(null)
+  const [message, setMessage] = useState<DecisionMessage | null>(null)
   const sessionQuery = useImportSessionQuery(sessionId ?? null)
   const rowsQuery = useImportRowsQuery(
     sessionId ?? null,
@@ -301,12 +333,75 @@ export function SchoolAdminImportSessionDetailPage() {
     rowPageSize,
     rowStatus,
   )
+  const acceptMutation = useAcceptImportSessionMutation()
+  const rejectMutation = useRejectImportSessionMutation()
   const session = sessionQuery.data
   const rows = rowsQuery.data?.content ?? []
+  const isAwaitingReview = session?.status?.trim().toUpperCase() === 'PREVIEWED'
+  const isDeciding = acceptMutation.isPending || rejectMutation.isPending
 
   function handleRowPageSizeChange(nextPageSize: number) {
     setRowPage(DEFAULT_ROW_PAGE)
     setRowPageSize(nextPageSize)
+  }
+
+  async function refreshAfterDecision() {
+    await queryClient.invalidateQueries({
+      queryKey: importManagementQueryKeys.all,
+    })
+    await Promise.all([sessionQuery.refetch(), rowsQuery.refetch()])
+  }
+
+  async function handleAccept() {
+    if (!sessionId || !session) {
+      return
+    }
+
+    const sourceMapping = session.confirmedMapping.length
+      ? session.confirmedMapping
+      : session.suggestedMapping
+
+    try {
+      setMessage(null)
+      const response = await acceptMutation.mutateAsync({
+        confirmedMapping: mappingEntriesToRecord(sourceMapping),
+        sessionId,
+        type: session.type,
+      })
+      setPendingDecision(null)
+      await refreshAfterDecision()
+      setMessage({
+        text: response.message || 'Đã duyệt và import phiên thành công.',
+        tone: 'success',
+      })
+    } catch (error) {
+      setMessage({
+        text: getErrorMessage(error) ?? 'Không thể duyệt phiên import.',
+        tone: 'error',
+      })
+    }
+  }
+
+  async function handleReject() {
+    if (!sessionId) {
+      return
+    }
+
+    try {
+      setMessage(null)
+      const response = await rejectMutation.mutateAsync({ sessionId })
+      setPendingDecision(null)
+      await refreshAfterDecision()
+      setMessage({
+        text: response.message || 'Đã từ chối phiên import.',
+        tone: 'success',
+      })
+    } catch (error) {
+      setMessage({
+        text: getErrorMessage(error) ?? 'Không thể từ chối phiên import.',
+        tone: 'error',
+      })
+    }
   }
 
   if (!sessionId) {
@@ -403,7 +498,7 @@ export function SchoolAdminImportSessionDetailPage() {
       aria-labelledby="school-admin-import-detail-title"
       className="grid gap-5"
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <nav
             aria-label="Đường dẫn"
@@ -416,62 +511,164 @@ export function SchoolAdminImportSessionDetailPage() {
             <span>Chi tiết file</span>
           </nav>
           <h1
-            className="mt-4 text-3xl font-black tracking-0 text-slate-950"
+            className="mt-3 text-2xl font-black tracking-0 text-slate-950"
             id="school-admin-import-detail-title"
           >
             Chi tiết file import
           </h1>
-          <p className="mt-3 text-sm font-medium text-slate-500">
-            Xem mapping, kết quả xử lý và từng dòng dữ liệu trong file import.
-          </p>
         </div>
-        <Link
-          className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-5 text-sm font-black text-slate-800 shadow-sm shadow-slate-950/5 transition hover:bg-slate-50"
-          to="/school-admin/imports"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          Quay lại
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {isAwaitingReview ? (
+            <>
+              <button
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isDeciding}
+                onClick={() => setPendingDecision('reject')}
+                type="button"
+              >
+                <Ban aria-hidden="true" className="size-4" />
+                Từ chối
+              </button>
+              <button
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isDeciding}
+                onClick={() => setPendingDecision('accept')}
+                type="button"
+              >
+                <CheckCircle2 aria-hidden="true" className="size-4" />
+                Duyệt &amp; import
+              </button>
+            </>
+          ) : null}
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+            disabled={sessionQuery.isFetching}
+            onClick={() => {
+              void sessionQuery.refetch()
+            }}
+            type="button"
+          >
+            <RefreshCw aria-hidden="true" className="size-4" />
+            Làm mới
+          </button>
+          <Link
+            className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            to="/school-admin/imports"
+          >
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Quay lại
+          </Link>
+        </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
-          <div className="inline-flex size-24 shrink-0 items-center justify-center rounded-full bg-cyan-50 text-cyan-700">
-            <FileSpreadsheet aria-hidden="true" className="size-11" />
+      {message ? (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm font-semibold ${
+            message.tone === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+          role={message.tone === 'error' ? 'alert' : 'status'}
+        >
+          {message.text}
+        </div>
+      ) : null}
+
+      {pendingDecision ? (
+        <div className="grid gap-3 rounded-lg border border-cyan-200 bg-cyan-50 p-4 sm:flex sm:items-center sm:justify-between">
+          <p className="text-sm font-bold text-cyan-900">
+            {pendingDecision === 'accept'
+              ? 'Xác nhận duyệt và import dữ liệu của phiên này?'
+              : 'Xác nhận từ chối phiên import này? Dữ liệu sẽ không được import.'}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              disabled={isDeciding}
+              onClick={() => setPendingDecision(null)}
+              type="button"
+            >
+              Hủy
+            </button>
+            <button
+              className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                pendingDecision === 'accept'
+                  ? 'bg-cyan-600 hover:bg-cyan-700'
+                  : 'bg-red-600 hover:bg-red-700'
+              }`}
+              disabled={isDeciding}
+              onClick={() => {
+                if (pendingDecision === 'accept') {
+                  void handleAccept()
+                } else {
+                  void handleReject()
+                }
+              }}
+              type="button"
+            >
+              {isDeciding ? (
+                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+              ) : null}
+              {pendingDecision === 'accept' ? 'Duyệt & import' : 'Từ chối'}
+            </button>
           </div>
-          <div className="min-w-0">
-            <h2 className="truncate text-2xl font-black tracking-0 text-slate-950">
+        </div>
+      ) : null}
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="inline-flex size-14 shrink-0 items-center justify-center rounded-full bg-cyan-50 text-cyan-700">
+            <FileSpreadsheet aria-hidden="true" className="size-7" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-xl font-black tracking-0 text-slate-950">
               {session.fileName}
             </h2>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <div className="min-w-42 border-slate-200 md:border-r md:pr-10">
-                <p className="text-xs font-bold text-slate-500">Loại import</p>
-                <p className="mt-2 text-base font-black text-slate-950">
-                  {getImportTypeDisplay(session.type)}
-                </p>
-              </div>
-              <div className="min-w-42 border-slate-200 md:border-r md:px-10">
-                <p className="text-xs font-bold text-slate-500">Trạng thái</p>
-                <div className="mt-2">
-                  <StatusBadge status={session.status} />
-                </div>
-              </div>
-              <div className="min-w-42 md:pl-10">
-                <p className="text-xs font-bold text-slate-500">Ngày tạo</p>
-                <p className="mt-2 text-base font-black text-slate-950">
-                  {formatImportDate(session.createdAt)}
-                </p>
-              </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
+              <span className="font-bold text-slate-700">
+                {getImportTypeDisplay(session.type)}
+              </span>
+              <StatusBadge status={session.status} />
+              <span>Tạo: {formatImportDate(session.createdAt)}</span>
             </div>
           </div>
         </div>
+        <dl className="mt-4 grid gap-x-6 gap-y-2 border-t border-slate-100 pt-4 text-xs sm:grid-cols-3">
+          <div className="grid gap-0.5">
+            <dt className="font-bold text-slate-500">Import ID</dt>
+            <dd className="break-all font-mono font-bold text-slate-700">
+              {session.id}
+            </dd>
+          </div>
+          <div className="grid gap-0.5">
+            <dt className="font-bold text-slate-500">Hết hạn</dt>
+            <dd className="font-semibold text-slate-700">
+              {formatImportDate(session.expiresAt)}
+            </dd>
+          </div>
+          <div className="grid gap-0.5">
+            <dt className="font-bold text-slate-500">Cập nhật</dt>
+            <dd className="font-semibold text-slate-700">
+              {formatImportDate(session.updatedAt)}
+            </dd>
+          </div>
+        </dl>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Tổng dòng" value={session.totalRows} />
-        <StatCard label="Hợp lệ" value={session.validRows} />
-        <StatCard label="Không hợp lệ" value={session.invalidRows} />
-        <StatCard label="Đã import" value={session.importedRows} />
+        <StatCard label="Hợp lệ" tone="info" value={session.validRows} />
+        <StatCard
+          label="Không hợp lệ"
+          tone="danger"
+          value={session.invalidRows}
+        />
+        <StatCard label="Đã thêm" tone="success" value={session.importedRows} />
+        <StatCard
+          label="Đã cập nhật"
+          tone="success"
+          value={getImportUpdatedRows(session)}
+        />
         <StatCard label="Bỏ qua" value={session.skippedRows} />
       </div>
 
@@ -485,43 +682,21 @@ export function SchoolAdminImportSessionDetailPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <section className="grid gap-3">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 aria-hidden="true" className="size-5 text-cyan-700" />
-            <h2 className="text-lg font-black text-slate-950">
-              Mapping đã xác nhận
-            </h2>
-          </div>
+      <details className="group rounded-lg border border-slate-200 bg-white">
+        <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-sm font-black text-slate-950 marker:content-['']">
+          <CheckCircle2 aria-hidden="true" className="size-5 text-cyan-700" />
+          Mapping đã xác nhận
+          <span className="ml-auto text-xs font-semibold text-slate-500 group-open:hidden">
+            Hiện
+          </span>
+          <span className="ml-auto hidden text-xs font-semibold text-slate-500 group-open:inline">
+            Ẩn
+          </span>
+        </summary>
+        <div className="border-t border-slate-100 p-4">
           <MappingList mappings={session.confirmedMapping} />
-        </section>
-        <section className="grid gap-3">
-          <div className="flex items-center gap-2">
-            <CalendarDays aria-hidden="true" className="size-5 text-cyan-700" />
-            <h2 className="text-lg font-black text-slate-950">Thông tin phụ</h2>
-          </div>
-          <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm">
-            <div className="grid gap-1">
-              <span className="font-bold text-slate-500">Import ID</span>
-              <span className="break-all font-mono text-xs font-bold text-slate-800">
-                {session.id}
-              </span>
-            </div>
-            <div className="grid gap-1">
-              <span className="font-bold text-slate-500">Hết hạn</span>
-              <span className="font-semibold text-slate-800">
-                {formatImportDate(session.expiresAt)}
-              </span>
-            </div>
-            <div className="grid gap-1">
-              <span className="font-bold text-slate-500">Cập nhật</span>
-              <span className="font-semibold text-slate-800">
-                {formatImportDate(session.updatedAt)}
-              </span>
-            </div>
-          </div>
-        </section>
-      </div>
+        </div>
+      </details>
 
       <section className="grid gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

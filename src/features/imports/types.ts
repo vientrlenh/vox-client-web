@@ -60,6 +60,22 @@ export type ImportSessionFilters = {
   type: string
 }
 
+export type AcceptImportSessionResponse = {
+  importSessionId: string
+  importedRows: number
+  invalidRows: number
+  skippedRows: number
+  status: string
+  totalRows: number
+}
+
+export function mappingEntriesToRecord(entries: ImportMappingEntry[]) {
+  return entries.reduce<Record<string, string>>((result, entry) => {
+    result[entry.originalHeader] = entry.systemField
+    return result
+  }, {})
+}
+
 export function formatImportDate(value?: string | null) {
   if (!value) {
     return '-'
