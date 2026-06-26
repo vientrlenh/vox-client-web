@@ -6,9 +6,9 @@ import { useImportSessionsQuery } from '../api/useImportSessionsQuery'
 import type { ImportSessionFilters, ImportSessionSummary } from '../types'
 import {
   formatImportDate,
+  getImportResultCounts,
   getImportStatusDisplay,
   getImportTypeDisplay,
-  getImportUpdatedRows,
 } from '../types'
 
 const DEFAULT_PAGE = 1
@@ -144,8 +144,10 @@ function ImportSessionsTable({
                   {session.totalRows}
                 </td>
                 <td className="px-4 py-4 text-sm font-semibold text-slate-600">
-                  {session.importedRows} thêm / {getImportUpdatedRows(session)}{' '}
-                  cập nhật / {session.invalidRows} lỗi
+                  {(() => {
+                    const result = getImportResultCounts(session)
+                    return `${result.added} thêm / ${result.updated} cập nhật / ${result.invalid} lỗi`
+                  })()}
                 </td>
                 <td className="px-4 py-4 text-sm font-semibold text-slate-600">
                   {formatImportDate(session.createdAt)}

@@ -172,3 +172,22 @@ export function getImportUpdatedRows(session: {
     session.totalRows - session.importedRows - session.invalidRows,
   )
 }
+
+export function getImportResultCounts(session: {
+  importedRows: number
+  invalidRows: number
+  skippedRows: number
+  status?: string | null
+  totalRows: number
+}) {
+  if (session.status?.trim().toUpperCase() !== 'COMPLETED') {
+    return { added: 0, invalid: 0, skipped: 0, updated: 0 }
+  }
+
+  return {
+    added: session.importedRows,
+    invalid: session.invalidRows,
+    skipped: session.skippedRows,
+    updated: getImportUpdatedRows(session),
+  }
+}

@@ -1,4 +1,8 @@
-import { getImportTypeDisplay, getImportUpdatedRows } from './types'
+import {
+  getImportResultCounts,
+  getImportTypeDisplay,
+  getImportUpdatedRows,
+} from './types'
 
 describe('imports type helpers', () => {
   it('maps known import types to Vietnamese labels', () => {
@@ -23,5 +27,29 @@ describe('imports type helpers', () => {
     expect(
       getImportUpdatedRows({ importedRows: 8, invalidRows: 5, totalRows: 10 }),
     ).toBe(0)
+  })
+
+  it('computes result counts only for completed sessions', () => {
+    expect(
+      getImportResultCounts({
+        importedRows: 3,
+        invalidRows: 1,
+        skippedRows: 2,
+        status: 'COMPLETED',
+        totalRows: 10,
+      }),
+    ).toEqual({ added: 3, invalid: 1, skipped: 2, updated: 6 })
+  })
+
+  it('returns zeroed result counts for non-completed sessions', () => {
+    expect(
+      getImportResultCounts({
+        importedRows: 3,
+        invalidRows: 1,
+        skippedRows: 2,
+        status: 'PREVIEWED',
+        totalRows: 10,
+      }),
+    ).toEqual({ added: 0, invalid: 0, skipped: 0, updated: 0 })
   })
 })

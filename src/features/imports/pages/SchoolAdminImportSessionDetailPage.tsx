@@ -24,9 +24,9 @@ import type { ImportDataEntry, ImportMappingEntry, ImportRow } from '../types'
 import {
   formatImportDate,
   formatNullableText,
+  getImportResultCounts,
   getImportStatusDisplay,
   getImportTypeDisplay,
-  getImportUpdatedRows,
   mappingEntriesToRecord,
 } from '../types'
 
@@ -493,6 +493,8 @@ export function SchoolAdminImportSessionDetailPage() {
     )
   }
 
+  const resultCounts = getImportResultCounts(session)
+
   return (
     <section
       aria-labelledby="school-admin-import-detail-title"
@@ -661,15 +663,15 @@ export function SchoolAdminImportSessionDetailPage() {
         <StatCard
           label="Không hợp lệ"
           tone="danger"
-          value={session.invalidRows}
+          value={resultCounts.invalid}
         />
-        <StatCard label="Đã thêm" tone="success" value={session.importedRows} />
+        <StatCard label="Đã thêm" tone="success" value={resultCounts.added} />
         <StatCard
           label="Đã cập nhật"
           tone="success"
-          value={getImportUpdatedRows(session)}
+          value={resultCounts.updated}
         />
-        <StatCard label="Bỏ qua" value={session.skippedRows} />
+        <StatCard label="Bỏ qua" value={resultCounts.skipped} />
       </div>
 
       {session.failureReason ? (
