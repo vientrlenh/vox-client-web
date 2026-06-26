@@ -197,7 +197,7 @@ function SampleRowsTable({ preview }: SampleRowsTableProps) {
 }
 
 type ImportResultPanelProps = {
-  classId: string
+  classId?: string
   result: AcceptSchoolClassImportResponse
 }
 
@@ -227,9 +227,9 @@ function ImportResultPanel({ classId, result }: ImportResultPanelProps) {
 
       <Link
         className="inline-flex h-11 w-fit items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
-        to={`/school-admin/classes/${classId}`}
+        to={classId ? `/school-admin/classes/${classId}` : '/school-admin/imports'}
       >
-        Quay lại chi tiết lớp
+        {classId ? 'Quay lại chi tiết lớp' : 'Về danh sách import'}
       </Link>
     </section>
   )
@@ -508,7 +508,7 @@ export function SchoolAdminClassUserImportPage() {
         </>
       ) : null}
 
-      {result && classId ? (
+      {result ? (
         <ImportResultPanel classId={classId} result={result} />
       ) : null}
     </section>

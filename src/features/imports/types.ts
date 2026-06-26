@@ -139,5 +139,20 @@ export function getImportTypeDisplay(type?: string | null) {
     return 'Học viên trong lớp'
   }
 
+  if (normalized === 'USER') {
+    return 'Người dùng'
+  }
+
   return normalized || '-'
+}
+
+export function getImportUpdatedRows(session: {
+  importedRows: number
+  invalidRows: number
+  totalRows: number
+}) {
+  return Math.max(
+    0,
+    session.totalRows - session.importedRows - session.invalidRows,
+  )
 }

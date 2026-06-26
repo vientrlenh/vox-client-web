@@ -169,6 +169,10 @@ export function AppRoutes() {
               element={<SchoolAdminClassImportPage />}
             />
             <Route
+              path="school-admin/classes/users/import"
+              element={<SchoolAdminClassUserImportPage />}
+            />
+            <Route
               path="school-admin/classes/:classId/users/import"
               element={<SchoolAdminClassUserImportPage />}
             />
