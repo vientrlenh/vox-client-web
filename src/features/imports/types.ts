@@ -159,6 +159,10 @@ export function getImportTypeDisplay(type?: string | null) {
     return 'Người dùng'
   }
 
+  if (normalized === 'SCHOOL_DIRECTORY') {
+    return 'Danh mục trường'
+  }
+
   return normalized || '-'
 }
 

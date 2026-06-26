@@ -16,6 +16,11 @@ import {
   useRejectImportSessionMutation,
 } from '../api/useImportSessionDecisionMutations'
 import {
+  type ImportField,
+  getImportFields,
+  getMissingRequiredFields,
+} from '../importFields'
+import {
   importManagementQueryKeys,
   useImportRowsQuery,
   useImportSessionQuery,
@@ -316,6 +321,54 @@ type DecisionMessage = {
   tone: 'error' | 'success'
 }
 
+type MappingEditorProps = {
+  fields: ImportField[]
+  mapping: Record<string, string>
+  onChange: (header: string, value: string) => void
+  originalHeaders: string[]
+}
+
+function MappingEditor({
+  fields,
+  mapping,
+  onChange,
+  originalHeaders,
+}: MappingEditorProps) {
+  if (!originalHeaders.length) {
+    return (
+      <p className="text-sm font-semibold text-slate-500">
+        Không có cột dữ liệu để ghép.
+      </p>
+    )
+  }
+
+  return (
+    <div className="grid gap-2">
+      {originalHeaders.map((header) => (
+        <label
+          className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm font-bold text-slate-700 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-center"
+          key={header}
+        >
+          <span className="truncate">{header}</span>
+          <select
+            className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+            onChange={(event) => onChange(header, event.target.value)}
+            value={mapping[header] ?? ''}
+          >
+            <option value="">Bỏ qua cột này</option>
+            {fields.map((field) => (
+              <option key={field.value} value={field.value}>
+                {field.label}
+                {field.isRequired ? ' *' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+    </div>
+  )
+}
+
 export function SchoolAdminImportSessionDetailPage() {
   const { sessionId } = useParams()
   const queryClient = useQueryClient()
@@ -325,6 +378,7 @@ export function SchoolAdminImportSessionDetailPage() {
   const [pendingDecision, setPendingDecision] = useState<
     'accept' | 'reject' | null
   >(null)
+  const [mapping, setMapping] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<DecisionMessage | null>(null)
   const sessionQuery = useImportSessionQuery(sessionId ?? null)
   const rowsQuery = useImportRowsQuery(
@@ -339,10 +393,42 @@ export function SchoolAdminImportSessionDetailPage() {
   const rows = rowsQuery.data?.content ?? []
   const isAwaitingReview = session?.status?.trim().toUpperCase() === 'PREVIEWED'
   const isDeciding = acceptMutation.isPending || rejectMutation.isPending
+  const importFields = getImportFields(session?.type)
+  const supportsMapping = importFields.length > 0
+  const missingFields = getMissingRequiredFields(importFields, mapping)
+  const canAccept = supportsMapping && missingFields.length === 0
 
   function handleRowPageSizeChange(nextPageSize: number) {
     setRowPage(DEFAULT_ROW_PAGE)
     setRowPageSize(nextPageSize)
+  }
+
+  function openAccept() {
+    if (!session) {
+      return
+    }
+
+    const sourceMapping = session.confirmedMapping.length
+      ? session.confirmedMapping
+      : session.suggestedMapping
+    const sourceRecord = mappingEntriesToRecord(sourceMapping)
+    const initialMapping = session.originalHeaders.reduce<
+      Record<string, string>
+    >((result, header) => {
+      result[header] = sourceRecord[header] ?? ''
+      return result
+    }, {})
+
+    setMapping(initialMapping)
+    setMessage(null)
+    setPendingDecision('accept')
+  }
+
+  function handleMappingChange(header: string, value: string) {
+    setMapping((current) => ({
+      ...current,
+      [header]: value,
+    }))
   }
 
   async function refreshAfterDecision() {
@@ -353,18 +439,14 @@ export function SchoolAdminImportSessionDetailPage() {
   }
 
   async function handleAccept() {
-    if (!sessionId || !session) {
+    if (!sessionId || !session || !canAccept) {
       return
     }
-
-    const sourceMapping = session.confirmedMapping.length
-      ? session.confirmedMapping
-      : session.suggestedMapping
 
     try {
       setMessage(null)
       const response = await acceptMutation.mutateAsync({
-        confirmedMapping: mappingEntriesToRecord(sourceMapping),
+        confirmedMapping: mapping,
         sessionId,
         type: session.type,
       })
@@ -534,7 +616,7 @@ export function SchoolAdminImportSessionDetailPage() {
               <button
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isDeciding}
-                onClick={() => setPendingDecision('accept')}
+                onClick={openAccept}
                 type="button"
               >
                 <CheckCircle2 aria-hidden="true" className="size-4" />
@@ -576,12 +658,10 @@ export function SchoolAdminImportSessionDetailPage() {
         </div>
       ) : null}
 
-      {pendingDecision ? (
-        <div className="grid gap-3 rounded-lg border border-cyan-200 bg-cyan-50 p-4 sm:flex sm:items-center sm:justify-between">
-          <p className="text-sm font-bold text-cyan-900">
-            {pendingDecision === 'accept'
-              ? 'Xác nhận duyệt và import dữ liệu của phiên này?'
-              : 'Xác nhận từ chối phiên import này? Dữ liệu sẽ không được import.'}
+      {pendingDecision === 'reject' ? (
+        <div className="grid gap-3 rounded-lg border border-red-200 bg-red-50 p-4 sm:flex sm:items-center sm:justify-between">
+          <p className="text-sm font-bold text-red-900">
+            Xác nhận từ chối phiên import này? Dữ liệu sẽ không được import.
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -593,28 +673,92 @@ export function SchoolAdminImportSessionDetailPage() {
               Hủy
             </button>
             <button
-              className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                pendingDecision === 'accept'
-                  ? 'bg-cyan-600 hover:bg-cyan-700'
-                  : 'bg-red-600 hover:bg-red-700'
-              }`}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isDeciding}
               onClick={() => {
-                if (pendingDecision === 'accept') {
-                  void handleAccept()
-                } else {
-                  void handleReject()
-                }
+                void handleReject()
               }}
               type="button"
             >
-              {isDeciding ? (
+              {rejectMutation.isPending ? (
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
               ) : null}
-              {pendingDecision === 'accept' ? 'Duyệt & import' : 'Từ chối'}
+              Từ chối
             </button>
           </div>
         </div>
+      ) : null}
+
+      {pendingDecision === 'accept' ? (
+        <section className="grid gap-4 rounded-lg border border-cyan-200 bg-cyan-50/60 p-4">
+          <div>
+            <h2 className="text-base font-black text-cyan-950">
+              Ghép cột trước khi import
+            </h2>
+            <p className="mt-1 text-sm font-medium text-cyan-900/80">
+              Chọn trường hệ thống tương ứng với từng cột trong file, sau đó xác
+              nhận để import.
+            </p>
+          </div>
+
+          {supportsMapping ? (
+            <>
+              <MappingEditor
+                fields={importFields}
+                mapping={mapping}
+                onChange={handleMappingChange}
+                originalHeaders={session.originalHeaders}
+              />
+
+              {missingFields.length ? (
+                <div
+                  className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800"
+                  role="alert"
+                >
+                  Cần ghép đủ trường bắt buộc:{' '}
+                  {missingFields.map((field) => field.label).join(', ')}.
+                </div>
+              ) : (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                  Mapping đã đủ các trường bắt buộc.
+                </div>
+              )}
+            </>
+          ) : (
+            <div
+              className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800"
+              role="alert"
+            >
+              Loại import này không hỗ trợ ghép cột tại đây.
+            </div>
+          )}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              disabled={isDeciding}
+              onClick={() => setPendingDecision(null)}
+              type="button"
+            >
+              Hủy
+            </button>
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!canAccept || isDeciding}
+              onClick={() => {
+                void handleAccept()
+              }}
+              type="button"
+            >
+              {acceptMutation.isPending ? (
+                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+              ) : (
+                <CheckCircle2 aria-hidden="true" className="size-4" />
+              )}
+              Xác nhận duyệt &amp; import
+            </button>
+          </div>
+        </section>
       ) : null}
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5">

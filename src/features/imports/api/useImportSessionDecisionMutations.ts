@@ -17,8 +17,15 @@ type RejectImportSessionInput = {
   sessionId: string
 }
 
-function getAcceptUrl(type: string, schoolId: string, sessionId: string) {
+function getAcceptUrl(type: string, sessionId: string) {
   const normalized = type.trim().toUpperCase()
+
+  // Import danh mục trường chạy ở phạm vi hệ thống, không gắn schoolId.
+  if (normalized === 'SCHOOL_DIRECTORY') {
+    return `/v1/schools/directories/import/${sessionId}/accept`
+  }
+
+  const schoolId = requireSchoolId()
 
   switch (normalized) {
     case 'SCHOOL_CLASS':
@@ -39,10 +46,9 @@ export async function acceptImportSession({
 }: AcceptImportSessionInput): Promise<
   MutationResult<AcceptImportSessionResponse>
 > {
-  const schoolId = requireSchoolId()
   const response = await apiClient.post<
     ApiResponse<AcceptImportSessionResponse>
-  >(getAcceptUrl(type, schoolId, sessionId), { confirmedMapping })
+  >(getAcceptUrl(type, sessionId), { confirmedMapping })
 
   return response.data
 }

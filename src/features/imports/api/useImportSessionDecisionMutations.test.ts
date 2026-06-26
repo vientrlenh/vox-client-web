@@ -110,12 +110,29 @@ describe('import session decision mutations', () => {
     )
   })
 
+  it('accepts a SCHOOL_DIRECTORY session via the directories endpoint without a schoolId', async () => {
+    localStorage.clear()
+    saveSession(null)
+    mockAcceptResponse()
+
+    await acceptImportSession({
+      confirmedMapping: { Code: 'code' },
+      sessionId: 'session-1',
+      type: 'SCHOOL_DIRECTORY',
+    })
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/schools/directories/import/session-1/accept',
+      { confirmedMapping: { Code: 'code' } },
+    )
+  })
+
   it('throws for an unsupported import type', async () => {
     await expect(
       acceptImportSession({
         confirmedMapping: {},
         sessionId: 'session-1',
-        type: 'SCHOOL_DIRECTORY',
+        type: 'UNKNOWN',
       }),
     ).rejects.toThrow('Loại import không được hỗ trợ')
 
