@@ -1,113 +1,119 @@
-import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
-import { SchoolAdminLayout } from '@/app/layouts/SchoolAdminLayout'
-import { SystemAdminLayout } from '@/app/layouts/SystemAdminLayout'
-import { RequireRole } from './RequireRole'
-import { PageLoader } from '@/shared/ui/PageLoader'
+import { lazy, Suspense } from "react";
+import { Navigate, Route, Routes } from "react-router";
+import { SchoolAdminLayout } from "@/app/layouts/SchoolAdminLayout";
+import { SystemAdminLayout } from "@/app/layouts/SystemAdminLayout";
+import { RequireRole } from "./RequireRole";
+import { PageLoader } from "@/shared/ui/PageLoader";
 
 const HomePage = lazy(() =>
-  import('@/features/home').then((module) => ({ default: module.HomePage })),
-)
+  import("@/features/home").then((module) => ({ default: module.HomePage })),
+);
 
 const LoginPage = lazy(() =>
-  import('@/features/auth').then((module) => ({ default: module.LoginPage })),
-)
+  import("@/features/auth").then((module) => ({ default: module.LoginPage })),
+);
 
 const RegisterPage = lazy(() =>
-  import('@/features/registration').then((module) => ({
+  import("@/features/registration").then((module) => ({
     default: module.RegisterPage,
   })),
-)
+);
 
 const ResetPasswordPage = lazy(() =>
-  import('@/features/auth').then((module) => ({
+  import("@/features/auth").then((module) => ({
     default: module.ResetPasswordPage,
   })),
-)
+);
 
 const SetupPasswordPage = lazy(() =>
-  import('@/features/auth').then((module) => ({
+  import("@/features/auth").then((module) => ({
     default: module.SetupPasswordPage,
   })),
-)
+);
 
 const SystemAdminDashboardPage = lazy(() =>
-  import('@/features/dashboard').then((module) => ({
+  import("@/features/dashboard").then((module) => ({
     default: module.SystemAdminDashboardPage,
   })),
-)
+);
 
 const SchoolAdminDashboardPage = lazy(() =>
-  import('@/features/dashboard').then((module) => ({
+  import("@/features/dashboard").then((module) => ({
     default: module.SchoolAdminDashboardPage,
   })),
-)
+);
 
 const SystemAdminRegistrationsPage = lazy(() =>
-  import('@/features/registration').then((module) => ({
+  import("@/features/registration").then((module) => ({
     default: module.SystemAdminRegistrationsPage,
   })),
-)
+);
 
 const SystemAdminLanguagesPage = lazy(() =>
-  import('@/features/languages').then((module) => ({
+  import("@/features/languages").then((module) => ({
     default: module.SystemAdminLanguagesPage,
   })),
-)
+);
 
 const SchoolAdminClassesPage = lazy(() =>
-  import('@/features/classes').then((module) => ({
+  import("@/features/classes").then((module) => ({
     default: module.SchoolAdminClassesPage,
   })),
-)
+);
 
 const SchoolAdminClassDetailPage = lazy(() =>
-  import('@/features/classes').then((module) => ({
+  import("@/features/classes").then((module) => ({
     default: module.SchoolAdminClassDetailPage,
   })),
-)
+);
 
 const SchoolAdminClassImportPage = lazy(() =>
-  import('@/features/classes').then((module) => ({
+  import("@/features/classes").then((module) => ({
     default: module.SchoolAdminClassImportPage,
   })),
-)
+);
 
 const SchoolAdminClassUserImportPage = lazy(() =>
-  import('@/features/classes').then((module) => ({
+  import("@/features/classes").then((module) => ({
     default: module.SchoolAdminClassUserImportPage,
   })),
-)
+);
 
 const SchoolAdminSchoolUsersPage = lazy(() =>
-  import('@/features/school-users').then((module) => ({
+  import("@/features/school-users").then((module) => ({
     default: module.SchoolAdminSchoolUsersPage,
   })),
-)
+);
 
 const SchoolAdminSchoolUserDetailPage = lazy(() =>
-  import('@/features/school-users').then((module) => ({
+  import("@/features/school-users").then((module) => ({
     default: module.SchoolAdminSchoolUserDetailPage,
   })),
-)
+);
 
 const SchoolAdminSchoolUserImportPage = lazy(() =>
-  import('@/features/school-users').then((module) => ({
+  import("@/features/school-users").then((module) => ({
     default: module.SchoolAdminSchoolUserImportPage,
   })),
-)
+);
 
 const SchoolAdminImportSessionsPage = lazy(() =>
-  import('@/features/imports').then((module) => ({
+  import("@/features/imports").then((module) => ({
     default: module.SchoolAdminImportSessionsPage,
   })),
-)
+);
 
 const SchoolAdminImportSessionDetailPage = lazy(() =>
-  import('@/features/imports').then((module) => ({
+  import("@/features/imports").then((module) => ({
     default: module.SchoolAdminImportSessionDetailPage,
   })),
-)
+);
+
+const SystemAdminSchoolsPage = lazy(() =>
+  import("@/features/school").then((module) => ({
+    default: module.SystemAdminSchoolsPage,
+  })),
+);
 
 export function AppRoutes() {
   return (
@@ -131,6 +137,11 @@ export function AppRoutes() {
             <Route
               path="system-admin/languages"
               element={<SystemAdminLanguagesPage />}
+            />
+            {/* Đăng ký route mới tại đây */}
+            <Route
+              path="system-admin/schools"
+              element={<SystemAdminSchoolsPage />}
             />
           </Route>
         </Route>
@@ -181,5 +192,5 @@ export function AppRoutes() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
-  )
+  );
 }
