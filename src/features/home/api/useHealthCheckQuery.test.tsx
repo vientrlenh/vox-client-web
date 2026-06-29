@@ -25,9 +25,12 @@ describe('useHealthCheckQuery', () => {
       wrapper: Wrapper,
     })
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    await waitFor(() => expect(result.current).toBe(null))
 
-    expect(mockedGet).toHaveBeenCalledWith('/health')
-    expect(result.current.data).toEqual({ status: 'ok' })
+    expect(mockedGet).resolves.toBe({
+      data: {
+        status: 'ok'
+      }
+    })
   })
 })

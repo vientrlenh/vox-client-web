@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { SchoolAdminLayout } from "@/app/layouts/SchoolAdminLayout";
 import { SystemAdminLayout } from "@/app/layouts/SystemAdminLayout";
+import { TeacherLayout } from "@/app/layouts/TeacherLayout";
 import { RequireRole } from "./RequireRole";
 import { PageLoader } from "@/shared/ui/PageLoader";
 
@@ -115,6 +116,24 @@ const SystemAdminSchoolsPage = lazy(() =>
   })),
 );
 
+const TeacherMonitoringRoomsPage = lazy(() =>
+  import("@/features/monitoring").then((module) => ({
+    default: module.TeacherMonitoringRoomsPage,
+  })),
+);
+
+const SchoolAdminMonitoringRoomsPage = lazy(() =>
+  import("@/features/monitoring").then((module) => ({
+    default: module.SchoolAdminMonitoringRoomsPage,
+  })),
+);
+
+const MonitoringRoomPage = lazy(() =>
+  import("@/features/monitoring").then((module) => ({
+    default: module.MonitoringRoomPage,
+  })),
+);
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -152,6 +171,14 @@ export function AppRoutes() {
               element={<SchoolAdminDashboardPage />}
             />
             <Route
+              path="school-admin/monitoring"
+              element={<SchoolAdminMonitoringRoomsPage />}
+            />
+            <Route
+              path="school-admin/monitoring/rooms/:roomId"
+              element={<MonitoringRoomPage />}
+            />
+            <Route
               path="school-admin/classes"
               element={<SchoolAdminClassesPage />}
             />
@@ -186,6 +213,18 @@ export function AppRoutes() {
             <Route
               path="school-admin/classes/:classId"
               element={<SchoolAdminClassDetailPage />}
+            />
+          </Route>
+        </Route>
+        <Route element={<RequireRole role="TEACHER" />}>
+          <Route element={<TeacherLayout />}>
+            <Route
+              path="teacher/monitoring"
+              element={<TeacherMonitoringRoomsPage />}
+            />
+            <Route
+              path="teacher/monitoring/rooms/:roomId"
+              element={<MonitoringRoomPage />}
             />
           </Route>
         </Route>
