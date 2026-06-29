@@ -4,9 +4,11 @@ import { questionQueryKeys } from './useQuestionsQuery'
 import type { QuestionDto } from '../types'
 
 const QUESTION_DETAIL_QUERY = `
-  query Question($id: ID!) {
+  query Question($id: UUID!) {
     question(id: $id) {
       id
+      questionBankId
+      questionTopicId
       code
       instructionText
       questionText
@@ -16,20 +18,31 @@ const QUESTION_DETAIL_QUERY = `
       preparationTimeSeconds
       minResponseSeconds
       maxResponseSeconds
-      scope
-      visibility
+      sharing
       sourceQuestionId
       locked
       status
+      confidentiality
+      securePoolId
       createdAt
       updatedAt
       createdBy
       updatedBy
-      questionTopic {
+      topic {
         id
         questionBankId
         code
         name
+        description
+        status
+      }
+      bank {
+        id
+        code
+        name
+        description
+        ownerType
+        status
       }
       assets {
         id
@@ -52,6 +65,13 @@ const QUESTION_DETAIL_QUERY = `
         offTopicExamples
         scoringHints
         commonMistakes
+      }
+      collaborators {
+        id
+        userId
+        questionId
+        permission
+        assignedAt
       }
     }
   }

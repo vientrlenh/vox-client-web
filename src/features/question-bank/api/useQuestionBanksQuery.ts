@@ -1,31 +1,39 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
-import type { QuestionBankPage } from '../types'
+import type { QuestionBankOwnerType, QuestionBankPage, QuestionBankStatus } from '../types'
 
 export type QuestionModuleScope = 'teacher' | 'school' | 'admin'
 
 const QUESTION_BANK_FIELDS = `
   id
-  bankName
+  languageId
+  schoolId
+  code
+  name
   description
-  isActive
+  ownerType
+  status
   createdAt
   updatedAt
   createdBy
   updatedBy
 `
 
-function getQuestionBanksQuery(scope: QuestionModuleScope) {
-  const queryName =
-    scope === 'teacher'
-      ? 'teacherQuestionBanks'
-      : scope === 'school'
-        ? 'schoolQuestionBanks'
-        : 'adminQuestionBanks'
-
-  return `
-  query QuestionBanks($page: Int!, $size: Int!) {
-    ${queryName}(page: $page, size: $size) {
+const QUESTION_BANKS_QUERY = `
+  query QuestionBanks(
+    $ownerType: QuestionBankOwnerType
+    $status: QuestionBankStatus
+    $keyword: String
+    $page: Int!
+    $size: Int!
+  ) {
+    questionBanks(
+      ownerType: $ownerType
+      status: $status
+      keyword: $keyword
+      page: $page
+      size: $size
+    ) {
       content {
         ${QUESTION_BANK_FIELDS}
       }
@@ -34,65 +42,70 @@ function getQuestionBanksQuery(scope: QuestionModuleScope) {
       totalElements
       totalPages
     }
-  }`
-}
+  }
+`
 
 type QuestionBanksQueryData = {
-  teacherQuestionBanks?: QuestionBankPage
-  schoolQuestionBanks?: QuestionBankPage
-  adminQuestionBanks?: QuestionBankPage
+  questionBanks: QuestionBankPage
 }
 
 type FetchQuestionBanksInput = {
+  keyword?: string
+  ownerType?: QuestionBankOwnerType
   page: number
-  scope: QuestionModuleScope
   size: number
+  status?: QuestionBankStatus
 }
 
 export const questionBankQueryKeys = {
   all: ['question-banks'] as const,
   questionBank: (id: string | null) =>
     [...questionBankQueryKeys.all, 'detail', id] as const,
-  questionBanks: (scope: QuestionModuleScope, page: number, size: number) =>
-    [...questionBankQueryKeys.all, 'list', scope, page, size] as const,
+  questionBanks: (input: FetchQuestionBanksInput) =>
+    [...questionBankQueryKeys.all, 'list', input] as const,
 }
 
-export async function fetchQuestionBanks({
-  page,
-  scope,
-  size,
-}: FetchQuestionBanksInput) {
-  const data = await graphQLRequest<QuestionBanksQueryData>(
-    getQuestionBanksQuery(scope),
-    {
-      page,
-      size,
-    },
-  )
+export async function fetchQuestionBanks(input: FetchQuestionBanksInput) {
+  const data = await graphQLRequest<QuestionBanksQueryData>(QUESTION_BANKS_QUERY, {
+    keyword: input.keyword || undefined,
+    ownerType: input.ownerType,
+    page: input.page,
+    size: input.size,
+    status: input.status,
+  })
 
-  return (
-    data.teacherQuestionBanks ??
-    data.schoolQuestionBanks ??
-    data.adminQuestionBanks ??
-    {
-      content: [],
-      page,
-      size,
-      totalElements: 0,
-      totalPages: 0,
-    }
-  )
+  return {
+    ...data.questionBanks,
+    content: data.questionBanks.content.map((bank) => ({
+      ...bank,
+      bankName: bank.name,
+      isActive: bank.status === 'PUBLISHED',
+    })),
+  }
 }
 
 export function useQuestionBanksQuery(
-  scope: QuestionModuleScope,
+  _scope: QuestionModuleScope,
   page: number,
   size: number,
   enabled = true,
+  options?: {
+    keyword?: string
+    ownerType?: QuestionBankOwnerType
+    status?: QuestionBankStatus
+  },
 ) {
+  const input: FetchQuestionBanksInput = {
+    keyword: options?.keyword,
+    ownerType: options?.ownerType,
+    page,
+    size,
+    status: options?.status,
+  }
+
   return useQuery({
     enabled,
-    queryFn: () => fetchQuestionBanks({ page, scope, size }),
-    queryKey: questionBankQueryKeys.questionBanks(scope, page, size),
+    queryFn: () => fetchQuestionBanks(input),
+    queryKey: questionBankQueryKeys.questionBanks(input),
   })
 }

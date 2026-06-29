@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   Bell,
-  BookOpen,
   ChevronDown,
+  ClipboardCheck,
   FileQuestion,
-  FolderTree,
   LogOut,
   Menu,
   Search,
@@ -18,7 +17,7 @@ import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
 
 type NavigationGroup = {
-  icon: typeof BookOpen
+  icon: typeof FileQuestion
   label: string
   items: Array<{
     label: string
@@ -28,30 +27,42 @@ type NavigationGroup = {
 
 const navigationGroups: NavigationGroup[] = [
   {
-    icon: FolderTree,
-    label: 'Question bank',
+    icon: FileQuestion,
+    label: 'Question',
     items: [
       {
-        label: 'Ngan hang cau hoi',
+        label: 'Cau hoi cua toi',
+        to: '/teacher/questions/my',
+      },
+      {
+        label: 'Cau hoi can duyet',
+        to: '/teacher/questions/review',
+      },
+      {
+        label: 'Ngan hang va chu de',
         to: '/teacher/question-banks',
       },
     ],
   },
   {
-    icon: FileQuestion,
-    label: 'Question',
+    icon: ClipboardCheck,
+    label: 'Exam',
     items: [
       {
-        label: 'My question',
-        to: '/teacher/questions/my',
+        label: 'Kiem tra tap trung',
+        to: '/teacher/exams',
       },
       {
-        label: 'Question tong',
-        to: '/teacher/questions/all',
+        label: 'Blueprint de thi',
+        to: '/teacher/blueprints',
       },
       {
-        label: 'Duyet question',
-        to: '/teacher/questions/review',
+        label: 'Tao bai tren lop',
+        to: '/teacher/class-tests/create',
+      },
+      {
+        label: 'Bai tren lop cua toi',
+        to: '/teacher/class-tests',
       },
     ],
   },

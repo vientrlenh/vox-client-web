@@ -1,32 +1,55 @@
 import type { RoleCode } from '@/features/auth/types'
-import type { QuestionDto } from './types'
+import type {
+  QuestionCollaboratorPermission,
+  QuestionDto,
+  QuestionStatus,
+} from './types'
 
-export type TeacherQuestionContext = 'owner' | 'reviewer' | 'viewer'
+export type TeacherQuestionContext =
+  | 'collaborator'
+  | 'owner'
+  | 'reviewer'
+  | 'viewer'
 
-export type QuestionActorRole = 'SYSTEM_ADMIN' | 'SCHOOL_ADMIN' | 'TEACHER' | null
+export type QuestionActorRole =
+  | 'SYSTEM_ADMIN'
+  | 'SCHOOL_ADMIN'
+  | 'TEACHER'
+  | null
 
-type ReviewActionOption = {
+export type QuestionWorkflowAction =
+  | 'APPROVE'
+  | 'ARCHIVE'
+  | 'LOCK'
+  | 'PUBLISH'
+  | 'REJECT'
+  | 'REQUEST_REVISION'
+  | 'SUBMIT'
+  | 'UNLOCK'
+
+export type ReviewActionOption = {
+  action: QuestionWorkflowAction
   description: string
-  requiresReason?: boolean
-  status: string
+  requiresNote?: boolean
   title: string
 }
 
-const EDITABLE_STATUSES = ['DRAFT', 'REJECTED'] as const
+const EDITABLE_STATUSES: QuestionStatus[] = ['DRAFT', 'REVISION_REQUESTED']
 
-function isEditableStatus(status?: string | null) {
-  return EDITABLE_STATUSES.includes(status as (typeof EDITABLE_STATUSES)[number])
+function isEditableStatus(status?: QuestionStatus | null) {
+  return Boolean(status && EDITABLE_STATUSES.includes(status))
 }
 
-function isApprovedStatus(question?: QuestionDto | null) {
-  return question?.status === 'APPROVED'
-}
+function getCurrentUserPermission(
+  question: QuestionDto | null | undefined,
+  userId?: string | null,
+): QuestionCollaboratorPermission | null {
+  if (!question || !userId) {
+    return null
+  }
 
-function isReviewerQueue(question?: QuestionDto | null) {
-  return (
-    question?.status === 'SUBMITTED_FOR_REVIEW' &&
-    question.visibility === 'REVIEWER_ONLY'
-  )
+  const collaborator = question.collaborators?.find((item) => item.userId === userId)
+  return collaborator?.permission ?? null
 }
 
 export function getQuestionActorRole(
@@ -70,6 +93,10 @@ export function resolveTeacherQuestionContext(
     return 'owner'
   }
 
+  if (getCurrentUserPermission(question, userId)) {
+    return 'collaborator'
+  }
+
   return getTeacherQuestionContext(view)
 }
 
@@ -77,12 +104,25 @@ export function canCreateQuestion(role: QuestionActorRole) {
   return role === 'SYSTEM_ADMIN' || role === 'TEACHER'
 }
 
+export function canManageQuestionSharing(
+  question: QuestionDto | null | undefined,
+  role: QuestionActorRole,
+  userId?: string | null,
+) {
+  if (!question) {
+    return false
+  }
+
+  return role === 'TEACHER' && Boolean(question.createdBy && userId && question.createdBy === userId)
+}
+
 export function canEditQuestion(
   question: QuestionDto | null | undefined,
   role: QuestionActorRole,
   teacherContext: TeacherQuestionContext,
+  userId?: string | null,
 ) {
-  if (!question || question.locked) {
+  if (!question) {
     return false
   }
 
@@ -90,8 +130,19 @@ export function canEditQuestion(
     return true
   }
 
-  if (role === 'TEACHER') {
-    return teacherContext === 'owner' && isEditableStatus(question.status)
+  if (role !== 'TEACHER') {
+    return false
+  }
+
+  if (teacherContext === 'owner') {
+    return isEditableStatus(question.status)
+  }
+
+  if (teacherContext === 'collaborator') {
+    return (
+      getCurrentUserPermission(question, userId) === 'CAN_EDIT' &&
+      isEditableStatus(question.status)
+    )
   }
 
   return false
@@ -102,233 +153,214 @@ export function canDeleteQuestion(
   role: QuestionActorRole,
   teacherContext: TeacherQuestionContext,
 ) {
-  return canEditQuestion(question, role, teacherContext)
+  if (!question) {
+    return false
+  }
+
+  if (role === 'SYSTEM_ADMIN' || role === 'SCHOOL_ADMIN') {
+    return true
+  }
+
+  return teacherContext === 'owner' && question.status === 'DRAFT'
 }
 
-export function canDeleteQuestionAssetsOrGuide(
+export function canEditQuestionAssetsOrGuide(
   question: QuestionDto | null | undefined,
   role: QuestionActorRole,
   teacherContext: TeacherQuestionContext,
+  userId?: string | null,
 ) {
-  return (
-    canEditQuestion(question, role, teacherContext) && question?.status === 'DRAFT'
-  )
+  return canEditQuestion(question, role, teacherContext, userId)
 }
 
 export function getQuestionReviewActions(
   question: QuestionDto | null | undefined,
   role: QuestionActorRole,
   teacherContext: TeacherQuestionContext,
+  userId?: string | null,
 ) {
   if (!question) {
     return [] as ReviewActionOption[]
   }
 
+  const isOwner = Boolean(question.createdBy && userId && question.createdBy === userId)
+  const collaboratorPermission = getCurrentUserPermission(question, userId)
+
   if (role === 'SYSTEM_ADMIN') {
-    const actions: ReviewActionOption[] = []
-
-    if (isEditableStatus(question.status)) {
-      actions.push({
-        description: 'Gui cau hoi vao hang doi review.',
-        status: 'SUBMITTED_FOR_REVIEW',
-        title: 'Submit for review',
-      })
-    }
-
-    if (question.status === 'SUBMITTED_FOR_REVIEW') {
-      actions.push(
-        {
-          description: 'Duyet cau hoi, chuyen sang trang thai approved.',
-          status: 'APPROVED',
-          title: 'Approve',
-        },
-        {
-          description: 'Tra cau hoi ve cho nguoi tao chinh sua.',
-          requiresReason: true,
-          status: 'REVISION_REQUESTED',
-          title: 'Request revision',
-        },
-        {
-          description: 'Tu choi cau hoi hien tai.',
-          requiresReason: true,
-          status: 'REJECTED',
-          title: 'Reject',
-        },
-      )
-    }
-
-    if (isApprovedStatus(question)) {
-      actions.push({
-        description: 'Xuat ban cau hoi da duoc approved.',
-        status: 'PUBLISHED',
-        title: 'Publish',
-      })
-    }
-
-    if (question.status !== 'ARCHIVED') {
-      actions.push({
-        description: 'Chuyen cau hoi sang luu tru.',
-        requiresReason: true,
-        status: 'ARCHIVED',
-        title: 'Archive',
-      })
-    }
-
-    if (question.status === 'ARCHIVED') {
-      actions.push({
-        description: 'Khoi phuc cau hoi ve trang thai draft neu backend cho phep.',
-        status: 'DRAFT',
-        title: 'Restore to draft',
-      })
-    }
-
-    return actions
+    return getAdminActions(question.status)
   }
 
   if (role === 'SCHOOL_ADMIN') {
-    const actions: ReviewActionOption[] = []
-
-    if (isEditableStatus(question.status)) {
-      actions.push({
-        description: 'Gui cau hoi vao hang doi review.',
-        status: 'SUBMITTED_FOR_REVIEW',
-        title: 'Submit for review',
-      })
-    }
-
-    if (question.status === 'SUBMITTED_FOR_REVIEW') {
-      actions.push(
-        {
-          description: 'Duyet cau hoi, chuyen sang trang thai approved.',
-          status: 'APPROVED',
-          title: 'Approve',
-        },
-        {
-          description: 'Tra cau hoi ve cho nguoi tao chinh sua.',
-          requiresReason: true,
-          status: 'REVISION_REQUESTED',
-          title: 'Request revision',
-        },
-        {
-          description: 'Tu choi cau hoi hien tai.',
-          requiresReason: true,
-          status: 'REJECTED',
-          title: 'Reject',
-        },
-      )
-    }
-
-    if (isApprovedStatus(question)) {
-      actions.push({
-        description: 'Xuat ban cau hoi da duoc approved.',
-        status: 'PUBLISHED',
-        title: 'Publish',
-      })
-    }
-
-    if (question.status !== 'ARCHIVED') {
-      actions.push({
-        description: 'Chuyen cau hoi sang luu tru.',
-        requiresReason: true,
-        status: 'ARCHIVED',
-        title: 'Archive',
-      })
-    }
-
-    if (question.status === 'ARCHIVED') {
-      actions.push({
-        description: 'Khoi phuc cau hoi ve trang thai draft.',
-        status: 'DRAFT',
-        title: 'Restore to draft',
-      })
-    }
-
-    return actions
+    return getSchoolAdminActions(question.status)
   }
 
   if (role !== 'TEACHER') {
     return []
   }
 
-  if (teacherContext === 'reviewer' && isReviewerQueue(question)) {
-    return [
-      {
-        description: 'Duyet cau hoi, chuyen sang trang thai approved.',
-        status: 'APPROVED',
-        title: 'Approve',
-      },
-      {
-        description: 'Yeu cau nguoi tao chinh sua them.',
-        requiresReason: true,
-        status: 'REVISION_REQUESTED',
-        title: 'Request revision',
-      },
-      {
-        description: 'Tu choi cau hoi hien tai.',
-        requiresReason: true,
-        status: 'REJECTED',
-        title: 'Reject',
-      },
-    ]
-  }
+  const actions: ReviewActionOption[] = []
 
-  if (teacherContext === 'owner' && isEditableStatus(question.status)) {
-    return [
-      {
-        description: 'Gui cau hoi vao hang doi review.',
-        status: 'SUBMITTED_FOR_REVIEW',
-        title: 'Submit for review',
-      },
-      {
-        description: 'Chuyen cau hoi sang luu tru.',
-        requiresReason: true,
-        status: 'ARCHIVED',
-        title: 'Archive',
-      },
-    ]
-  }
-
-  if (teacherContext === 'owner' && isApprovedStatus(question)) {
-    return [
-      {
-        description: 'Xuat ban cau hoi sau khi da duoc approved.',
-        status: 'PUBLISHED',
-        title: 'Publish',
-      },
-      {
-        description: 'Chuyen cau hoi sang luu tru.',
-        requiresReason: true,
-        status: 'ARCHIVED',
-        title: 'Archive',
-      },
-    ]
-  }
-
-  if (teacherContext === 'owner' && question.status === 'ARCHIVED') {
-    return [
-      {
-        description: 'Khoi phuc cau hoi cua ban ve trang thai draft.',
-        status: 'DRAFT',
-        title: 'Restore to draft',
-      },
-    ]
+  if (
+    (teacherContext === 'owner' || collaboratorPermission === 'CAN_EDIT') &&
+    isEditableStatus(question.status)
+  ) {
+    actions.push({
+      action: 'SUBMIT',
+      description: 'Gui cau hoi vao hang doi duyet.',
+      title: 'Submit',
+    })
   }
 
   if (
-    teacherContext === 'owner' &&
-    question.status &&
-    question.status !== 'ARCHIVED' &&
-    question.status !== 'PUBLISHED'
+    collaboratorPermission === 'CAN_EDIT' &&
+    !isOwner &&
+    question.status === 'SUBMITTED_FOR_REVIEW'
   ) {
-    return [
+    actions.push(
       {
-        description: 'Chuyen cau hoi sang luu tru.',
-        requiresReason: true,
-        status: 'ARCHIVED',
-        title: 'Archive',
+        action: 'APPROVE',
+        description: 'Duyet cau hoi de chuyen sang approved.',
+        title: 'Approve',
       },
-    ]
+      {
+        action: 'REQUEST_REVISION',
+        description: 'Yeu cau tac gia sua cau hoi.',
+        requiresNote: true,
+        title: 'Request revision',
+      },
+      {
+        action: 'REJECT',
+        description: 'Tu choi cau hoi hien tai.',
+        requiresNote: true,
+        title: 'Reject',
+      },
+    )
   }
 
-  return []
+  if (teacherContext === 'owner' && question.status !== 'ARCHIVED') {
+    actions.push({
+      action: 'ARCHIVE',
+      description: 'Luu tru cau hoi hien tai.',
+      title: 'Archive',
+    })
+  }
+
+  return actions
+}
+
+function getAdminActions(status?: QuestionStatus | null) {
+  const actions: ReviewActionOption[] = []
+
+  if (status && isEditableStatus(status)) {
+    actions.push({
+      action: 'SUBMIT',
+      description: 'Gui cau hoi vao hang doi duyet.',
+      title: 'Submit',
+    })
+  }
+
+  if (status === 'SUBMITTED_FOR_REVIEW') {
+    actions.push(
+      {
+        action: 'APPROVE',
+        description: 'Duyet cau hoi.',
+        title: 'Approve',
+      },
+      {
+        action: 'REQUEST_REVISION',
+        description: 'Yeu cau chinh sua cau hoi.',
+        requiresNote: true,
+        title: 'Request revision',
+      },
+      {
+        action: 'REJECT',
+        description: 'Tu choi cau hoi.',
+        requiresNote: true,
+        title: 'Reject',
+      },
+    )
+  }
+
+  if (status === 'APPROVED') {
+    actions.push({
+      action: 'PUBLISH',
+      description: 'Xuat ban cau hoi.',
+      title: 'Publish',
+    })
+  }
+
+  actions.push({
+    action: 'ARCHIVE',
+    description: 'Chuyen cau hoi sang luu tru.',
+    title: 'Archive',
+  })
+
+  actions.push(
+    {
+      action: 'LOCK',
+      description: 'Khoa cau hoi.',
+      title: 'Lock',
+    },
+    {
+      action: 'UNLOCK',
+      description: 'Mo khoa cau hoi.',
+      title: 'Unlock',
+    },
+  )
+
+  return actions
+}
+
+function getSchoolAdminActions(status?: QuestionStatus | null) {
+  const actions: ReviewActionOption[] = []
+
+  if (status === 'SUBMITTED_FOR_REVIEW') {
+    actions.push(
+      {
+        action: 'APPROVE',
+        description: 'Duyet cau hoi.',
+        title: 'Approve',
+      },
+      {
+        action: 'REQUEST_REVISION',
+        description: 'Yeu cau chinh sua cau hoi.',
+        requiresNote: true,
+        title: 'Request revision',
+      },
+      {
+        action: 'REJECT',
+        description: 'Tu choi cau hoi.',
+        requiresNote: true,
+        title: 'Reject',
+      },
+    )
+  }
+
+  if (status === 'APPROVED') {
+    actions.push({
+      action: 'PUBLISH',
+      description: 'Xuat ban cau hoi da duyet.',
+      title: 'Publish',
+    })
+  }
+
+  actions.push(
+    {
+      action: 'ARCHIVE',
+      description: 'Luu tru cau hoi.',
+      title: 'Archive',
+    },
+    {
+      action: 'LOCK',
+      description: 'Khoa cau hoi.',
+      title: 'Lock',
+    },
+    {
+      action: 'UNLOCK',
+      description: 'Mo khoa cau hoi.',
+      title: 'Unlock',
+    },
+  )
+
+  return actions
 }

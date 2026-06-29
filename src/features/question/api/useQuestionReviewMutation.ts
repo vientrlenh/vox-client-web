@@ -1,22 +1,18 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
-import type { ReviewQuestionRequest } from '../types'
+import type { QuestionDto, UpdateQuestionStatusRequest } from '../types'
 
 type ApiResponse<T> = {
   data: T
   message: string
 }
 
-type MutationResult = {
-  id?: string
-}
-
 export async function reviewQuestion(
   questionId: string,
-  payload: ReviewQuestionRequest,
+  payload: UpdateQuestionStatusRequest,
 ) {
-  const response = await apiClient.patch<ApiResponse<MutationResult>>(
-    `/v1/questions/${questionId}/review-actions`,
+  const response = await apiClient.patch<ApiResponse<QuestionDto>>(
+    `/v1/questions/${questionId}/status`,
     payload,
   )
 
@@ -29,7 +25,7 @@ export function useReviewQuestionMutation() {
       payload,
       questionId,
     }: {
-      payload: ReviewQuestionRequest
+      payload: UpdateQuestionStatusRequest
       questionId: string
     }) => reviewQuestion(questionId, payload),
   })

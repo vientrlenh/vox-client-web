@@ -13,13 +13,14 @@ import {
   formatDuration,
   formatNullableText,
   formatQuestionDate,
-  getQuestionScopeDisplay,
+  getQuestionCollaboratorPermissionDisplay,
+  getQuestionConfidentialityDisplay,
+  getQuestionSharingDisplay,
   getQuestionStatusDisplay,
   getQuestionTypeDisplay,
-  getQuestionVisibilityDisplay,
 } from '../types'
 
-type DetailTab = 'assets' | 'content' | 'guide'
+type DetailTab = 'assets' | 'content' | 'guide' | 'sharing'
 type TeacherView = 'all' | 'my' | 'review'
 
 function getErrorMessage(error: unknown) {
@@ -35,34 +36,6 @@ function getErrorMessage(error: unknown) {
   return 'Khong the tai chi tiet cau hoi.'
 }
 
-function SuccessPopup({
-  message,
-  onClose,
-}: {
-  message: string
-  onClose: () => void
-}) {
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl shadow-slate-950/20">
-        <h2 className="text-xl font-black text-slate-950">Thanh cong</h2>
-        <p className="mt-3 text-sm font-medium leading-6 text-slate-600">
-          {message}
-        </p>
-        <div className="mt-6 flex justify-end">
-          <button
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
-            onClick={onClose}
-            type="button"
-          >
-            Dong
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 type QuestionDetailPageProps = {
   basePath: string
 }
@@ -75,9 +48,6 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
   const questionQuery = useQuestionQuery(questionId ?? null)
   const question = questionQuery.data
   const [activeTab, setActiveTab] = useState<DetailTab>('content')
-  const [successMessage, setSuccessMessage] = useState<string | null>(
-    (location.state as { successMessage?: string } | null)?.successMessage ?? null,
-  )
 
   const teacherView =
     ((location.state as { fromView?: TeacherView } | null)?.fromView ?? null)
@@ -87,10 +57,13 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
     question,
     user?.userId,
   )
-  const canEdit = canEditQuestion(question, primaryRole, teacherContext)
-  const canOpenEditor =
-    canEdit ||
-    getQuestionReviewActions(question, primaryRole, teacherContext).length > 0
+  const canEdit = canEditQuestion(question, primaryRole, teacherContext, user?.userId)
+  const reviewActions = getQuestionReviewActions(
+    question,
+    primaryRole,
+    teacherContext,
+    user?.userId,
+  )
 
   if (questionQuery.isLoading) {
     return (
@@ -119,13 +92,6 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
 
   return (
     <section className="grid gap-6">
-      {successMessage ? (
-        <SuccessPopup
-          message={successMessage}
-          onClose={() => setSuccessMessage(null)}
-        />
-      ) : null}
-
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <button
@@ -138,11 +104,11 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
           </button>
           <h1 className="text-3xl font-black text-blue-950">Chi tiet cau hoi</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
-            Xem toan bo thong tin question, assets va evaluation guide.
+            Xem thong tin, tai lieu dinh kem, huong dan cham va chia se.
           </p>
         </div>
 
-        {canOpenEditor ? (
+        {canEdit || reviewActions.length > 0 ? (
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
             onClick={() =>
@@ -173,9 +139,10 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-1">
           <div className="flex flex-wrap gap-2">
             {[
-              { id: 'content', label: 'Question content' },
+              { id: 'content', label: 'Noi dung' },
               { id: 'assets', label: 'Assets' },
               { id: 'guide', label: 'Evaluation guide' },
+              { id: 'sharing', label: 'Chia se' },
             ].map((tab) => (
               <button
                 className={[
@@ -197,38 +164,20 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
         {activeTab === 'content' ? (
           <div className="grid gap-6">
             <div className="grid gap-4 md:grid-cols-2">
+              <DetailItem label="Loai cau hoi" value={getQuestionTypeDisplay(question.type)} />
+              <DetailItem label="Chia se" value={getQuestionSharingDisplay(question.sharing)} />
               <DetailItem
-                label="Loai cau hoi"
-                value={getQuestionTypeDisplay(question.type)}
+                label="Bao mat"
+                value={getQuestionConfidentialityDisplay(question.confidentiality)}
               />
+              <DetailItem label="Chu de" value={formatNullableText(question.topic?.name)} />
               <DetailItem
-                label="Scope"
-                value={getQuestionScopeDisplay(question.scope)}
+                label="Ngan hang"
+                value={formatNullableText(question.bank?.name)}
               />
-              <DetailItem
-                label="Hien thi"
-                value={getQuestionVisibilityDisplay(question.visibility)}
-              />
-              <DetailItem
-                label="Chu de"
-                value={formatNullableText(question.questionTopic?.name)}
-              />
-              <DetailItem
-                label="Ngay tao"
-                value={formatQuestionDate(question.createdAt)}
-              />
-              <DetailItem
-                label="Cap nhat"
-                value={formatQuestionDate(question.updatedAt)}
-              />
-              <DetailItem
-                label="Created by"
-                value={formatNullableText(question.createdBy)}
-              />
-              <DetailItem
-                label="Updated by"
-                value={formatNullableText(question.updatedBy)}
-              />
+              <DetailItem label="Ngay tao" value={formatQuestionDate(question.createdAt)} />
+              <DetailItem label="Cap nhat" value={formatQuestionDate(question.updatedAt)} />
+              <DetailItem label="Created by" value={formatNullableText(question.createdBy)} />
             </div>
 
             <DetailBlock label="Noi dung cau hoi" value={question.questionText} />
@@ -239,15 +188,15 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
             <div className="grid gap-4 md:grid-cols-3">
               <DetailItem
                 label="Thoi gian chuan bi"
-                value={`${question.preparationTimeSeconds ?? 0} giay`}
+                value={formatDuration(question.preparationTimeSeconds)}
               />
               <DetailItem
                 label="Phan hoi toi thieu"
-                value={`${question.minResponseSeconds ?? 0} giay`}
+                value={formatDuration(question.minResponseSeconds)}
               />
               <DetailItem
                 label="Phan hoi toi da"
-                value={`${question.maxResponseSeconds ?? 0} giay`}
+                value={formatDuration(question.maxResponseSeconds)}
               />
             </div>
           </div>
@@ -257,10 +206,7 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
           <div className="grid gap-4">
             {question.assets?.length ? (
               question.assets.map((asset) => (
-                <div
-                  className="grid gap-4 rounded-lg border border-slate-200 p-4"
-                  key={asset.id}
-                >
+                <div className="grid gap-4 rounded-lg border border-slate-200 p-4" key={asset.id}>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
                       {formatNullableText(asset.type)}
@@ -274,16 +220,9 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
                     <DetailItem label="URL" value={formatNullableText(asset.url)} />
                     <DetailItem
                       label="Thoi luong"
-                      value={
-                        asset.durationSeconds == null
-                          ? '-'
-                          : formatDuration(asset.durationSeconds)
-                      }
+                      value={formatDuration(asset.durationSeconds)}
                     />
-                    <DetailItem
-                      label="Alt text"
-                      value={formatNullableText(asset.altText)}
-                    />
+                    <DetailItem label="Alt text" value={formatNullableText(asset.altText)} />
                     <DetailItem label="Thu tu" value={String(asset.order)} />
                   </div>
                   <DetailBlock label="Mo ta" value={asset.description} />
@@ -303,10 +242,7 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
                 label="Expected content"
                 value={question.evaluationGuide.expectedContent}
               />
-              <DetailBlock
-                label="Key points"
-                value={question.evaluationGuide.keyPoints}
-              />
+              <DetailBlock label="Key points" value={question.evaluationGuide.keyPoints} />
               <DetailBlock
                 label="Acceptable responses"
                 value={question.evaluationGuide.acceptableResponses}
@@ -327,6 +263,45 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
           ) : (
             <EmptyState text="Chua co evaluation guide cho cau hoi nay." />
           )
+        ) : null}
+
+        {activeTab === 'sharing' ? (
+          <div className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <DetailItem label="General access" value={getQuestionSharingDisplay(question.sharing)} />
+              <DetailItem
+                label="So collaborator"
+                value={String(question.collaborators?.length ?? 0)}
+              />
+            </div>
+
+            {question.collaborators?.length ? (
+              <div className="grid gap-3">
+                {question.collaborators.map((collaborator) => (
+                  <div
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4"
+                    key={collaborator.id}
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">
+                        User ID: {collaborator.userId}
+                      </p>
+                      <p className="text-xs font-medium text-slate-500">
+                        Assigned at: {formatQuestionDate(collaborator.assignedAt)}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700">
+                      {getQuestionCollaboratorPermissionDisplay(
+                        collaborator.permission,
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="Chua co collaborator nao duoc gan rieng." />
+            )}
+          </div>
         ) : null}
       </div>
     </section>

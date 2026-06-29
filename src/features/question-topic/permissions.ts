@@ -34,7 +34,7 @@ export function canEditQuestionTopic(
   topic: QuestionTopicDto | null | undefined,
   role: QuestionTopicActorRole,
 ) {
-  return canManageQuestionTopic(role) && topic?.status !== 'ARCHIVED'
+  return canManageQuestionTopic(role) && topic?.status === 'DRAFT'
 }
 
 export function canDeleteQuestionTopic(

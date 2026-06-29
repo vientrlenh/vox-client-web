@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import {
   Bell,
   ChevronDown,
+  ClipboardCheck,
   FileQuestion,
-  FolderTree,
   Home,
   LogOut,
   Menu,
@@ -42,8 +42,8 @@ const navigationItems = [
 
 const navigationGroups: NavigationGroup[] = [
   {
-    icon: FolderTree,
-    label: 'Question bank',
+    icon: FileQuestion,
+    label: 'Question',
     items: [
       {
         label: 'Ngan hang cau hoi',
@@ -56,12 +56,30 @@ const navigationGroups: NavigationGroup[] = [
     label: 'Question',
     items: [
       {
-        label: 'Question tong',
+        label: 'Cau hoi trong truong',
         to: '/school-admin/questions/all',
       },
       {
         label: 'Duyet question',
         to: '/school-admin/questions/review',
+      },
+    ],
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Exam',
+    items: [
+      {
+        label: 'Kiem tra tap trung',
+        to: '/school-admin/exams',
+      },
+      {
+        label: 'Bai kiem tra tren lop',
+        to: '/school-admin/class-tests',
+      },
+      {
+        label: 'Blueprint de thi',
+        to: '/school-admin/blueprints',
       },
     ],
   },

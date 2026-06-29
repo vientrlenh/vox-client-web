@@ -8,7 +8,7 @@ import type { QuestionBankDto } from '../types'
 import {
   formatNullableText,
   formatQuestionBankDate,
-  getActiveStatusDisplay,
+  getQuestionBankStatusDisplay,
 } from '../types'
 
 type QuestionBankTableProps = {
@@ -25,8 +25,8 @@ type QuestionBankTableProps = {
   selectedId: string | null
 }
 
-function ActiveStatusBadge({ isActive }: { isActive: boolean }) {
-  const display = getActiveStatusDisplay(isActive)
+function StatusBadge({ status }: { status: QuestionBankDto['status'] }) {
+  const display = getQuestionBankStatusDisplay(status)
 
   return (
     <span
@@ -95,6 +95,7 @@ export function QuestionBankTable({
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
                 <th className="px-6 py-4">Ten ngan hang</th>
                 <th className="px-4 py-4">Mo ta</th>
+                <th className="px-4 py-4">Ma</th>
                 <th className="px-4 py-4">Trang thai</th>
                 <th className="px-4 py-4">Ngay tao</th>
                 <th className="px-4 py-4 text-center">Hanh dong</th>
@@ -113,13 +114,16 @@ export function QuestionBankTable({
                     key={bank.id}
                   >
                     <td className="px-6 py-5 font-bold">
-                      {formatNullableText(bank.bankName)}
+                      {formatNullableText(bank.name)}
                     </td>
                     <td className="max-w-44 wrap-break-word px-4 py-5">
                       {formatNullableText(bank.description)}
                     </td>
+                    <td className="px-4 py-5 font-mono text-xs font-semibold text-slate-600">
+                      {formatNullableText(bank.code)}
+                    </td>
                     <td className="px-4 py-5">
-                      <ActiveStatusBadge isActive={bank.isActive} />
+                      <StatusBadge status={bank.status} />
                     </td>
                     <td className="px-4 py-5">
                       {formatQuestionBankDate(bank.createdAt)}
@@ -127,7 +131,7 @@ export function QuestionBankTable({
                     <td className="px-4 py-4">
                       <div className="flex justify-center">
                         <ActionMenuButton
-                          ariaLabel={`Mo hanh dong cho ${formatNullableText(bank.bankName)}`}
+                          ariaLabel={`Mo hanh dong cho ${formatNullableText(bank.name)}`}
                           items={[
                             {
                               icon: Eye,

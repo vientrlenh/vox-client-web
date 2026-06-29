@@ -1,20 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
-import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { questionTopicQueryKeys } from './useQuestionTopicsQuery'
 import type { QuestionTopicDto } from '../types'
 
-function getQuestionTopicDetailQuery(scope: QuestionModuleScope) {
-  const queryName =
-    scope === 'teacher'
-      ? 'teacherQuestionTopic'
-      : scope === 'school'
-        ? 'schoolQuestionTopic'
-        : 'adminQuestionTopic'
-
-  return `
-  query QuestionTopic($id: ID!) {
-    ${queryName}(id: $id) {
+const QUESTION_TOPIC_DETAIL_QUERY = `
+  query QuestionTopic($id: UUID!) {
+    questionTopic(id: $id) {
       id
       questionBankId
       code
@@ -23,37 +14,41 @@ function getQuestionTopicDetailQuery(scope: QuestionModuleScope) {
       status
       createdAt
       updatedAt
+      bank {
+        id
+        code
+        name
+        status
+      }
     }
-  }`
-}
+  }
+`
 
 type QuestionTopicDetailQueryData = {
-  teacherQuestionTopic?: QuestionTopicDto | null
-  schoolQuestionTopic?: QuestionTopicDto | null
-  adminQuestionTopic?: QuestionTopicDto | null
+  questionTopic: QuestionTopicDto | null
 }
 
-export async function fetchQuestionTopic(scope: QuestionModuleScope, id: string) {
+export async function fetchQuestionTopic(id: string) {
   const data = await graphQLRequest<QuestionTopicDetailQueryData>(
-    getQuestionTopicDetailQuery(scope),
+    QUESTION_TOPIC_DETAIL_QUERY,
     { id },
   )
 
-  return (
-    data.teacherQuestionTopic ??
-    data.schoolQuestionTopic ??
-    data.adminQuestionTopic ??
-    null
-  )
+  if (!data.questionTopic) {
+    return null
+  }
+
+  return {
+    ...data.questionTopic,
+    bankId: data.questionTopic.questionBankId,
+    topicName: data.questionTopic.name,
+  }
 }
 
-export function useQuestionTopicQuery(
-  scope: QuestionModuleScope,
-  id: string | null,
-) {
+export function useQuestionTopicQuery(id: string | null) {
   return useQuery({
     enabled: Boolean(id),
-    queryFn: () => fetchQuestionTopic(scope, id!),
-    queryKey: [...questionTopicQueryKeys.questionTopic(id), scope],
+    queryFn: () => fetchQuestionTopic(id!),
+    queryKey: questionTopicQueryKeys.questionTopic(id),
   })
 }

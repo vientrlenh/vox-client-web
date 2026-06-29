@@ -234,6 +234,108 @@ const SystemAdminReviewQuestionsPage = lazy(() =>
   })),
 )
 
+const SchoolAdminExamsPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SchoolAdminExamsPage,
+  })),
+)
+
+const SchoolAdminExamDetailPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SchoolAdminExamDetailPage,
+  })),
+)
+
+const SchoolAdminBlueprintsPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SchoolAdminBlueprintsPage,
+  })),
+)
+
+const SchoolAdminBlueprintDetailPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SchoolAdminBlueprintDetailPage,
+  })),
+)
+
+const SchoolAdminClassTestsPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SchoolAdminClassTestsPage,
+  })),
+)
+
+const SchoolAdminClassTestDetailPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SchoolAdminClassTestDetailPage,
+  })),
+)
+
+const TeacherExamsPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherExamsPage,
+  })),
+)
+
+const TeacherExamDetailPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherExamDetailPage,
+  })),
+)
+
+const TeacherBlueprintsPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherBlueprintsPage,
+  })),
+)
+
+const TeacherBlueprintDetailPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherBlueprintDetailPage,
+  })),
+)
+
+const TeacherClassTestsPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherClassTestsPage,
+  })),
+)
+
+const TeacherClassTestCreatePage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherClassTestCreatePage,
+  })),
+)
+
+const TeacherClassTestDetailPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherClassTestDetailPage,
+  })),
+)
+
+const SystemAdminExamsPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SystemAdminExamsPage,
+  })),
+)
+
+const SystemAdminExamDetailPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SystemAdminExamDetailPage,
+  })),
+)
+
+const SystemAdminBlueprintsPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SystemAdminBlueprintsPage,
+  })),
+)
+
+const SystemAdminBlueprintDetailPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.SystemAdminBlueprintDetailPage,
+  })),
+)
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -288,6 +390,22 @@ export function AppRoutes() {
             <Route
               path="system-admin/questions/review"
               element={<SystemAdminReviewQuestionsPage />}
+            />
+            <Route
+              path="system-admin/exams"
+              element={<SystemAdminExamsPage />}
+            />
+            <Route
+              path="system-admin/exams/:examId"
+              element={<SystemAdminExamDetailPage />}
+            />
+            <Route
+              path="system-admin/blueprints"
+              element={<SystemAdminBlueprintsPage />}
+            />
+            <Route
+              path="system-admin/blueprints/:blueprintId"
+              element={<SystemAdminBlueprintDetailPage />}
             />
           </Route>
         </Route>
@@ -345,6 +463,30 @@ export function AppRoutes() {
               path="school-admin/questions/review"
               element={<SchoolAdminReviewQuestionsPage />}
             />
+            <Route
+              path="school-admin/exams"
+              element={<SchoolAdminExamsPage />}
+            />
+            <Route
+              path="school-admin/exams/:examId"
+              element={<SchoolAdminExamDetailPage />}
+            />
+            <Route
+              path="school-admin/blueprints"
+              element={<SchoolAdminBlueprintsPage />}
+            />
+            <Route
+              path="school-admin/blueprints/:blueprintId"
+              element={<SchoolAdminBlueprintDetailPage />}
+            />
+            <Route
+              path="school-admin/class-tests"
+              element={<SchoolAdminClassTestsPage />}
+            />
+            <Route
+              path="school-admin/class-tests/:examId"
+              element={<SchoolAdminClassTestDetailPage />}
+            />
           </Route>
         </Route>
         <Route element={<RequireRole role="TEACHER" />}>
@@ -388,6 +530,34 @@ export function AppRoutes() {
             <Route
               path="teacher/questions/review"
               element={<TeacherReviewQuestionsPage />}
+            />
+            <Route
+              path="teacher/exams"
+              element={<TeacherExamsPage />}
+            />
+            <Route
+              path="teacher/exams/:examId"
+              element={<TeacherExamDetailPage />}
+            />
+            <Route
+              path="teacher/blueprints"
+              element={<TeacherBlueprintsPage />}
+            />
+            <Route
+              path="teacher/blueprints/:blueprintId"
+              element={<TeacherBlueprintDetailPage />}
+            />
+            <Route
+              path="teacher/class-tests"
+              element={<TeacherClassTestsPage />}
+            />
+            <Route
+              path="teacher/class-tests/create"
+              element={<TeacherClassTestCreatePage />}
+            />
+            <Route
+              path="teacher/class-tests/:examId"
+              element={<TeacherClassTestDetailPage />}
             />
           </Route>
         </Route>

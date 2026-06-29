@@ -1,20 +1,18 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { useAppSelector } from '@/app/store/hooks'
-import { QUESTION_MODULE_DEFAULT_LANGUAGE_ID } from '@/features/question/constants'
 import {
   useCreateQuestionBankMutation,
   useDeleteQuestionBankMutation,
   useReviewQuestionBankMutation,
   useUpdateQuestionBankMutation,
 } from '../api/useQuestionBankMutations'
+import { useQuestionBankQuery } from '../api/useQuestionBankQuery'
 import {
   questionBankQueryKeys,
   type QuestionModuleScope,
   useQuestionBanksQuery,
 } from '../api/useQuestionBanksQuery'
-import { useQuestionBankQuery } from '../api/useQuestionBankQuery'
 import { QuestionBankFormDialog } from '../components/QuestionBankFormDialog'
 import type {
   QuestionBankFormMode,
@@ -24,15 +22,14 @@ import { QuestionBankPageHeader } from '../components/QuestionBankPageHeader'
 import { QuestionBankPagination } from '../components/QuestionBankPagination'
 import { QuestionBankTable } from '../components/QuestionBankTable'
 import {
+  canEditQuestionBank,
   canManageQuestionBank,
   getQuestionBankActorRole,
-  getQuestionBankReviewActions,
+  getQuestionBankStatusActions,
 } from '../permissions'
-import type {
-  CreateQuestionBankRequest,
-  QuestionBankDto,
-  UpdateQuestionBankRequest,
-} from '../types'
+import type { CreateQuestionBankRequest, QuestionBankDto } from '../types'
+import { useAppSelector } from '@/app/store/hooks'
+import { QUESTION_MODULE_DEFAULT_LANGUAGE_ID } from '@/features/question/constants'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
@@ -74,68 +71,24 @@ function QuestionBanksPage({
 
   const actorRole = getQuestionBankActorRole(user?.roles)
   const canManage = canManageQuestionBank(actorRole)
-  const questionBanksQuery = useQuestionBanksQuery(scope, page, pageSize)
+  const questionBanksQuery = useQuestionBanksQuery(scope, page - 1, pageSize)
   const questionBanks = questionBanksQuery.data?.content ?? []
   const selectedListBank =
     questionBanks.find((bank) => bank.id === selectedId) ??
     questionBanks[0] ??
     null
   const effectiveSelectedId = selectedListBank?.id ?? null
-  const selectedBankQuery = useQuestionBankQuery(scope, effectiveSelectedId)
+  const selectedBankQuery = useQuestionBankQuery(effectiveSelectedId)
   const selectedBank = selectedBankQuery.data ?? selectedListBank
   const createMutation = useCreateQuestionBankMutation()
   const updateMutation = useUpdateQuestionBankMutation()
   const deleteMutation = useDeleteQuestionBankMutation()
-  const reviewMutation = useReviewQuestionBankMutation()
+  const statusMutation = useReviewQuestionBankMutation()
   const isSubmitting =
     createMutation.isPending ||
     updateMutation.isPending ||
     deleteMutation.isPending ||
-    reviewMutation.isPending
-
-  function handlePageChange(nextPage: number) {
-    setSelectedId(null)
-    setPage(nextPage)
-  }
-
-  function handlePageSizeChange(nextPageSize: number) {
-    setSelectedId(null)
-    setPage(DEFAULT_PAGE)
-    setPageSize(nextPageSize)
-  }
-
-  function handleViewTopics(bankId: string, bankName: string) {
-    navigate(
-      `${basePath}/question-topics?bankId=${bankId}&bankName=${encodeURIComponent(bankName)}`,
-    )
-  }
-
-  function handleViewDetail(bankId: string) {
-    setSelectedId(bankId)
-    navigate(`${basePath}/question-banks/${bankId}`)
-  }
-
-  function openCreateDialog() {
-    setDialogError(null)
-    setDialogTarget(null)
-    setDialogMode('create')
-  }
-
-  function openEditDialog(bank: QuestionBankDto) {
-    setDialogError(null)
-    setDialogTarget(bank)
-    setDialogMode('edit')
-  }
-
-  function closeDialog() {
-    if (isSubmitting) {
-      return
-    }
-
-    setDialogError(null)
-    setDialogTarget(null)
-    setDialogMode(null)
-  }
+    statusMutation.isPending
 
   async function refreshBanks() {
     await queryClient.invalidateQueries({ queryKey: questionBankQueryKeys.all })
@@ -149,17 +102,11 @@ function QuestionBanksPage({
       setDialogError(null)
 
       if (mode === 'create') {
-        if (scope === 'school' && !user?.schoolId) {
-          setDialogError('Khong tim thay schoolId de tao question bank.')
-          return
-        }
-
         const payload: CreateQuestionBankRequest = {
           code: values.code,
           description: values.description || null,
           languageId: QUESTION_MODULE_DEFAULT_LANGUAGE_ID,
-          name: values.bankName,
-          ...(scope === 'school' ? { schoolId: user?.schoolId } : {}),
+          name: values.name,
         }
 
         const message = await createMutation.mutateAsync({
@@ -178,15 +125,12 @@ function QuestionBanksPage({
         return
       }
 
-      const payload: UpdateQuestionBankRequest = {
-        bankName: values.bankName,
-        description: values.description || null,
-        isActive: values.isActive,
-      }
-
       const message = await updateMutation.mutateAsync({
         id: dialogTarget.id,
-        payload,
+        payload: {
+          description: values.description || null,
+          name: values.name,
+        },
       })
 
       await refreshBanks()
@@ -201,43 +145,29 @@ function QuestionBanksPage({
   }
 
   async function handleDeleteBank(bank: QuestionBankDto) {
-    if (!window.confirm(`Xoa question bank "${bank.bankName}"?`)) {
+    if (!window.confirm(`Xoa question bank "${bank.name}"?`)) {
       return
     }
 
     try {
-      const message = await deleteMutation.mutateAsync(bank.id)
+      const result = await deleteMutation.mutateAsync(bank.id)
       await refreshBanks()
-      setPageMessage(message)
+      setPageMessage(
+        result.archivedInstead
+          ? `${result.message}. Backend da archive thay vi xoa.`
+          : result.message,
+      )
     } catch (error) {
       setPageMessage(getErrorMessage(error) ?? 'Khong the xoa question bank.')
     }
   }
 
-  async function handleReviewAction(bank: QuestionBankDto, targetStatus: string) {
-    try {
-      const message = await reviewMutation.mutateAsync({
-        id: bank.id,
-        payload: { targetStatus },
-      })
-      await refreshBanks()
-      setPageMessage(message)
-    } catch (error) {
-      setPageMessage(
-        getErrorMessage(error) ?? 'Khong the cap nhat trang thai question bank.',
-      )
-    }
-  }
-
   return (
-    <section
-      aria-labelledby="teacher-question-banks-title"
-      className="grid gap-6"
-    >
+    <section aria-labelledby="teacher-question-banks-title" className="grid gap-6">
       <QuestionBankPageHeader
         description="Danh sach ngan hang cau hoi duoc phep xem theo quyen cua ban."
         isRefreshing={questionBanksQuery.isFetching}
-        onCreate={canManage ? openCreateDialog : undefined}
+        onCreate={canManage ? () => setDialogMode('create') : undefined}
         onRefresh={() => {
           void questionBanksQuery.refetch()
         }}
@@ -255,8 +185,15 @@ function QuestionBanksPage({
         footer={
           <QuestionBankPagination
             isDisabled={questionBanksQuery.isLoading || questionBanksQuery.isError}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
+            onPageChange={(nextPage) => {
+              setSelectedId(null)
+              setPage(nextPage)
+            }}
+            onPageSizeChange={(nextPageSize) => {
+              setSelectedId(null)
+              setPage(DEFAULT_PAGE)
+              setPageSize(nextPageSize)
+            }}
             page={page}
             pageSize={pageSize}
             totalElements={questionBanksQuery.data?.totalElements ?? 0}
@@ -266,38 +203,65 @@ function QuestionBanksPage({
         getAdditionalActions={
           canManage
             ? (bank) => [
+                ...getQuestionBankStatusActions(bank, actorRole).map((action) => ({
+                  id: `${action.id}-${bank.id}`,
+                  label: action.label,
+                  onSelect: () => {
+                    void (async () => {
+                      try {
+                        const message = await statusMutation.mutateAsync({
+                          id: bank.id,
+                          payload: { action: action.action },
+                        })
+                        await refreshBanks()
+                        setPageMessage(message)
+                      } catch (error) {
+                        setPageMessage(
+                          getErrorMessage(error) ??
+                            'Khong the cap nhat trang thai question bank.',
+                        )
+                      }
+                    })()
+                  },
+                  tone: action.action === 'PUBLISH' ? ('success' as const) : ('default' as const),
+                })),
                 {
                   id: `delete-${bank.id}`,
                   label: 'Xoa',
                   onSelect: () => {
                     void handleDeleteBank(bank)
                   },
-                  tone: 'danger',
+                  tone: 'danger' as const,
                 },
-                ...getQuestionBankReviewActions(actorRole).map((action) => ({
-                  id: `${action.id}-${bank.id}`,
-                  label: action.label,
-                  onSelect: () => {
-                    void handleReviewAction(bank, action.status)
-                  },
-                  tone:
-                    action.status === 'PUBLISHED'
-                      ? ('success' as const)
-                      : action.status === 'REJECTED'
-                        ? ('danger' as const)
-                        : ('default' as const),
-                })),
               ]
             : undefined
         }
         isError={questionBanksQuery.isError}
         isLoading={questionBanksQuery.isLoading}
-        onEdit={canManage ? openEditDialog : undefined}
+        onEdit={
+          canManage
+            ? (bank) => {
+                if (!canEditQuestionBank(bank, actorRole)) {
+                  return
+                }
+                setDialogError(null)
+                setDialogTarget(bank)
+                setDialogMode('edit')
+              }
+            : undefined
+        }
         onRetry={() => {
           void questionBanksQuery.refetch()
         }}
-        onSelect={handleViewDetail}
-        onViewTopics={(bank) => handleViewTopics(bank.id, bank.bankName)}
+        onSelect={(id) => {
+          setSelectedId(id)
+          navigate(`${basePath}/question-banks/${id}`)
+        }}
+        onViewTopics={(bank) =>
+          navigate(
+            `${basePath}/question-topics?bankId=${bank.id}&bankName=${encodeURIComponent(bank.name)}`,
+          )
+        }
         questionBanks={questionBanks}
         selectedId={effectiveSelectedId}
       />
@@ -306,7 +270,14 @@ function QuestionBanksPage({
         errorMessage={dialogError ?? undefined}
         isSubmitting={isSubmitting}
         mode={dialogMode}
-        onClose={closeDialog}
+        onClose={() => {
+          if (isSubmitting) {
+            return
+          }
+          setDialogError(null)
+          setDialogTarget(null)
+          setDialogMode(null)
+        }}
         onSubmit={(mode, payload) => {
           void handleSubmit(mode, payload)
         }}

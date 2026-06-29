@@ -1,12 +1,30 @@
+export type QuestionBankStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+export type QuestionBankOwnerType = 'SYSTEM' | 'SCHOOL'
+
+export type QuestionBankGradeDto = {
+  id: string
+  questionBankId?: string
+  schoolGradeId: string
+  attachedAt: string | null
+  attachedBy: string | null
+}
+
 export type QuestionBankDto = {
   id: string
+  languageId: string
+  schoolId: string | null
+  code: string
+  name: string
   bankName: string
   description: string | null
+  ownerType: QuestionBankOwnerType
+  status: QuestionBankStatus
   isActive: boolean
-  createdAt: string
-  updatedAt: string
+  createdAt: string | null
+  updatedAt: string | null
   createdBy: string | null
   updatedBy: string | null
+  grades?: QuestionBankGradeDto[]
 }
 
 export type QuestionBankPage = {
@@ -19,16 +37,16 @@ export type QuestionBankPage = {
 
 export type CreateQuestionBankRequest = {
   code: string
-  description: string | null
+  description?: string | null
   languageId: string
   name: string
-  schoolId?: string
 }
 
 export type UpdateQuestionBankRequest = {
-  bankName: string
-  description: string | null
-  isActive: boolean
+  bankName?: string
+  name?: string
+  description?: string | null
+  isActive?: boolean
 }
 
 export type ReviewQuestionBankRequest = {
@@ -64,14 +82,39 @@ export function formatNullableText(value?: string | null) {
   return value?.trim() ? value : '-'
 }
 
+export function getQuestionBankStatusDisplay(status?: QuestionBankStatus | null) {
+  switch (status) {
+    case 'DRAFT':
+      return {
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
+        label: 'Ban nhap',
+      }
+    case 'PUBLISHED':
+      return {
+        className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        label: 'Da xuat ban',
+      }
+    case 'ARCHIVED':
+      return {
+        className: 'border-slate-200 bg-slate-50 text-slate-500',
+        label: 'Luu tru',
+      }
+    default:
+      return {
+        className: 'border-slate-200 bg-slate-50 text-slate-600',
+        label: String(status ?? '-'),
+      }
+  }
+}
+
 export function getActiveStatusDisplay(isActive: boolean) {
   return isActive
     ? {
         className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        label: 'Hoạt động',
+        label: 'Hoat dong',
       }
     : {
         className: 'border-slate-200 bg-slate-50 text-slate-500',
-        label: 'Ngừng hoạt động',
+        label: 'Ngung hoat dong',
       }
 }

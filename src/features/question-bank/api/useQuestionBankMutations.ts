@@ -2,10 +2,9 @@ import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
 import type {
   CreateQuestionBankRequest,
-  QuestionBankDto,
-  ReviewQuestionBankRequest,
   UpdateQuestionBankRequest,
 } from '../types'
+import type { QuestionBankStatusAction } from '../permissions'
 
 type ApiResponse<T> = {
   data: T
@@ -17,13 +16,18 @@ type CreateQuestionBankInput = {
   scope: 'admin' | 'school'
 }
 
+type DeleteQuestionBankResponse = {
+  archivedInstead: boolean
+  deleted: boolean
+}
+
 export async function createQuestionBank({
   payload,
   scope,
 }: CreateQuestionBankInput) {
   const endpoint =
     scope === 'admin' ? '/v1/question-banks/system' : '/v1/question-banks/school'
-  const response = await apiClient.post<ApiResponse<QuestionBankDto>>(
+  const response = await apiClient.post<ApiResponse<unknown>>(
     endpoint,
     payload,
   )
@@ -35,7 +39,7 @@ export async function updateQuestionBank(
   id: string,
   payload: UpdateQuestionBankRequest,
 ) {
-  const response = await apiClient.patch<ApiResponse<QuestionBankDto>>(
+  const response = await apiClient.put<ApiResponse<unknown>>(
     `/v1/question-banks/${id}`,
     payload,
   )
@@ -44,19 +48,22 @@ export async function updateQuestionBank(
 }
 
 export async function deleteQuestionBank(id: string) {
-  const response = await apiClient.delete<ApiResponse<QuestionBankDto>>(
+  const response = await apiClient.delete<ApiResponse<DeleteQuestionBankResponse>>(
     `/v1/question-banks/${id}`,
   )
 
-  return response.data.message
+  return {
+    ...response.data.data,
+    message: response.data.message,
+  }
 }
 
 export async function reviewQuestionBank(
   id: string,
-  payload: ReviewQuestionBankRequest,
+  payload: { action: QuestionBankStatusAction },
 ) {
-  const response = await apiClient.patch<ApiResponse<QuestionBankDto>>(
-    `/v1/question-banks/${id}/review-actions`,
+  const response = await apiClient.patch<ApiResponse<unknown>>(
+    `/v1/question-banks/${id}/status`,
     payload,
   )
 
@@ -94,7 +101,7 @@ export function useReviewQuestionBankMutation() {
       payload,
     }: {
       id: string
-      payload: ReviewQuestionBankRequest
+      payload: { action: QuestionBankStatusAction }
     }) => reviewQuestionBank(id, payload),
   })
 }

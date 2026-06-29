@@ -4,8 +4,8 @@ import {
   Building2,
   ChevronDown,
   ClipboardList,
+  ClipboardCheck,
   FileQuestion,
-  FolderTree,
   Home,
   LogOut,
   Menu,
@@ -66,8 +66,8 @@ const navigationItems: NavigationItem[] = [
 
 const navigationGroups: NavigationGroup[] = [
   {
-    icon: FolderTree,
-    label: 'Question bank',
+    icon: FileQuestion,
+    label: 'Question',
     items: [
       {
         label: 'Ngan hang cau hoi',
@@ -86,6 +86,20 @@ const navigationGroups: NavigationGroup[] = [
       {
         label: 'Duyet question',
         to: '/system-admin/questions/review',
+      },
+    ],
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Exam',
+    items: [
+      {
+        label: 'Giam sat exam',
+        to: '/system-admin/exams',
+      },
+      {
+        label: 'Giam sat blueprint',
+        to: '/system-admin/blueprints',
       },
     ],
   },

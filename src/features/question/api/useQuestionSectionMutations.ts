@@ -1,8 +1,11 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
 import type {
-  UpdateQuestionAssetsRequest,
-  UpdateQuestionEvaluationGuideRequest,
+  CreateQuestionAssetRequest,
+  QuestionAssetDto,
+  QuestionEvaluationGuideDto,
+  UpdateQuestionAssetRequest,
+  UpsertQuestionEvaluationGuideRequest,
 } from '../types'
 
 type ApiResponse<T> = {
@@ -10,15 +13,11 @@ type ApiResponse<T> = {
   message: string
 }
 
-type MutationResult = {
-  id?: string
-}
-
-export async function createQuestionAssets(
+export async function createQuestionAsset(
   questionId: string,
-  payload: UpdateQuestionAssetsRequest,
+  payload: CreateQuestionAssetRequest,
 ) {
-  const response = await apiClient.post<ApiResponse<MutationResult>>(
+  const response = await apiClient.post<ApiResponse<QuestionAssetDto>>(
     `/v1/questions/${questionId}/assets`,
     payload,
   )
@@ -26,31 +25,32 @@ export async function createQuestionAssets(
   return response.data.message
 }
 
-export async function updateQuestionAssets(
+export async function updateQuestionAsset(
   questionId: string,
-  payload: UpdateQuestionAssetsRequest,
+  assetId: string,
+  payload: UpdateQuestionAssetRequest,
 ) {
-  const response = await apiClient.put<ApiResponse<MutationResult>>(
-    `/v1/questions/${questionId}/assets`,
+  const response = await apiClient.put<ApiResponse<QuestionAssetDto>>(
+    `/v1/questions/${questionId}/assets/${assetId}`,
     payload,
   )
 
   return response.data.message
 }
 
-export async function deleteQuestionAssets(questionId: string) {
-  const response = await apiClient.delete<ApiResponse<MutationResult>>(
-    `/v1/questions/${questionId}/assets`,
+export async function deleteQuestionAsset(questionId: string, assetId: string) {
+  const response = await apiClient.delete<ApiResponse<null>>(
+    `/v1/questions/${questionId}/assets/${assetId}`,
   )
 
   return response.data.message
 }
 
-export async function createQuestionEvaluationGuide(
+export async function upsertQuestionEvaluationGuide(
   questionId: string,
-  payload: UpdateQuestionEvaluationGuideRequest,
+  payload: UpsertQuestionEvaluationGuideRequest,
 ) {
-  const response = await apiClient.post<ApiResponse<MutationResult>>(
+  const response = await apiClient.put<ApiResponse<QuestionEvaluationGuideDto>>(
     `/v1/questions/${questionId}/evaluation-guide`,
     payload,
   )
@@ -58,82 +58,52 @@ export async function createQuestionEvaluationGuide(
   return response.data.message
 }
 
-export async function updateQuestionEvaluationGuide(
-  questionId: string,
-  payload: UpdateQuestionEvaluationGuideRequest,
-) {
-  const response = await apiClient.put<ApiResponse<MutationResult>>(
-    `/v1/questions/${questionId}/evaluation-guide`,
-    payload,
-  )
-
-  return response.data.message
-}
-
-export async function deleteQuestionEvaluationGuide(questionId: string) {
-  const response = await apiClient.delete<ApiResponse<MutationResult>>(
-    `/v1/questions/${questionId}/evaluation-guide`,
-  )
-
-  return response.data.message
-}
-
-export function useCreateQuestionAssetsMutation() {
+export function useCreateQuestionAssetMutation() {
   return useMutation({
     mutationFn: ({
       payload,
       questionId,
     }: {
-      payload: UpdateQuestionAssetsRequest
+      payload: CreateQuestionAssetRequest
       questionId: string
-    }) => createQuestionAssets(questionId, payload),
+    }) => createQuestionAsset(questionId, payload),
   })
 }
 
-export function useUpdateQuestionAssetsMutation() {
+export function useUpdateQuestionAssetMutation() {
+  return useMutation({
+    mutationFn: ({
+      assetId,
+      payload,
+      questionId,
+    }: {
+      assetId: string
+      payload: UpdateQuestionAssetRequest
+      questionId: string
+    }) => updateQuestionAsset(questionId, assetId, payload),
+  })
+}
+
+export function useDeleteQuestionAssetMutation() {
+  return useMutation({
+    mutationFn: ({
+      assetId,
+      questionId,
+    }: {
+      assetId: string
+      questionId: string
+    }) => deleteQuestionAsset(questionId, assetId),
+  })
+}
+
+export function useUpsertQuestionEvaluationGuideMutation() {
   return useMutation({
     mutationFn: ({
       payload,
       questionId,
     }: {
-      payload: UpdateQuestionAssetsRequest
+      payload: UpsertQuestionEvaluationGuideRequest
       questionId: string
-    }) => updateQuestionAssets(questionId, payload),
-  })
-}
-
-export function useDeleteQuestionAssetsMutation() {
-  return useMutation({
-    mutationFn: (questionId: string) => deleteQuestionAssets(questionId),
-  })
-}
-
-export function useCreateQuestionEvaluationGuideMutation() {
-  return useMutation({
-    mutationFn: ({
-      payload,
-      questionId,
-    }: {
-      payload: UpdateQuestionEvaluationGuideRequest
-      questionId: string
-    }) => createQuestionEvaluationGuide(questionId, payload),
-  })
-}
-
-export function useUpdateQuestionEvaluationGuideMutation() {
-  return useMutation({
-    mutationFn: ({
-      payload,
-      questionId,
-    }: {
-      payload: UpdateQuestionEvaluationGuideRequest
-      questionId: string
-    }) => updateQuestionEvaluationGuide(questionId, payload),
-  })
-}
-
-export function useDeleteQuestionEvaluationGuideMutation() {
-  return useMutation({
-    mutationFn: (questionId: string) => deleteQuestionEvaluationGuide(questionId),
+    }) => upsertQuestionEvaluationGuide(questionId, payload),
   })
 }

@@ -1,10 +1,11 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
-import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import type {
   CreateQuestionRequest,
-  QuestionDto,
   UpdateQuestionRequest,
+  QuestionAssetDto,
+  QuestionDto,
+  QuestionEvaluationGuideDto,
 } from '../types'
 
 type ApiResponse<T> = {
@@ -12,30 +13,31 @@ type ApiResponse<T> = {
   message: string
 }
 
-type CreateQuestionMutationResult = {
-  id?: string
-  questionId?: string
+type CreateQuestionResponse = {
+  question: QuestionDto
+  assets: QuestionAssetDto[]
+  evaluationGuide: QuestionEvaluationGuideDto | null
 }
 
-type CreateQuestionInput = {
-  payload: CreateQuestionRequest
-  scope: QuestionModuleScope
+type UpdateQuestionResponse = {
+  question: QuestionDto
+  clonedAsNew: boolean
 }
 
-export async function createQuestion({
-  payload,
-  scope,
-}: CreateQuestionInput) {
-  const endpoint =
-    scope === 'admin' ? '/v1/questions/system' : '/v1/questions/school'
-  const response = await apiClient.post<ApiResponse<CreateQuestionMutationResult>>(
-    endpoint,
+type DeleteQuestionResponse = {
+  deleted: boolean
+  archivedInstead: boolean
+}
+
+export async function createQuestion(payload: CreateQuestionRequest) {
+  const response = await apiClient.post<ApiResponse<CreateQuestionResponse>>(
+    '/v1/questions',
     payload,
   )
 
   return {
     message: response.data.message,
-    questionId: response.data.data?.questionId ?? response.data.data?.id,
+    questionId: response.data.data.question.id,
   }
 }
 
@@ -43,20 +45,27 @@ export async function updateQuestion(
   id: string,
   payload: UpdateQuestionRequest,
 ) {
-  const response = await apiClient.put<ApiResponse<QuestionDto>>(
-    `/v1/questions/${id}/content`,
+  const response = await apiClient.put<ApiResponse<UpdateQuestionResponse>>(
+    `/v1/questions/${id}`,
     payload,
   )
 
-  return response.data.message
+  return {
+    clonedAsNew: response.data.data.clonedAsNew,
+    message: response.data.message,
+    questionId: response.data.data.question.id,
+  }
 }
 
 export async function deleteQuestion(id: string) {
-  const response = await apiClient.delete<ApiResponse<QuestionDto>>(
+  const response = await apiClient.delete<ApiResponse<DeleteQuestionResponse>>(
     `/v1/questions/${id}`,
   )
 
-  return response.data.message
+  return {
+    ...response.data.data,
+    message: response.data.message,
+  }
 }
 
 export function useCreateQuestionMutation() {

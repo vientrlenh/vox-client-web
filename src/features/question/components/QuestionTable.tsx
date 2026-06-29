@@ -6,10 +6,10 @@ import {
   formatDuration,
   formatNullableText,
   formatQuestionDate,
-  getQuestionScopeDisplay,
+  getQuestionConfidentialityDisplay,
+  getQuestionSharingDisplay,
   getQuestionStatusDisplay,
   getQuestionTypeDisplay,
-  getQuestionVisibilityDisplay,
 } from '../types'
 
 type QuestionTableProps = {
@@ -26,7 +26,7 @@ type QuestionTableProps = {
 }
 
 function StatusBadge({ status }: { status?: string | null }) {
-  const display = getQuestionStatusDisplay(status)
+  const display = getQuestionStatusDisplay(status as never)
 
   return (
     <span
@@ -55,33 +55,33 @@ export function QuestionTable({
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-6 py-5">
-        <h2 className="text-lg font-black text-blue-950">Danh sách câu hỏi</h2>
+        <h2 className="text-lg font-black text-blue-950">Danh sach cau hoi</h2>
       </div>
 
       {isLoading ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-          Đang tải danh sách câu hỏi...
+          Dang tai danh sach cau hoi...
         </div>
       ) : null}
 
       {isError ? (
         <div className="flex min-h-80 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
           <p className="text-sm font-bold text-red-600">
-            {errorMessage ?? 'Không thể tải danh sách câu hỏi.'}
+            {errorMessage ?? 'Khong the tai danh sach cau hoi.'}
           </p>
           <button
             className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
             onClick={onRetry}
             type="button"
           >
-            Thử lại
+            Thu lai
           </button>
         </div>
       ) : null}
 
       {!isLoading && !isError && questions.length === 0 ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-          Chưa có câu hỏi nào
+          Chua co cau hoi nao
         </div>
       ) : null}
 
@@ -90,15 +90,15 @@ export function QuestionTable({
           <table className="w-full min-w-280 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
-                <th className="px-6 py-4">Câu hỏi</th>
-                <th className="px-4 py-4">Mã</th>
-                <th className="px-4 py-4">Loại</th>
-                <th className="px-4 py-4">Scope</th>
-                <th className="px-4 py-4">Hiển thị</th>
-                <th className="px-4 py-4">Thời lượng</th>
-                <th className="px-4 py-4">Trạng thái</th>
-                <th className="px-4 py-4">Cập nhật</th>
-                <th className="px-4 py-4 text-center">Hành động</th>
+                <th className="px-6 py-4">Cau hoi</th>
+                <th className="px-4 py-4">Ma</th>
+                <th className="px-4 py-4">Loai</th>
+                <th className="px-4 py-4">Chia se</th>
+                <th className="px-4 py-4">Bao mat</th>
+                <th className="px-4 py-4">Thoi luong</th>
+                <th className="px-4 py-4">Trang thai</th>
+                <th className="px-4 py-4">Cap nhat</th>
+                <th className="px-4 py-4 text-center">Hanh dong</th>
               </tr>
             </thead>
             <tbody>
@@ -113,13 +113,16 @@ export function QuestionTable({
                     ].join(' ')}
                     key={question.id}
                   >
-                    <td className="max-w-80 px-6 py-5">
+                    <td className="max-w-90 px-6 py-5">
                       <div className="grid gap-1">
                         <span className="font-bold">
                           {formatNullableText(question.questionText)}
                         </span>
                         <span className="text-xs font-medium text-slate-500">
-                          Chủ đề: {formatNullableText(question.questionTopic?.name)}
+                          Chu de: {formatNullableText(question.topic?.name)}
+                        </span>
+                        <span className="text-xs font-medium text-slate-500">
+                          Ngan hang: {formatNullableText(question.bank?.name)}
                         </span>
                       </div>
                     </td>
@@ -130,10 +133,12 @@ export function QuestionTable({
                       {getQuestionTypeDisplay(question.type)}
                     </td>
                     <td className="px-4 py-5">
-                      {getQuestionScopeDisplay(question.scope)}
+                      {getQuestionSharingDisplay(question.sharing)}
                     </td>
                     <td className="max-w-44 px-4 py-5">
-                      {getQuestionVisibilityDisplay(question.visibility)}
+                      {getQuestionConfidentialityDisplay(
+                        question.confidentiality,
+                      )}
                     </td>
                     <td className="px-4 py-5">
                       {formatDuration(question.maxResponseSeconds)}
@@ -147,12 +152,12 @@ export function QuestionTable({
                     <td className="px-4 py-4">
                       <div className="flex justify-center">
                         <ActionMenuButton
-                          ariaLabel="Mở hành động cho câu hỏi"
+                          ariaLabel="Mo hanh dong cho cau hoi"
                           items={[
                             {
                               icon: Eye,
                               id: 'view',
-                              label: 'Xem chi tiết',
+                              label: 'Xem chi tiet',
                               onSelect: () => onSelect(question.id),
                               tone: 'primary',
                             },
@@ -161,7 +166,7 @@ export function QuestionTable({
                                   {
                                     icon: Pencil,
                                     id: 'edit',
-                                    label: 'Chỉnh sửa',
+                                    label: 'Chinh sua',
                                     onSelect: () => onEdit(question),
                                     tone:
                                       canEdit?.(question) ?? true

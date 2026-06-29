@@ -1,61 +1,59 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
-import {
-  type QuestionModuleScope,
-  questionBankQueryKeys,
-} from './useQuestionBanksQuery'
+import { questionBankQueryKeys } from './useQuestionBanksQuery'
 import type { QuestionBankDto } from '../types'
 
-function getQuestionBankDetailQuery(scope: QuestionModuleScope) {
-  const queryName =
-    scope === 'teacher'
-      ? 'teacherQuestionBank'
-      : scope === 'school'
-        ? 'schoolQuestionBank'
-        : 'adminQuestionBank'
-
-  return `
-  query QuestionBank($id: ID!) {
-    ${queryName}(id: $id) {
+const QUESTION_BANK_DETAIL_QUERY = `
+  query QuestionBank($id: UUID!) {
+    questionBank(id: $id) {
       id
-      bankName
+      languageId
+      schoolId
+      code
+      name
       description
-      isActive
+      ownerType
+      status
       createdAt
       updatedAt
       createdBy
       updatedBy
+      grades {
+        id
+        questionBankId
+        schoolGradeId
+        attachedAt
+        attachedBy
+      }
     }
-  }`
-}
+  }
+`
 
 type QuestionBankDetailQueryData = {
-  teacherQuestionBank?: QuestionBankDto | null
-  schoolQuestionBank?: QuestionBankDto | null
-  adminQuestionBank?: QuestionBankDto | null
+  questionBank: QuestionBankDto | null
 }
 
-export async function fetchQuestionBank(scope: QuestionModuleScope, id: string) {
+export async function fetchQuestionBank(id: string) {
   const data = await graphQLRequest<QuestionBankDetailQueryData>(
-    getQuestionBankDetailQuery(scope),
+    QUESTION_BANK_DETAIL_QUERY,
     { id },
   )
 
-  return (
-    data.teacherQuestionBank ??
-    data.schoolQuestionBank ??
-    data.adminQuestionBank ??
-    null
-  )
+  if (!data.questionBank) {
+    return null
+  }
+
+  return {
+    ...data.questionBank,
+    bankName: data.questionBank.name,
+    isActive: data.questionBank.status === 'PUBLISHED',
+  }
 }
 
-export function useQuestionBankQuery(
-  scope: QuestionModuleScope,
-  id: string | null,
-) {
+export function useQuestionBankQuery(id: string | null) {
   return useQuery({
     enabled: Boolean(id),
-    queryFn: () => fetchQuestionBank(scope, id!),
-    queryKey: [...questionBankQueryKeys.questionBank(id), scope],
+    queryFn: () => fetchQuestionBank(id!),
+    queryKey: questionBankQueryKeys.questionBank(id),
   })
 }

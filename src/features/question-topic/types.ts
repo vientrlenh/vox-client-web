@@ -1,26 +1,22 @@
+export type QuestionTopicStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+
 export type QuestionTopicDto = {
   id: string
   questionBankId: string
-  bankId?: string
+  bankId: string
   code: string
   name: string
-  topicName?: string
+  topicName: string
   description: string | null
-  status: string
+  status: QuestionTopicStatus
   createdAt?: string | null
   updatedAt?: string | null
-  bank?: QuestionBankDto | null
-}
-
-type QuestionBankDto = {
-  id: string
-  bankName: string
-  description: string | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-  createdBy: string | null
-  updatedBy: string | null
+  bank?: {
+    id: string
+    code: string
+    name: string
+    status?: string | null
+  } | null
 }
 
 export type QuestionTopicPage = {
@@ -32,17 +28,19 @@ export type QuestionTopicPage = {
 }
 
 export type CreateQuestionTopicRequest = {
-  bankId: string
+  questionBankId?: string
+  bankId?: string
   code?: string
   name?: string
   topicName?: string
-  description: string | null
+  description?: string | null
 }
 
 export type UpdateQuestionTopicRequest = {
-  bankId: string
-  description: string | null
-  topicName: string
+  bankId?: string
+  name?: string
+  topicName?: string
+  description?: string | null
 }
 
 export type ReviewQuestionTopicRequest = {
@@ -58,37 +56,22 @@ export function getQuestionTopicStatusDisplay(status?: string | null) {
     case 'PUBLISHED':
       return {
         className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        label: 'Đã xuất bản',
+        label: 'Da xuat ban',
       }
     case 'DRAFT':
       return {
         className: 'border-amber-200 bg-amber-50 text-amber-700',
-        label: 'Bản nháp',
-      }
-    case 'SUBMITTED_FOR_REVIEW':
-      return {
-        className: 'border-blue-200 bg-blue-50 text-blue-700',
-        label: 'Chờ duyệt',
-      }
-    case 'REVISION_REQUESTED':
-      return {
-        className: 'border-orange-200 bg-orange-50 text-orange-700',
-        label: 'Yêu cầu sửa',
-      }
-    case 'REJECTED':
-      return {
-        className: 'border-red-200 bg-red-50 text-red-700',
-        label: 'Bị từ chối',
+        label: 'Ban nhap',
       }
     case 'ARCHIVED':
       return {
         className: 'border-slate-200 bg-slate-50 text-slate-500',
-        label: 'Lưu trữ',
+        label: 'Luu tru',
       }
     default:
       return {
         className: 'border-slate-200 bg-slate-50 text-slate-600',
-        label: status?.trim() || '-',
+        label: String(status ?? '-'),
       }
   }
 }

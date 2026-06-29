@@ -2,8 +2,6 @@ import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
 import type {
   CreateQuestionTopicRequest,
-  QuestionTopicDto,
-  ReviewQuestionTopicRequest,
   UpdateQuestionTopicRequest,
 } from '../types'
 
@@ -13,7 +11,7 @@ type ApiResponse<T> = {
 }
 
 export async function createQuestionTopic(payload: CreateQuestionTopicRequest) {
-  const response = await apiClient.post<ApiResponse<QuestionTopicDto>>(
+  const response = await apiClient.post<ApiResponse<unknown>>(
     '/v1/question-topics',
     payload,
   )
@@ -25,7 +23,7 @@ export async function updateQuestionTopic(
   id: string,
   payload: UpdateQuestionTopicRequest,
 ) {
-  const response = await apiClient.put<ApiResponse<QuestionTopicDto>>(
+  const response = await apiClient.put<ApiResponse<unknown>>(
     `/v1/question-topics/${id}`,
     payload,
   )
@@ -34,7 +32,7 @@ export async function updateQuestionTopic(
 }
 
 export async function deleteQuestionTopic(id: string) {
-  const response = await apiClient.delete<ApiResponse<QuestionTopicDto>>(
+  const response = await apiClient.delete<ApiResponse<unknown>>(
     `/v1/question-topics/${id}`,
   )
 
@@ -43,10 +41,10 @@ export async function deleteQuestionTopic(id: string) {
 
 export async function reviewQuestionTopic(
   id: string,
-  payload: ReviewQuestionTopicRequest,
+  payload: { action: 'PUBLISH' | 'ARCHIVE' },
 ) {
-  const response = await apiClient.patch<ApiResponse<QuestionTopicDto>>(
-    `/v1/question-topics/${id}/review-actions`,
+  const response = await apiClient.patch<ApiResponse<unknown>>(
+    `/v1/question-topics/${id}/status`,
     payload,
   )
 
@@ -84,7 +82,7 @@ export function useReviewQuestionTopicMutation() {
       payload,
     }: {
       id: string
-      payload: ReviewQuestionTopicRequest
+      payload: { action: 'PUBLISH' | 'ARCHIVE' }
     }) => reviewQuestionTopic(id, payload),
   })
 }

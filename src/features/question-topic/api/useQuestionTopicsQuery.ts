@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
-import type { QuestionTopicPage } from '../types'
+import type { QuestionTopicPage, QuestionTopicStatus } from '../types'
 
 const QUESTION_TOPIC_FIELDS = `
   id
@@ -14,17 +14,21 @@ const QUESTION_TOPIC_FIELDS = `
   updatedAt
 `
 
-function getQuestionTopicsQuery(scope: QuestionModuleScope) {
-  const queryName =
-    scope === 'teacher'
-      ? 'teacherBankTopics'
-      : scope === 'school'
-        ? 'schoolBankTopics'
-        : 'adminBankTopics'
-
-  return `
-  query QuestionTopics($bankId: ID!, $page: Int!, $size: Int!) {
-    ${queryName}(bankId: $bankId, page: $page, size: $size) {
+const QUESTION_TOPICS_QUERY = `
+  query QuestionTopics(
+    $questionBankId: UUID
+    $status: QuestionTopicStatus
+    $keyword: String
+    $page: Int!
+    $size: Int!
+  ) {
+    questionTopics(
+      questionBankId: $questionBankId
+      status: $status
+      keyword: $keyword
+      page: $page
+      size: $size
+    ) {
       content {
         ${QUESTION_TOPIC_FIELDS}
       }
@@ -33,73 +37,70 @@ function getQuestionTopicsQuery(scope: QuestionModuleScope) {
       totalElements
       totalPages
     }
-  }`
-}
+  }
+`
 
 type QuestionTopicsQueryData = {
-  teacherBankTopics?: QuestionTopicPage
-  schoolBankTopics?: QuestionTopicPage
-  adminBankTopics?: QuestionTopicPage
+  questionTopics: QuestionTopicPage
 }
 
 type FetchQuestionTopicsInput = {
-  bankId: string
+  bankId?: string
+  keyword?: string
   page: number
-  scope: QuestionModuleScope
   size: number
+  status?: QuestionTopicStatus
 }
 
 export const questionTopicQueryKeys = {
   all: ['question-topics'] as const,
   questionTopic: (id: string | null) =>
     [...questionTopicQueryKeys.all, 'detail', id] as const,
-  questionTopics: (
-    scope: QuestionModuleScope,
-    bankId: string,
-    page: number,
-    size: number,
-  ) => [...questionTopicQueryKeys.all, 'list', scope, bankId, page, size] as const,
+  questionTopics: (input: FetchQuestionTopicsInput) =>
+    [...questionTopicQueryKeys.all, 'list', input] as const,
 }
 
-export async function fetchQuestionTopics({
-  bankId,
-  page,
-  scope,
-  size,
-}: FetchQuestionTopicsInput) {
-  const data = await graphQLRequest<QuestionTopicsQueryData>(
-    getQuestionTopicsQuery(scope),
-    {
-      bankId,
-      page,
-      size,
-    },
-  )
+export async function fetchQuestionTopics(input: FetchQuestionTopicsInput) {
+  const data = await graphQLRequest<QuestionTopicsQueryData>(QUESTION_TOPICS_QUERY, {
+    keyword: input.keyword || undefined,
+    page: input.page,
+    questionBankId: input.bankId || undefined,
+    size: input.size,
+    status: input.status,
+  })
 
-  return (
-    data.teacherBankTopics ??
-    data.schoolBankTopics ??
-    data.adminBankTopics ??
-    {
-      content: [],
-      page,
-      size,
-      totalElements: 0,
-      totalPages: 0,
-    }
-  )
+  return {
+    ...data.questionTopics,
+    content: data.questionTopics.content.map((topic) => ({
+      ...topic,
+      bankId: topic.questionBankId,
+      topicName: topic.name,
+    })),
+  }
 }
 
 export function useQuestionTopicsQuery(
-  scope: QuestionModuleScope,
+  _scope: QuestionModuleScope,
   bankId: string,
   page: number,
   size: number,
   enabled = true,
+  options?: {
+    keyword?: string
+    status?: QuestionTopicStatus
+  },
 ) {
+  const input: FetchQuestionTopicsInput = {
+    bankId,
+    keyword: options?.keyword,
+    page,
+    size,
+    status: options?.status,
+  }
+
   return useQuery({
     enabled: enabled && Boolean(bankId),
-    queryFn: () => fetchQuestionTopics({ bankId, page, scope, size }),
-    queryKey: questionTopicQueryKeys.questionTopics(scope, bankId, page, size),
+    queryFn: () => fetchQuestionTopics(input),
+    queryKey: questionTopicQueryKeys.questionTopics(input),
   })
 }

@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router'
-import { useAppSelector } from '@/app/store/hooks'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
+import { useAppSelector } from '@/app/store/hooks'
+import { useQuestionTopicQuery } from '../api/useQuestionTopicQuery'
 import {
   questionTopicQueryKeys,
   useQuestionTopicsQuery,
 } from '../api/useQuestionTopicsQuery'
-import { useQuestionTopicQuery } from '../api/useQuestionTopicQuery'
 import {
   useCreateQuestionTopicMutation,
   useDeleteQuestionTopicMutation,
@@ -15,9 +15,7 @@ import {
   useUpdateQuestionTopicMutation,
 } from '../api/useQuestionTopicMutations'
 import { QuestionTopicFormDialog } from '../components/QuestionTopicFormDialog'
-import type {
-  QuestionTopicFormMode,
-} from '../components/QuestionTopicFormDialog'
+import type { QuestionTopicFormMode } from '../components/QuestionTopicFormDialog'
 import { QuestionTopicPageHeader } from '../components/QuestionTopicPageHeader'
 import { QuestionTopicPagination } from '../components/QuestionTopicPagination'
 import { QuestionTopicTable } from '../components/QuestionTopicTable'
@@ -31,7 +29,6 @@ import {
 import type {
   CreateQuestionTopicRequest,
   QuestionTopicDto,
-  ReviewQuestionTopicRequest,
   UpdateQuestionTopicRequest,
 } from '../types'
 
@@ -78,14 +75,14 @@ function QuestionTopicsPage({
 
   const actorRole = getQuestionTopicActorRole(user?.roles)
   const canManage = canManageQuestionTopic(actorRole)
-  const questionTopicsQuery = useQuestionTopicsQuery(scope, bankId, page, pageSize)
+  const questionTopicsQuery = useQuestionTopicsQuery(scope, bankId, page - 1, pageSize)
   const questionTopics = questionTopicsQuery.data?.content ?? []
   const selectedListTopic =
     questionTopics.find((topic) => topic.id === selectedId) ??
     questionTopics[0] ??
     null
   const effectiveSelectedId = selectedListTopic?.id ?? null
-  const selectedTopicQuery = useQuestionTopicQuery(scope, effectiveSelectedId)
+  const selectedTopicQuery = useQuestionTopicQuery(effectiveSelectedId)
   const selectedTopic = selectedTopicQuery.data ?? selectedListTopic
   const createMutation = useCreateQuestionTopicMutation()
   const updateMutation = useUpdateQuestionTopicMutation()
@@ -101,37 +98,23 @@ function QuestionTopicsPage({
     await queryClient.invalidateQueries({ queryKey: questionTopicQueryKeys.all })
   }
 
-  function handleBack() {
-    navigate(`${basePath}/question-banks`)
-  }
-
-  function handleViewDetail(topicId: string) {
-    setSelectedId(topicId)
-    navigate(
-      `${basePath}/question-topics/${topicId}?bankId=${bankId}&bankName=${encodeURIComponent(bankName)}`,
+  if (!bankId) {
+    return (
+      <section className="grid gap-6">
+        <div className="flex min-h-80 flex-col items-center justify-center px-6 py-12 text-center">
+          <p className="text-sm font-bold text-red-600">
+            Khong tim thay ngan hang cau hoi. Vui long chon mot ngan hang truoc.
+          </p>
+          <button
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+            onClick={() => navigate(`${basePath}/question-banks`)}
+            type="button"
+          >
+            Quay lai danh sach ngan hang
+          </button>
+        </div>
+      </section>
     )
-  }
-
-  function openCreateDialog() {
-    setDialogError(null)
-    setDialogTarget(null)
-    setDialogMode('create')
-  }
-
-  function openEditDialog(topic: QuestionTopicDto) {
-    setDialogError(null)
-    setDialogTarget(topic)
-    setDialogMode('edit')
-  }
-
-  function closeDialog() {
-    if (isSubmitting) {
-      return
-    }
-
-    setDialogError(null)
-    setDialogTarget(null)
-    setDialogMode(null)
   }
 
   async function handleSubmit(
@@ -142,9 +125,7 @@ function QuestionTopicsPage({
       setDialogError(null)
 
       if (mode === 'create') {
-        const message = await createMutation.mutateAsync(
-          payload as CreateQuestionTopicRequest,
-        )
+        const message = await createMutation.mutateAsync(payload as CreateQuestionTopicRequest)
         await refreshTopics()
         setDialogMode(null)
         setDialogTarget(null)
@@ -171,66 +152,14 @@ function QuestionTopicsPage({
     }
   }
 
-  async function handleDeleteTopic(topic: QuestionTopicDto) {
-    if (!window.confirm(`Xoa question topic "${topic.name}"?`)) {
-      return
-    }
-
-    try {
-      const message = await deleteMutation.mutateAsync(topic.id)
-      await refreshTopics()
-      setPageMessage(message)
-    } catch (error) {
-      setPageMessage(getErrorMessage(error) ?? 'Khong the xoa question topic.')
-    }
-  }
-
-  async function handleReviewAction(topic: QuestionTopicDto, targetStatus: string) {
-    try {
-      const payload: ReviewQuestionTopicRequest = { targetStatus }
-      const message = await reviewMutation.mutateAsync({
-        id: topic.id,
-        payload,
-      })
-      await refreshTopics()
-      setPageMessage(message)
-    } catch (error) {
-      setPageMessage(
-        getErrorMessage(error) ?? 'Khong the cap nhat trang thai question topic.',
-      )
-    }
-  }
-
-  if (!bankId) {
-    return (
-      <section className="grid gap-6">
-        <div className="flex min-h-80 flex-col items-center justify-center px-6 py-12 text-center">
-          <p className="text-sm font-bold text-red-600">
-            Khong tim thay ngan hang cau hoi. Vui long chon mot ngan hang truoc.
-          </p>
-          <button
-            className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
-            onClick={handleBack}
-            type="button"
-          >
-            Quay lai danh sach ngan hang
-          </button>
-        </div>
-      </section>
-    )
-  }
-
   return (
-    <section
-      aria-labelledby="teacher-question-topics-title"
-      className="grid gap-6"
-    >
+    <section aria-labelledby="teacher-question-topics-title" className="grid gap-6">
       <QuestionTopicPageHeader
         bankName={bankName}
         description="Danh sach chu de thuoc ngan hang cau hoi theo quyen cua ban."
         isRefreshing={questionTopicsQuery.isFetching}
-        onBack={handleBack}
-        onCreate={canManage ? openCreateDialog : undefined}
+        onBack={() => navigate(`${basePath}/question-banks`)}
+        onCreate={canManage ? () => setDialogMode('create') : undefined}
         onRefresh={() => {
           void questionTopicsQuery.refetch()
         }}
@@ -268,10 +197,38 @@ function QuestionTopicsPage({
             ? (topic) => [
                 ...getQuestionTopicReviewActions(topic, actorRole, {
                   onArchive: () => {
-                    void handleReviewAction(topic, 'ARCHIVED')
+                    void (async () => {
+                      try {
+                        const message = await reviewMutation.mutateAsync({
+                          id: topic.id,
+                          payload: { action: 'ARCHIVE' },
+                        })
+                        await refreshTopics()
+                        setPageMessage(message)
+                      } catch (error) {
+                        setPageMessage(
+                          getErrorMessage(error) ??
+                            'Khong the cap nhat trang thai question topic.',
+                        )
+                      }
+                    })()
                   },
                   onPublish: () => {
-                    void handleReviewAction(topic, 'PUBLISHED')
+                    void (async () => {
+                      try {
+                        const message = await reviewMutation.mutateAsync({
+                          id: topic.id,
+                          payload: { action: 'PUBLISH' },
+                        })
+                        await refreshTopics()
+                        setPageMessage(message)
+                      } catch (error) {
+                        setPageMessage(
+                          getErrorMessage(error) ??
+                            'Khong the cap nhat trang thai question topic.',
+                        )
+                      }
+                    })()
                   },
                 }),
                 ...(canDeleteQuestionTopic(topic, actorRole)
@@ -280,7 +237,18 @@ function QuestionTopicsPage({
                         id: `delete-${topic.id}`,
                         label: 'Xoa',
                         onSelect: () => {
-                          void handleDeleteTopic(topic)
+                          void (async () => {
+                            try {
+                              const message = await deleteMutation.mutateAsync(topic.id)
+                              await refreshTopics()
+                              setPageMessage(message)
+                            } catch (error) {
+                              setPageMessage(
+                                getErrorMessage(error) ??
+                                  'Khong the xoa question topic.',
+                              )
+                            }
+                          })()
                         },
                         tone: 'danger' as const,
                       },
@@ -294,16 +262,24 @@ function QuestionTopicsPage({
         onEdit={
           canManage
             ? (topic) => {
-                if (canEditQuestionTopic(topic, actorRole)) {
-                  openEditDialog(topic)
+                if (!canEditQuestionTopic(topic, actorRole)) {
+                  return
                 }
+                setDialogError(null)
+                setDialogTarget(topic)
+                setDialogMode('edit')
               }
             : undefined
         }
         onRetry={() => {
           void questionTopicsQuery.refetch()
         }}
-        onSelect={handleViewDetail}
+        onSelect={(topicId) => {
+          setSelectedId(topicId)
+          navigate(
+            `${basePath}/question-topics/${topicId}?bankId=${bankId}&bankName=${encodeURIComponent(bankName)}`,
+          )
+        }}
         onViewQuestions={(topic) => {
           navigate(
             `${basePath}/questions/all?bankId=${bankId}&topicId=${topic.id}&topicName=${encodeURIComponent(topic.name)}`,
@@ -318,7 +294,14 @@ function QuestionTopicsPage({
         errorMessage={dialogError ?? undefined}
         isSubmitting={isSubmitting}
         mode={dialogMode}
-        onClose={closeDialog}
+        onClose={() => {
+          if (isSubmitting) {
+            return
+          }
+          setDialogError(null)
+          setDialogTarget(null)
+          setDialogMode(null)
+        }}
         onSubmit={(mode, payload) => {
           void handleSubmit(mode, payload)
         }}
