@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle2, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, X } from 'lucide-react'
 import type {
   CreateSchoolClassRequest,
   SchoolClass,
@@ -7,6 +7,7 @@ import type {
   UpdateSchoolClassRequest,
 } from '../types'
 import type { SupportedLanguage } from '@/features/languages/types'
+import { SchoolGradePickerDialog } from './SchoolGradePickerDialog'
 
 export type SchoolClassFormMode = 'create' | 'edit'
 
@@ -63,12 +64,6 @@ type LanguageSelectProps = {
   onChange: (value: string) => void
   schoolClass?: SchoolClass | null
   value: string
-}
-
-function isUuidLike(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    value.trim(),
-  )
 }
 
 function toEditForm(schoolClass: SchoolClass): ClassFormState {
@@ -254,12 +249,24 @@ function SchoolClassFormDialogContent({
     isEdit && schoolClass ? toEditForm(schoolClass) : emptyClassForm,
   )
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [isGradePickerOpen, setIsGradePickerOpen] = useState(false)
+  const [selectedGradeName, setSelectedGradeName] = useState<string>(
+    isEdit
+      ? (schoolClass?.schoolGrade?.name ?? schoolClass?.schoolGrade?.code ?? '')
+      : '',
+  )
 
   function handleChange(name: keyof ClassFormState, value: string) {
     setForm((current) => ({
       ...current,
       [name]: value,
     }))
+  }
+
+  function handleGradeSelect(grade: { code: string; id: string; name: string }) {
+    handleChange('schoolGradeId', grade.id)
+    setSelectedGradeName(`${grade.name} (${grade.code})`)
+    setIsGradePickerOpen(false)
   }
 
   function validateForm() {
@@ -276,8 +283,8 @@ function SchoolClassFormDialogContent({
         return 'Vui lòng chọn ngôn ngữ.'
       }
 
-      if (!isUuidLike(form.schoolGradeId)) {
-        return 'ID khối lớp không hợp lệ.'
+      if (!form.schoolGradeId.trim()) {
+        return 'Vui lòng chọn niên học.'
       }
     }
 
@@ -319,6 +326,13 @@ function SchoolClassFormDialogContent({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6">
+      <SchoolGradePickerDialog
+        initialGradeId={form.schoolGradeId}
+        isOpen={isGradePickerOpen}
+        onClose={() => setIsGradePickerOpen(false)}
+        onSelect={handleGradeSelect}
+        zIndex="z-60"
+      />
       <form
         aria-labelledby="class-dialog-title"
         className="grid max-h-[92vh] w-full max-w-2xl gap-5 overflow-y-auto rounded-lg bg-white p-6 shadow-xl shadow-slate-950/20"
@@ -392,15 +406,37 @@ function SchoolClassFormDialogContent({
             schoolClass={schoolClass}
             value={form.languageId}
           />
-          <FieldInput
-            disabled={isEdit || isSubmitting}
-            label="ID khối lớp"
-            name="schoolGradeId"
-            onChange={handleChange}
-            placeholder="Dán ID khối lớp"
-            required={!isEdit}
-            value={form.schoolGradeId}
-          />
+          {isEdit ? (
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Niên học
+              <div className="flex h-11 items-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm font-medium text-slate-500">
+                {selectedGradeName || form.schoolGradeId || '—'}
+              </div>
+              <span className="text-xs font-semibold text-slate-500">
+                Không thể đổi niên học khi cập nhật lớp.
+              </span>
+            </label>
+          ) : (
+            <div className="grid gap-2 text-sm font-bold text-slate-700">
+              Niên học
+              <button
+                className="flex h-11 w-full items-center justify-between overflow-hidden rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition hover:bg-slate-50 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={isSubmitting}
+                onClick={() => setIsGradePickerOpen(true)}
+                type="button"
+              >
+                <span
+                  className={`truncate ${form.schoolGradeId ? 'text-slate-950' : 'text-slate-400'}`}
+                >
+                  {selectedGradeName || 'Chọn niên học'}
+                </span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="ml-2 size-4 shrink-0 text-slate-400"
+                />
+              </button>
+            </div>
+          )}
         </div>
 
         <label className="grid gap-2 text-sm font-bold text-slate-700">

@@ -333,10 +333,8 @@ function GradesTab({ gradeLevelId }: GradesTabProps) {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [tabMessage, setTabMessage] = useState<PageMessage | null>(null)
 
-  const gradesQuery = useSchoolGradesQuery(page, pageSize)
-  const grades = (gradesQuery.data?.content ?? []).filter(
-    (g) => g.schoolGradeLevelId === gradeLevelId,
-  )
+  const gradesQuery = useSchoolGradesQuery(page, pageSize, gradeLevelId)
+  const grades = gradesQuery.data?.content ?? []
   const createMutation = useCreateSchoolGradeMutation()
   const updateMutation = useUpdateSchoolGradeMutation()
   const deleteMutation = useDeleteSchoolGradeMutation()

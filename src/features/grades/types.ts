@@ -21,7 +21,6 @@ export type SchoolGrade = {
   endDate: string
   id: string
   name: string
-  schoolGradeLevelId: string
   schoolId?: string | null
   startDate: string
   status: SchoolGradeStatus | string
@@ -38,8 +37,8 @@ export type SchoolGradeLevelPage = {
 
 export type SchoolGradePage = {
   content: SchoolGrade[]
-  currentPage: number
-  pageSize: number
+  page: number
+  size: number
   totalElements: number
   totalPages: number
 }

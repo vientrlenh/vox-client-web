@@ -14,7 +14,6 @@ const mockGrade: SchoolGrade = {
   endDate: '2025-05-31',
   id: 'grade-1',
   name: 'Năm học 2024-2025',
-  schoolGradeLevelId: 'level-1',
   startDate: '2024-09-01',
   status: 'ACTIVE',
   updatedAt: '2026-06-02T00:00:00Z',
@@ -22,8 +21,8 @@ const mockGrade: SchoolGrade = {
 
 const mockGradePage: SchoolGradePage = {
   content: [mockGrade],
-  currentPage: 1,
-  pageSize: 10,
+  page: 1,
+  size: 10,
   totalElements: 1,
   totalPages: 1,
 }

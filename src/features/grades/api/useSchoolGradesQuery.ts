@@ -15,15 +15,15 @@ const SCHOOL_GRADE_FIELDS = `
 `
 
 const SCHOOL_GRADES_QUERY = `
-  query SchoolGrades($schoolId: ID!, $page: Int, $size: Int) {
-    schoolGrades(schoolId: $schoolId, page: $page, size: $size) {
+  query SchoolGrades($schoolId: ID!, $schoolGradeLevelId: ID, $page: Int, $size: Int) {
+    schoolGrades(schoolId: $schoolId, schoolGradeLevelId: $schoolGradeLevelId, page: $page, size: $size) {
       content {
         ${SCHOOL_GRADE_FIELDS}
       }
       totalElements
       totalPages
-      currentPage
-      pageSize
+      page
+      size
     }
   }
 `
@@ -47,14 +47,15 @@ type SchoolGradeQueryData = {
 export const gradeManagementQueryKeys = {
   all: ['grade-management'] as const,
   detail: (id: string) => [...gradeManagementQueryKeys.all, 'detail', id] as const,
-  grades: (page: number, size: number) =>
-    [...gradeManagementQueryKeys.all, 'list', page, size] as const,
+  grades: (page: number, size: number, schoolGradeLevelId?: string) =>
+    [...gradeManagementQueryKeys.all, 'list', page, size, schoolGradeLevelId] as const,
 }
 
-export async function fetchSchoolGrades(page: number, size: number) {
+export async function fetchSchoolGrades(page: number, size: number, schoolGradeLevelId?: string) {
   const schoolId = requireSchoolId()
   const data = await graphQLRequest<SchoolGradesQueryData>(SCHOOL_GRADES_QUERY, {
     page,
+    schoolGradeLevelId: schoolGradeLevelId || undefined,
     schoolId,
     size,
   })
@@ -67,10 +68,10 @@ export async function fetchSchoolGrade(id: string) {
   return data.schoolGrade
 }
 
-export function useSchoolGradesQuery(page: number, size: number) {
+export function useSchoolGradesQuery(page: number, size: number, schoolGradeLevelId?: string) {
   return useQuery({
-    queryFn: () => fetchSchoolGrades(page, size),
-    queryKey: gradeManagementQueryKeys.grades(page, size),
+    queryFn: () => fetchSchoolGrades(page, size, schoolGradeLevelId),
+    queryKey: gradeManagementQueryKeys.grades(page, size, schoolGradeLevelId),
   })
 }
 
