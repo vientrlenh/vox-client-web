@@ -1,0 +1,1 @@
+export { SystemAdminSchoolsPage } from './pages/SystemAdminSchoolsPage'

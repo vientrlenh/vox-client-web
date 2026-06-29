@@ -17,6 +17,11 @@ export default defineConfig({
         changeOrigin: true,
         target: 'http://localhost:8080',
       },
+      // Thêm proxy cho GraphQL tại đây
+      '/graphql': {
+        changeOrigin: true,
+        target: 'http://localhost:8080',
+      },
     },
   },
 })
