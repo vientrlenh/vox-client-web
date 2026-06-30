@@ -52,7 +52,7 @@ function DetailRows({ rows }: { rows: DetailRow[] }) {
         <div className="grid grid-cols-[120px_12px_1fr] gap-3" key={row.label}>
           <dt className="text-sm text-slate-600">{row.label}</dt>
           <dd className="text-sm text-slate-500">:</dd>
-          <dd className="min-w-0 break-words text-sm font-bold text-blue-950">
+          <dd className="min-w-0 wrap-break-word text-sm font-bold text-blue-950">
             {row.value}
           </dd>
         </div>

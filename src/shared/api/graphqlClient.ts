@@ -2,7 +2,7 @@ import axios from 'axios'
 import { appConfig } from '@/shared/config/env'
 import type { ApiError } from './apiError'
 import { getAuthTokens } from './authTokenStorage'
-import { toApiError } from './apiError'
+import { createRawErrorInterceptorInstaller } from './rawErrorInterceptor'
 
 type GraphQLErrorResponse = {
   extensions?: unknown
@@ -21,6 +21,7 @@ export const graphqlApiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true
 })
 
 graphqlApiClient.interceptors.request.use((config) => {
@@ -33,10 +34,7 @@ graphqlApiClient.interceptors.request.use((config) => {
   return config
 })
 
-graphqlApiClient.interceptors.response.use(
-  (response) => response,
-  (error: unknown) => Promise.reject(toApiError(error)),
-)
+export const addGraphqlClientRawErrorInterceptor = createRawErrorInterceptorInstaller(graphqlApiClient)
 
 function toGraphQLError(errors: GraphQLErrorResponse[]): ApiError {
   const message = errors

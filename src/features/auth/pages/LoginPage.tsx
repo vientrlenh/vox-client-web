@@ -11,8 +11,8 @@ import {
   UserRound,
 } from 'lucide-react'
 import type { FormEvent } from 'react'
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router'
 import cartoonSchoolImage from '@/assets/images/cartoon-school.png'
 import logoImage from '@/assets/images/logo.png'
 import { setAuthenticatedUser } from '@/app/store/authSlice'
@@ -20,12 +20,14 @@ import { useAppDispatch } from '@/app/store/hooks'
 import {
   clearAuthTokens,
   decodeAccessToken,
+  getClientDevice,
   isAccessTokenExpired,
   saveAuthTokens,
 } from '@/features/auth/session/authSession'
 import { SiteFooter } from '@/shared/ui/SiteFooter'
-import type { ApiError } from '@/shared/api'
+import { type ApiError } from '@/shared/api'
 import { useLoginMutation } from '../api/useLoginMutation'
+import { appConfig } from '@/shared/config/env'
 
 const trustItems = [
   { icon: Brain, label: 'Chấm điểm chính xác' },
@@ -104,6 +106,15 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState<LoginMessage | null>(null)
 
+  const location = useLocation()
+  useEffect(() => {
+    const incoming = (location.state as { message?: LoginMessage } | null)?.message
+    if (incoming) {
+      setMessage(incoming)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location, navigate])
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -162,11 +173,15 @@ export function LoginPage() {
   }
 
   function handleGoogleLogin() {
-    setMessage({
-      text: 'Google login sẽ được kết nối sau khi BE sẵn sàng.',
-      tone: 'info',
+    const device = getClientDevice()
+    const qs = new URLSearchParams({
+      deviceId: device.deviceId, 
+      deviceName: device.deviceName, 
+      platform: device.platform
     })
+    window.location.href = `${appConfig.apiBaseUrl}/v1/auth/oauth2/google/start?${qs}`
   }
+ 
 
   const messageClassName =
     message?.tone === 'error'

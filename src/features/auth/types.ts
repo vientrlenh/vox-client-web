@@ -23,7 +23,6 @@ export type LoginResponse = {
 
 export type RefreshRequest = {
   deviceId: string
-  token: string
 }
 
 export type RefreshResponse = {
