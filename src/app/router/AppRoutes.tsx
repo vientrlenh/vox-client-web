@@ -5,6 +5,7 @@ import { SystemAdminLayout } from "@/app/layouts/SystemAdminLayout";
 import { TeacherLayout } from "@/app/layouts/TeacherLayout";
 import { RequireRole } from "./RequireRole";
 import { PageLoader } from "@/shared/ui/PageLoader";
+import { OAuth2CallbackPage } from "@/features/auth/pages/OAuth2SuccessPage";
 
 const HomePage = lazy(() =>
   import("@/features/home").then((module) => ({ default: module.HomePage })),
@@ -30,6 +31,12 @@ const SetupPasswordPage = lazy(() =>
   import("@/features/auth").then((module) => ({
     default: module.SetupPasswordPage,
   })),
+);
+
+const ProfilePage = lazy(() => 
+  import("@/features/profile").then((module) => ({
+    default: module.ProfilePage
+  }))
 );
 
 const SystemAdminDashboardPage = lazy(() =>
@@ -140,6 +147,7 @@ export function AppRoutes() {
       <Routes>
         <Route index element={<HomePage />} />
         <Route path="login" element={<LoginPage />} />
+        <Route path="oauth2-callback" element={<OAuth2CallbackPage/>}/>
         <Route path="register" element={<RegisterPage />} />
         <Route path="reset-password" element={<ResetPasswordPage />} />
         <Route path="setup-password" element={<SetupPasswordPage />} />
@@ -161,6 +169,10 @@ export function AppRoutes() {
             <Route
               path="system-admin/schools"
               element={<SystemAdminSchoolsPage />}
+            />
+            <Route
+              path="system-admin/profile"
+              element={<ProfilePage/>}
             />
           </Route>
         </Route>
@@ -214,6 +226,10 @@ export function AppRoutes() {
               path="school-admin/classes/:classId"
               element={<SchoolAdminClassDetailPage />}
             />
+            <Route
+              path="school-admin/profile"
+              element={<ProfilePage/>}
+            />
           </Route>
         </Route>
         <Route element={<RequireRole role="TEACHER" />}>
@@ -225,6 +241,10 @@ export function AppRoutes() {
             <Route
               path="teacher/monitoring/rooms/:roomId"
               element={<MonitoringRoomPage />}
+            />
+            <Route
+              path="teacher/profile"
+              element={<ProfilePage/>}
             />
           </Route>
         </Route>

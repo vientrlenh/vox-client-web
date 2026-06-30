@@ -95,8 +95,7 @@ describe('authRefreshInterceptor', () => {
     })
 
     saveAuthTokens({
-      accessToken: 'old-access-token',
-      refreshToken: 'old-refresh-token',
+      accessToken: 'old-access-token'
     })
     jest.mocked(refreshAuthTokens).mockResolvedValue({
       accessToken: newAccessToken,
@@ -138,8 +137,7 @@ describe('authRefreshInterceptor', () => {
     })
 
     saveAuthTokens({
-      accessToken: 'old-access-token',
-      refreshToken: 'old-refresh-token',
+      accessToken: 'old-access-token'
     })
     jest.mocked(refreshAuthTokens).mockResolvedValue({
       accessToken: newAccessToken,
@@ -158,8 +156,7 @@ describe('authRefreshInterceptor', () => {
     const store = configureAppStore()
 
     saveAuthTokens({
-      accessToken: 'old-access-token',
-      refreshToken: 'old-refresh-token',
+      accessToken: 'old-access-token'
     })
     apiClient.defaults.adapter = (config: InternalAxiosRequestConfig) =>
       rejectUnauthorized(config)
@@ -179,8 +176,7 @@ describe('authRefreshInterceptor', () => {
     const store = configureAppStore()
 
     saveAuthTokens({
-      accessToken: 'old-access-token',
-      refreshToken: 'old-refresh-token',
+      accessToken: 'old-access-token'
     })
     jest.mocked(refreshAuthTokens).mockRejectedValue(new Error('refresh failed'))
     apiClient.defaults.adapter = (config: InternalAxiosRequestConfig) =>

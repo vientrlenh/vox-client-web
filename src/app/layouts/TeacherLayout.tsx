@@ -7,6 +7,7 @@ import {
   MonitorPlay,
   Search,
   ShieldCheck,
+  UserRound,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
@@ -14,6 +15,7 @@ import logoImage from '@/assets/images/logo.png'
 import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
+import { useProfileQuery } from '@/features/profile'
 
 const navigationItems = [
   {
@@ -76,7 +78,7 @@ function TeacherSidebar({
       </div>
 
       <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-cyan-100/80">
-        Giám thị
+        Giảng viên
       </p>
 
       <nav aria-label="Giám thị" className="mt-6 grid gap-2">
@@ -120,8 +122,8 @@ export function TeacherLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const teacherEmail = user?.email ?? 'unknown'
-  const teacherRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
   const teacherInitials = getEmailInitials(teacherEmail)
+  const { data: profile } = useProfileQuery()
 
   function handleLogout() {
     setIsMobileMenuOpen(false)
@@ -209,10 +211,10 @@ export function TeacherLayout() {
                 </span>
                 <span className="hidden max-w-56 sm:block">
                   <span className="block truncate text-sm font-bold text-slate-950">
-                    {teacherEmail}
+                    {profile?.fullName}
                   </span>
-                  <span className="block truncate text-xs font-medium text-slate-500">
-                    {teacherRoles}
+                  <span className="block truncate uppercase text-xs font-medium text-slate-500">
+                    Giảng viên
                   </span>
                 </span>
                 <ChevronDown
@@ -226,6 +228,19 @@ export function TeacherLayout() {
                   className="absolute right-0 mt-2 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-950/10"
                   role="menu"
                 >
+                  <button
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-cyan-700"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      setIsUserMenuOpen(false)
+                      navigate('/teacher/profile')
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <UserRound aria-hidden="true" className="size-4" />
+                    Thông tin cá nhân
+                  </button>
                   <button
                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-red-600"
                     onClick={handleLogout}

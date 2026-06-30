@@ -11,6 +11,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  UserRound,
   Users,
   X,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ import logoImage from '@/assets/images/logo.png'
 import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
+import { useProfileQuery } from '@/features/profile'
 
 const navigationItems = [
   {
@@ -110,7 +112,7 @@ function SystemAdminSidebar({
       </div>
 
       <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-indigo-100/80">
-        System Admin
+        Quản trị hệ thống
       </p>
 
       <nav aria-label="System admin" className="mt-6 grid gap-2">
@@ -155,6 +157,8 @@ function SystemAdminSidebar({
   )
 }
 
+
+
 export function SystemAdminLayout() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
@@ -162,8 +166,9 @@ export function SystemAdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const adminEmail = user?.email ?? 'unknown'
-  const adminRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
   const adminInitials = getEmailInitials(adminEmail)
+  const { data: profile } = useProfileQuery()
+
 
   function handleLogout() {
     setIsMobileMenuOpen(false)
@@ -254,10 +259,10 @@ export function SystemAdminLayout() {
                 </span>
                 <span className="hidden max-w-56 sm:block">
                   <span className="block truncate text-sm font-bold text-blue-950">
-                    {adminEmail}
+                    {profile?.fullName}
                   </span>
-                  <span className="block truncate text-xs font-medium text-slate-500">
-                    {adminRoles}
+                  <span className="block truncate uppercase text-xs font-medium text-slate-500">
+                    Quản trị hệ thống
                   </span>
                 </span>
                 <ChevronDown
@@ -271,6 +276,19 @@ export function SystemAdminLayout() {
                   className="absolute right-0 mt-2 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-950/10"
                   role="menu"
                 >
+                  <button
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-indigo-700"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      setIsUserMenuOpen(false)
+                      navigate('/system-admin/profile')
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <UserRound aria-hidden="true" className="size-4" />
+                    Thông tin cá nhân
+                  </button>
                   <button
                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-red-600"
                     onClick={handleLogout}
