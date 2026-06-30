@@ -67,13 +67,18 @@ const QUESTION_FIELDS = `
     questionId
     permission
     assignedAt
+    user {
+      id
+      fullName
+      email
+    }
   }
 `
 
 const QUESTIONS_QUERY = `
   query Questions(
-    $questionBankId: UUID
-    $questionTopicId: UUID
+    $questionBankId: ID
+    $questionTopicId: ID
     $topicName: String
     $status: QuestionStatus
     $type: QuestionType
@@ -133,7 +138,7 @@ function resolveScopeForView(
   view: QuestionListView,
   filters: QuestionQueryFilters,
 ) {
-  if (view === 'review') {
+  if (view === 'review' && scope === 'teacher') {
     return 'COLLABORATING'
   }
 

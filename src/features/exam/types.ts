@@ -25,6 +25,11 @@ export type ExamMemberDto = {
   id: string
   role: ExamMemberRole
   userId: string
+  user?: {
+    email?: string | null
+    fullName?: string | null
+    id: string
+  } | null
 }
 
 export type ExamPaperItemDto = {
@@ -109,6 +114,7 @@ export type ExamBlueprintSlotDto = {
     code?: string | null
     id: string
     questionText?: string | null
+    status?: string | null
   } | null
   fixedQuestionId?: string | null
   id: string
@@ -232,6 +238,28 @@ export type CreateExamBlueprintVersionRequest = {
   sections: ExamBlueprintSectionInput[]
   totalTimeLimitSeconds?: number | null
 }
+
+export type CreateExamBlueprintSectionRequest = {
+  instruction?: string | null
+  order: number
+  sectionTimeLimitSeconds?: number | null
+  sectionWeight?: number | null
+  title: string
+}
+
+export type UpdateExamBlueprintSectionRequest = CreateExamBlueprintSectionRequest
+
+export type CreateExamBlueprintSlotRequest = {
+  fixedQuestionId?: string | null
+  order: number
+  prepTimeSecondsOverride?: number | null
+  responseTimeSecondsOverride?: number | null
+  selectionSpec?: QuestionSelectionSpec | null
+  slotType: ExamBlueprintSlotType
+  weight?: number | null
+}
+
+export type UpdateExamBlueprintSlotRequest = CreateExamBlueprintSlotRequest
 
 export type UpdateExamBlueprintRequest = {
   description?: string | null

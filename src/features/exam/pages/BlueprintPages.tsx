@@ -1,20 +1,37 @@
-import type { ReactNode } from 'react'
-import { useState } from 'react'
+import type { Dispatch, ReactNode, SetStateAction } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router'
+import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
+import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
+import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { QuestionPicker } from '../components/QuestionPicker'
 import {
   useCreateBlueprintMutation,
+  useCreateBlueprintSectionMutation,
+  useCreateBlueprintSlotMutation,
   useCreateBlueprintVersionMutation,
   useDeleteBlueprintMutation,
+  useDeleteBlueprintSectionMutation,
+  useDeleteBlueprintSlotMutation,
   useUpdateBlueprintMutation,
+  useUpdateBlueprintSectionMutation,
+  useUpdateBlueprintSlotMutation,
   useUpdateBlueprintVersionStatusMutation,
 } from '../api/useExamMutations'
 import { examQueryKeys, useExamBlueprintQuery, useExamBlueprintsQuery } from '../api/useExamQueries'
 import type {
   CreateExamBlueprintRequest,
+  CreateExamBlueprintSectionRequest,
+  CreateExamBlueprintSlotRequest,
   CreateExamBlueprintVersionRequest,
+  ExamBlueprintSectionDto,
   ExamBlueprintSectionInput,
+  ExamBlueprintSlotDto,
   ExamBlueprintSlotInput,
+  ExamBlueprintVersionDto,
+  QuestionSelectionSpec,
 } from '../types'
 import {
   formatDateTime,
@@ -23,6 +40,14 @@ import {
 } from '../types'
 
 const DEFAULT_LANGUAGE_ID = '00000000-0000-0000-0000-000000000001'
+
+const QUESTION_TYPE_OPTIONS = [
+  { label: 'Doc to', value: 'READ_ALOUD' },
+  { label: 'Tra loi ngan', value: 'SHORT_ANSWER' },
+  { label: 'Tra loi dai', value: 'LONG_ANSWER' },
+  { label: 'Y kien', value: 'OPINION' },
+  { label: 'Mo ta', value: 'DESCRIPTION' },
+] as const
 
 function getErrorMessage(error: unknown) {
   if (
@@ -35,6 +60,112 @@ function getErrorMessage(error: unknown) {
   }
 
   return 'Khong the xu ly blueprint.'
+}
+
+function createSelectionSpec(): QuestionSelectionSpec {
+  return {
+    difficulty: null,
+    questionType: null,
+    skillCode: null,
+    targetBandLevel: null,
+    topicId: null,
+  }
+}
+
+function createDefaultSlotInput(order: number): ExamBlueprintSlotInput {
+  return {
+    order,
+    selectionSpec: createSelectionSpec(),
+    slotType: 'SELECTION',
+    weight: 1,
+  }
+}
+
+function createDefaultSectionInput(order: number): ExamBlueprintSectionInput {
+  return {
+    instruction: '',
+    order,
+    sectionTimeLimitSeconds: 0,
+    sectionWeight: 1,
+    slots: [createDefaultSlotInput(1)],
+    title: `Section ${order}`,
+  }
+}
+
+function cloneDraftSection(section: ExamBlueprintSectionDto): ExamBlueprintSectionDto {
+  return {
+    ...section,
+    slots: section.slots.map((slot) => ({
+      ...slot,
+      fixedQuestion: slot.fixedQuestion ? { ...slot.fixedQuestion } : null,
+      selectionSpec: slot.selectionSpec ? { ...slot.selectionSpec } : null,
+    })),
+  }
+}
+
+function normalizeSectionPayload(
+  section: Pick<
+    ExamBlueprintSectionDto | ExamBlueprintSectionInput,
+    'instruction' | 'order' | 'sectionTimeLimitSeconds' | 'sectionWeight' | 'title'
+  >,
+): CreateExamBlueprintSectionRequest {
+  return {
+    instruction: section.instruction?.trim() || null,
+    order: Number(section.order) || 1,
+    sectionTimeLimitSeconds: section.sectionTimeLimitSeconds ?? null,
+    sectionWeight: section.sectionWeight ?? null,
+    title: section.title.trim(),
+  }
+}
+
+function normalizeSlotPayload(
+  slot: Pick<
+    ExamBlueprintSlotDto | ExamBlueprintSlotInput,
+    | 'fixedQuestionId'
+    | 'order'
+    | 'prepTimeSecondsOverride'
+    | 'responseTimeSecondsOverride'
+    | 'selectionSpec'
+    | 'slotType'
+    | 'weight'
+  >,
+): CreateExamBlueprintSlotRequest {
+  return {
+    fixedQuestionId: slot.slotType === 'FIXED' ? slot.fixedQuestionId || null : null,
+    order: Number(slot.order) || 1,
+    prepTimeSecondsOverride: slot.prepTimeSecondsOverride ?? null,
+    responseTimeSecondsOverride: slot.responseTimeSecondsOverride ?? null,
+    selectionSpec:
+      slot.slotType === 'SELECTION'
+        ? {
+            difficulty: slot.selectionSpec?.difficulty?.trim() || null,
+            questionType: slot.selectionSpec?.questionType?.trim() || null,
+            skillCode: slot.selectionSpec?.skillCode?.trim() || null,
+            targetBandLevel: slot.selectionSpec?.targetBandLevel?.trim() || null,
+            topicId: slot.selectionSpec?.topicId?.trim() || null,
+          }
+        : null,
+    slotType: slot.slotType,
+    weight: slot.weight ?? null,
+  }
+}
+
+function getPublishBlockers(version: ExamBlueprintVersionDto) {
+  return version.sections.flatMap((section) =>
+    section.slots
+      .filter(
+        (slot) =>
+          slot.slotType === 'FIXED' &&
+          slot.fixedQuestion &&
+          slot.fixedQuestion.status !== 'PUBLISHED',
+      )
+      .map((slot) => ({
+        questionCode: slot.fixedQuestion?.code ?? slot.fixedQuestionId ?? 'unknown',
+        sectionTitle: section.title,
+        slotOrder: slot.order,
+        status: slot.fixedQuestion?.status ?? '-',
+      })),
+  )
 }
 
 type BlueprintListPageProps = {
@@ -50,6 +181,7 @@ function BlueprintListPage({ basePath, readOnly = false, title }: BlueprintListP
   const [showCreate, setShowCreate] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { confirm, dialog } = useConfirmationDialog()
   const blueprintsQuery = useExamBlueprintsQuery({ keyword, page: 1, size: 10 })
   const createMutation = useCreateBlueprintMutation()
   const deleteMutation = useDeleteBlueprintMutation()
@@ -87,22 +219,27 @@ function BlueprintListPage({ basePath, readOnly = false, title }: BlueprintListP
         </div>
       </div>
 
-      {message ? <Notice tone="success">{message}</Notice> : null}
-      {error ? <Notice tone="error">{error}</Notice> : null}
+      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      {dialog}
 
       {showCreate ? (
         <form
           className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-3"
           onSubmit={(event) => {
             event.preventDefault()
-            const form = new FormData(event.currentTarget)
-            const payload: CreateExamBlueprintRequest = {
-              code: String(form.get('code') ?? ''),
-              description: String(form.get('description') ?? '') || null,
-              languageId: DEFAULT_LANGUAGE_ID,
-              name: String(form.get('name') ?? ''),
-            }
+            const formElement = event.currentTarget
             void (async () => {
+              if (!(await confirm({ message: 'Ban co chac muon tao blueprint nay khong?' }))) {
+                return
+              }
+              const form = new FormData(formElement)
+              const payload: CreateExamBlueprintRequest = {
+                code: String(form.get('code') ?? ''),
+                description: String(form.get('description') ?? '') || null,
+                languageId: DEFAULT_LANGUAGE_ID,
+                name: String(form.get('name') ?? ''),
+              }
               try {
                 const result = await createMutation.mutateAsync(payload)
                 await refresh()
@@ -207,23 +344,214 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
   const updateBlueprintMutation = useUpdateBlueprintMutation()
   const createVersionMutation = useCreateBlueprintVersionMutation()
   const updateVersionStatusMutation = useUpdateBlueprintVersionStatusMutation()
+  const createSectionMutation = useCreateBlueprintSectionMutation()
+  const updateSectionMutation = useUpdateBlueprintSectionMutation()
+  const deleteSectionMutation = useDeleteBlueprintSectionMutation()
+  const createSlotMutation = useCreateBlueprintSlotMutation()
+  const updateSlotMutation = useUpdateBlueprintSlotMutation()
+  const deleteSlotMutation = useDeleteBlueprintSlotMutation()
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [sections, setSections] = useState<ExamBlueprintSectionInput[]>([
-    {
-      instruction: '',
-      order: 1,
-      sectionTimeLimitSeconds: 0,
-      sectionWeight: 1,
-      slots: [{ fixedQuestionId: '', order: 1, slotType: 'FIXED', weight: 1 }],
-      title: 'Section 1',
-    },
+    createDefaultSectionInput(1),
   ])
+  const [draftSectionsByVersion, setDraftSectionsByVersion] = useState<
+    Record<string, ExamBlueprintSectionDto[]>
+  >({})
+  const [selectionBankBySlot, setSelectionBankBySlot] = useState<Record<string, string>>({})
+  const { confirm, dialog } = useConfirmationDialog()
+
+  const questionBanksQuery = useQuestionBanksQuery('teacher', 0, 100, canEdit, {
+    status: 'PUBLISHED',
+  })
+
+  useEffect(() => {
+    if (!blueprint?.versions) {
+      return
+    }
+
+    setDraftSectionsByVersion((current) => {
+      const next = { ...current }
+      for (const version of blueprint.versions ?? []) {
+        if (version.status === 'DRAFT') {
+          next[version.id] = version.sections.map(cloneDraftSection)
+        }
+      }
+      return next
+    })
+  }, [blueprint])
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
+  }
+
+  function setDraftSections(
+    versionId: string,
+    updater: (sectionsState: ExamBlueprintSectionDto[]) => ExamBlueprintSectionDto[],
+  ) {
+    setDraftSectionsByVersion((current) => ({
+      ...current,
+      [versionId]: updater(current[versionId] ?? []),
+    }))
+  }
+
+  function updateCreateSlot(
+    sectionIndex: number,
+    slotIndex: number,
+    updater: (slot: ExamBlueprintSlotInput) => ExamBlueprintSlotInput,
+  ) {
+    setSections((current) =>
+      current.map((item, currentSectionIndex) =>
+        currentSectionIndex === sectionIndex
+          ? {
+              ...item,
+              slots: item.slots.map((currentSlot, currentSlotIndex) =>
+                currentSlotIndex === slotIndex ? updater(currentSlot) : currentSlot,
+              ),
+            }
+          : item,
+      ),
+    )
+  }
+
+  function updateDraftSection(
+    versionId: string,
+    sectionId: string,
+    updater: (section: ExamBlueprintSectionDto) => ExamBlueprintSectionDto,
+  ) {
+    setDraftSections(versionId, (current) =>
+      current.map((section) => (section.id === sectionId ? updater(section) : section)),
+    )
+  }
+
+  function updateDraftSlot(
+    versionId: string,
+    sectionId: string,
+    slotId: string,
+    updater: (slot: ExamBlueprintSlotDto) => ExamBlueprintSlotDto,
+  ) {
+    setDraftSections(versionId, (current) =>
+      current.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              slots: section.slots.map((slot) => (slot.id === slotId ? updater(slot) : slot)),
+            }
+          : section,
+      ),
+    )
+  }
+
+  async function handleSaveDraftSection(versionId: string, section: ExamBlueprintSectionDto) {
+    if (!section.title.trim()) {
+      setError('Tieu de section khong duoc de trong.')
+      return
+    }
+
+    if (!(await confirm({ message: 'Ban co chac muon luu section draft nay khong?' }))) {
+      return
+    }
+
+    try {
+      const result = await updateSectionMutation.mutateAsync({
+        payload: normalizeSectionPayload(section),
+        sectionId: section.id,
+      })
+      await refresh()
+      setMessage(result)
+      setError(null)
+    } catch (submitError) {
+      setError(getErrorMessage(submitError))
+      setDraftSections(versionId, () =>
+        blueprint?.versions?.find((version) => version.id === versionId)?.sections.map(cloneDraftSection) ?? [],
+      )
+    }
+  }
+
+  async function handleAddDraftSection(version: ExamBlueprintVersionDto) {
+    try {
+      const result = await createSectionMutation.mutateAsync({
+        payload: normalizeSectionPayload({
+          instruction: '',
+          order: version.sections.length + 1,
+          sectionTimeLimitSeconds: 0,
+          sectionWeight: 1,
+          title: `Section ${version.sections.length + 1}`,
+        }),
+        versionId: version.id,
+      })
+      await refresh()
+      setMessage(result)
+      setError(null)
+    } catch (submitError) {
+      setError(getErrorMessage(submitError))
+    }
+  }
+
+  async function handleDeleteDraftSection(sectionId: string) {
+    try {
+      const result = await deleteSectionMutation.mutateAsync(sectionId)
+      await refresh()
+      setMessage(result)
+      setError(null)
+    } catch (submitError) {
+      setError(getErrorMessage(submitError))
+    }
+  }
+
+  async function handleSaveDraftSlot(slotId: string, slot: ExamBlueprintSlotDto) {
+    if (slot.slotType === 'FIXED' && !slot.fixedQuestionId) {
+      setError('Slot FIXED can chon fixed question truoc khi luu.')
+      return
+    }
+
+    if (!(await confirm({ message: 'Ban co chac muon luu slot draft nay khong?' }))) {
+      return
+    }
+
+    try {
+      const result = await updateSlotMutation.mutateAsync({
+        payload: normalizeSlotPayload(slot),
+        slotId,
+      })
+      await refresh()
+      setMessage(result)
+      setError(null)
+    } catch (submitError) {
+      setError(getErrorMessage(submitError))
+    }
+  }
+
+  async function handleAddDraftSlot(section: ExamBlueprintSectionDto) {
+    try {
+      const result = await createSlotMutation.mutateAsync({
+        payload: normalizeSlotPayload({
+          order: section.slots.length + 1,
+          selectionSpec: createSelectionSpec(),
+          slotType: 'SELECTION',
+          weight: 1,
+        }),
+        sectionId: section.id,
+      })
+      await refresh()
+      setMessage(result)
+      setError(null)
+    } catch (submitError) {
+      setError(getErrorMessage(submitError))
+    }
+  }
+
+  async function handleDeleteDraftSlot(slotId: string) {
+    try {
+      const result = await deleteSlotMutation.mutateAsync(slotId)
+      await refresh()
+      setMessage(result)
+      setError(null)
+    } catch (submitError) {
+      setError(getErrorMessage(submitError))
+    }
   }
 
   if (!blueprint) {
@@ -241,12 +569,13 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
         </button>
         <h1 className="text-3xl font-black text-blue-950">{title}</h1>
         <p className="mt-2 text-sm font-medium text-slate-600">
-          Xem thong tin blueprint, version va tao draft version moi.
+          Xem thong tin blueprint, version va soan editor chi tiet cho draft version.
         </p>
       </div>
 
-      {message ? <Notice tone="success">{message}</Notice> : null}
-      {error ? <Notice tone="error">{error}</Notice> : null}
+      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      {dialog}
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
         <InfoItem label="Ten" value={blueprint.name} />
@@ -295,12 +624,20 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
         <div className="grid gap-4">
           {blueprint.versions?.map((version) => {
             const status = getBlueprintVersionStatusDisplay(version.status)
+            const publishBlockers = getPublishBlockers(version)
+            const draftSections = draftSectionsByVersion[version.id] ?? version.sections
+
             return (
               <div className="grid gap-4 rounded-lg border border-slate-200 p-4" key={version.id}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
+                  <div className="grid gap-2">
                     <p className="text-sm font-black text-slate-950">Version {version.version} - {version.code}</p>
-                    <span className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-black ${status.className}`}>{status.label}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${status.className}`}>{status.label}</span>
+                      <span className="text-xs font-semibold text-slate-500">
+                        Tong thoi gian: {version.totalTimeLimitSeconds ?? 0} giay
+                      </span>
+                    </div>
                   </div>
                   {canEdit ? (
                     <div className="flex gap-2">
@@ -349,21 +686,298 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                     </div>
                   ) : null}
                 </div>
-                {version.sections.map((section) => (
-                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-4" key={section.id}>
-                    <p className="text-sm font-black text-slate-950">
-                      Section {section.order}: {section.title}
-                    </p>
-                    <div className="mt-2 grid gap-2">
-                      {section.slots.map((slot) => (
-                        <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-medium text-slate-700" key={slot.id}>
-                          Slot {slot.order} - {slot.slotType}
-                          {slot.fixedQuestion?.code ? ` - ${slot.fixedQuestion.code}` : ''}
-                        </div>
-                      ))}
+
+                {publishBlockers.length ? (
+                  <Notice tone="error">
+                    {`Version nay con ${publishBlockers.length} slot FIXED tro toi question chua PUBLISHED: `}
+                    {publishBlockers
+                      .map(
+                        (blocker) =>
+                          `${blocker.sectionTitle}/slot ${blocker.slotOrder} (${blocker.questionCode} - ${blocker.status})`,
+                      )
+                      .join(', ')}
+                  </Notice>
+                ) : null}
+
+                {version.status === 'DRAFT' && canEdit ? (
+                  <div className="grid gap-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-black text-slate-950">Editor draft version</h3>
+                        <p className="mt-1 text-sm font-medium text-slate-600">
+                          Them, sua, xoa section va slot ngay tren version DRAFT nay.
+                        </p>
+                      </div>
+                      <button
+                        className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+                        onClick={() => void handleAddDraftSection(version)}
+                        type="button"
+                      >
+                        Them section
+                      </button>
                     </div>
+
+                    {draftSections.map((section) => (
+                      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4" key={section.id}>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-black text-slate-950">
+                              Section {section.order}: {section.title}
+                            </p>
+                            <p className="mt-1 text-xs font-medium text-slate-500">
+                              Blur o input de luu section, slot co nut luu rieng khi can.
+                            </p>
+                          </div>
+                          <button
+                            className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-bold text-red-600"
+                            onClick={() => void handleDeleteDraftSection(section.id)}
+                            type="button"
+                          >
+                            Xoa section
+                          </button>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-4">
+                          <Field
+                            label="Thu tu"
+                            name={`draft-section-order-${section.id}`}
+                            onBlur={() => void handleSaveDraftSection(version.id, section)}
+                            onValueChange={(value) =>
+                              updateDraftSection(version.id, section.id, (current) => ({
+                                ...current,
+                                order: Number(value) || 1,
+                              }))
+                            }
+                            value={String(section.order)}
+                          />
+                          <Field
+                            label="Tieu de section"
+                            name={`draft-section-title-${section.id}`}
+                            onBlur={() => void handleSaveDraftSection(version.id, section)}
+                            onValueChange={(value) =>
+                              updateDraftSection(version.id, section.id, (current) => ({
+                                ...current,
+                                title: value,
+                              }))
+                            }
+                            value={section.title}
+                          />
+                          <Field
+                            label="Section time"
+                            name={`draft-section-time-${section.id}`}
+                            onBlur={() => void handleSaveDraftSection(version.id, section)}
+                            onValueChange={(value) =>
+                              updateDraftSection(version.id, section.id, (current) => ({
+                                ...current,
+                                sectionTimeLimitSeconds: Number(value) || 0,
+                              }))
+                            }
+                            value={String(section.sectionTimeLimitSeconds ?? 0)}
+                          />
+                          <Field
+                            label="Section weight"
+                            name={`draft-section-weight-${section.id}`}
+                            onBlur={() => void handleSaveDraftSection(version.id, section)}
+                            onValueChange={(value) =>
+                              updateDraftSection(version.id, section.id, (current) => ({
+                                ...current,
+                                sectionWeight: Number(value) || 1,
+                              }))
+                            }
+                            value={String(section.sectionWeight ?? 1)}
+                          />
+                        </div>
+
+                        <Field
+                          label="Instruction"
+                          name={`draft-section-instruction-${section.id}`}
+                          onBlur={() => void handleSaveDraftSection(version.id, section)}
+                          onValueChange={(value) =>
+                            updateDraftSection(version.id, section.id, (current) => ({
+                              ...current,
+                              instruction: value,
+                            }))
+                          }
+                          value={section.instruction ?? ''}
+                        />
+
+                        <div className="flex justify-end">
+                          <button
+                            className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
+                            onClick={() => void handleAddDraftSlot(section)}
+                            type="button"
+                          >
+                            Them slot
+                          </button>
+                        </div>
+
+                        {section.slots.map((slot) => {
+                          const topicQueryKey = slot.id || `${section.id}-${slot.order}`
+
+                          return (
+                            <div className="grid gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4" key={slot.id}>
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-black text-slate-950">
+                                    Slot {slot.order} - {slot.slotType}
+                                  </p>
+                                  {slot.fixedQuestion?.code ? (
+                                    <p className="mt-1 text-xs font-medium text-slate-500">
+                                      Fixed question: {slot.fixedQuestion.code}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                                    onClick={() => void handleSaveDraftSlot(slot.id, slot)}
+                                    type="button"
+                                  >
+                                    Luu slot
+                                  </button>
+                                  <button
+                                    className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-bold text-red-600"
+                                    onClick={() => void handleDeleteDraftSlot(slot.id)}
+                                    type="button"
+                                  >
+                                    Xoa slot
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="grid gap-4 md:grid-cols-5">
+                                <Field
+                                  label="Thu tu"
+                                  name={`draft-slot-order-${slot.id}`}
+                                  onValueChange={(value) =>
+                                    updateDraftSlot(version.id, section.id, slot.id, (current) => ({
+                                      ...current,
+                                      order: Number(value) || 1,
+                                    }))
+                                  }
+                                  value={String(slot.order)}
+                                />
+                                <SelectField
+                                  label="Slot type"
+                                  onChange={(value) =>
+                                    updateDraftSlot(version.id, section.id, slot.id, (current) => ({
+                                      ...current,
+                                      fixedQuestionId: value === 'FIXED' ? current.fixedQuestionId ?? null : null,
+                                      selectionSpec:
+                                        value === 'SELECTION'
+                                          ? current.selectionSpec ?? createSelectionSpec()
+                                          : null,
+                                      slotType: value as ExamBlueprintSlotDto['slotType'],
+                                    }))
+                                  }
+                                  options={[
+                                    { label: 'Fixed', value: 'FIXED' },
+                                    { label: 'Selection', value: 'SELECTION' },
+                                  ]}
+                                  value={slot.slotType}
+                                />
+                                <Field
+                                  label="Weight"
+                                  name={`draft-slot-weight-${slot.id}`}
+                                  onValueChange={(value) =>
+                                    updateDraftSlot(version.id, section.id, slot.id, (current) => ({
+                                      ...current,
+                                      weight: Number(value) || 1,
+                                    }))
+                                  }
+                                  value={String(slot.weight ?? 1)}
+                                />
+                                <Field
+                                  label="Prep time"
+                                  name={`draft-slot-prep-${slot.id}`}
+                                  onValueChange={(value) =>
+                                    updateDraftSlot(version.id, section.id, slot.id, (current) => ({
+                                      ...current,
+                                      prepTimeSecondsOverride: Number(value) || 0,
+                                    }))
+                                  }
+                                  value={String(slot.prepTimeSecondsOverride ?? 0)}
+                                />
+                                <Field
+                                  label="Response time"
+                                  name={`draft-slot-response-${slot.id}`}
+                                  onValueChange={(value) =>
+                                    updateDraftSlot(version.id, section.id, slot.id, (current) => ({
+                                      ...current,
+                                      responseTimeSecondsOverride: Number(value) || 0,
+                                    }))
+                                  }
+                                  value={String(slot.responseTimeSecondsOverride ?? 0)}
+                                />
+                              </div>
+
+                              {slot.slotType === 'FIXED' ? (
+                                <div className="grid gap-3">
+                                  <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+                                    {slot.fixedQuestion
+                                      ? `Dang chon ${slot.fixedQuestion.code} - ${formatNullableText(slot.fixedQuestion.questionText)}`
+                                      : 'Chua chon question co dinh cho slot nay.'}
+                                  </div>
+                                  <QuestionPicker
+                                    allowStatusChange={false}
+                                    mode="single"
+                                    onSelect={(question) => {
+                                      const nextSlot = {
+                                        ...slot,
+                                        fixedQuestion: {
+                                          code: question.code,
+                                          id: question.id,
+                                          questionText: question.questionText,
+                                          status: question.status,
+                                        },
+                                        fixedQuestionId: question.id,
+                                      }
+                                      updateDraftSlot(version.id, section.id, slot.id, () => nextSlot)
+                                      void handleSaveDraftSlot(slot.id, nextSlot)
+                                    }}
+                                    selectedQuestionIds={slot.fixedQuestionId ? [slot.fixedQuestionId] : []}
+                                    title="Question picker"
+                                  />
+                                </div>
+                              ) : (
+                                <SelectionSpecEditor
+                                  bankOptions={questionBanksQuery.data?.content ?? []}
+                                  canEdit={canEdit}
+                                  selectionBankBySlot={selectionBankBySlot}
+                                  selectionSpec={slot.selectionSpec}
+                                  setSelectionBankBySlot={setSelectionBankBySlot}
+                                  slotKey={topicQueryKey}
+                                  onSelectionSpecChange={(nextSelectionSpec) =>
+                                    updateDraftSlot(version.id, section.id, slot.id, (current) => ({
+                                      ...current,
+                                      selectionSpec: nextSelectionSpec,
+                                    }))
+                                  }
+                                />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  version.sections.map((section) => (
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-4" key={section.id}>
+                      <p className="text-sm font-black text-slate-950">
+                        Section {section.order}: {section.title}
+                      </p>
+                      <div className="mt-2 grid gap-2">
+                        {section.slots.map((slot) => (
+                          <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-medium text-slate-700" key={slot.id}>
+                            Slot {slot.order} - {slot.slotType}
+                            {slot.fixedQuestion?.code ? ` - ${slot.fixedQuestion.code}` : ''}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )
           })}
@@ -375,8 +989,25 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
           className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6"
           onSubmit={(event) => {
             event.preventDefault()
+
+            for (const section of sections) {
+              if (!section.title.trim()) {
+                setError('Moi section phai co tieu de.')
+                return
+              }
+              for (const slot of section.slots) {
+                if (slot.slotType === 'FIXED' && !slot.fixedQuestionId) {
+                  setError(`Section ${section.order} co slot FIXED chua chon question.`)
+                  return
+                }
+              }
+            }
+
             const payload: CreateExamBlueprintVersionRequest = {
-              sections,
+              sections: sections.map((section) => ({
+                ...normalizeSectionPayload(section),
+                slots: section.slots.map((slot) => normalizeSlotPayload(slot)),
+              })),
               totalTimeLimitSeconds: sections.reduce(
                 (sum, section) => sum + (section.sectionTimeLimitSeconds ?? 0),
                 0,
@@ -389,6 +1020,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                   payload,
                 })
                 await refresh()
+                setSections([createDefaultSectionInput(1)])
                 setMessage(result)
                 setError(null)
               } catch (submitError) {
@@ -398,21 +1030,16 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
           }}
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-slate-950">Tao draft version</h2>
+            <div>
+              <h2 className="text-lg font-black text-slate-950">Tao draft version</h2>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                Flow nay dung cho tao moi hoan toan. Draft da ton tai thi sua o editor phia tren.
+              </p>
+            </div>
             <button
               className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
               onClick={() =>
-                setSections((current) => [
-                  ...current,
-                  {
-                    instruction: '',
-                    order: current.length + 1,
-                    sectionTimeLimitSeconds: 0,
-                    sectionWeight: 1,
-                    slots: [{ fixedQuestionId: '', order: 1, slotType: 'FIXED', weight: 1 }],
-                    title: `Section ${current.length + 1}`,
-                  },
-                ])
+                setSections((current) => [...current, createDefaultSectionInput(current.length + 1)])
               }
               type="button"
             >
@@ -422,7 +1049,26 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
 
           {sections.map((section, sectionIndex) => (
             <div className="grid gap-4 rounded-lg border border-slate-200 p-4" key={`section-${sectionIndex}`}>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="flex justify-between gap-3">
+                <p className="text-sm font-black text-slate-950">Section moi #{sectionIndex + 1}</p>
+                {sections.length > 1 ? (
+                  <button
+                    className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-bold text-red-600"
+                    onClick={() =>
+                      setSections((current) =>
+                        current
+                          .filter((_, index) => index !== sectionIndex)
+                          .map((item, index) => ({ ...item, order: index + 1 })),
+                      )
+                    }
+                    type="button"
+                  >
+                    Xoa section
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-4">
                 <Field
                   label="Tieu de section"
                   name={`section-title-${sectionIndex}`}
@@ -432,6 +1078,18 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                     )
                   }
                   value={section.title}
+                />
+                <Field
+                  label="Thu tu"
+                  name={`section-order-${sectionIndex}`}
+                  onValueChange={(value) =>
+                    setSections((current) =>
+                      current.map((item, index) =>
+                        index === sectionIndex ? { ...item, order: Number(value) || 1 } : item,
+                      ),
+                    )
+                  }
+                  value={String(section.order)}
                 />
                 <Field
                   label="Section time"
@@ -458,104 +1116,176 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                   value={String(section.sectionWeight ?? 1)}
                 />
               </div>
-              {section.slots.map((slot, slotIndex) => (
-                <div className="grid gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4 md:grid-cols-4" key={`slot-${sectionIndex}-${slotIndex}`}>
-                  <SelectField
-                    label="Slot type"
-                    onChange={(value) =>
-                      setSections((current) =>
-                        current.map((item, currentSectionIndex) =>
-                          currentSectionIndex === sectionIndex
-                            ? {
-                                ...item,
-                                slots: item.slots.map((currentSlot, currentSlotIndex) =>
-                                  currentSlotIndex === slotIndex
-                                    ? { ...currentSlot, slotType: value as ExamBlueprintSlotInput['slotType'] }
-                                    : currentSlot,
-                                ),
-                              }
-                            : item,
-                        ),
-                      )
-                    }
-                    options={[
-                      { label: 'Fixed', value: 'FIXED' },
-                      { label: 'Selection', value: 'SELECTION' },
-                    ]}
-                    value={slot.slotType}
-                  />
-                  <Field
-                    label="Fixed question ID"
-                    name={`fixed-question-${sectionIndex}-${slotIndex}`}
-                    onValueChange={(value) =>
-                      setSections((current) =>
-                        current.map((item, currentSectionIndex) =>
-                          currentSectionIndex === sectionIndex
-                            ? {
-                                ...item,
-                                slots: item.slots.map((currentSlot, currentSlotIndex) =>
-                                  currentSlotIndex === slotIndex
-                                    ? { ...currentSlot, fixedQuestionId: value }
-                                    : currentSlot,
-                                ),
-                              }
-                            : item,
-                        ),
-                      )
-                    }
-                    value={slot.fixedQuestionId ?? ''}
-                  />
-                  <Field
-                    label="Weight"
-                    name={`slot-weight-${sectionIndex}-${slotIndex}`}
-                    onValueChange={(value) =>
-                      setSections((current) =>
-                        current.map((item, currentSectionIndex) =>
-                          currentSectionIndex === sectionIndex
-                            ? {
-                                ...item,
-                                slots: item.slots.map((currentSlot, currentSlotIndex) =>
-                                  currentSlotIndex === slotIndex
-                                    ? { ...currentSlot, weight: Number(value) || 1 }
-                                    : currentSlot,
-                                ),
-                              }
-                            : item,
-                        ),
-                      )
-                    }
-                    value={String(slot.weight ?? 1)}
-                  />
-                  <div className="self-end">
-                    <button
-                      className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700"
-                      onClick={() =>
-                        setSections((current) =>
-                          current.map((item, currentSectionIndex) =>
-                            currentSectionIndex === sectionIndex
-                              ? {
-                                  ...item,
-                                  slots: [
-                                    ...item.slots,
-                                    {
-                                      fixedQuestionId: '',
-                                      order: item.slots.length + 1,
-                                      slotType: 'FIXED',
-                                      weight: 1,
-                                    },
-                                  ],
-                                }
-                              : item,
-                          ),
-                        )
-                      }
-                      type="button"
-                    >
-                      Them slot
-                    </button>
+
+              <Field
+                label="Instruction"
+                name={`section-instruction-${sectionIndex}`}
+                onValueChange={(value) =>
+                  setSections((current) =>
+                    current.map((item, index) => (index === sectionIndex ? { ...item, instruction: value } : item)),
+                  )
+                }
+                value={section.instruction ?? ''}
+              />
+
+              {section.slots.map((slot, slotIndex) => {
+                const createSlotKey = `create-${sectionIndex}-${slotIndex}`
+
+                return (
+                  <div className="grid gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4" key={`slot-${sectionIndex}-${slotIndex}`}>
+                    <div className="flex justify-between gap-3">
+                      <p className="text-sm font-black text-slate-950">Slot #{slotIndex + 1}</p>
+                      {section.slots.length > 1 ? (
+                        <button
+                          className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-bold text-red-600"
+                          onClick={() =>
+                            setSections((current) =>
+                              current.map((item, currentSectionIndex) =>
+                                currentSectionIndex === sectionIndex
+                                  ? {
+                                      ...item,
+                                      slots: item.slots
+                                        .filter((_, currentSlotIndex) => currentSlotIndex !== slotIndex)
+                                        .map((currentSlot, nextSlotIndex) => ({
+                                          ...currentSlot,
+                                          order: nextSlotIndex + 1,
+                                        })),
+                                    }
+                                  : item,
+                              ),
+                            )
+                          }
+                          type="button"
+                        >
+                          Xoa slot
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-5">
+                      <Field
+                        label="Thu tu"
+                        name={`slot-order-${sectionIndex}-${slotIndex}`}
+                        onValueChange={(value) =>
+                          updateCreateSlot(sectionIndex, slotIndex, (currentSlot) => ({
+                            ...currentSlot,
+                            order: Number(value) || 1,
+                          }))
+                        }
+                        value={String(slot.order)}
+                      />
+                      <SelectField
+                        label="Slot type"
+                        onChange={(value) =>
+                          updateCreateSlot(sectionIndex, slotIndex, (currentSlot) => ({
+                            ...currentSlot,
+                            fixedQuestionId: value === 'FIXED' ? currentSlot.fixedQuestionId ?? null : null,
+                            selectionSpec:
+                              value === 'SELECTION'
+                                ? currentSlot.selectionSpec ?? createSelectionSpec()
+                                : null,
+                            slotType: value as ExamBlueprintSlotInput['slotType'],
+                          }))
+                        }
+                        options={[
+                          { label: 'Fixed', value: 'FIXED' },
+                          { label: 'Selection', value: 'SELECTION' },
+                        ]}
+                        value={slot.slotType}
+                      />
+                      <Field
+                        label="Weight"
+                        name={`slot-weight-${sectionIndex}-${slotIndex}`}
+                        onValueChange={(value) =>
+                          updateCreateSlot(sectionIndex, slotIndex, (currentSlot) => ({
+                            ...currentSlot,
+                            weight: Number(value) || 1,
+                          }))
+                        }
+                        value={String(slot.weight ?? 1)}
+                      />
+                      <Field
+                        label="Prep time"
+                        name={`slot-prep-${sectionIndex}-${slotIndex}`}
+                        onValueChange={(value) =>
+                          updateCreateSlot(sectionIndex, slotIndex, (currentSlot) => ({
+                            ...currentSlot,
+                            prepTimeSecondsOverride: Number(value) || 0,
+                          }))
+                        }
+                        value={String(slot.prepTimeSecondsOverride ?? 0)}
+                      />
+                      <Field
+                        label="Response time"
+                        name={`slot-response-${sectionIndex}-${slotIndex}`}
+                        onValueChange={(value) =>
+                          updateCreateSlot(sectionIndex, slotIndex, (currentSlot) => ({
+                            ...currentSlot,
+                            responseTimeSecondsOverride: Number(value) || 0,
+                          }))
+                        }
+                        value={String(slot.responseTimeSecondsOverride ?? 0)}
+                      />
+                    </div>
+
+                    {slot.slotType === 'FIXED' ? (
+                      <div className="grid gap-3">
+                        <p className="text-sm font-bold text-slate-700">
+                          Chon cau hoi co dinh cho slot nay
+                        </p>
+                        <QuestionPicker
+                          allowStatusChange={false}
+                          mode="single"
+                          onSelect={(question) =>
+                            updateCreateSlot(sectionIndex, slotIndex, (currentSlot) => ({
+                              ...currentSlot,
+                              fixedQuestionId: question.id,
+                            }))
+                          }
+                          selectedQuestionIds={slot.fixedQuestionId ? [slot.fixedQuestionId] : []}
+                          title="Question picker"
+                        />
+                      </div>
+                    ) : (
+                      <SelectionSpecEditor
+                        bankOptions={questionBanksQuery.data?.content ?? []}
+                        canEdit={canEdit}
+                        selectionBankBySlot={selectionBankBySlot}
+                        selectionSpec={slot.selectionSpec}
+                        setSelectionBankBySlot={setSelectionBankBySlot}
+                        slotKey={createSlotKey}
+                        onSelectionSpecChange={(nextSelectionSpec) =>
+                          updateCreateSlot(sectionIndex, slotIndex, (currentSlot) => ({
+                            ...currentSlot,
+                            selectionSpec: nextSelectionSpec,
+                          }))
+                        }
+                      />
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
+
+              <div className="flex justify-end">
+                <button
+                  className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700"
+                  onClick={() =>
+                    setSections((current) =>
+                      current.map((item, currentSectionIndex) =>
+                        currentSectionIndex === sectionIndex
+                          ? {
+                              ...item,
+                              slots: [...item.slots, createDefaultSlotInput(item.slots.length + 1)],
+                            }
+                          : item,
+                      ),
+                    )
+                  }
+                  type="button"
+                >
+                  Them slot
+                </button>
+              </div>
             </div>
           ))}
 
@@ -573,11 +1303,13 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
 function Field({
   label,
   name,
+  onBlur,
   onValueChange,
   value,
 }: {
   label: string
   name: string
+  onBlur?: () => void
   onValueChange?: (value: string) => void
   value?: string
 }) {
@@ -587,6 +1319,7 @@ function Field({
       <input
         className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
         name={name}
+        onBlur={onBlur}
         onChange={onValueChange ? (event) => onValueChange(event.target.value) : undefined}
         value={value}
       />
@@ -620,6 +1353,139 @@ function SelectField({
         ))}
       </select>
     </label>
+  )
+}
+
+function SelectionSpecEditor({
+  bankOptions,
+  canEdit,
+  onSelectionSpecChange,
+  selectionBankBySlot,
+  selectionSpec,
+  setSelectionBankBySlot,
+  slotKey,
+}: {
+  bankOptions: Array<{ code: string; id: string; name: string }>
+  canEdit: boolean
+  onSelectionSpecChange: (selectionSpec: QuestionSelectionSpec) => void
+  selectionBankBySlot: Record<string, string>
+  selectionSpec?: QuestionSelectionSpec | null
+  setSelectionBankBySlot: Dispatch<SetStateAction<Record<string, string>>>
+  slotKey: string
+}) {
+  const selectedBankId = selectionBankBySlot[slotKey] || bankOptions[0]?.id || ''
+  const questionTopicsQuery = useQuestionTopicsQuery(
+    'teacher',
+    selectedBankId,
+    0,
+    100,
+    canEdit && Boolean(selectedBankId),
+    { status: 'PUBLISHED' },
+  )
+
+  const currentSelectionSpec = {
+    ...createSelectionSpec(),
+    ...selectionSpec,
+  }
+
+  return (
+    <div className="grid gap-4 rounded-lg border border-dashed border-slate-300 bg-white p-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="grid gap-2 text-sm font-bold text-slate-700">
+          Question bank
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
+            onChange={(event) =>
+              setSelectionBankBySlot((current) => ({
+                ...current,
+                [slotKey]: event.target.value,
+              }))
+            }
+            value={selectedBankId}
+          >
+            <option value="">Chon bank de loc topic</option>
+            {bankOptions.map((bank) => (
+              <option key={bank.id} value={bank.id}>
+                {bank.code} - {bank.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-2 text-sm font-bold text-slate-700">
+          Question type
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
+            onChange={(event) =>
+              onSelectionSpecChange({
+                ...currentSelectionSpec,
+                questionType: event.target.value || null,
+              })
+            }
+            value={currentSelectionSpec.questionType ?? ''}
+          >
+            <option value="">Khong gioi han</option>
+            {QUESTION_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Field
+          label="Difficulty"
+          name={`selection-difficulty-${slotKey}`}
+          onValueChange={(value) =>
+            onSelectionSpecChange({
+              ...currentSelectionSpec,
+              difficulty: value || null,
+            })
+          }
+          value={currentSelectionSpec.difficulty ?? ''}
+        />
+        <Field
+          label="Target band"
+          name={`selection-band-${slotKey}`}
+          onValueChange={(value) =>
+            onSelectionSpecChange({
+              ...currentSelectionSpec,
+              targetBandLevel: value || null,
+            })
+          }
+          value={currentSelectionSpec.targetBandLevel ?? ''}
+        />
+        <Field
+          label="Skill code"
+          name={`selection-skill-${slotKey}`}
+          onValueChange={(value) =>
+            onSelectionSpecChange({
+              ...currentSelectionSpec,
+              skillCode: value || null,
+            })
+          }
+          value={currentSelectionSpec.skillCode ?? ''}
+        />
+        <label className="grid gap-2 text-sm font-bold text-slate-700">
+          Topic
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
+            onChange={(event) =>
+              onSelectionSpecChange({
+                ...currentSelectionSpec,
+                topicId: event.target.value || null,
+              })
+            }
+            value={currentSelectionSpec.topicId ?? ''}
+          >
+            <option value="">Khong gioi han</option>
+            {questionTopicsQuery.data?.content.map((topic) => (
+              <option key={topic.id} value={topic.id}>
+                {topic.code} - {topic.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
   )
 }
 

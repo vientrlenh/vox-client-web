@@ -1,8 +1,10 @@
 import type { FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { exportQuestions } from '../api/useQuestionExport'
 import { useQuestionsQuery, type QuestionQueryFilters } from '../api/useQuestionsQuery'
 import { QuestionPageHeader } from '../components/QuestionPageHeader'
 import { QuestionPagination } from '../components/QuestionPagination'
@@ -132,18 +134,24 @@ function QuestionsPage({
   const location = useLocation()
   const user = useAppSelector((state) => state.auth.user)
   const [searchParams] = useSearchParams()
+  const initialStatus: '' | QuestionStatus =
+    view === 'review' ? 'SUBMITTED_FOR_REVIEW' : ''
   const [page, setPage] = useState(DEFAULT_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const [draftFilters, setDraftFilters] = useState<QuestionQueryFilters>({
     ...EMPTY_FILTERS,
     questionBankId: searchParams.get('bankId') ?? '',
     questionTopicId: searchParams.get('topicId') ?? '',
+    status: initialStatus,
     topicName: searchParams.get('topicName') ?? '',
   })
   const [filters, setFilters] = useState<QuestionQueryFilters>({
     ...EMPTY_FILTERS,
     questionBankId: searchParams.get('bankId') ?? '',
     questionTopicId: searchParams.get('topicId') ?? '',
+    status: initialStatus,
     topicName: searchParams.get('topicName') ?? '',
   })
 
@@ -159,8 +167,13 @@ function QuestionsPage({
     if (tab === 'all') {
       return 'ALL'
     }
-    return 'MINE'
-  }, [allowTeacherTabs, searchParams])
+    if (tab === 'mine') {
+      return 'MINE'
+    }
+    // Khong co param tab (vd link tu Topic detail sang /teacher/questions/all?bankId=...&topicId=...)
+    // thi mac dinh theo dung danh tinh cua route: trang "/all" phai mac dinh la ALL, khong roi ve MINE.
+    return view === 'all' ? 'ALL' : 'MINE'
+  }, [allowTeacherTabs, searchParams, view])
 
   const actorRole = getQuestionActorRole(user?.roles)
   const teacherContext = getTeacherQuestionContext(view)
@@ -178,6 +191,28 @@ function QuestionsPage({
   const questionsQuery = useQuestionsQuery(scope, view, page, pageSize, effectiveFilters)
   const flashMessage =
     (location.state as { successMessage?: string } | null)?.successMessage ?? null
+  const [toastMessage, setToastMessage] = useState<string | null>(flashMessage)
+
+  useEffect(() => {
+    if (!flashMessage) {
+      return
+    }
+
+    setToastMessage(flashMessage)
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+  }, [flashMessage, location.pathname, location.search, navigate])
+
+  async function handleExport() {
+    setIsExporting(true)
+    setExportError(null)
+    try {
+      await exportQuestions(effectiveFilters)
+    } catch (error) {
+      setExportError(getErrorMessage(error) ?? 'Khong the xuat file. Vui long thu lai.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   function handleFilterSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -190,6 +225,7 @@ function QuestionsPage({
       ...EMPTY_FILTERS,
       questionBankId: searchParams.get('bankId') ?? '',
       questionTopicId: searchParams.get('topicId') ?? '',
+      status: initialStatus,
       topicName: searchParams.get('topicName') ?? '',
     }
     setPage(DEFAULT_PAGE)
@@ -202,6 +238,7 @@ function QuestionsPage({
       <QuestionPageHeader
         createLabel="Tao cau hoi moi"
         description={getDescription(view, teacherScopeTab, filters.topicName)}
+        isExporting={isExporting}
         isRefreshing={questionsQuery.isFetching}
         onBack={
           filters.questionBankId && filters.questionTopicId
@@ -229,17 +266,30 @@ function QuestionsPage({
               }
             : undefined
         }
+        onExport={() => {
+          void handleExport()
+        }}
+        onImport={
+          canCreateQuestion(actorRole) && view !== 'review'
+            ? () => navigate(`${basePath}/questions/import`)
+            : undefined
+        }
         onRefresh={() => {
           void questionsQuery.refetch()
         }}
         title={getTitle(view, teacherScopeTab)}
       />
 
-      {flashMessage ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-          {flashMessage}
-        </div>
-      ) : null}
+      <FeedbackToast
+        message={toastMessage}
+        onClose={() => setToastMessage(null)}
+        tone="success"
+      />
+      <FeedbackToast
+        message={exportError}
+        onClose={() => setExportError(null)}
+        tone="error"
+      />
 
       {allowTeacherTabs && view !== 'review' ? (
         <div className="rounded-lg border border-slate-200 bg-white p-1">

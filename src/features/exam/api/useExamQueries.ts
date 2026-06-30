@@ -37,6 +37,11 @@ const EXAM_DETAIL_FIELDS = `
     role
     grantedAt
     grantedBy
+    user {
+      id
+      fullName
+      email
+    }
   }
   papers {
     id
@@ -81,7 +86,7 @@ const EXAM_DETAIL_FIELDS = `
 `
 
 const EXAMS_QUERY = `
-  query Exams($kind: ExamKind, $status: ExamStatus, $schoolId: UUID, $keyword: String, $page: Int!, $size: Int!) {
+  query Exams($kind: ExamKind, $status: ExamStatus, $schoolId: ID, $keyword: String, $page: Int!, $size: Int!) {
     exams(kind: $kind, status: $status, schoolId: $schoolId, keyword: $keyword, page: $page, size: $size) {
       content { ${EXAM_LIST_FIELDS} }
       page
@@ -93,7 +98,7 @@ const EXAMS_QUERY = `
 `
 
 const CLASS_TESTS_QUERY = `
-  query ClassTests($status: ExamStatus, $schoolClassId: UUID, $keyword: String, $page: Int!, $size: Int!) {
+  query ClassTests($status: ExamStatus, $schoolClassId: ID, $keyword: String, $page: Int!, $size: Int!) {
     classTests(status: $status, schoolClassId: $schoolClassId, keyword: $keyword, page: $page, size: $size) {
       content { ${EXAM_LIST_FIELDS} }
       page
@@ -105,7 +110,7 @@ const CLASS_TESTS_QUERY = `
 `
 
 const EXAM_QUERY = `
-  query Exam($id: UUID!) {
+  query Exam($id: ID!) {
     exam(id: $id) { ${EXAM_DETAIL_FIELDS} }
   }
 `
@@ -164,6 +169,7 @@ const EXAM_BLUEPRINT_DETAIL_FIELDS = `
           id
           code
           questionText
+          status
         }
       }
     }
@@ -171,7 +177,7 @@ const EXAM_BLUEPRINT_DETAIL_FIELDS = `
 `
 
 const EXAM_BLUEPRINTS_QUERY = `
-  query ExamBlueprints($schoolId: UUID, $isActive: Boolean, $languageId: UUID, $keyword: String, $page: Int!, $size: Int!) {
+  query ExamBlueprints($schoolId: ID, $isActive: Boolean, $languageId: ID, $keyword: String, $page: Int!, $size: Int!) {
     examBlueprints(schoolId: $schoolId, isActive: $isActive, languageId: $languageId, keyword: $keyword, page: $page, size: $size) {
       content { ${EXAM_BLUEPRINT_LIST_FIELDS} }
       page
@@ -183,7 +189,7 @@ const EXAM_BLUEPRINTS_QUERY = `
 `
 
 const EXAM_BLUEPRINT_QUERY = `
-  query ExamBlueprint($id: UUID!) {
+  query ExamBlueprint($id: ID!) {
     examBlueprint(id: $id) { ${EXAM_BLUEPRINT_DETAIL_FIELDS} }
   }
 `

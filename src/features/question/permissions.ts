@@ -20,12 +20,10 @@ export type QuestionActorRole =
 export type QuestionWorkflowAction =
   | 'APPROVE'
   | 'ARCHIVE'
-  | 'LOCK'
   | 'PUBLISH'
   | 'REJECT'
   | 'REQUEST_REVISION'
   | 'SUBMIT'
-  | 'UNLOCK'
 
 export type ReviewActionOption = {
   action: QuestionWorkflowAction
@@ -237,14 +235,6 @@ export function getQuestionReviewActions(
     )
   }
 
-  if (teacherContext === 'owner' && question.status !== 'ARCHIVED') {
-    actions.push({
-      action: 'ARCHIVE',
-      description: 'Luu tru cau hoi hien tai.',
-      title: 'Archive',
-    })
-  }
-
   return actions
 }
 
@@ -289,24 +279,21 @@ function getAdminActions(status?: QuestionStatus | null) {
     })
   }
 
-  actions.push({
-    action: 'ARCHIVE',
-    description: 'Chuyen cau hoi sang luu tru.',
-    title: 'Archive',
-  })
+  if (status === 'PUBLISHED') {
+    actions.push({
+      action: 'ARCHIVE',
+      description: 'Ngung trien khai va dua cau hoi vao luu tru.',
+      title: 'Archive',
+    })
+  }
 
-  actions.push(
-    {
-      action: 'LOCK',
-      description: 'Khoa cau hoi.',
-      title: 'Lock',
-    },
-    {
-      action: 'UNLOCK',
-      description: 'Mo khoa cau hoi.',
-      title: 'Unlock',
-    },
-  )
+  if (status === 'ARCHIVED') {
+    actions.push({
+      action: 'PUBLISH',
+      description: 'Mo lai cau hoi da luu tru de tiep tuc su dung.',
+      title: 'Republish',
+    })
+  }
 
   return actions
 }
@@ -344,23 +331,21 @@ function getSchoolAdminActions(status?: QuestionStatus | null) {
     })
   }
 
-  actions.push(
-    {
+  if (status === 'PUBLISHED') {
+    actions.push({
       action: 'ARCHIVE',
-      description: 'Luu tru cau hoi.',
+      description: 'Luu tru cau hoi da trien khai.',
       title: 'Archive',
-    },
-    {
-      action: 'LOCK',
-      description: 'Khoa cau hoi.',
-      title: 'Lock',
-    },
-    {
-      action: 'UNLOCK',
-      description: 'Mo khoa cau hoi.',
-      title: 'Unlock',
-    },
-  )
+    })
+  }
+
+  if (status === 'ARCHIVED') {
+    actions.push({
+      action: 'PUBLISH',
+      description: 'Xuat ban lai cau hoi tu trang thai luu tru.',
+      title: 'Republish',
+    })
+  }
 
   return actions
 }

@@ -60,6 +60,11 @@ export type QuestionCollaboratorDto = {
   questionId: string
   permission: QuestionCollaboratorPermission
   assignedAt: string | null
+  user?: {
+    email?: string | null
+    fullName?: string | null
+    id: string
+  } | null
 }
 
 export type QuestionBankRefDto = {
@@ -239,6 +244,59 @@ export type CreateQuestionCollaboratorRequest = {
 
 export type UpdateQuestionCollaboratorRequest = {
   permission: QuestionCollaboratorPermission
+}
+
+export type PreviewQuestionImportResponse = {
+  importSessionId: string
+  fileName: string
+  originalHeaders: string[]
+  suggestedMapping: Record<string, string | null | undefined>
+  sampleRows: Record<string, string | null | undefined>[]
+  totalRows: number
+  expiresAt: string | null
+}
+
+export type AcceptQuestionImportRequest = {
+  confirmedMapping: Record<string, string>
+}
+
+export type ImportSessionDto = {
+  id: string
+  schoolId: string | null
+  type: string
+  fileName: string
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  importedRows: number
+  skippedRows: number
+  status: string
+  failureReason: string | null
+  expiresAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export type ImportRowErrorDto = {
+  field: string | null
+  message: string
+}
+
+export type ImportRowDto = {
+  id: string
+  sessionId: string
+  rowNumber: number
+  rawData: Array<{ key: string; value: string | null }>
+  errors: ImportRowErrorDto[]
+  status: string
+}
+
+export type ImportRowPage = {
+  content: ImportRowDto[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
 }
 
 export function formatQuestionDate(value?: string | null) {

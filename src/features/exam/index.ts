@@ -7,6 +7,11 @@ export {
   TeacherExamDetailPage,
 } from './pages/ExamPages'
 export {
+  TeacherExamPapersPage,
+  TeacherExamPaperDetailPage,
+  TeacherExamPaperEditPage,
+} from './pages/ExamPaperPages'
+export {
   SchoolAdminBlueprintsPage,
   SchoolAdminBlueprintDetailPage,
   SystemAdminBlueprintsPage,

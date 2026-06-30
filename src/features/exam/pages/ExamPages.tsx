@@ -1,8 +1,13 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
+import { useSchoolUsersBySchoolQuery } from '@/features/classes/api/useSchoolUsersBySchoolQuery'
+import { formatNullableText as formatQuestionNullableText } from '@/features/question/types'
+import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { QuestionPicker } from '../components/QuestionPicker'
 import {
   useCreateExamMemberMutation,
   useCreateExamMutation,
@@ -78,6 +83,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const { confirm, dialog } = useConfirmationDialog()
   const examsQuery = useExamsQuery({
     kind,
     keyword,
@@ -122,22 +128,18 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
         </div>
       </div>
 
-      {message ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-          {message}
-        </div>
-      ) : null}
-      {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          {error}
-        </div>
-      ) : null}
+      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      {dialog}
 
       {showCreate ? (
         <CreateExamCard
           isSubmitting={createExamMutation.isPending}
           onCancel={() => setShowCreate(false)}
           onSubmit={async (payload) => {
+            if (!(await confirm({ message: 'Ban co chac muon tao exam nay khong?' }))) {
+              return
+            }
             try {
               const result = await createExamMutation.mutateAsync(payload)
               await refresh()
@@ -269,6 +271,7 @@ type ExamDetailPageProps = {
 }
 
 function ExamDetailPage({
+  basePath,
   canManageMembers,
   canManagePapers,
   canManageStatus,
@@ -277,6 +280,7 @@ function ExamDetailPage({
 }: ExamDetailPageProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const user = useAppSelector((state) => state.auth.user)
   const { examId } = useParams()
   const examQuery = useExamQuery(examId ?? null)
   const exam = examQuery.data
@@ -295,6 +299,13 @@ function ExamDetailPage({
   const [draftDescription, setDraftDescription] = useState('')
   const [memberUserId, setMemberUserId] = useState('')
   const [memberRole, setMemberRole] = useState<ExamMemberRole>('AUTHOR')
+  const [memberSearch, setMemberSearch] = useState('')
+  const { confirm, dialog } = useConfirmationDialog()
+  const schoolUsersQuery = useSchoolUsersBySchoolQuery(1, 8, {
+    role: 'TEACHER',
+    schoolId: user?.schoolId ?? '',
+    search: memberSearch,
+  })
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -329,8 +340,9 @@ function ExamDetailPage({
         </div>
       </div>
 
-      {message ? <Notice tone="success">{message}</Notice> : null}
-      {error ? <Notice tone="error">{error}</Notice> : null}
+      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      {dialog}
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
         <InfoItem label="Ten exam" value={exam.name} />
@@ -349,6 +361,9 @@ function ExamDetailPage({
           onSubmit={(event) => {
             event.preventDefault()
             void (async () => {
+              if (!(await confirm({ message: 'Ban co chac muon luu thong tin exam nay khong?' }))) {
+                return
+              }
               try {
                 const result = await updateExamMutation.mutateAsync({
                   examId: exam.id,
@@ -415,10 +430,13 @@ function ExamDetailPage({
           </div>
           {canManageMembers ? (
             <form
-              className="grid gap-3 md:grid-cols-[1fr_180px_auto]"
+              className="grid gap-4"
               onSubmit={(event) => {
                 event.preventDefault()
                 void (async () => {
+                  if (!(await confirm({ message: 'Ban co chac muon them thanh vien vao exam nay khong?' }))) {
+                    return
+                  }
                   try {
                     const payload: CreateExamMemberRequest = {
                       role: memberRole,
@@ -435,21 +453,45 @@ function ExamDetailPage({
                 })()
               }}
             >
-              <Field label="User ID" value={memberUserId} onChange={setMemberUserId} />
-              <SelectField
-                label="Role"
-                value={memberRole}
-                onChange={(value) => setMemberRole(value as ExamMemberRole)}
-                options={[
-                  { label: 'Chair', value: 'CHAIR' },
-                  { label: 'Author', value: 'AUTHOR' },
-                  { label: 'Reviewer', value: 'REVIEWER' },
-                ]}
-              />
-              <div className="self-end">
-                <button className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white" type="submit">
-                  Them
-                </button>
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+                <Field label="Tim giao vien" value={memberSearch} onChange={setMemberSearch} placeholder="Nhap ten hoac email" />
+                <SelectField
+                  label="Role"
+                  value={memberRole}
+                  onChange={(value) => setMemberRole(value as ExamMemberRole)}
+                  options={[
+                    { label: 'Chair', value: 'CHAIR' },
+                    { label: 'Author', value: 'AUTHOR' },
+                    { label: 'Reviewer', value: 'REVIEWER' },
+                  ]}
+                />
+                <div className="self-end">
+                  <button className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white" type="submit">
+                    Them
+                  </button>
+                </div>
+              </div>
+              {memberUserId ? (
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700">
+                  Da chon user: {memberUserId}
+                </div>
+              ) : null}
+              <div className="grid gap-3">
+                {schoolUsersQuery.data?.content.map((schoolUser) => {
+                  const displayName = schoolUser.user?.fullName?.trim() || schoolUser.user?.email || schoolUser.userId || 'Unknown'
+                  const displayUserId = schoolUser.userId ?? schoolUser.user?.id ?? ''
+                  return (
+                    <button
+                      className={`grid gap-1 rounded-lg border px-4 py-3 text-left transition ${memberUserId === displayUserId ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}
+                      key={schoolUser.id}
+                      onClick={() => setMemberUserId(displayUserId)}
+                      type="button"
+                    >
+                      <span className="text-sm font-black text-slate-950">{displayName}</span>
+                      <span className="text-xs font-semibold text-slate-500">{schoolUser.user?.email ?? displayUserId}</span>
+                    </button>
+                  )
+                })}
               </div>
             </form>
           ) : null}
@@ -458,8 +500,12 @@ function ExamDetailPage({
             {exam.members?.map((member) => (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4" key={member.id}>
                 <div>
-                  <p className="text-sm font-black text-slate-950">{member.userId}</p>
-                  <p className="text-xs font-medium text-slate-500">{member.role}</p>
+                  <p className="text-sm font-black text-slate-950">
+                    {member.user?.fullName?.trim() || member.user?.email || member.userId}
+                  </p>
+                  <p className="text-xs font-medium text-slate-500">
+                    {member.user?.email ?? member.userId} - {member.role}
+                  </p>
                 </div>
                 {canManageMembers ? (
                   <div className="flex gap-2">
@@ -522,26 +568,35 @@ function ExamDetailPage({
         <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-slate-950">De thi / Papers</h2>
-            {canManagePapers ? (
+            <div className="flex flex-wrap gap-2">
               <button
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
-                onClick={() => {
-                  void (async () => {
-                    try {
-                      const result = await createPaperMutation.mutateAsync(exam.id)
-                      await refresh()
-                      setMessage(result)
-                      setError(null)
-                    } catch (submitError) {
-                      setError(getErrorMessage(submitError))
-                    }
-                  })()
-                }}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700"
+                onClick={() => navigate(`${basePath}/${exam.id}/papers`)}
                 type="button"
               >
-                Tao paper
+                Mo danh sach papers
               </button>
-            ) : null}
+              {canManagePapers ? (
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        const result = await createPaperMutation.mutateAsync(exam.id)
+                        await refresh()
+                        setMessage(result)
+                        setError(null)
+                      } catch (submitError) {
+                        setError(getErrorMessage(submitError))
+                      }
+                    })()
+                  }}
+                  type="button"
+                >
+                  Tao paper
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="grid gap-4">
             {exam.papers?.map((paper) => (
@@ -578,6 +633,13 @@ function ExamDetailPage({
                         </button>
                       ))}
                       <button
+                        className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                        onClick={() => navigate(`${basePath}/${exam.id}/papers/${paper.id}`)}
+                        type="button"
+                      >
+                        Chi tiet paper
+                      </button>
+                      <button
                         className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-bold text-red-600"
                         onClick={() => {
                           void (async () => {
@@ -596,7 +658,15 @@ function ExamDetailPage({
                         Xoa paper
                       </button>
                     </div>
-                  ) : null}
+                  ) : (
+                    <button
+                      className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                      onClick={() => navigate(`${basePath}/${exam.id}/papers/${paper.id}`)}
+                      type="button"
+                    >
+                      Chi tiet paper
+                    </button>
+                  )}
                 </div>
 
                 {paper.sections.map((section) => (
@@ -687,30 +757,32 @@ function PaperItemEditor({
   onSave: (questionId: string) => void
 }) {
   const [questionId, setQuestionId] = useState(item.questionId ?? item.question?.id ?? '')
+  const questionCode = (item.question?.code ?? questionId) || 'Chua gan cau hoi'
+
+  useEffect(() => {
+    setQuestionId(item.questionId ?? item.question?.id ?? '')
+  }, [item.id, item.question?.id, item.questionId])
 
   return (
-    <div className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-[120px_minmax(0,1fr)_auto]">
+    <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3">
       <div className="text-sm font-black text-slate-950">Item {item.order}</div>
-      <div className="grid gap-1">
-        <input
-          className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
-          disabled={!canEdit}
-          onChange={(event) => setQuestionId(event.target.value)}
-          placeholder="Question ID"
-          value={questionId}
-        />
-        <p className="text-xs font-medium text-slate-500">
-          {item.question?.code ? `${item.question.code} - ` : ''}{formatNullableText(item.question?.questionText)}
-        </p>
+      <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Question hien tai</p>
+        <p className="mt-2 text-sm font-black text-slate-950">{questionCode}</p>
+        <p className="mt-1 text-sm font-medium text-slate-600">{formatQuestionNullableText(item.question?.questionText)}</p>
       </div>
       {canEdit ? (
-        <button
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
-          onClick={() => onSave(questionId)}
-          type="button"
-        >
-          Luu
-        </button>
+        <QuestionPicker
+          allowStatusChange={false}
+          fixedStatus="PUBLISHED"
+          mode="single"
+          onSelect={(question) => {
+            setQuestionId(question.id)
+            onSave(question.id)
+          }}
+          selectedQuestionIds={questionId ? [questionId] : []}
+          title="Chon cau hoi published"
+        />
       ) : null}
     </div>
   )
@@ -774,14 +846,6 @@ function InfoItem({ label, value }: { label: string; value: ReactNode }) {
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
       <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
       <div className="mt-2 text-sm font-bold text-slate-950">{value}</div>
-    </div>
-  )
-}
-
-function Notice({ children, tone }: { children: ReactNode; tone: 'error' | 'success' }) {
-  return (
-    <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
-      {children}
     </div>
   )
 }

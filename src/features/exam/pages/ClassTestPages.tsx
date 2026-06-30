@@ -1,15 +1,18 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
+import { useAppSelector } from '@/app/store/hooks'
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery'
-import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
 import type { QuestionDto, QuestionStatus } from '@/features/question/types'
+import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import {
   formatNullableText as formatQuestionNullableText,
   getQuestionStatusDisplay,
   getQuestionTypeDisplay,
 } from '@/features/question/types'
+import { QuestionPicker } from '../components/QuestionPicker'
 import {
   useCreateClassTestMutation,
   useDeleteClassTestMutation,
@@ -17,7 +20,13 @@ import {
   useUpdateClassTestQuestionsMutation,
   useUpdateClassTestStatusMutation,
 } from '../api/useExamMutations'
-import { examQueryKeys, useClassTestsQuery, useExamQuery } from '../api/useExamQueries'
+import {
+  examQueryKeys,
+  useClassTestsQuery,
+  useExamBlueprintQuery,
+  useExamBlueprintsQuery,
+  useExamQuery,
+} from '../api/useExamQueries'
 import type { CreateClassTestRequest, ExamStatus, UpdateExamStatusRequest } from '../types'
 import { formatDateTime, formatNullableText, getExamStatusDisplay } from '../types'
 
@@ -39,14 +48,6 @@ function StatusBadge({ status }: { status?: string | null }) {
   return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${display.className}`}>{display.label}</span>
 }
 
-function Notice({ children, tone }: { children: ReactNode; tone: 'error' | 'success' }) {
-  return (
-    <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
-      {children}
-    </div>
-  )
-}
-
 function Field({
   label,
   onChange,
@@ -66,6 +67,30 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         value={value}
+      />
+    </label>
+  )
+}
+
+function DateTimeField({
+  label,
+  onChange,
+  value,
+}: {
+  label: string
+  onChange: (value: string) => void
+  value: string
+}) {
+  // input type=datetime-local dung dinh dang "YYYY-MM-DDTHH:mm" (khong co giay), trong khi gia tri
+  // luu/gui len BE la ISO day du co giay "YYYY-MM-DDTHH:mm:ss" - cat/them ":00" khi qua lai 2 chieu.
+  return (
+    <label className="grid gap-2 text-sm font-bold text-slate-700">
+      {label}
+      <input
+        className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
+        onChange={(event) => onChange(event.target.value ? `${event.target.value}:00` : '')}
+        type="datetime-local"
+        value={value ? value.slice(0, 16) : ''}
       />
     </label>
   )
@@ -215,71 +240,6 @@ function ClassPicker({
   )
 }
 
-function QuestionPicker({
-  onAdd,
-  selectedQuestionIds,
-}: {
-  onAdd: (question: QuestionDto) => void
-  selectedQuestionIds: string[]
-}) {
-  const [keyword, setKeyword] = useState('')
-  const [status, setStatus] = useState<'' | QuestionStatus>('PUBLISHED')
-  const questionsQuery = useQuestionsQuery('teacher', 'all', 1, 12, {
-    keyword,
-    scope: 'ALL',
-    status,
-  })
-
-  return (
-    <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Tim cau hoi" onChange={setKeyword} placeholder="Nhap code, noi dung..." value={keyword} />
-        <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Trang thai
-          <select
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
-            onChange={(event) => setStatus(event.target.value as '' | QuestionStatus)}
-            value={status}
-          >
-            <option value="">Tat ca</option>
-            <option value="PUBLISHED">Published</option>
-            <option value="APPROVED">Approved</option>
-            <option value="DRAFT">Draft</option>
-            <option value="SUBMITTED_FOR_REVIEW">Submitted</option>
-          </select>
-        </label>
-      </div>
-      <div className="grid gap-3">
-        {questionsQuery.data?.content.map((question) => {
-          const isSelected = selectedQuestionIds.includes(question.id)
-          return (
-            <div className="grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center" key={question.id}>
-              <div className="grid gap-1">
-                <p className="text-sm font-black text-slate-950">{question.code}</p>
-                <p className="text-sm font-medium text-slate-600">{formatQuestionNullableText(question.questionText)}</p>
-                <div className="flex flex-wrap gap-2">
-                  <QuestionStatusBadge status={question.status} />
-                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">
-                    {getQuestionTypeDisplay(question.type)}
-                  </span>
-                </div>
-              </div>
-              <button
-                className={`inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-bold ${isSelected ? 'border border-slate-200 text-slate-400' : 'bg-indigo-600 text-white'}`}
-                disabled={isSelected}
-                onClick={() => onAdd(question)}
-                type="button"
-              >
-                {isSelected ? 'Da chon' : 'Them'}
-              </button>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 type ClassTestListPageProps = {
   allowCreate: boolean
   basePath: string
@@ -288,15 +248,29 @@ type ClassTestListPageProps = {
 
 function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPageProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [page, setPage] = useState(1)
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState<'' | ExamStatus>('')
+  const flashMessage =
+    (location.state as { successMessage?: string } | null)?.successMessage ?? null
+  const [message, setMessage] = useState<string | null>(flashMessage)
+  const { dialog } = useConfirmationDialog()
   const classTestsQuery = useClassTestsQuery({
     keyword,
     page,
     size: 10,
     status: status || undefined,
   })
+
+  useEffect(() => {
+    if (!flashMessage) {
+      return
+    }
+
+    setMessage(flashMessage)
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+  }, [flashMessage, location.pathname, location.search, navigate])
 
   return (
     <section className="grid gap-6">
@@ -326,6 +300,9 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
           ) : null}
         </div>
       </div>
+
+      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      {dialog}
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 md:grid-cols-2">
         <Field label="Tu khoa" onChange={setKeyword} value={keyword} />
@@ -425,6 +402,7 @@ export function SchoolAdminClassTestsPage() {
 
 export function TeacherClassTestCreatePage() {
   const navigate = useNavigate()
+  const user = useAppSelector((state) => state.auth.user)
   const queryClient = useQueryClient()
   const createMutation = useCreateClassTestMutation()
   const [message, setMessage] = useState<string | null>(null)
@@ -435,10 +413,72 @@ export function TeacherClassTestCreatePage() {
   const [openAt, setOpenAt] = useState('')
   const [closeAt, setCloseAt] = useState('')
   const [selectedQuestions, setSelectedQuestions] = useState<QuestionDto[]>([])
+  const [blueprintKeyword, setBlueprintKeyword] = useState('')
+  const [blueprintPage, setBlueprintPage] = useState(1)
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState('')
+  const { confirm, dialog } = useConfirmationDialog()
+  const blueprintsQuery = useExamBlueprintsQuery({
+    keyword: blueprintKeyword,
+    page: blueprintPage,
+    schoolId: user?.schoolId,
+    size: 8,
+  })
+  const blueprintTemplateQuery = useExamBlueprintQuery(selectedBlueprintId || null)
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
   }
+
+  useEffect(() => {
+    if (!blueprintTemplateQuery.data || !selectedBlueprintId) {
+      return
+    }
+
+    const publishedVersion = [...(blueprintTemplateQuery.data.versions ?? [])]
+      .reverse()
+      .find((version) => version.status === 'PUBLISHED')
+
+    if (!publishedVersion) {
+      return
+    }
+
+    const templateQuestions = publishedVersion.sections.flatMap((section) =>
+      section.slots
+        .filter((slot) => slot.slotType === 'FIXED' && slot.fixedQuestion?.id)
+        .map((slot) => ({
+          code: slot.fixedQuestion?.code ?? '',
+          createdAt: null,
+          createdBy: null,
+          id: slot.fixedQuestion?.id ?? '',
+          instructionText: null,
+          locked: false,
+          maxResponseSeconds: 0,
+          minResponseSeconds: 0,
+          preparationText: null,
+          preparationTimeSeconds: 0,
+          promptText: null,
+          questionBankId: '',
+          questionText: slot.fixedQuestion?.questionText ?? '',
+          questionTopicId: '',
+          securePoolId: null,
+          sharing: 'PRIVATE' as const,
+          sourceQuestionId: null,
+          status: 'PUBLISHED' as const,
+          topic: null,
+          type: 'SHORT_ANSWER' as const,
+          updatedAt: null,
+          updatedBy: null,
+          confidentiality: 'OPEN' as const,
+        })),
+    )
+
+    setSelectedQuestions(
+      templateQuestions.filter(
+        (question, index, current) =>
+          question.id && current.findIndex((item) => item.id === question.id) === index,
+      ),
+    )
+  }, [blueprintTemplateQuery.data, selectedBlueprintId])
 
   return (
     <section className="grid gap-6">
@@ -452,28 +492,33 @@ export function TeacherClassTestCreatePage() {
         </p>
       </div>
 
-      {message ? <Notice tone="success">{message}</Notice> : null}
-      {error ? <Notice tone="error">{error}</Notice> : null}
+      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      {dialog}
 
       <form
         className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6"
         onSubmit={(event) => {
           event.preventDefault()
-          const payload: CreateClassTestRequest = {
-            closeAt: closeAt || null,
-            description: description || null,
-            name,
-            openAt: openAt || null,
-            questionIds: selectedQuestions.map((question) => question.id),
-            schoolClassId,
-          }
           void (async () => {
+            if (!(await confirm({ message: 'Ban co chac muon tao bai kiem tra nay khong?' }))) {
+              return
+            }
+            const payload: CreateClassTestRequest = {
+              closeAt: closeAt || null,
+              description: description || null,
+              name,
+              openAt: openAt || null,
+              questionIds: selectedQuestions.map((question) => question.id),
+              schoolClassId,
+            }
             try {
               const result = await createMutation.mutateAsync(payload)
               await refresh()
-              setMessage(result)
               setError(null)
-              navigate('/teacher/class-tests')
+              navigate('/teacher/class-tests', {
+                state: { successMessage: result },
+              })
             } catch (submitError) {
               setError(getErrorMessage(submitError))
             }
@@ -482,10 +527,79 @@ export function TeacherClassTestCreatePage() {
       >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Ten bai kiem tra" onChange={setName} value={name} />
-          <Field label="Open at (ISO)" onChange={setOpenAt} placeholder="2026-07-01T08:00:00" value={openAt} />
-          <Field label="Close at (ISO)" onChange={setCloseAt} placeholder="2026-07-01T09:00:00" value={closeAt} />
+          <DateTimeField label="Mo luc" onChange={setOpenAt} value={openAt} />
+          <DateTimeField label="Dong luc" onChange={setCloseAt} value={closeAt} />
         </div>
         <TextAreaField label="Mo ta" onChange={setDescription} value={description} />
+        <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">Bat dau tu blueprint mau</h2>
+              <p className="text-sm font-medium text-slate-600">
+                Chon blueprint de nap san cac slot FIXED vao danh sach cau hoi.
+              </p>
+            </div>
+            {selectedBlueprintId ? (
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
+                onClick={() => setSelectedBlueprintId('')}
+                type="button"
+              >
+                Bo mau
+              </button>
+            ) : null}
+          </div>
+          <Field
+            label="Tim blueprint"
+            onChange={(value) => {
+              setBlueprintKeyword(value)
+              setBlueprintPage(1)
+            }}
+            placeholder="Nhap ma hoac ten blueprint"
+            value={blueprintKeyword}
+          />
+          <div className="grid gap-3 md:grid-cols-2">
+            {blueprintsQuery.data?.content.map((blueprint) => (
+              <button
+                className={`grid gap-1 rounded-lg border px-4 py-3 text-left transition ${selectedBlueprintId === blueprint.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                key={blueprint.id}
+                onClick={() => setSelectedBlueprintId(blueprint.id)}
+                type="button"
+              >
+                <span className="text-sm font-black text-slate-950">{blueprint.name}</span>
+                <span className="text-xs font-semibold text-slate-500">{blueprint.code}</span>
+              </button>
+            ))}
+            {blueprintsQuery.data && blueprintsQuery.data.content.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-sm font-semibold text-slate-500 md:col-span-2">
+                Khong tim thay blueprint phu hop.
+              </div>
+            ) : null}
+          </div>
+          <div className="flex items-center justify-between text-sm font-semibold text-slate-600">
+            <span>
+              {blueprintsQuery.data?.totalElements ?? 0} blueprint, trang {blueprintsQuery.data?.page ?? 1}/{blueprintsQuery.data?.totalPages || 1}
+            </span>
+            <div className="flex gap-2">
+              <button
+                className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
+                disabled={blueprintPage <= 1}
+                onClick={() => setBlueprintPage((current) => current - 1)}
+                type="button"
+              >
+                Truoc
+              </button>
+              <button
+                className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
+                disabled={blueprintPage >= (blueprintsQuery.data?.totalPages ?? 1)}
+                onClick={() => setBlueprintPage((current) => current + 1)}
+                type="button"
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        </div>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="grid gap-3">
             <h2 className="text-lg font-black text-slate-950">Chon lop hoc</h2>
@@ -499,7 +613,9 @@ export function TeacherClassTestCreatePage() {
         <div className="grid gap-3">
           <h2 className="text-lg font-black text-slate-950">Them cau hoi</h2>
           <QuestionPicker
-            onAdd={(question) =>
+            allowStatusChange={false}
+            mode="multiple"
+            onSelect={(question) =>
               setSelectedQuestions((current) =>
                 current.some((item) => item.id === question.id) ? current : [...current, question],
               )
@@ -538,6 +654,12 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
   const [description, setDescription] = useState('')
   const [openAt, setOpenAt] = useState('')
   const [closeAt, setCloseAt] = useState('')
+  const { confirm, dialog } = useConfirmationDialog()
+
+  useEffect(() => {
+    setOpenAt(exam?.openAt ?? '')
+    setCloseAt(exam?.closeAt ?? '')
+  }, [exam?.id])
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -602,8 +724,9 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
         </p>
       </div>
 
-      {message ? <Notice tone="success">{message}</Notice> : null}
-      {error ? <Notice tone="error">{error}</Notice> : null}
+      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      {dialog}
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
         <InfoItem label="Ten" value={exam.name} />
@@ -624,16 +747,19 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
           <form
             className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6"
             onSubmit={(event) => {
-              event.preventDefault()
-              void (async () => {
+            event.preventDefault()
+            void (async () => {
+                if (!(await confirm({ message: 'Ban co chac muon luu thong tin bai kiem tra nay khong?' }))) {
+                  return
+                }
                 try {
                   const result = await updateMutation.mutateAsync({
                     examId: exam.id,
                     payload: {
-                      closeAt: closeAt || exam.closeAt || null,
+                      closeAt: closeAt || null,
                       description: description || exam.description || null,
                       name: name || exam.name,
-                      openAt: openAt || exam.openAt || null,
+                      openAt: openAt || null,
                     },
                   })
                   await refresh()
@@ -649,8 +775,8 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Ten bai kiem tra" onChange={setName} placeholder={exam.name} value={name} />
               <Field label="Mo ta ngan" onChange={setDescription} placeholder={exam.description ?? ''} value={description} />
-              <Field label="Open at (ISO)" onChange={setOpenAt} placeholder={exam.openAt ?? ''} value={openAt} />
-              <Field label="Close at (ISO)" onChange={setCloseAt} placeholder={exam.closeAt ?? ''} value={closeAt} />
+              <DateTimeField label="Mo luc" onChange={setOpenAt} value={openAt} />
+              <DateTimeField label="Dong luc" onChange={setCloseAt} value={closeAt} />
             </div>
             <div className="flex justify-end">
               <button className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white" type="submit">
@@ -662,8 +788,11 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
           <form
             className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6"
             onSubmit={(event) => {
-              event.preventDefault()
-              void (async () => {
+            event.preventDefault()
+            void (async () => {
+                if (!(await confirm({ message: 'Ban co chac muon cap nhat danh sach cau hoi nay khong?' }))) {
+                  return
+                }
                 try {
                   const result = await updateQuestionsMutation.mutateAsync({
                     examId: exam.id,
@@ -682,7 +811,9 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
           >
             <h2 className="text-lg font-black text-slate-950">Sua danh sach cau hoi</h2>
             <QuestionPicker
-              onAdd={(question) =>
+              allowStatusChange={false}
+              mode="multiple"
+              onSelect={(question) =>
                 setSelectedQuestions((current) =>
                   current.some((item) => item.id === question.id) ? current : [...current, question],
                 )
@@ -730,8 +861,9 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
                     try {
                       const result = await deleteMutation.mutateAsync(exam.id)
                       await refresh()
-                      navigate('/teacher/class-tests')
-                      setMessage(result)
+                      navigate('/teacher/class-tests', {
+                        state: { successMessage: result },
+                      })
                       setError(null)
                     } catch (submitError) {
                       setError(getErrorMessage(submitError))

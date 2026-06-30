@@ -2,14 +2,26 @@ import { ArrowLeft, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
+import { useSchoolUsersBySchoolQuery } from '@/features/classes/api/useSchoolUsersBySchoolQuery'
+import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import {
+  useCreateQuestionCollaboratorMutation,
+  useDeleteQuestionCollaboratorMutation,
+  useUpdateQuestionCollaboratorMutation,
+  useUpdateQuestionMutation,
+} from '../api/useQuestionMutations'
 import { useQuestionQuery } from '../api/useQuestionQuery'
 import {
+  canManageQuestionSharing,
   canEditQuestion,
   getQuestionActorRole,
   getQuestionReviewActions,
   resolveTeacherQuestionContext,
 } from '../permissions'
 import {
+  type QuestionCollaboratorPermission,
+  type QuestionDto,
   formatDuration,
   formatNullableText,
   formatQuestionDate,
@@ -64,6 +76,7 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
     teacherContext,
     user?.userId,
   )
+  const canManageSharing = canManageQuestionSharing(question, primaryRole, user?.userId)
 
   if (questionQuery.isLoading) {
     return (
@@ -266,42 +279,11 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
         ) : null}
 
         {activeTab === 'sharing' ? (
-          <div className="grid gap-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <DetailItem label="General access" value={getQuestionSharingDisplay(question.sharing)} />
-              <DetailItem
-                label="So collaborator"
-                value={String(question.collaborators?.length ?? 0)}
-              />
-            </div>
-
-            {question.collaborators?.length ? (
-              <div className="grid gap-3">
-                {question.collaborators.map((collaborator) => (
-                  <div
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4"
-                    key={collaborator.id}
-                  >
-                    <div>
-                      <p className="text-sm font-bold text-slate-950">
-                        User ID: {collaborator.userId}
-                      </p>
-                      <p className="text-xs font-medium text-slate-500">
-                        Assigned at: {formatQuestionDate(collaborator.assignedAt)}
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700">
-                      {getQuestionCollaboratorPermissionDisplay(
-                        collaborator.permission,
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState text="Chua co collaborator nao duoc gan rieng." />
-            )}
-          </div>
+          <QuestionSharingPanel
+            canManage={canManageSharing}
+            onRefresh={() => void questionQuery.refetch()}
+            question={question}
+          />
         ) : null}
       </div>
     </section>
@@ -342,6 +324,265 @@ function EmptyState({ text }: { text: string }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">
       {text}
+    </div>
+  )
+}
+
+function QuestionSharingPanel({
+  canManage,
+  onRefresh,
+  question,
+}: {
+  canManage: boolean
+  onRefresh: () => void
+  question: QuestionDto
+}) {
+  const user = useAppSelector((state) => state.auth.user)
+  const updateQuestionMutation = useUpdateQuestionMutation()
+  const createCollaboratorMutation = useCreateQuestionCollaboratorMutation()
+  const updateCollaboratorMutation = useUpdateQuestionCollaboratorMutation()
+  const deleteCollaboratorMutation = useDeleteQuestionCollaboratorMutation()
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(question.sharing)
+  const [teacherSearch, setTeacherSearch] = useState('')
+  const [newUserId, setNewUserId] = useState('')
+  const [newPermission, setNewPermission] = useState<QuestionCollaboratorPermission>('READ_ONLY')
+  const { confirm, dialog } = useConfirmationDialog()
+  const schoolUsersQuery = useSchoolUsersBySchoolQuery(1, 8, {
+    role: 'TEACHER',
+    schoolId: user?.schoolId ?? '',
+    search: teacherSearch,
+  })
+
+  return (
+    <div className="grid gap-4">
+      <FeedbackToast
+        message={message}
+        onClose={() => setMessage(null)}
+        tone="success"
+      />
+      <FeedbackToast
+        message={error}
+        onClose={() => setError(null)}
+        tone="error"
+      />
+      {dialog}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <DetailItem label="General access" value={getQuestionSharingDisplay(question.sharing)} />
+        <DetailItem
+          label="So collaborator"
+          value={String(question.collaborators?.length ?? 0)}
+        />
+      </div>
+
+      {canManage ? (
+        <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              General access
+              <select
+                className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950"
+                onChange={(event) => setSharing(event.target.value as QuestionDto['sharing'])}
+                value={sharing}
+              >
+                <option value="PRIVATE">Private</option>
+                <option value="SCHOOL_SHARED">School shared</option>
+              </select>
+            </label>
+            <div className="self-end">
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+                onClick={() => {
+                  void (async () => {
+                    if (!(await confirm({ message: 'Ban co chac muon luu thay doi chia se nay khong?' }))) {
+                      return
+                    }
+                    try {
+                      const result = await updateQuestionMutation.mutateAsync({
+                        id: question.id,
+                        payload: { sharing },
+                      })
+                      setMessage(result.message)
+                      setError(null)
+                      onRefresh()
+                    } catch (submitError) {
+                      setError(getErrorMessage(submitError))
+                    }
+                  })()
+                }}
+                type="button"
+              >
+                Luu chia se
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Tim giao vien
+              <input
+                className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950"
+                onChange={(event) => setTeacherSearch(event.target.value)}
+                placeholder="Nhap ten hoac email"
+                value={teacherSearch}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Permission
+              <select
+                className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950"
+                onChange={(event) => setNewPermission(event.target.value as QuestionCollaboratorPermission)}
+                value={newPermission}
+              >
+                <option value="READ_ONLY">Read only</option>
+                <option value="CAN_USE">Can use</option>
+                <option value="CAN_EDIT">Can edit</option>
+              </select>
+            </label>
+            <div className="self-end">
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
+                onClick={() => {
+                  void (async () => {
+                    if (!(await confirm({ message: 'Ban co chac muon them collaborator nay khong?' }))) {
+                      return
+                    }
+                    try {
+                      const result = await createCollaboratorMutation.mutateAsync({
+                        payload: {
+                          permission: newPermission,
+                          userId: newUserId,
+                        },
+                        questionId: question.id,
+                      })
+                      setMessage(result)
+                      setError(null)
+                      setNewUserId('')
+                      setTeacherSearch('')
+                      onRefresh()
+                    } catch (submitError) {
+                      setError(getErrorMessage(submitError))
+                    }
+                  })()
+                }}
+                type="button"
+              >
+                Them collaborator
+              </button>
+            </div>
+          </div>
+          {newUserId ? (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700">
+              Da chon user: {newUserId}
+            </div>
+          ) : null}
+          <div className="grid gap-3 md:grid-cols-2">
+            {schoolUsersQuery.data?.content.map((schoolUser) => {
+              const displayUserId = schoolUser.userId ?? schoolUser.user?.id ?? ''
+              const displayName =
+                schoolUser.user?.fullName?.trim() || schoolUser.user?.email || displayUserId
+
+              return (
+                <button
+                  className={`grid gap-1 rounded-lg border bg-white px-4 py-3 text-left transition ${newUserId === displayUserId ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}
+                  key={schoolUser.id}
+                  onClick={() => setNewUserId(displayUserId)}
+                  type="button"
+                >
+                  <span className="text-sm font-black text-slate-950">{displayName}</span>
+                  <span className="text-xs font-semibold text-slate-500">
+                    {schoolUser.user?.email ?? displayUserId}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {question.collaborators?.length ? (
+        <div className="grid gap-3">
+          {question.collaborators.map((collaborator) => (
+            <div
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4"
+              key={collaborator.id}
+            >
+              <div>
+                <p className="text-sm font-bold text-slate-950">
+                  {collaborator.user?.fullName?.trim() || collaborator.user?.email || collaborator.userId}
+                </p>
+                <p className="text-xs font-medium text-slate-500">
+                  {collaborator.user?.email ?? collaborator.userId} - Assigned at: {formatQuestionDate(collaborator.assignedAt)}
+                </p>
+              </div>
+              {canManage ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
+                    onChange={(event) => {
+                      void (async () => {
+                        if (!(await confirm({ message: 'Ban co chac muon cap nhat quyen collaborator nay khong?' }))) {
+                          return
+                        }
+                        try {
+                          const result = await updateCollaboratorMutation.mutateAsync({
+                            collaboratorId: collaborator.id,
+                            payload: {
+                              permission: event.target.value as QuestionCollaboratorPermission,
+                            },
+                            questionId: question.id,
+                          })
+                          setMessage(result)
+                          setError(null)
+                          onRefresh()
+                        } catch (submitError) {
+                          setError(getErrorMessage(submitError))
+                        }
+                      })()
+                    }}
+                    value={collaborator.permission}
+                  >
+                    <option value="READ_ONLY">Read only</option>
+                    <option value="CAN_USE">Can use</option>
+                    <option value="CAN_EDIT">Can edit</option>
+                  </select>
+                  <button
+                    className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 px-4 text-sm font-bold text-red-600"
+                    onClick={() => {
+                      void (async () => {
+                        try {
+                          const result = await deleteCollaboratorMutation.mutateAsync({
+                            collaboratorId: collaborator.id,
+                            questionId: question.id,
+                          })
+                          setMessage(result)
+                          setError(null)
+                          onRefresh()
+                        } catch (submitError) {
+                          setError(getErrorMessage(submitError))
+                        }
+                      })()
+                    }}
+                    type="button"
+                  >
+                    Xoa
+                  </button>
+                </div>
+              ) : (
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700">
+                  {getQuestionCollaboratorPermissionDisplay(
+                    collaborator.permission,
+                  )}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState text="Chua co collaborator nao duoc gan rieng." />
+      )}
     </div>
   )
 }

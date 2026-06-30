@@ -1,12 +1,15 @@
-import { ArrowLeft, Plus, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Download, Plus, RefreshCw, Upload } from 'lucide-react'
 
 type QuestionPageHeaderProps = {
   createLabel?: string
   description?: string
   isCreateDisabled?: boolean
+  isExporting?: boolean
   isRefreshing: boolean
   onBack?: () => void
   onCreate?: () => void
+  onExport?: () => void
+  onImport?: () => void
   onRefresh: () => void
   title?: string
 }
@@ -15,9 +18,12 @@ export function QuestionPageHeader({
   createLabel = 'Tạo câu hỏi',
   description = 'Quản lý và theo dõi danh sách câu hỏi theo quyền hiện tại.',
   isCreateDisabled = false,
+  isExporting = false,
   isRefreshing,
   onBack,
   onCreate,
+  onExport,
+  onImport,
   onRefresh,
   title = 'Câu hỏi',
 }: QuestionPageHeaderProps) {
@@ -56,6 +62,29 @@ export function QuestionPageHeader({
           />
           Làm mới
         </button>
+
+        {onExport ? (
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-70"
+            disabled={isExporting}
+            onClick={onExport}
+            type="button"
+          >
+            <Download aria-hidden="true" className="size-4" />
+            {isExporting ? 'Đang xuất...' : 'Xuất Excel'}
+          </button>
+        ) : null}
+
+        {onImport ? (
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            onClick={onImport}
+            type="button"
+          >
+            <Upload aria-hidden="true" className="size-4" />
+            Nhập từ Excel
+          </button>
+        ) : null}
 
         {onCreate ? (
           <button

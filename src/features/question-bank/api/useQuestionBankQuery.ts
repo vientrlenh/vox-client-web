@@ -4,7 +4,7 @@ import { questionBankQueryKeys } from './useQuestionBanksQuery'
 import type { QuestionBankDto } from '../types'
 
 const QUESTION_BANK_DETAIL_QUERY = `
-  query QuestionBank($id: UUID!) {
+  query QuestionBank($id: ID!) {
     questionBank(id: $id) {
       id
       languageId

@@ -16,7 +16,7 @@ const QUESTION_TOPIC_FIELDS = `
 
 const QUESTION_TOPICS_QUERY = `
   query QuestionTopics(
-    $questionBankId: UUID
+    $questionBankId: ID
     $status: QuestionTopicStatus
     $keyword: String
     $page: Int!

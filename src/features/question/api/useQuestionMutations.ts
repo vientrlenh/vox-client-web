@@ -2,7 +2,9 @@ import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
 import type {
   CreateQuestionRequest,
+  CreateQuestionCollaboratorRequest,
   UpdateQuestionRequest,
+  UpdateQuestionCollaboratorRequest,
   QuestionAssetDto,
   QuestionDto,
   QuestionEvaluationGuideDto,
@@ -68,6 +70,42 @@ export async function deleteQuestion(id: string) {
   }
 }
 
+export async function createQuestionCollaborator(
+  questionId: string,
+  payload: CreateQuestionCollaboratorRequest,
+) {
+  const response = await apiClient.post<ApiResponse<unknown>>(
+    `/v1/questions/${questionId}/collaborators`,
+    payload,
+  )
+
+  return response.data.message
+}
+
+export async function updateQuestionCollaborator(
+  questionId: string,
+  collaboratorId: string,
+  payload: UpdateQuestionCollaboratorRequest,
+) {
+  const response = await apiClient.put<ApiResponse<unknown>>(
+    `/v1/questions/${questionId}/collaborators/${collaboratorId}`,
+    payload,
+  )
+
+  return response.data.message
+}
+
+export async function deleteQuestionCollaborator(
+  questionId: string,
+  collaboratorId: string,
+) {
+  const response = await apiClient.delete<ApiResponse<unknown>>(
+    `/v1/questions/${questionId}/collaborators/${collaboratorId}`,
+  )
+
+  return response.data.message
+}
+
 export function useCreateQuestionMutation() {
   return useMutation({
     mutationFn: createQuestion,
@@ -89,5 +127,43 @@ export function useUpdateQuestionMutation() {
 export function useDeleteQuestionMutation() {
   return useMutation({
     mutationFn: (id: string) => deleteQuestion(id),
+  })
+}
+
+export function useCreateQuestionCollaboratorMutation() {
+  return useMutation({
+    mutationFn: ({
+      payload,
+      questionId,
+    }: {
+      payload: CreateQuestionCollaboratorRequest
+      questionId: string
+    }) => createQuestionCollaborator(questionId, payload),
+  })
+}
+
+export function useUpdateQuestionCollaboratorMutation() {
+  return useMutation({
+    mutationFn: ({
+      collaboratorId,
+      payload,
+      questionId,
+    }: {
+      collaboratorId: string
+      payload: UpdateQuestionCollaboratorRequest
+      questionId: string
+    }) => updateQuestionCollaborator(questionId, collaboratorId, payload),
+  })
+}
+
+export function useDeleteQuestionCollaboratorMutation() {
+  return useMutation({
+    mutationFn: ({
+      collaboratorId,
+      questionId,
+    }: {
+      collaboratorId: string
+      questionId: string
+    }) => deleteQuestionCollaborator(questionId, collaboratorId),
   })
 }

@@ -20,3 +20,7 @@ export {
   SystemAdminQuestionDetailPage,
   TeacherQuestionDetailPage,
 } from './pages/QuestionDetailPage'
+export {
+  SystemAdminQuestionImportPage,
+  TeacherQuestionImportPage,
+} from './pages/QuestionImportPage'

@@ -4,7 +4,7 @@ import { questionTopicQueryKeys } from './useQuestionTopicsQuery'
 import type { QuestionTopicDto } from '../types'
 
 const QUESTION_TOPIC_DETAIL_QUERY = `
-  query QuestionTopic($id: UUID!) {
+  query QuestionTopic($id: ID!) {
     questionTopic(id: $id) {
       id
       questionBankId

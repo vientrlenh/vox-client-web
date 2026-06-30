@@ -3,11 +3,15 @@ import { apiClient } from '@/shared/api'
 import type {
   CreateClassTestRequest,
   CreateExamBlueprintRequest,
+  CreateExamBlueprintSectionRequest,
+  CreateExamBlueprintSlotRequest,
   CreateExamBlueprintVersionRequest,
   CreateExamMemberRequest,
   CreateExamRequest,
   UpdateClassTestQuestionsRequest,
   UpdateExamBlueprintRequest,
+  UpdateExamBlueprintSectionRequest,
+  UpdateExamBlueprintSlotRequest,
   UpdateExamBlueprintVersionStatusRequest,
   UpdateExamMemberRequest,
   UpdateExamPaperItemRequest,
@@ -164,6 +168,72 @@ export function useUpdateBlueprintVersionStatusMutation() {
       versionId: string
     }) =>
       (await apiClient.patch<ApiResponse<unknown>>(`/v1/exam-blueprint-versions/${versionId}/status`, payload)).data.message,
+  })
+}
+
+export function useCreateBlueprintSectionMutation() {
+  return useMutation({
+    mutationFn: async ({
+      payload,
+      versionId,
+    }: {
+      payload: CreateExamBlueprintSectionRequest
+      versionId: string
+    }) =>
+      (await apiClient.post<ApiResponse<unknown>>(`/v1/exam-blueprint-versions/${versionId}/sections`, payload)).data.message,
+  })
+}
+
+export function useUpdateBlueprintSectionMutation() {
+  return useMutation({
+    mutationFn: async ({
+      payload,
+      sectionId,
+    }: {
+      payload: UpdateExamBlueprintSectionRequest
+      sectionId: string
+    }) =>
+      (await apiClient.put<ApiResponse<unknown>>(`/v1/exam-blueprint-sections/${sectionId}`, payload)).data.message,
+  })
+}
+
+export function useDeleteBlueprintSectionMutation() {
+  return useMutation({
+    mutationFn: async (sectionId: string) =>
+      (await apiClient.delete<ApiResponse<unknown>>(`/v1/exam-blueprint-sections/${sectionId}`)).data.message,
+  })
+}
+
+export function useCreateBlueprintSlotMutation() {
+  return useMutation({
+    mutationFn: async ({
+      payload,
+      sectionId,
+    }: {
+      payload: CreateExamBlueprintSlotRequest
+      sectionId: string
+    }) =>
+      (await apiClient.post<ApiResponse<unknown>>(`/v1/exam-blueprint-sections/${sectionId}/slots`, payload)).data.message,
+  })
+}
+
+export function useUpdateBlueprintSlotMutation() {
+  return useMutation({
+    mutationFn: async ({
+      payload,
+      slotId,
+    }: {
+      payload: UpdateExamBlueprintSlotRequest
+      slotId: string
+    }) =>
+      (await apiClient.put<ApiResponse<unknown>>(`/v1/exam-blueprint-slots/${slotId}`, payload)).data.message,
+  })
+}
+
+export function useDeleteBlueprintSlotMutation() {
+  return useMutation({
+    mutationFn: async (slotId: string) =>
+      (await apiClient.delete<ApiResponse<unknown>>(`/v1/exam-blueprint-slots/${slotId}`)).data.message,
   })
 }
 

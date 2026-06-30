@@ -4,7 +4,7 @@ import { questionQueryKeys } from './useQuestionsQuery'
 import type { QuestionDto } from '../types'
 
 const QUESTION_DETAIL_QUERY = `
-  query Question($id: UUID!) {
+  query Question($id: ID!) {
     question(id: $id) {
       id
       questionBankId
@@ -72,6 +72,11 @@ const QUESTION_DETAIL_QUERY = `
         questionId
         permission
         assignedAt
+        user {
+          id
+          fullName
+          email
+        }
       }
     }
   }

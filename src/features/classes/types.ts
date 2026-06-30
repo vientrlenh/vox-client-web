@@ -48,6 +48,15 @@ export type UserSummary = {
   phone: string | null
 }
 
+export type SchoolUser = {
+  endDate: string | null
+  id: string
+  schoolId: string | null
+  startDate: string | null
+  user: UserSummary | null
+  userId: string | null
+}
+
 export type CreateSchoolClassRequest = {
   code: string
   description: string | null

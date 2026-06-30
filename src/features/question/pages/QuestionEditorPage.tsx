@@ -6,6 +6,8 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { useAppSelector } from '@/app/store/hooks'
 import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
+import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { useQuestionQuery } from '../api/useQuestionQuery'
 import {
   useCreateQuestionMutation,
@@ -166,6 +168,8 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const teacherView =
     ((location.state as { fromView?: 'all' | 'my' | 'review' } | null)?.fromView ??
       null)
+  const locationSuccessMessage =
+    (location.state as { successMessage?: string } | null)?.successMessage ?? null
 
   const questionQuery = useQuestionQuery(mode === 'edit' ? questionId : null)
   const createMutation = useCreateQuestionMutation()
@@ -184,9 +188,10 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const [assetForm, setAssetForm] = useState<AssetFormState[]>([createAssetForm()])
   const [guideForm, setGuideForm] = useState<EvaluationGuideFormState>(createGuideForm())
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(locationSuccessMessage)
   const [workflowAction, setWorkflowAction] = useState('')
   const [workflowNote, setWorkflowNote] = useState('')
+  const { confirm, dialog } = useConfirmationDialog()
 
   const actorRole = getQuestionActorRole(user?.roles)
   const teacherContext = resolveTeacherQuestionContext(
@@ -234,6 +239,18 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     mode === 'create' && Boolean(selectedBankId),
     { status: 'PUBLISHED' },
   )
+
+  useEffect(() => {
+    if (!locationSuccessMessage) {
+      return
+    }
+
+    setSuccessMessage(locationSuccessMessage)
+    navigate(`${location.pathname}${location.search}`, {
+      replace: true,
+      state: teacherView ? { fromView: teacherView } : null,
+    })
+  }, [location.pathname, location.search, locationSuccessMessage, navigate, teacherView])
 
   useEffect(() => {
     if (!questionQuery.data) {
@@ -335,6 +352,10 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
           return
         }
 
+        if (!(await confirm({ message: 'Ban co chac muon tao question nay khong?' }))) {
+          return
+        }
+
         const payload: CreateQuestionRequest = {
           instructionText: form.instructionText.trim() || null,
           maxResponseSeconds,
@@ -360,6 +381,10 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
 
       if (!questionId || !canEdit) {
         setErrorMessage('Ban khong co quyen cap nhat cau hoi nay.')
+        return
+      }
+
+      if (!(await confirm({ message: 'Ban co chac muon luu noi dung question nay khong?' }))) {
         return
       }
 
@@ -409,6 +434,10 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     const asset = assetForm[index]
     if (!asset.url.trim()) {
       setErrorMessage('URL asset khong duoc de trong.')
+      return
+    }
+
+    if (!(await confirm({ message: asset.id ? 'Ban co chac muon cap nhat asset nay khong?' : 'Ban co chac muon tao asset nay khong?' }))) {
       return
     }
 
@@ -479,6 +508,10 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       return
     }
 
+    if (!(await confirm({ message: 'Ban co chac muon luu evaluation guide nay khong?' }))) {
+      return
+    }
+
     try {
       const message = await upsertGuideMutation.mutateAsync({
         payload: {
@@ -530,6 +563,10 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       return
     }
 
+    if (!(await confirm({ message: 'Ban co chac muon gui workflow action nay khong?' }))) {
+      return
+    }
+
     try {
       const action = workflowAction as UpdateQuestionStatusRequest['action']
       const message = await reviewMutation.mutateAsync({
@@ -570,17 +607,17 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
         </div>
       </div>
 
-      {errorMessage ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          {errorMessage}
-        </div>
-      ) : null}
-
-      {successMessage ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-          {successMessage}
-        </div>
-      ) : null}
+      <FeedbackToast
+        message={errorMessage}
+        onClose={() => setErrorMessage(null)}
+        tone="error"
+      />
+      <FeedbackToast
+        message={successMessage}
+        onClose={() => setSuccessMessage(null)}
+        tone="success"
+      />
+      {dialog}
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-1">
         <div className="flex flex-wrap gap-2">

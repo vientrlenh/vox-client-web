@@ -150,6 +150,18 @@ const TeacherQuestionsPage = lazy(() =>
   })),
 )
 
+const TeacherQuestionImportPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.TeacherQuestionImportPage,
+  })),
+)
+
+const SystemAdminQuestionImportPage = lazy(() =>
+  import('@/features/question').then((module) => ({
+    default: module.SystemAdminQuestionImportPage,
+  })),
+)
+
 const TeacherCreateQuestionPage = lazy(() =>
   import('@/features/question').then((module) => ({
     default: module.TeacherCreateQuestionPage,
@@ -282,6 +294,24 @@ const TeacherExamDetailPage = lazy(() =>
   })),
 )
 
+const TeacherExamPapersPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherExamPapersPage,
+  })),
+)
+
+const TeacherExamPaperDetailPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherExamPaperDetailPage,
+  })),
+)
+
+const TeacherExamPaperEditPage = lazy(() =>
+  import('@/features/exam').then((module) => ({
+    default: module.TeacherExamPaperEditPage,
+  })),
+)
+
 const TeacherBlueprintsPage = lazy(() =>
   import('@/features/exam').then((module) => ({
     default: module.TeacherBlueprintsPage,
@@ -378,6 +408,10 @@ export function AppRoutes() {
             <Route
               path="system-admin/questions/create"
               element={<SystemAdminCreateQuestionPage />}
+            />
+            <Route
+              path="system-admin/questions/import"
+              element={<SystemAdminQuestionImportPage />}
             />
             <Route
               path="system-admin/questions/:questionId"
@@ -520,6 +554,10 @@ export function AppRoutes() {
               element={<TeacherCreateQuestionPage />}
             />
             <Route
+              path="teacher/questions/import"
+              element={<TeacherQuestionImportPage />}
+            />
+            <Route
               path="teacher/questions/:questionId"
               element={<TeacherQuestionDetailPage />}
             />
@@ -538,6 +576,18 @@ export function AppRoutes() {
             <Route
               path="teacher/exams/:examId"
               element={<TeacherExamDetailPage />}
+            />
+            <Route
+              path="teacher/exams/:examId/papers"
+              element={<TeacherExamPapersPage />}
+            />
+            <Route
+              path="teacher/exams/:examId/papers/:paperId"
+              element={<TeacherExamPaperDetailPage />}
+            />
+            <Route
+              path="teacher/exams/:examId/papers/:paperId/edit"
+              element={<TeacherExamPaperEditPage />}
             />
             <Route
               path="teacher/blueprints"

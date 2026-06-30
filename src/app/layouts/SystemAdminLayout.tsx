@@ -20,6 +20,7 @@ import logoImage from '@/assets/images/logo.png'
 import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
+import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
 
 type NavigationItem = {
   icon: typeof Home
@@ -31,6 +32,7 @@ type NavigationGroup = {
   icon: typeof Home
   label: string
   items: Array<{
+    badgeCount?: number
     label: string
     to: string
   }>
@@ -73,12 +75,6 @@ const navigationGroups: NavigationGroup[] = [
         label: 'Ngan hang cau hoi',
         to: '/system-admin/question-banks',
       },
-    ],
-  },
-  {
-    icon: FileQuestion,
-    label: 'Question',
-    items: [
       {
         label: 'Question tong',
         to: '/system-admin/questions/all',
@@ -168,7 +164,7 @@ function SystemAdminNavigationGroup({
 
       {isOpen ? (
         <div className="ml-4 grid gap-2 border-l border-white/10 pl-4">
-          {items.map(({ label: itemLabel, to }) => (
+          {items.map(({ badgeCount, label: itemLabel, to }) => (
             <NavLink
               className={({ isActive }) =>
                 [
@@ -182,7 +178,14 @@ function SystemAdminNavigationGroup({
               onClick={onNavigate}
               to={to}
             >
-              {itemLabel}
+              <span className="flex flex-1 items-center justify-between gap-3">
+                <span>{itemLabel}</span>
+                {badgeCount && badgeCount > 0 ? (
+                  <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-black text-white">
+                    {badgeCount}
+                  </span>
+                ) : null}
+              </span>
             </NavLink>
           ))}
         </div>
@@ -192,12 +195,13 @@ function SystemAdminNavigationGroup({
 }
 
 function SystemAdminSidebar({
+  groups,
   onClose,
   onNavigate,
   showCloseButton = false,
-}: SystemAdminSidebarProps) {
+}: SystemAdminSidebarProps & { groups: NavigationGroup[] }) {
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-blue-950 via-indigo-900 to-violet-900 px-6 py-7 text-white">
+    <div className="flex h-full flex-col overflow-hidden border-r border-white/10 bg-linear-to-b from-blue-950 via-indigo-900 to-violet-900 px-6 py-7 text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
       <div className="flex items-center justify-between">
         <NavLink
           aria-label="VOX system admin"
@@ -228,51 +232,55 @@ function SystemAdminSidebar({
         System Admin
       </p>
 
-      <nav aria-label="System admin" className="mt-6 grid gap-3">
-        {navigationItems.map(({ icon: Icon, label, to }) => (
-          <NavLink
-            className={({ isActive }) =>
-              [
-                'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
-                isActive
-                  ? 'bg-violet-500 text-white shadow-sm shadow-violet-950/20'
-                  : 'text-indigo-50/90 hover:bg-white/10 hover:text-white',
-              ].join(' ')
-            }
-            key={to}
-            onClick={onNavigate}
-            to={to}
-          >
-            <Icon aria-hidden="true" className="size-5 shrink-0" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
+      <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-2 [mask-image:linear-gradient(to_bottom,black,black_calc(100%-24px),transparent)] [scrollbar-color:rgba(255,255,255,0.28)_transparent] [scrollbar-width:thin]">
+        <div className="flex min-h-full flex-col gap-6 pb-6">
+          <nav aria-label="System admin" className="grid gap-3">
+            {navigationItems.map(({ icon: Icon, label, to }) => (
+              <NavLink
+                className={({ isActive }) =>
+                  [
+                    'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
+                    isActive
+                      ? 'bg-violet-500 text-white shadow-sm shadow-violet-950/20'
+                      : 'text-indigo-50/90 hover:bg-white/10 hover:text-white',
+                  ].join(' ')
+                }
+                key={to}
+                onClick={onNavigate}
+                to={to}
+              >
+                <Icon aria-hidden="true" className="size-5 shrink-0" />
+                <span>{label}</span>
+              </NavLink>
+            ))}
 
-        {navigationGroups.map((group) => (
-          <SystemAdminNavigationGroup
-            {...group}
-            key={group.label}
-            onNavigate={onNavigate}
-          />
-        ))}
-      </nav>
+            {groups.map((group) => (
+              <SystemAdminNavigationGroup
+                {...group}
+                key={group.label}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </nav>
 
-      <div className="mt-auto rounded-lg border border-white/15 bg-white/10 p-5 text-white backdrop-blur">
-        <div className="inline-flex size-11 items-center justify-center rounded-lg bg-white text-indigo-700">
-          <ShieldCheck aria-hidden="true" className="size-6" />
+          <div className="mt-auto rounded-2xl border border-white/15 bg-white/10 p-5 text-white backdrop-blur">
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-white text-indigo-700">
+              <ShieldCheck aria-hidden="true" className="size-6" />
+            </div>
+            <p className="mt-4 text-sm font-bold leading-6">
+              He thong an toan va bao mat
+            </p>
+            <p className="mt-2 text-xs leading-5 text-indigo-50/80">
+              Du lieu duoc ma hoa va bao ve theo tieu chuan quoc te.
+            </p>
+            <button
+              className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/35 text-sm font-bold text-white transition hover:bg-white/10"
+              type="button"
+            >
+              Xem chi tiet
+            </button>
+          </div>
         </div>
-        <p className="mt-4 text-sm font-bold leading-6">
-          He thong an toan va bao mat
-        </p>
-        <p className="mt-2 text-xs leading-5 text-indigo-50/80">
-          Du lieu duoc ma hoa va bao ve theo tieu chuan quoc te.
-        </p>
-        <button
-          className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-white/35 text-sm font-bold text-white transition hover:bg-white/10"
-          type="button"
-        >
-          Xem chi tiet
-        </button>
       </div>
     </div>
   )
@@ -287,6 +295,28 @@ export function SystemAdminLayout() {
   const adminEmail = user?.email ?? 'unknown'
   const adminRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
   const adminInitials = getEmailInitials(adminEmail)
+  const reviewQuestionsQuery = useQuestionsQuery('admin', 'review', 1, 1, {
+    keyword: '',
+    questionBankId: '',
+    questionTopicId: '',
+    scope: '',
+    sharing: '',
+    status: 'SUBMITTED_FOR_REVIEW',
+    topicName: '',
+    type: '',
+  })
+  const systemAdminNavigationGroups = navigationGroups.map((group) =>
+    group.label === 'Question'
+      ? {
+          ...group,
+          items: group.items.map((item) =>
+            item.to === '/system-admin/questions/review'
+              ? { ...item, badgeCount: reviewQuestionsQuery.data?.totalElements ?? 0 }
+              : item,
+          ),
+        }
+      : group,
+  )
 
   function handleLogout() {
     setIsMobileMenuOpen(false)
@@ -299,7 +329,7 @@ export function SystemAdminLayout() {
   return (
     <div className="min-h-screen bg-slate-50 text-blue-950 lg:pl-70">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-70 lg:block">
-        <SystemAdminSidebar />
+        <SystemAdminSidebar groups={systemAdminNavigationGroups} />
       </aside>
 
       {isMobileMenuOpen ? (
@@ -317,6 +347,7 @@ export function SystemAdminLayout() {
             role="dialog"
           >
             <SystemAdminSidebar
+              groups={systemAdminNavigationGroups}
               onClose={() => setIsMobileMenuOpen(false)}
               onNavigate={() => setIsMobileMenuOpen(false)}
               showCloseButton
