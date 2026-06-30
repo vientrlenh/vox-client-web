@@ -60,6 +60,22 @@ export type ImportSessionFilters = {
   type: string
 }
 
+export type AcceptImportSessionResponse = {
+  importSessionId: string
+  importedRows: number
+  invalidRows: number
+  skippedRows: number
+  status: string
+  totalRows: number
+}
+
+export function mappingEntriesToRecord(entries: ImportMappingEntry[]) {
+  return entries.reduce<Record<string, string>>((result, entry) => {
+    result[entry.originalHeader] = entry.systemField
+    return result
+  }, {})
+}
+
 export function formatImportDate(value?: string | null) {
   if (!value) {
     return '-'
@@ -139,5 +155,43 @@ export function getImportTypeDisplay(type?: string | null) {
     return 'Học viên trong lớp'
   }
 
+  if (normalized === 'USER') {
+    return 'Người dùng'
+  }
+
+  if (normalized === 'SCHOOL_DIRECTORY') {
+    return 'Danh mục trường'
+  }
+
   return normalized || '-'
+}
+
+export function getImportUpdatedRows(session: {
+  importedRows: number
+  invalidRows: number
+  totalRows: number
+}) {
+  return Math.max(
+    0,
+    session.totalRows - session.importedRows - session.invalidRows,
+  )
+}
+
+export function getImportResultCounts(session: {
+  importedRows: number
+  invalidRows: number
+  skippedRows: number
+  status?: string | null
+  totalRows: number
+}) {
+  if (session.status?.trim().toUpperCase() !== 'COMPLETED') {
+    return { added: 0, invalid: 0, skipped: 0, updated: 0 }
+  }
+
+  return {
+    added: session.importedRows,
+    invalid: session.invalidRows,
+    skipped: session.skippedRows,
+    updated: getImportUpdatedRows(session),
+  }
 }

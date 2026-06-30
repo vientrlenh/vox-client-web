@@ -1,12 +1,13 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { Check, ChevronLeft, X } from 'lucide-react'
+import { useVietnamProvincesQuery } from '../api/useVietnamProvincesQuery'
 import type {
   ApproveRegisterFormRequest,
   RegisterForm,
   RejectRegisterFormRequest,
 } from '../types'
-import { formatNullableText, formatStudentCount } from '../types'
+import { formatNullableText } from '../types'
 
 export type RegistrationDecisionMode = 'approve' | 'reject'
 
@@ -38,17 +39,9 @@ type RegistrationDecisionDialogContentProps = Omit<
 }
 
 type ApproveFormState = {
-  contactAddress: string
-  contactEmail: string
-  contactFullName: string
-  contactPhone: string
-  dateOfBirth: string
   description: string
-  schoolAddress: string
+  provinceCode: string
   schoolCode: string
-  schoolDomain: string
-  schoolName: string
-  studentCount: string
 }
 
 type ApproveFieldName = keyof ApproveFormState
@@ -63,138 +56,29 @@ type TextFieldConfig = {
   type?: string
 }
 
-const approveFieldGroups: Array<{
-  fields: TextFieldConfig[]
-  title: string
-}> = [
+const approveTextFields: TextFieldConfig[] = [
   {
-    fields: [
-      {
-        id: 'approve-school-code',
-        label: 'Mã trường',
-        maxLength: 100,
-        name: 'schoolCode',
-        required: true,
-      },
-      {
-        autoComplete: 'organization',
-        id: 'approve-school-name',
-        label: 'Tên trường',
-        maxLength: 255,
-        name: 'schoolName',
-        required: true,
-      },
-      {
-        id: 'approve-school-domain',
-        label: 'Tên miền trường',
-        maxLength: 100,
-        name: 'schoolDomain',
-        required: true,
-      },
-      {
-        id: 'approve-student-count',
-        label: 'Số học sinh',
-        name: 'studentCount',
-        required: true,
-        type: 'number',
-      },
-      {
-        autoComplete: 'street-address',
-        id: 'approve-school-address',
-        label: 'Địa chỉ trường',
-        maxLength: 512,
-        name: 'schoolAddress',
-        required: true,
-      },
-    ],
-    title: 'Thông tin trường',
-  },
-  {
-    fields: [
-      {
-        autoComplete: 'name',
-        id: 'approve-contact-name',
-        label: 'Họ và tên liên hệ',
-        maxLength: 255,
-        name: 'contactFullName',
-        required: true,
-      },
-      {
-        autoComplete: 'tel',
-        id: 'approve-contact-phone',
-        label: 'Số điện thoại liên hệ',
-        maxLength: 20,
-        name: 'contactPhone',
-        required: true,
-        type: 'tel',
-      },
-      {
-        autoComplete: 'email',
-        id: 'approve-contact-email',
-        label: 'Email liên hệ',
-        maxLength: 255,
-        name: 'contactEmail',
-        required: true,
-        type: 'email',
-      },
-      {
-        id: 'approve-date-of-birth',
-        label: 'Ngày sinh',
-        name: 'dateOfBirth',
-        required: true,
-        type: 'date',
-      },
-      {
-        autoComplete: 'street-address',
-        id: 'approve-contact-address',
-        label: 'Địa chỉ liên hệ',
-        maxLength: 512,
-        name: 'contactAddress',
-        required: true,
-      },
-    ],
-    title: 'Thông tin liên hệ',
+    id: 'approve-school-code',
+    label: 'Mã trường',
+    maxLength: 100,
+    name: 'schoolCode',
+    required: true,
   },
 ]
 
-function getDateInputValue(value?: string | null) {
-  const isoDate = /^(\d{4}-\d{2}-\d{2})/.exec(value ?? '')
-
-  return isoDate?.[1] ?? ''
-}
-
-function createApproveFormState(form: RegisterForm | null): ApproveFormState {
+function createApproveFormState(): ApproveFormState {
   return {
-    contactAddress: form?.contactAddress ?? '',
-    contactEmail: form?.contactEmail ?? '',
-    contactFullName: form?.contactFullName ?? '',
-    contactPhone: form?.contactPhone ?? '',
-    dateOfBirth: getDateInputValue(form?.dateOfBirth),
     description: '',
-    schoolAddress: form?.schoolAddress ?? '',
+    provinceCode: '',
     schoolCode: '',
-    schoolDomain: form?.schoolDomain ?? '',
-    schoolName: form?.schoolName ?? '',
-    studentCount:
-      typeof form?.studentCount === 'number' && form.studentCount > 0
-        ? String(form.studentCount)
-        : '',
   }
 }
 
 function trimApproveFormState(state: ApproveFormState): ApproveFormState {
   return {
-    contactAddress: state.contactAddress.trim(),
-    contactEmail: state.contactEmail.trim(),
-    contactFullName: state.contactFullName.trim(),
-    contactPhone: state.contactPhone.trim(),
-    dateOfBirth: state.dateOfBirth.trim(),
     description: state.description.trim(),
-    schoolAddress: state.schoolAddress.trim(),
+    provinceCode: state.provinceCode.trim(),
     schoolCode: state.schoolCode.trim(),
-    schoolDomain: state.schoolDomain.trim(),
-    schoolName: state.schoolName.trim(),
-    studentCount: state.studentCount.trim(),
   }
 }
 
@@ -202,15 +86,7 @@ function buildApprovePayload(state: ApproveFormState) {
   const values = trimApproveFormState(state)
   const requiredFields: Array<[label: string, value: string]> = [
     ['Mã trường', values.schoolCode],
-    ['Tên trường', values.schoolName],
-    ['Số điện thoại liên hệ', values.contactPhone],
-    ['Email liên hệ', values.contactEmail],
-    ['Tên miền trường', values.schoolDomain],
-    ['Địa chỉ trường', values.schoolAddress],
-    ['Số học sinh', values.studentCount],
-    ['Họ và tên liên hệ', values.contactFullName],
-    ['Ngày sinh', values.dateOfBirth],
-    ['Địa chỉ liên hệ', values.contactAddress],
+    ['Mã tỉnh thành', values.provinceCode],
   ]
   const missingField = requiredFields.find(([, value]) => !value)
 
@@ -221,29 +97,12 @@ function buildApprovePayload(state: ApproveFormState) {
     }
   }
 
-  const studentCount = Number(values.studentCount)
-
-  if (!Number.isInteger(studentCount) || studentCount < 1) {
-    return {
-      error: 'Số học sinh phải là số nguyên lớn hơn 0.',
-      payload: null,
-    }
-  }
-
   return {
     error: null,
     payload: {
-      contactAddress: values.contactAddress,
-      contactEmail: values.contactEmail,
-      contactFullName: values.contactFullName,
-      contactPhone: values.contactPhone,
-      dateOfBirth: values.dateOfBirth,
       description: values.description || null,
-      schoolAddress: values.schoolAddress,
+      provinceCode: values.provinceCode,
       schoolCode: values.schoolCode,
-      schoolDomain: values.schoolDomain,
-      schoolName: values.schoolName,
-      studentCount,
     } satisfies ApproveRegisterFormRequest,
   }
 }
@@ -361,7 +220,7 @@ function RegistrationDecisionDialogContent({
   onSubmit,
 }: RegistrationDecisionDialogContentProps) {
   const [approveForm, setApproveForm] = useState(() =>
-    createApproveFormState(form),
+    createApproveFormState(),
   )
   const [rejectReason, setRejectReason] = useState('')
   const [validationMessage, setValidationMessage] = useState<string | null>(
@@ -382,6 +241,15 @@ function RegistrationDecisionDialogContent({
   const actionClassName = isApproveMode
     ? 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-100'
     : 'bg-red-600 hover:bg-red-700 focus:ring-red-100'
+
+  const provincesQuery = useVietnamProvincesQuery()
+  const provinces = provincesQuery.data ?? []
+
+  function getProvinceName(code: string) {
+    return (
+      provinces.find((province) => String(province.code) === code)?.name ?? code
+    )
+  }
 
   function handleApproveFieldChange(name: ApproveFieldName, value: string) {
     setApproveForm((current) => ({
@@ -473,24 +341,61 @@ function RegistrationDecisionDialogContent({
             <form className="grid gap-5" onSubmit={handleSubmitForm}>
               {isApproveMode ? (
                 <>
-                  {approveFieldGroups.map((group) => (
-                    <section className="grid gap-3" key={group.title}>
-                      <h3 className="text-sm font-black text-blue-950">
-                        {group.title}
-                      </h3>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {group.fields.map((field) => (
-                          <TextField
-                            disabled={isSubmitting}
-                            field={field}
-                            key={field.id}
-                            onChange={handleApproveFieldChange}
-                            value={approveForm[field.name]}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ))}
+                  <section className="grid gap-3">
+                    <h3 className="text-sm font-black text-blue-950">
+                      Thông tin trường
+                    </h3>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {approveTextFields.map((field) => (
+                        <TextField
+                          disabled={isSubmitting}
+                          field={field}
+                          key={field.id}
+                          onChange={handleApproveFieldChange}
+                          value={approveForm[field.name]}
+                        />
+                      ))}
+
+                      <label
+                        className="block min-w-0"
+                        htmlFor="approve-province-code"
+                      >
+                        <span className="mb-1.5 block text-xs font-bold text-blue-950">
+                          Tỉnh / Thành phố <RequiredMark />
+                        </span>
+                        <select
+                          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+                          disabled={isSubmitting || provincesQuery.isLoading}
+                          id="approve-province-code"
+                          onChange={(event) =>
+                            handleApproveFieldChange(
+                              'provinceCode',
+                              event.target.value,
+                            )
+                          }
+                          required
+                          value={approveForm.provinceCode}
+                        >
+                          <option value="">
+                            {provincesQuery.isLoading
+                              ? 'Đang tải tỉnh/thành phố...'
+                              : 'Chọn tỉnh / thành phố'}
+                          </option>
+                          {provinces.map((province) => (
+                            <option key={province.code} value={String(province.code)}>
+                              {province.name}
+                            </option>
+                          ))}
+                        </select>
+                        {provincesQuery.isError ? (
+                          <span className="mt-1 block text-xs font-medium text-red-600">
+                            Không thể tải danh sách tỉnh/thành phố. Vui lòng thử
+                            lại.
+                          </span>
+                        ) : null}
+                      </label>
+                    </div>
+                  </section>
 
                   <label className="block min-w-0" htmlFor="approve-description">
                     <span className="mb-1.5 block text-xs font-bold text-blue-950">
@@ -580,20 +485,12 @@ function RegistrationDecisionDialogContent({
                       value={decision.payload.schoolCode}
                     />
                     <SummaryRow
-                      label="Tên trường"
-                      value={decision.payload.schoolName}
+                      label="Tỉnh / Thành phố"
+                      value={getProvinceName(decision.payload.provinceCode)}
                     />
                     <SummaryRow
-                      label="Tên miền"
-                      value={decision.payload.schoolDomain}
-                    />
-                    <SummaryRow
-                      label="Email"
-                      value={decision.payload.contactEmail}
-                    />
-                    <SummaryRow
-                      label="Số học sinh"
-                      value={formatStudentCount(decision.payload.studentCount)}
+                      label="Mô tả"
+                      value={decision.payload.description}
                     />
                   </>
                 ) : (

@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Home,
   Languages,
+  Library,
   LogOut,
   Menu,
   Search,
@@ -37,6 +38,11 @@ const navigationItems = [
     icon: Languages,
     label: 'Quản lý ngôn ngữ',
     to: '/system-admin/languages',
+  },
+  {
+    icon: Library,
+    label: 'Danh mục trường',
+    to: '/system-admin/school-directory',
   },
   {
     icon: Users,

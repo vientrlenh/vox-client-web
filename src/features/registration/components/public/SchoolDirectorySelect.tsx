@@ -1,5 +1,5 @@
 import { Check, Loader2, Search } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSchoolDirectoriesQuery } from '../../api/useSchoolDirectoriesQuery'
 import type { SchoolDirectory } from '../../types'
 import { RequiredMark } from './RegistrationFormFields'
@@ -29,14 +29,26 @@ export function SchoolDirectorySelect({
   selected: SchoolDirectory | null
 }) {
   const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const directoriesQuery = useSchoolDirectoriesQuery(1, DIRECTORY_PAGE_SIZE, search)
-  const directories = directoriesQuery.data?.content ?? []
+  const directoriesQuery = useSchoolDirectoriesQuery(DIRECTORY_PAGE_SIZE)
 
-  function handleSearch() {
-    onSelect(null)
-    setSearch(searchInput.trim())
-  }
+  const directories = useMemo(
+    () => directoriesQuery.data?.pages.flatMap((page) => page.content) ?? [],
+    [directoriesQuery.data],
+  )
+
+  const filteredDirectories = useMemo(() => {
+    const keyword = searchInput.trim().toLowerCase()
+
+    if (!keyword) {
+      return directories
+    }
+
+    return directories.filter((directory) =>
+      [directory.name, directory.domain]
+        .filter(Boolean)
+        .some((value) => value?.toLowerCase().includes(keyword)),
+    )
+  }, [directories, searchInput])
 
   return (
     <div className="grid gap-3">
@@ -44,35 +56,19 @@ export function SchoolDirectorySelect({
         Chọn trường từ danh mục <RequiredMark />
       </span>
 
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
-          />
-          <input
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-            disabled={disabled}
-            onChange={(event) => setSearchInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                handleSearch()
-              }
-            }}
-            placeholder="Tìm theo tên trường"
-            type="search"
-            value={searchInput}
-          />
-        </div>
-        <button
-          className="inline-flex h-10 shrink-0 items-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+      <div className="relative">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+        />
+        <input
+          className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
           disabled={disabled}
-          onClick={handleSearch}
-          type="button"
-        >
-          Tìm
-        </button>
+          onChange={(event) => setSearchInput(event.target.value)}
+          placeholder="Lọc theo tên trường đã tải"
+          type="search"
+          value={searchInput}
+        />
       </div>
 
       {selected ? (
@@ -113,14 +109,14 @@ export function SchoolDirectorySelect({
 
           {!directoriesQuery.isLoading &&
           !directoriesQuery.isError &&
-          directories.length === 0 ? (
+          filteredDirectories.length === 0 ? (
             <div className="px-3 py-6 text-center text-xs font-semibold text-slate-500">
               Không tìm thấy trường phù hợp.
             </div>
           ) : null}
 
           {!directoriesQuery.isError
-            ? directories.map((directory) => (
+            ? filteredDirectories.map((directory) => (
                 <button
                   className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left transition last:border-b-0 hover:bg-indigo-50 disabled:cursor-not-allowed"
                   disabled={disabled}
@@ -133,7 +129,7 @@ export function SchoolDirectorySelect({
                       {directory.name}
                     </span>
                     <span className="block truncate text-[11px] font-medium text-slate-500">
-                      {[directory.domain, directory.province]
+                      {[directory.domain, directory.provinceName]
                         .filter(Boolean)
                         .join(' · ') || 'Không có thông tin'}
                     </span>
@@ -145,6 +141,28 @@ export function SchoolDirectorySelect({
                 </button>
               ))
             : null}
+
+          {!directoriesQuery.isLoading &&
+          !directoriesQuery.isError &&
+          directoriesQuery.hasNextPage ? (
+            <button
+              className="flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={disabled || directoriesQuery.isFetchingNextPage}
+              onClick={() => {
+                void directoriesQuery.fetchNextPage()
+              }}
+              type="button"
+            >
+              {directoriesQuery.isFetchingNextPage ? (
+                <>
+                  <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                  Đang tải thêm...
+                </>
+              ) : (
+                'Tải thêm'
+              )}
+            </button>
+          ) : null}
         </div>
       )}
     </div>

@@ -24,9 +24,11 @@ export async function approveRegisterForm({
   id,
   payload,
 }: ApproveRegisterFormInput) {
+  // `id` nằm trên path, nhưng DTO body (ApproveRegisterFormRequest) vẫn validate
+  // @NotBlank cho `registerFormId` nên phải gửi kèm trong body.
   const response = await apiClient.post<ApiResponse<null>>(
     `/v1/register-forms/${id}/approve`,
-    payload,
+    { ...payload, registerFormId: id },
   )
 
   return response.data.message
@@ -38,7 +40,7 @@ export async function rejectRegisterForm({
 }: RejectRegisterFormInput) {
   const response = await apiClient.post<ApiResponse<null>>(
     `/v1/register-forms/${id}/reject`,
-    payload,
+    { ...payload, registerFormId: id },
   )
 
   return response.data.message

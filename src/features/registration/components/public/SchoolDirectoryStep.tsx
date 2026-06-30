@@ -10,12 +10,12 @@ import type {
   SchoolDirectory,
 } from '../../types'
 import { ContactInfoFields } from './ContactInfoFields'
+import { uploadFileToStorage } from '@/shared/firebase/uploadToStorage'
 import type { FormMessage } from './RegistrationFormFields'
-import { DocumentUrlsField, FormMessageBanner } from './RegistrationFormFields'
+import { DocumentFilesField, FormMessageBanner } from './RegistrationFormFields'
 import {
   getApiErrorMessage,
   getStringValue,
-  sanitizeUrls,
 } from './registrationFormUtils'
 import {
   RegistrationCard,
@@ -35,9 +35,10 @@ export function SchoolDirectoryStep({
 }) {
   const mutation = useRegisterSchoolDirectoryMutation()
   const [directory, setDirectory] = useState<SchoolDirectory | null>(null)
-  const [documentUrls, setDocumentUrls] = useState<string[]>([''])
+  const [files, setFiles] = useState<File[]>([])
+  const [isUploading, setIsUploading] = useState(false)
   const [message, setMessage] = useState<FormMessage | null>(null)
-  const isSubmitting = mutation.isPending
+  const isSubmitting = mutation.isPending || isUploading
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -58,8 +59,32 @@ export function SchoolDirectoryStep({
       return
     }
 
-    const cleanedUrls = sanitizeUrls(documentUrls)
     const contactEmail = getStringValue(formData, 'contactEmail')
+
+    let documentUrls: string[] | undefined
+    if (files.length > 0) {
+      try {
+        setIsUploading(true)
+        setMessage(null)
+        documentUrls = await Promise.all(
+          files.map((file) =>
+            uploadFileToStorage(
+              file,
+              `registrations/${crypto.randomUUID()}/${file.name}`,
+            ),
+          ),
+        )
+      } catch {
+        setMessage({
+          text: 'Tải tài liệu lên thất bại. Vui lòng thử lại.',
+          tone: 'error',
+        })
+        return
+      } finally {
+        setIsUploading(false)
+      }
+    }
+
     const payload: RegisterSchoolDirectoryRequest = {
       contactAddress: getStringValue(formData, 'contactAddress'),
       contactEmail,
@@ -71,7 +96,7 @@ export function SchoolDirectoryStep({
       postalCode: getStringValue(formData, 'postalCode'),
       schoolDirectoryId: directory.id,
       studentCount,
-      ...(cleanedUrls.length > 0 ? { documentUrls: cleanedUrls } : {}),
+      ...(documentUrls && documentUrls.length > 0 ? { documentUrls } : {}),
     }
 
     try {
@@ -122,10 +147,10 @@ export function SchoolDirectoryStep({
         <ContactInfoFields disabled={isSubmitting} />
 
         <div className="border-t border-slate-200 pt-4">
-          <DocumentUrlsField
+          <DocumentFilesField
             disabled={isSubmitting}
-            onChange={setDocumentUrls}
-            urls={documentUrls}
+            files={files}
+            onChange={setFiles}
           />
           <p className="mt-2 text-[11px] font-medium leading-4 text-slate-500">
             Nếu email của bạn khớp tên miền trường, hệ thống sẽ gửi mã OTP và
@@ -136,7 +161,7 @@ export function SchoolDirectoryStep({
         <FormMessageBanner message={message} />
 
         <RegistrationSubmitButton disabled={isSubmitting}>
-          {isSubmitting ? 'Đang gửi...' : 'Gửi đăng ký'}
+          {isUploading ? 'Đang tải tài liệu...' : isSubmitting ? 'Đang gửi...' : 'Gửi đăng ký'}
         </RegistrationSubmitButton>
       </form>
     </RegistrationCard>

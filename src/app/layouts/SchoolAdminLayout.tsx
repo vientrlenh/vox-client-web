@@ -5,6 +5,7 @@ import {
   ChevronDown,
   FileSpreadsheet,
   Home,
+  Layers,
   LogOut,
   Menu,
   MonitorPlay,
@@ -36,6 +37,11 @@ const navigationItems = [
     icon: BookOpen,
     label: 'Quản lý lớp học',
     to: '/school-admin/classes',
+  },
+  {
+    icon: Layers,
+    label: 'Quản lý khối',
+    to: '/school-admin/grades',
   },
   {
     icon: FileSpreadsheet,

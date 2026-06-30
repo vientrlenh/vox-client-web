@@ -63,6 +63,18 @@ const SystemAdminLanguagesPage = lazy(() =>
   })),
 );
 
+const SystemAdminSchoolDirectoryPage = lazy(() =>
+  import('@/features/school-directory').then((module) => ({
+    default: module.SystemAdminSchoolDirectoryPage,
+  })),
+)
+
+const SystemAdminSchoolDirectoryImportPage = lazy(() =>
+  import('@/features/school-directory').then((module) => ({
+    default: module.SystemAdminSchoolDirectoryImportPage,
+  })),
+)
+
 const SchoolAdminClassesPage = lazy(() =>
   import("@/features/classes").then((module) => ({
     default: module.SchoolAdminClassesPage,
@@ -86,6 +98,30 @@ const SchoolAdminClassUserImportPage = lazy(() =>
     default: module.SchoolAdminClassUserImportPage,
   })),
 );
+
+const SchoolAdminGradesPage = lazy(() =>
+  import('@/features/grades').then((module) => ({
+    default: module.SchoolAdminGradesPage,
+  })),
+)
+
+const SchoolAdminGradeLevelDetailPage = lazy(() =>
+  import('@/features/grades').then((module) => ({
+    default: module.SchoolAdminGradeLevelDetailPage,
+  })),
+)
+
+const SchoolAdminGradeLevelImportPage = lazy(() =>
+  import('@/features/grades').then((module) => ({
+    default: module.SchoolAdminGradeLevelImportPage,
+  })),
+)
+
+const SchoolAdminGradeImportPage = lazy(() =>
+  import('@/features/grades').then((module) => ({
+    default: module.SchoolAdminGradeImportPage,
+  })),
+)
 
 const SchoolAdminSchoolUsersPage = lazy(() =>
   import("@/features/school-users").then((module) => ({
@@ -165,7 +201,14 @@ export function AppRoutes() {
               path="system-admin/languages"
               element={<SystemAdminLanguagesPage />}
             />
-            {/* Đăng ký route mới tại đây */}
+            <Route
+              path="system-admin/school-directory"
+              element={<SystemAdminSchoolDirectoryPage />}
+            />
+            <Route
+              path="system-admin/school-directory/import"
+              element={<SystemAdminSchoolDirectoryImportPage />}
+            />
             <Route
               path="system-admin/schools"
               element={<SystemAdminSchoolsPage />}
@@ -199,8 +242,28 @@ export function AppRoutes() {
               element={<SchoolAdminClassImportPage />}
             />
             <Route
+              path="school-admin/classes/users/import"
+              element={<SchoolAdminClassUserImportPage />}
+            />
+            <Route
               path="school-admin/classes/:classId/users/import"
               element={<SchoolAdminClassUserImportPage />}
+            />
+            <Route
+              path="school-admin/grades"
+              element={<SchoolAdminGradesPage />}
+            />
+            <Route
+              path="school-admin/grades/import"
+              element={<SchoolAdminGradeLevelImportPage />}
+            />
+            <Route
+              path="school-admin/grades/:gradeLevelId/grades/import"
+              element={<SchoolAdminGradeImportPage />}
+            />
+            <Route
+              path="school-admin/grades/:gradeLevelId"
+              element={<SchoolAdminGradeLevelDetailPage />}
             />
             <Route
               path="school-admin/students"

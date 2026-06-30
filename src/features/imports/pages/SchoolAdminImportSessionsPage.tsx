@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { Eye, RefreshCw, Upload } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, Eye, RefreshCw, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import { useImportSessionsQuery } from '../api/useImportSessionsQuery'
 import type { ImportSessionFilters, ImportSessionSummary } from '../types'
 import {
   formatImportDate,
+  getImportResultCounts,
   getImportStatusDisplay,
   getImportTypeDisplay,
 } from '../types'
@@ -143,7 +144,10 @@ function ImportSessionsTable({
                   {session.totalRows}
                 </td>
                 <td className="px-4 py-4 text-sm font-semibold text-slate-600">
-                  {session.importedRows} import / {session.invalidRows} lỗi
+                  {(() => {
+                    const result = getImportResultCounts(session)
+                    return `${result.added} thêm / ${result.updated} cập nhật / ${result.invalid} lỗi`
+                  })()}
                 </td>
                 <td className="px-4 py-4 text-sm font-semibold text-slate-600">
                   {formatImportDate(session.createdAt)}
@@ -230,6 +234,93 @@ function Pagination({
   )
 }
 
+type ImportTypeOption = {
+  label: string
+  to: string
+}
+
+const IMPORT_TYPE_OPTIONS: ImportTypeOption[] = [
+  { label: 'Lớp học', to: '/school-admin/classes/import' },
+  { label: 'Học viên trong lớp', to: '/school-admin/classes/users/import' },
+  { label: 'Người dùng', to: '/school-admin/students/import' },
+]
+
+type ImportTypeMenuProps = {
+  onSelect: (to: string) => void
+}
+
+function ImportTypeMenu({ onSelect }: ImportTypeMenuProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node | null
+
+      if (target && containerRef.current?.contains(target)) {
+        return
+      }
+
+      setIsOpen(false)
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <Upload aria-hidden="true" className="size-4" />
+        Import
+        <ChevronDown aria-hidden="true" className="size-4" />
+      </button>
+      {isOpen ? (
+        <div
+          className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-950/10"
+          role="menu"
+        >
+          {IMPORT_TYPE_OPTIONS.map((option) => (
+            <button
+              className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              key={option.to}
+              onClick={() => {
+                setIsOpen(false)
+                onSelect(option.to)
+              }}
+              role="menuitem"
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function SchoolAdminImportSessionsPage() {
   const navigate = useNavigate()
   const [page, setPage] = useState(DEFAULT_PAGE)
@@ -270,14 +361,7 @@ export function SchoolAdminImportSessionsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
-            onClick={() => navigate('/school-admin/classes/import')}
-            type="button"
-          >
-            <Upload aria-hidden="true" className="size-4" />
-            Import lớp học
-          </button>
+          <ImportTypeMenu onSelect={(to) => navigate(to)} />
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
             disabled={sessionsQuery.isFetching}
@@ -303,6 +387,7 @@ export function SchoolAdminImportSessionsPage() {
             <option value="">Tất cả</option>
             <option value="SCHOOL_CLASS">Lớp học</option>
             <option value="SCHOOL_CLASS_USER">Học viên trong lớp</option>
+            <option value="USER">Người dùng</option>
           </select>
         </label>
         <label className="grid gap-2 text-sm font-bold text-slate-700">

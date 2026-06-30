@@ -3,18 +3,19 @@ import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRegisterSelfDeclaredMutation } from '../../api/useRegisterSelfDeclaredMutation'
 import type { RegisterSelfDeclaredRequest } from '../../types'
+import { uploadFileToStorage } from '@/shared/firebase/uploadToStorage'
 import { ContactInfoFields } from './ContactInfoFields'
 import type { FieldConfig, FormMessage } from './RegistrationFormFields'
 import {
-  DocumentUrlsField,
+  DocumentFilesField,
   FormMessageBanner,
   FormSection,
   TextField,
 } from './RegistrationFormFields'
+import { ProvinceDistrictFields } from './ProvinceDistrictFields'
 import {
   getApiErrorMessage,
   getStringValue,
-  sanitizeUrls,
 } from './registrationFormUtils'
 import {
   RegistrationCard,
@@ -22,7 +23,7 @@ import {
   RegistrationSubmitButton,
 } from './RegistrationLayout'
 
-const schoolFields: FieldConfig[] = [
+const schoolInfoFields: FieldConfig[] = [
   {
     autoComplete: 'organization',
     id: 'school-name',
@@ -39,22 +40,6 @@ const schoolFields: FieldConfig[] = [
     name: 'schoolDomain',
     placeholder: 'vd: ten-truong.edu.vn',
   },
-  {
-    id: 'school-district',
-    label: 'Quận / Huyện',
-    maxLength: 100,
-    name: 'schoolDistrict',
-    placeholder: 'Nhập quận/huyện',
-    required: true,
-  },
-  {
-    id: 'school-province',
-    label: 'Tỉnh / Thành phố',
-    maxLength: 100,
-    name: 'schoolProvince',
-    placeholder: 'Nhập tỉnh/thành phố',
-    required: true,
-  },
 ]
 
 export function SelfDeclaredStep({
@@ -65,9 +50,10 @@ export function SelfDeclaredStep({
   onPending: () => void
 }) {
   const mutation = useRegisterSelfDeclaredMutation()
-  const [documentUrls, setDocumentUrls] = useState<string[]>([''])
+  const [files, setFiles] = useState<File[]>([])
+  const [isUploading, setIsUploading] = useState(false)
   const [message, setMessage] = useState<FormMessage | null>(null)
-  const isSubmitting = mutation.isPending
+  const isSubmitting = mutation.isPending || isUploading
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -83,14 +69,34 @@ export function SelfDeclaredStep({
       return
     }
 
-    const cleanedUrls = sanitizeUrls(documentUrls)
-
-    if (cleanedUrls.length === 0) {
+    if (files.length === 0) {
       setMessage({
         text: 'Vui lòng đính kèm ít nhất một tài liệu xác thực.',
         tone: 'error',
       })
       return
+    }
+
+    let documentUrls: string[]
+    try {
+      setIsUploading(true)
+      setMessage(null)
+      documentUrls = await Promise.all(
+        files.map((file) =>
+          uploadFileToStorage(
+            file,
+            `registrations/${crypto.randomUUID()}/${file.name}`,
+          ),
+        ),
+      )
+    } catch {
+      setMessage({
+        text: 'Tải tài liệu lên thất bại. Vui lòng thử lại.',
+        tone: 'error',
+      })
+      return
+    } finally {
+      setIsUploading(false)
     }
 
     const schoolDomain = getStringValue(formData, 'schoolDomain')
@@ -100,7 +106,7 @@ export function SelfDeclaredStep({
       contactFullName: getStringValue(formData, 'contactFullName'),
       contactPhone: getStringValue(formData, 'contactPhone'),
       dateOfBirth: getStringValue(formData, 'dateOfBirth'),
-      documentUrls: cleanedUrls,
+      documentUrls,
       identityNumber: getStringValue(formData, 'identityNumber'),
       position: getStringValue(formData, 'position'),
       postalCode: getStringValue(formData, 'postalCode'),
@@ -149,10 +155,11 @@ export function SelfDeclaredStep({
         <FormSection title="Thông tin trường">
           <div className="grid gap-3">
             <div className="grid gap-3 sm:grid-cols-2">
-              {schoolFields.map((field) => (
+              {schoolInfoFields.map((field) => (
                 <TextField disabled={isSubmitting} key={field.id} {...field} />
               ))}
             </div>
+            <ProvinceDistrictFields disabled={isSubmitting} />
             <TextField
               autoComplete="street-address"
               disabled={isSubmitting}
@@ -169,18 +176,18 @@ export function SelfDeclaredStep({
         <ContactInfoFields disabled={isSubmitting} />
 
         <div className="border-t border-slate-200 pt-4">
-          <DocumentUrlsField
+          <DocumentFilesField
             disabled={isSubmitting}
-            onChange={setDocumentUrls}
+            files={files}
+            onChange={setFiles}
             required
-            urls={documentUrls}
           />
         </div>
 
         <FormMessageBanner message={message} />
 
         <RegistrationSubmitButton disabled={isSubmitting}>
-          {isSubmitting ? 'Đang gửi...' : 'Gửi đăng ký'}
+          {isUploading ? 'Đang tải tài liệu...' : isSubmitting ? 'Đang gửi...' : 'Gửi đăng ký'}
         </RegistrationSubmitButton>
       </form>
     </RegistrationCard>
