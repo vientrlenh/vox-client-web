@@ -287,7 +287,7 @@ export function SystemAdminLayout() {
                     onClick={() => {
                       setIsMobileMenuOpen(false)
                       setIsUserMenuOpen(false)
-                      navigate('/system-admin/profile')
+                      navigate('/profile')
                     }}
                     role="menuitem"
                     type="button"

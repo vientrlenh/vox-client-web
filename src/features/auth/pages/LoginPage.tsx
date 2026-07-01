@@ -93,6 +93,9 @@ function getPostLoginPath(roles: string[]) {
   if (roles.includes('SCHOOL_ADMIN')) {
     return '/school-admin/dashboard'
   }
+  if (roles.includes('TEACHER')) {
+    return '/teacher/dashboard'
+  }
 
   return null
 }

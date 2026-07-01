@@ -6,6 +6,8 @@ import { TeacherLayout } from "@/app/layouts/TeacherLayout";
 import { RequireRole } from "./RequireRole";
 import { PageLoader } from "@/shared/ui/PageLoader";
 import { OAuth2CallbackPage } from "@/features/auth/pages/OAuth2SuccessPage";
+import { RequireAuth } from "./RequireAuth";
+import { RoleLayout } from "../layouts/RoleLayout";
 
 const HomePage = lazy(() =>
   import("@/features/home").then((module) => ({ default: module.HomePage })),
@@ -50,6 +52,12 @@ const SchoolAdminDashboardPage = lazy(() =>
     default: module.SchoolAdminDashboardPage,
   })),
 );
+
+const TeacherDashboardPage = lazy(() => 
+  import("@/features/dashboard").then((module) => ({
+    default: module.TeacherDashboardPage,
+  }))
+)
 
 const SystemAdminRegistrationsPage = lazy(() =>
   import("@/features/registration").then((module) => ({
@@ -187,6 +195,14 @@ export function AppRoutes() {
         <Route path="register" element={<RegisterPage />} />
         <Route path="reset-password" element={<ResetPasswordPage />} />
         <Route path="setup-password" element={<SetupPasswordPage />} />
+        <Route element={<RequireAuth/>}>
+          <Route element={<RoleLayout/>}>
+              <Route 
+                path="profile"
+                element={<ProfilePage/>}
+              />
+          </Route>
+        </Route>
         <Route element={<RequireRole role="SYSTEM_ADMIN" />}>
           <Route element={<SystemAdminLayout />}>
             <Route
@@ -212,10 +228,6 @@ export function AppRoutes() {
             <Route
               path="system-admin/schools"
               element={<SystemAdminSchoolsPage />}
-            />
-            <Route
-              path="system-admin/profile"
-              element={<ProfilePage/>}
             />
           </Route>
         </Route>
@@ -289,14 +301,14 @@ export function AppRoutes() {
               path="school-admin/classes/:classId"
               element={<SchoolAdminClassDetailPage />}
             />
-            <Route
-              path="school-admin/profile"
-              element={<ProfilePage/>}
-            />
           </Route>
         </Route>
         <Route element={<RequireRole role="TEACHER" />}>
           <Route element={<TeacherLayout />}>
+            <Route
+              path="teacher/dashboard"
+              element={<TeacherDashboardPage/>}
+            />
             <Route
               path="teacher/monitoring"
               element={<TeacherMonitoringRoomsPage />}
@@ -304,10 +316,6 @@ export function AppRoutes() {
             <Route
               path="teacher/monitoring/rooms/:roomId"
               element={<MonitoringRoomPage />}
-            />
-            <Route
-              path="teacher/profile"
-              element={<ProfilePage/>}
             />
           </Route>
         </Route>

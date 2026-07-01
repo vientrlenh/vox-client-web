@@ -1,8 +1,6 @@
-import { MonitorPlay } from 'lucide-react'
-import { useAppSelector } from '@/app/store/hooks'
+import { ActiveRoomsList } from '../components/ActiveRoomsList'
 
 export function TeacherMonitoringRoomsPage() {
-  const user = useAppSelector((state) => state.auth.user)
 
   return (
     <section aria-labelledby="teacher-monitoring-title" className="grid gap-6">
@@ -22,18 +20,7 @@ export function TeacherMonitoringRoomsPage() {
         </p>
       </div>
 
-      <div className="grid place-items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
-        <div className="inline-flex size-12 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700">
-          <MonitorPlay aria-hidden="true" className="size-6" />
-        </div>
-        <p className="text-base font-black text-slate-950">
-          Danh sách phòng sẽ hiển thị ở đây
-        </p>
-        <p className="max-w-md text-sm font-medium text-slate-500">
-          Khung màn hình đã sẵn sàng. Dữ liệu phòng thi được kết nối ở bước tiếp
-          theo ({user?.email ?? 'giám thị'}).
-        </p>
-      </div>
+      <ActiveRoomsList/>
     </section>
   )
 }

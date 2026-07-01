@@ -15,6 +15,7 @@ export function RequireRole({ role }: RequireRoleProps) {
   const dispatch = useAppDispatch()
   const location = useLocation()
   const user = useAppSelector((state) => state.auth.user)
+  
   const isForbidden = user ? !user.roles.includes(role) : false
 
   useEffect(() => {
