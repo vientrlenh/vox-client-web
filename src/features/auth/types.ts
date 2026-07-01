@@ -46,11 +46,6 @@ export type ResetPasswordRequest = {
   password: string
 }
 
-export type ApiResponse<T> = {
-  data: T
-  message: string
-}
-
 export type AuthUser = {
   email: string
   exp: number
