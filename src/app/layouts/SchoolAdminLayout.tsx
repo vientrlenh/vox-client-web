@@ -267,7 +267,7 @@ export function SchoolAdminLayout() {
                     onClick={() => {
                       setIsMobileMenuOpen(false)
                       setIsUserMenuOpen(false)
-                      navigate('/school-admin/profile')
+                      navigate('/profile')
                     }}
                     role="menuitem"
                     type="button"

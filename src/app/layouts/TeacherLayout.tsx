@@ -233,7 +233,7 @@ export function TeacherLayout() {
                     onClick={() => {
                       setIsMobileMenuOpen(false)
                       setIsUserMenuOpen(false)
-                      navigate('/teacher/profile')
+                      navigate('/profile')
                     }}
                     role="menuitem"
                     type="button"
