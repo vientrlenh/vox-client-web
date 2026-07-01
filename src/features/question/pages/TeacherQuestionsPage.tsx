@@ -38,7 +38,7 @@ const EMPTY_FILTERS: QuestionQueryFilters = {
 
 const QUESTION_STATUS_OPTIONS: Array<{ label: string; value: '' | QuestionStatus }> = [
   { label: 'Tat ca trang thai', value: '' },
-  { label: 'Draft', value: 'DRAFT' },
+  { label: 'Bản nháp', value: 'DRAFT' },
   { label: 'Submitted for review', value: 'SUBMITTED_FOR_REVIEW' },
   { label: 'Revision requested', value: 'REVISION_REQUESTED' },
   { label: 'Approved', value: 'APPROVED' },
@@ -77,18 +77,18 @@ function getErrorMessage(error: unknown) {
 
 function getTitle(view: QuestionListView, teacherScopeTab: QuestionScope) {
   if (view === 'review') {
-    return 'Cau hoi can toi duyet'
+    return 'Câu hỏi cần tôi duyệt'
   }
 
   if (teacherScopeTab === 'MINE') {
-    return 'Cau hoi cua toi'
+    return 'Câu hỏi của tôi'
   }
 
   if (teacherScopeTab === 'COLLABORATING') {
-    return 'Cau hoi duoc chia se'
+    return 'Câu hỏi được chia sẻ'
   }
 
-  return 'Cau hoi trong truong'
+  return 'Câu hỏi trong trường'
 }
 
 function getDescription(
@@ -109,7 +109,7 @@ function getDescription(
   }
 
   if (teacherScopeTab === 'COLLABORATING') {
-    return 'Cau hoi duoc chia se rieng voi ban theo co che collaborator.'
+    return 'Câu hỏi được chia sẻ riêng với bạn theo cơ chế cộng tác.'
   }
 
   return 'Tat ca cau hoi ban duoc phep xem trong truong.'
@@ -208,7 +208,7 @@ function QuestionsPage({
     try {
       await exportQuestions(effectiveFilters)
     } catch (error) {
-      setExportError(getErrorMessage(error) ?? 'Khong the xuat file. Vui long thu lai.')
+      setExportError(getErrorMessage(error) ?? 'Không thể xuất file. Vui lòng thử lại.')
     } finally {
       setIsExporting(false)
     }
@@ -236,7 +236,7 @@ function QuestionsPage({
   return (
     <section aria-labelledby="questions-title" className="grid gap-6">
       <QuestionPageHeader
-        createLabel="Tao cau hoi moi"
+        createLabel="Tạo câu hỏi mới"
         description={getDescription(view, teacherScopeTab, filters.topicName)}
         isExporting={isExporting}
         isRefreshing={questionsQuery.isFetching}
@@ -341,7 +341,7 @@ function QuestionsPage({
           </label>
 
           <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Trang thai
+            Trạng thái
             <select
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
               onChange={(event) =>

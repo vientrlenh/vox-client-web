@@ -12,6 +12,7 @@ import type {
 const EXAM_LIST_FIELDS = `
   id
   blueprintId
+  blueprintVersionId
   code
   name
   description
@@ -46,6 +47,7 @@ const EXAM_DETAIL_FIELDS = `
   papers {
     id
     examId
+    blueprintVersionId
     code
     variant
     status
@@ -177,8 +179,8 @@ const EXAM_BLUEPRINT_DETAIL_FIELDS = `
 `
 
 const EXAM_BLUEPRINTS_QUERY = `
-  query ExamBlueprints($schoolId: ID, $isActive: Boolean, $languageId: ID, $keyword: String, $page: Int!, $size: Int!) {
-    examBlueprints(schoolId: $schoolId, isActive: $isActive, languageId: $languageId, keyword: $keyword, page: $page, size: $size) {
+  query ExamBlueprints($schoolId: ID, $isActive: Boolean, $languageId: ID, $examKind: String, $keyword: String, $page: Int!, $size: Int!) {
+    examBlueprints(schoolId: $schoolId, isActive: $isActive, languageId: $languageId, examKind: $examKind, keyword: $keyword, page: $page, size: $size) {
       content { ${EXAM_BLUEPRINT_LIST_FIELDS} }
       page
       size
@@ -267,6 +269,7 @@ export function useExamQuery(id: string | null) {
 }
 
 export function useExamBlueprintsQuery(filters: {
+  examKind?: ExamKind
   isActive?: boolean
   keyword?: string
   languageId?: string
@@ -277,6 +280,7 @@ export function useExamBlueprintsQuery(filters: {
   return useQuery({
     queryFn: async () => {
       const data = await graphQLRequest<ExamBlueprintsQueryData>(EXAM_BLUEPRINTS_QUERY, {
+        examKind: filters.examKind,
         isActive: filters.isActive,
         keyword: filters.keyword || undefined,
         languageId: filters.languageId || undefined,

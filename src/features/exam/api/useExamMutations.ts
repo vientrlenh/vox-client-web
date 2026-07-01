@@ -18,6 +18,7 @@ import type {
   UpdateExamPaperStatusRequest,
   UpdateExamRequest,
   UpdateExamStatusRequest,
+  ExamBlueprintDto,
 } from '../types'
 
 type ApiResponse<T> = {
@@ -126,8 +127,33 @@ export function useDeleteExamPaperMutation() {
 
 export function useCreateBlueprintMutation() {
   return useMutation({
-    mutationFn: async (payload: CreateExamBlueprintRequest) =>
-      (await apiClient.post<ApiResponse<unknown>>('/v1/exam-blueprints', payload)).data.message,
+    mutationFn: async (payload: CreateExamBlueprintRequest) => {
+      const response = await apiClient.post<ApiResponse<ExamBlueprintDto>>('/v1/exam-blueprints', payload)
+      return {
+        blueprint: response.data.data,
+        message: response.data.message,
+      }
+    },
+  })
+}
+
+export function useAttachExamBlueprintMutation() {
+  return useMutation({
+    mutationFn: async ({
+      blueprintId,
+      blueprintVersionId,
+      examId,
+    }: {
+      blueprintId?: string | null
+      blueprintVersionId?: string | null
+      examId: string
+    }) =>
+      (
+        await apiClient.patch<ApiResponse<unknown>>(`/v1/exams/${examId}/blueprint`, {
+          blueprintId: blueprintId ?? null,
+          blueprintVersionId: blueprintVersionId ?? null,
+        })
+      ).data.message,
   })
 }
 

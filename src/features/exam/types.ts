@@ -58,6 +58,7 @@ export type ExamPaperSectionDto = {
 }
 
 export type ExamPaperDto = {
+  blueprintVersionId?: string | null
   code: string
   createdAt?: string | null
   examId: string
@@ -81,6 +82,7 @@ export type ExamSecurePoolDto = {
 export type ExamDto = {
   assessmentPolicyId?: string | null
   blueprintId?: string | null
+  blueprintVersionId?: string | null
   closeAt?: string | null
   code: string
   createdAt?: string | null
@@ -274,9 +276,11 @@ export type UpdateExamBlueprintVersionStatusRequest = {
 export type CreateClassTestRequest = {
   closeAt?: string | null
   description?: string | null
+  existingBlueprintId?: string | null
+  existingBlueprintVersionId?: string | null
   name: string
   openAt?: string | null
-  questionIds: string[]
+  questionIds?: string[] | null
   schoolClassId: string
 }
 
@@ -320,17 +324,17 @@ export function formatDateTime(value?: string | null) {
 export function getExamStatusDisplay(status?: string | null) {
   switch (status) {
     case 'DRAFT':
-      return { className: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Draft' }
+      return { className: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Bản nháp' }
     case 'SCHEDULED':
-      return { className: 'border-blue-200 bg-blue-50 text-blue-700', label: 'Scheduled' }
+      return { className: 'border-blue-200 bg-blue-50 text-blue-700', label: 'Đã lên lịch' }
     case 'IN_PROGRESS':
-      return { className: 'border-violet-200 bg-violet-50 text-violet-700', label: 'In progress' }
+      return { className: 'border-violet-200 bg-violet-50 text-violet-700', label: 'Đang diễn ra' }
     case 'CLOSED':
-      return { className: 'border-slate-200 bg-slate-100 text-slate-700', label: 'Closed' }
+      return { className: 'border-slate-200 bg-slate-100 text-slate-700', label: 'Đã đóng' }
     case 'RESULTS_PUBLISHED':
-      return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Results published' }
+      return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Đã công bố kết quả' }
     case 'CANCELLED':
-      return { className: 'border-red-200 bg-red-50 text-red-700', label: 'Cancelled' }
+      return { className: 'border-red-200 bg-red-50 text-red-700', label: 'Đã hủy' }
     default:
       return { className: 'border-slate-200 bg-slate-50 text-slate-600', label: String(status ?? '-') }
   }
@@ -339,13 +343,13 @@ export function getExamStatusDisplay(status?: string | null) {
 export function getExamPaperStatusDisplay(status?: string | null) {
   switch (status) {
     case 'DRAFT':
-      return { className: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Draft' }
+      return { className: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Bản nháp' }
     case 'IN_REVIEW':
-      return { className: 'border-blue-200 bg-blue-50 text-blue-700', label: 'In review' }
+      return { className: 'border-blue-200 bg-blue-50 text-blue-700', label: 'Đang duyệt' }
     case 'APPROVED':
-      return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Approved' }
+      return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Đã duyệt' }
     case 'LOCKED':
-      return { className: 'border-slate-200 bg-slate-100 text-slate-700', label: 'Locked' }
+      return { className: 'border-slate-200 bg-slate-100 text-slate-700', label: 'Đã khóa' }
     default:
       return { className: 'border-slate-200 bg-slate-50 text-slate-600', label: String(status ?? '-') }
   }
@@ -354,11 +358,11 @@ export function getExamPaperStatusDisplay(status?: string | null) {
 export function getBlueprintVersionStatusDisplay(status?: string | null) {
   switch (status) {
     case 'DRAFT':
-      return { className: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Draft' }
+      return { className: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Bản nháp' }
     case 'PUBLISHED':
-      return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Published' }
+      return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Đã xuất bản' }
     case 'ARCHIVED':
-      return { className: 'border-slate-200 bg-slate-100 text-slate-700', label: 'Archived' }
+      return { className: 'border-slate-200 bg-slate-100 text-slate-700', label: 'Lưu trữ' }
     default:
       return { className: 'border-slate-200 bg-slate-50 text-slate-600', label: String(status ?? '-') }
   }

@@ -370,9 +370,9 @@ function QuestionSharingPanel({
       {dialog}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <DetailItem label="General access" value={getQuestionSharingDisplay(question.sharing)} />
+        <DetailItem label="Quyền truy cập chung" value={getQuestionSharingDisplay(question.sharing)} />
         <DetailItem
-          label="So collaborator"
+          label="Số cộng tác viên"
           value={String(question.collaborators?.length ?? 0)}
         />
       </div>
@@ -381,14 +381,14 @@ function QuestionSharingPanel({
         <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
             <label className="grid gap-2 text-sm font-bold text-slate-700">
-              General access
+              Quyền truy cập chung
               <select
                 className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950"
                 onChange={(event) => setSharing(event.target.value as QuestionDto['sharing'])}
                 value={sharing}
               >
-                <option value="PRIVATE">Private</option>
-                <option value="SCHOOL_SHARED">School shared</option>
+                <option value="PRIVATE">Riêng tư</option>
+                <option value="SCHOOL_SHARED">Chia sẻ trong trường</option>
               </select>
             </label>
             <div className="self-end">
@@ -396,7 +396,7 @@ function QuestionSharingPanel({
                 className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
                 onClick={() => {
                   void (async () => {
-                    if (!(await confirm({ message: 'Ban co chac muon luu thay doi chia se nay khong?' }))) {
+                    if (!(await confirm({ message: 'Bạn có chắc muốn lưu thay đổi chia sẻ này không?' }))) {
                       return
                     }
                     try {
@@ -414,31 +414,31 @@ function QuestionSharingPanel({
                 }}
                 type="button"
               >
-                Luu chia se
+                Lưu chia sẻ
               </button>
             </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
             <label className="grid gap-2 text-sm font-bold text-slate-700">
-              Tim giao vien
+              Tìm giáo viên
               <input
                 className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950"
                 onChange={(event) => setTeacherSearch(event.target.value)}
-                placeholder="Nhap ten hoac email"
+                placeholder="Nhập tên hoặc email"
                 value={teacherSearch}
               />
             </label>
             <label className="grid gap-2 text-sm font-bold text-slate-700">
-              Permission
+              Quyền
               <select
                 className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950"
                 onChange={(event) => setNewPermission(event.target.value as QuestionCollaboratorPermission)}
                 value={newPermission}
               >
-                <option value="READ_ONLY">Read only</option>
-                <option value="CAN_USE">Can use</option>
-                <option value="CAN_EDIT">Can edit</option>
+                <option value="READ_ONLY">Chỉ xem</option>
+                <option value="CAN_USE">Được sử dụng</option>
+                <option value="CAN_EDIT">Được chỉnh sửa</option>
               </select>
             </label>
             <div className="self-end">
@@ -446,7 +446,7 @@ function QuestionSharingPanel({
                 className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
                 onClick={() => {
                   void (async () => {
-                    if (!(await confirm({ message: 'Ban co chac muon them collaborator nay khong?' }))) {
+                    if (!(await confirm({ message: 'Bạn có chắc muốn thêm cộng tác viên này không?' }))) {
                       return
                     }
                     try {
@@ -469,13 +469,13 @@ function QuestionSharingPanel({
                 }}
                 type="button"
               >
-                Them collaborator
+                Thêm cộng tác viên
               </button>
             </div>
           </div>
           {newUserId ? (
             <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700">
-              Da chon user: {newUserId}
+              Đã chọn người dùng: {newUserId}
             </div>
           ) : null}
           <div className="grid gap-3 md:grid-cols-2">
@@ -514,7 +514,7 @@ function QuestionSharingPanel({
                   {collaborator.user?.fullName?.trim() || collaborator.user?.email || collaborator.userId}
                 </p>
                 <p className="text-xs font-medium text-slate-500">
-                  {collaborator.user?.email ?? collaborator.userId} - Assigned at: {formatQuestionDate(collaborator.assignedAt)}
+                  {collaborator.user?.email ?? collaborator.userId} - Gán lúc: {formatQuestionDate(collaborator.assignedAt)}
                 </p>
               </div>
               {canManage ? (
@@ -523,7 +523,7 @@ function QuestionSharingPanel({
                     className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
                     onChange={(event) => {
                       void (async () => {
-                        if (!(await confirm({ message: 'Ban co chac muon cap nhat quyen collaborator nay khong?' }))) {
+                        if (!(await confirm({ message: 'Bạn có chắc muốn cập nhật quyền cộng tác viên này không?' }))) {
                           return
                         }
                         try {
@@ -544,9 +544,9 @@ function QuestionSharingPanel({
                     }}
                     value={collaborator.permission}
                   >
-                    <option value="READ_ONLY">Read only</option>
-                    <option value="CAN_USE">Can use</option>
-                    <option value="CAN_EDIT">Can edit</option>
+                    <option value="READ_ONLY">Chỉ xem</option>
+                    <option value="CAN_USE">Được sử dụng</option>
+                    <option value="CAN_EDIT">Được chỉnh sửa</option>
                   </select>
                   <button
                     className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 px-4 text-sm font-bold text-red-600"
@@ -567,7 +567,7 @@ function QuestionSharingPanel({
                     }}
                     type="button"
                   >
-                    Xoa
+                    Xóa
                   </button>
                 </div>
               ) : (
@@ -581,7 +581,7 @@ function QuestionSharingPanel({
           ))}
         </div>
       ) : (
-        <EmptyState text="Chua co collaborator nao duoc gan rieng." />
+        <EmptyState text="Chưa có cộng tác viên nào được gán riêng." />
       )}
     </div>
   )

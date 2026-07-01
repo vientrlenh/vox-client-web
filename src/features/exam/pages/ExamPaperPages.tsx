@@ -27,7 +27,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Khong the xu ly paper.'
+  return 'Không thể xử lý đề thi.'
 }
 
 function PaperStatusBadge({ status }: { status?: string | null }) {
@@ -45,6 +45,40 @@ function Notice({ children, tone }: { children: ReactNode; tone: 'error' | 'succ
 
 function getPaperFromExam(exam: { papers?: ExamPaperDto[] } | null | undefined, paperId?: string) {
   return exam?.papers?.find((paper) => paper.id === paperId) ?? null
+}
+
+function getBlockingFixedSlots(version: {
+  sections: Array<{
+    slots: Array<{
+      fixedQuestion?: { status?: string | null } | null
+      slotType: string
+    }>
+  }>
+} | null) {
+  return version?.sections.flatMap((section) =>
+    section.slots.filter(
+      (slot) =>
+        slot.slotType === 'FIXED' &&
+        slot.fixedQuestion &&
+        slot.fixedQuestion.status !== 'PUBLISHED',
+    ),
+  ) ?? []
+}
+
+function getBlueprintVersionById(versions?: Array<{
+  id: string
+  sections: Array<{
+    slots: Array<{
+      fixedQuestion?: { status?: string | null } | null
+      slotType: string
+    }>
+  }>
+}> | null, blueprintVersionId?: string | null) {
+  if (!blueprintVersionId) {
+    return null
+  }
+
+  return versions?.find((version) => version.id === blueprintVersionId) ?? null
 }
 
 export function TeacherExamPapersPage() {
@@ -75,41 +109,37 @@ export function TeacherExamPapersPage() {
   }
 
   if (examQuery.isLoading) {
-    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Dang tai papers...</section>
+    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Đang tải danh sách đề thi...</section>
   }
 
   if (!exam) {
-    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Khong tim thay exam.</section>
+    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Không tìm thấy kỳ thi.</section>
   }
 
-  const publishedVersion = [...(blueprintQuery.data?.versions ?? [])]
-    .reverse()
-    .find((version) => version.status === 'PUBLISHED')
-  const blockingFixedSlots = publishedVersion?.sections.flatMap((section) =>
-    section.slots.filter(
-      (slot) =>
-        slot.slotType === 'FIXED' &&
-        slot.fixedQuestion &&
-        slot.fixedQuestion.status !== 'PUBLISHED',
-    ),
-  ) ?? []
+  const finalizedVersion = getBlueprintVersionById(blueprintQuery.data?.versions, exam.blueprintVersionId)
+  const blockingFixedSlots = getBlockingFixedSlots(finalizedVersion)
+  const canManagePaperActions = Boolean(exam.blueprintVersionId && finalizedVersion) && blockingFixedSlots.length === 0
 
   return (
     <section className="grid gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <button className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600" onClick={() => navigate(-1)} type="button">
-            Quay lai
+            Quay lại
           </button>
-          <h1 className="text-3xl font-black text-blue-950">Danh sach de thi / papers</h1>
+          <h1 className="text-3xl font-black text-blue-950">Danh sách đề thi</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
-            Quan ly cac variant paper thuoc exam {exam.code}.
+            Quản lý các mã đề thuộc kỳ thi {exam.code}.
           </p>
         </div>
         <button
-          className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+          className={`inline-flex h-11 items-center justify-center rounded-lg px-4 text-sm font-bold text-white ${canManagePaperActions ? 'bg-indigo-600' : 'bg-slate-300'}`}
+          disabled={!canManagePaperActions}
           onClick={() => {
             void (async () => {
+              if (!canManagePaperActions) {
+                return
+              }
               try {
                 const result = await createPaperMutation.mutateAsync(exam.id)
                 await refresh()
@@ -122,15 +152,25 @@ export function TeacherExamPapersPage() {
           }}
           type="button"
         >
-          Tao paper moi
+          Tạo đề thi mới
         </button>
       </div>
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
       <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      {!exam.blueprintVersionId ? (
+        <Notice tone="error">
+          CHAIR cần chốt blueprint version trước khi tạo đề thi.
+        </Notice>
+      ) : null}
+      {exam.blueprintVersionId && !finalizedVersion ? (
+        <Notice tone="error">
+          Khong tai duoc version da chot cua exam nay, nen hien tai chi xem duoc tab paper.
+        </Notice>
+      ) : null}
       {blockingFixedSlots.length ? (
         <Notice tone="error">
-          Blueprint dang co slot FIXED tro toi cau hoi chua du dieu kien de sinh paper.
+          Version da chot dang co slot FIXED tro toi cau hoi chua du dieu kien de sinh paper.
         </Notice>
       ) : null}
 
@@ -138,10 +178,10 @@ export function TeacherExamPapersPage() {
         <table className="min-w-full text-left">
           <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">Paper</th>
-              <th className="px-4 py-3">Variant</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Thao tac</th>
+              <th className="px-4 py-3">Đề thi</th>
+              <th className="px-4 py-3">Mã đề</th>
+              <th className="px-4 py-3">Trạng thái</th>
+              <th className="px-4 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -157,7 +197,7 @@ export function TeacherExamPapersPage() {
                       onClick={() => navigate(`/teacher/exams/${exam.id}/papers/${paper.id}`)}
                       type="button"
                     >
-                      Chi tiet
+                      Chi tiết
                     </button>
                   </div>
                 </td>
@@ -177,6 +217,7 @@ export function TeacherExamPaperDetailPage() {
   const examQuery = useExamQuery(examId ?? null)
   const exam = examQuery.data
   const paper = getPaperFromExam(exam, paperId)
+  const blueprintQuery = useExamBlueprintQuery(exam?.blueprintId ?? null)
   const updatePaperStatusMutation = useUpdateExamPaperStatusMutation()
   const deletePaperMutation = useDeleteExamPaperMutation()
   const [message, setMessage] = useState<string | null>(null)
@@ -187,29 +228,47 @@ export function TeacherExamPaperDetailPage() {
   }
 
   if (examQuery.isLoading) {
-    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Dang tai paper...</section>
+    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Đang tải đề thi...</section>
   }
 
   if (!exam || !paper) {
-    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Khong tim thay paper.</section>
+    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Không tìm thấy đề thi.</section>
   }
 
+  const finalizedVersion = getBlueprintVersionById(blueprintQuery.data?.versions, exam.blueprintVersionId)
+  const blockingFixedSlots = getBlockingFixedSlots(finalizedVersion)
+  const canManagePaperActions = Boolean(exam.blueprintVersionId && finalizedVersion) && blockingFixedSlots.length === 0
   const paperStatusActions: UpdateExamPaperStatusRequest['action'][] = ['SUBMIT', 'APPROVE', 'REQUEST_REVISION', 'LOCK']
 
   return (
     <section className="grid gap-6">
       <div>
         <button className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600" onClick={() => navigate(-1)} type="button">
-          Quay lai
+          Quay lại
         </button>
-        <h1 className="text-3xl font-black text-blue-950">Chi tiet paper</h1>
+        <h1 className="text-3xl font-black text-blue-950">Chi tiết đề thi</h1>
         <p className="mt-2 text-sm font-medium text-slate-600">
-          Theo doi cau truc paper, trang thai va thao tac workflow.
+          Theo dõi cấu trúc đề thi, trạng thái và thao tác workflow.
         </p>
       </div>
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
       <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      {!exam.blueprintVersionId ? (
+        <Notice tone="error">
+          CHAIR cần chốt blueprint version trước khi thao tác đề thi.
+        </Notice>
+      ) : null}
+      {exam.blueprintVersionId && !finalizedVersion ? (
+        <Notice tone="error">
+          Khong tai duoc version da chot cua exam nay, nen paper hien chi de xem.
+        </Notice>
+      ) : null}
+      {blockingFixedSlots.length ? (
+        <Notice tone="error">
+          Version da chot dang co slot FIXED tro toi cau hoi chua PUBLISHED, nen cac thao tac voi paper dang bi khoa.
+        </Notice>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-6">
         <div>
@@ -220,25 +279,30 @@ export function TeacherExamPaperDetailPage() {
           <PaperStatusBadge status={paper.status} />
           {paper.status === 'DRAFT' ? (
             <button
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+              className={`inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-bold text-white ${canManagePaperActions ? 'bg-indigo-600' : 'bg-slate-300'}`}
+              disabled={!canManagePaperActions}
               onClick={() => navigate(`/teacher/exams/${exam.id}/papers/${paper.id}/edit`)}
               type="button"
             >
-              Sua paper
+              Sửa đề thi
             </button>
           ) : null}
         </div>
       </div>
 
       <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="text-lg font-black text-slate-950">Workflow paper</h2>
+        <h2 className="text-lg font-black text-slate-950">Workflow đề thi</h2>
         <div className="flex flex-wrap gap-3">
           {paperStatusActions.map((action) => (
             <button
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700"
+              className={`inline-flex h-10 items-center justify-center rounded-lg border px-4 text-sm font-bold ${canManagePaperActions ? 'border-slate-200 text-slate-700' : 'border-slate-200 text-slate-400'}`}
+              disabled={!canManagePaperActions}
               key={action}
               onClick={() => {
                 void (async () => {
+                  if (!canManagePaperActions) {
+                    return
+                  }
                   try {
                     const result = await updatePaperStatusMutation.mutateAsync({
                       paperId: paper.id,
@@ -258,9 +322,13 @@ export function TeacherExamPaperDetailPage() {
             </button>
           ))}
           <button
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 px-4 text-sm font-bold text-red-600"
+            className={`inline-flex h-10 items-center justify-center rounded-lg border px-4 text-sm font-bold ${canManagePaperActions ? 'border-red-200 text-red-600' : 'border-slate-200 text-slate-400'}`}
+            disabled={!canManagePaperActions}
             onClick={() => {
               void (async () => {
+                if (!canManagePaperActions) {
+                  return
+                }
                 try {
                   const result = await deletePaperMutation.mutateAsync(paper.id)
                   await refresh()
@@ -275,7 +343,7 @@ export function TeacherExamPaperDetailPage() {
             }}
             type="button"
           >
-            Xoa paper
+            Xóa đề thi
           </button>
         </div>
       </div>
@@ -284,11 +352,11 @@ export function TeacherExamPaperDetailPage() {
         {paper.sections.map((section) => (
           <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-5" key={section.id}>
             <p className="text-sm font-black text-slate-950">
-              Section {section.order}: {formatNullableText(section.title)}
+              Phần {section.order}: {formatNullableText(section.title)}
             </p>
             {section.items.map((item) => (
               <div className="rounded-lg border border-slate-100 bg-slate-50 p-4" key={item.id}>
-                <p className="text-sm font-black text-slate-950">Item {item.order}</p>
+                <p className="text-sm font-black text-slate-950">Câu {item.order}</p>
                 <p className="mt-2 text-sm font-semibold text-slate-700">
                   {item.question?.code ?? 'Chua gan cau hoi'}
                 </p>
@@ -321,13 +389,16 @@ export function TeacherExamPaperEditPage() {
   }
 
   if (examQuery.isLoading) {
-    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Dang tai paper editor...</section>
+    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Đang tải màn chỉnh sửa đề thi...</section>
   }
 
   if (!exam || !paper) {
-    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Khong tim thay paper.</section>
+    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Không tìm thấy đề thi.</section>
   }
 
+  const finalizedVersion = getBlueprintVersionById(blueprintQuery.data?.versions, exam.blueprintVersionId)
+  const blockingFixedSlots = getBlockingFixedSlots(finalizedVersion)
+  const canManagePaperActions = Boolean(exam.blueprintVersionId && finalizedVersion) && blockingFixedSlots.length === 0
   const slotTypeById = new Map(
     (blueprintQuery.data?.versions ?? []).flatMap((version) =>
       version.sections.flatMap((section) =>
@@ -340,9 +411,9 @@ export function TeacherExamPaperEditPage() {
     <section className="grid gap-6">
       <div>
         <button className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600" onClick={() => navigate(-1)} type="button">
-          Quay lai
+          Quay lại
         </button>
-        <h1 className="text-3xl font-black text-blue-950">Sua paper</h1>
+        <h1 className="text-3xl font-black text-blue-950">Sửa đề thi</h1>
         <p className="mt-2 text-sm font-medium text-slate-600">
           Gan cau hoi cho tung item cua paper.
         </p>
@@ -350,21 +421,36 @@ export function TeacherExamPaperEditPage() {
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
       <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      {!exam.blueprintVersionId ? (
+        <Notice tone="error">
+          CHAIR can chot blueprint version truoc khi sua paper.
+        </Notice>
+      ) : null}
+      {exam.blueprintVersionId && !finalizedVersion ? (
+        <Notice tone="error">
+          Khong tai duoc version da chot cua exam nay, nen man sua paper hien chi de xem.
+        </Notice>
+      ) : null}
+      {blockingFixedSlots.length ? (
+        <Notice tone="error">
+          Version da chot dang co slot FIXED tro toi cau hoi chua PUBLISHED, nen chua the sua paper.
+        </Notice>
+      ) : null}
 
       <div className="grid gap-4">
         {paper.sections.map((section) => (
           <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5" key={section.id}>
             <p className="text-sm font-black text-slate-950">
-              Section {section.order}: {formatNullableText(section.title)}
+              Phần {section.order}: {formatNullableText(section.title)}
             </p>
             {section.items.map((item) => {
               const slotType = slotTypeById.get(item.blueprintSlotId ?? '')
-              const canEditItem = slotType !== 'FIXED'
+              const canEditItem = canManagePaperActions && slotType !== 'FIXED'
 
               return (
                 <div className="grid gap-3 rounded-lg border border-slate-100 bg-slate-50 p-4" key={item.id}>
                   <div>
-                    <p className="text-sm font-black text-slate-950">Item {item.order}</p>
+                    <p className="text-sm font-black text-slate-950">Câu {item.order}</p>
                     <p className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                       {slotType ?? 'SELECTION'}
                     </p>
@@ -395,7 +481,7 @@ export function TeacherExamPaperEditPage() {
                         })()
                       }}
                       selectedQuestionIds={item.question?.id ? [item.question.id] : []}
-                      title="Chon cau hoi published"
+                      title="Chọn câu hỏi đã xuất bản"
                     />
                   ) : (
                     <div className="rounded-lg border border-dashed border-slate-200 px-4 py-3 text-sm font-semibold text-slate-500">

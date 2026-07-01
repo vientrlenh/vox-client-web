@@ -337,23 +337,23 @@ export function formatDuration(seconds?: number | null) {
   const remainingSeconds = seconds % 60
 
   if (minutes === 0) {
-    return `${remainingSeconds} giay`
+    return `${remainingSeconds} giây`
   }
 
   if (remainingSeconds === 0) {
-    return `${minutes} phut`
+    return `${minutes} phút`
   }
 
-  return `${minutes} phut ${remainingSeconds} giay`
+  return `${minutes} phút ${remainingSeconds} giây`
 }
 
 export function getQuestionTypeDisplay(type?: QuestionType | null) {
   const map: Record<QuestionType, string> = {
-    READ_ALOUD: 'Doc to',
-    SHORT_ANSWER: 'Tra loi ngan',
-    LONG_ANSWER: 'Tra loi dai',
-    OPINION: 'Y kien',
-    DESCRIPTION: 'Mo ta',
+    READ_ALOUD: 'Đọc to',
+    SHORT_ANSWER: 'Trả lời ngắn',
+    LONG_ANSWER: 'Trả lời dài',
+    OPINION: 'Ý kiến',
+    DESCRIPTION: 'Mô tả',
   }
 
   return type ? map[type] ?? type : '-'
@@ -364,37 +364,37 @@ export function getQuestionStatusDisplay(status?: QuestionStatus | null) {
     case 'APPROVED':
       return {
         className: 'border-teal-200 bg-teal-50 text-teal-700',
-        label: 'Da duyet',
+        label: 'Đã duyệt',
       }
     case 'PUBLISHED':
       return {
         className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        label: 'Da xuat ban',
+        label: 'Đã xuất bản',
       }
     case 'DRAFT':
       return {
         className: 'border-amber-200 bg-amber-50 text-amber-700',
-        label: 'Ban nhap',
+        label: 'Bản nháp',
       }
     case 'SUBMITTED_FOR_REVIEW':
       return {
         className: 'border-blue-200 bg-blue-50 text-blue-700',
-        label: 'Cho duyet',
+        label: 'Chờ duyệt',
       }
     case 'REVISION_REQUESTED':
       return {
         className: 'border-orange-200 bg-orange-50 text-orange-700',
-        label: 'Yeu cau sua',
+        label: 'Yêu cầu sửa',
       }
     case 'REJECTED':
       return {
         className: 'border-red-200 bg-red-50 text-red-700',
-        label: 'Bi tu choi',
+        label: 'Bị từ chối',
       }
     case 'ARCHIVED':
       return {
         className: 'border-slate-200 bg-slate-50 text-slate-500',
-        label: 'Luu tru',
+        label: 'Lưu trữ',
       }
     default:
       return {
@@ -407,9 +407,9 @@ export function getQuestionStatusDisplay(status?: QuestionStatus | null) {
 export function getQuestionSharingDisplay(sharing?: QuestionSharing | null) {
   switch (sharing) {
     case 'PRIVATE':
-      return 'Private'
+      return 'Riêng tư'
     case 'SCHOOL_SHARED':
-      return 'School shared'
+      return 'Chia sẻ trong trường'
     default:
       return String(sharing ?? '-')
   }
@@ -420,11 +420,11 @@ export function getQuestionConfidentialityDisplay(
 ) {
   switch (confidentiality) {
     case 'OPEN':
-      return 'Open'
+      return 'Mở'
     case 'EXAM_RESTRICTED':
-      return 'Exam restricted'
+      return 'Giới hạn cho kỳ thi'
     case 'RELEASED':
-      return 'Released'
+      return 'Đã phát hành'
     default:
       return String(confidentiality ?? '-')
   }
@@ -435,11 +435,11 @@ export function getQuestionCollaboratorPermissionDisplay(
 ) {
   switch (permission) {
     case 'READ_ONLY':
-      return 'Read only'
+      return 'Chỉ xem'
     case 'CAN_USE':
-      return 'Can use'
+      return 'Được sử dụng'
     case 'CAN_EDIT':
-      return 'Can edit'
+      return 'Được chỉnh sửa'
     default:
       return String(permission ?? '-')
   }

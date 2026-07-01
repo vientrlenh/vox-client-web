@@ -40,7 +40,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Khong the xu ly class test.'
+  return 'Không thể xử lý bài kiểm tra trên lớp.'
 }
 
 function StatusBadge({ status }: { status?: string | null }) {
@@ -176,7 +176,7 @@ function SelectedQuestionsEditor({
                 onClick={() => onChange(moveItem(selectedQuestions, index, index - 1))}
                 type="button"
               >
-                Len
+                Lên
               </button>
               <button
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 disabled:opacity-50"
@@ -184,21 +184,21 @@ function SelectedQuestionsEditor({
                 onClick={() => onChange(moveItem(selectedQuestions, index, index + 1))}
                 type="button"
               >
-                Xuong
+                Xuống
               </button>
               <button
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-bold text-red-600"
                 onClick={() => onChange(selectedQuestions.filter((item) => item.id !== question.id))}
                 type="button"
               >
-                Bo
+                Bỏ
               </button>
             </div>
           </div>
         ))
       ) : (
         <div className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-sm font-semibold text-slate-500">
-          Chua co cau hoi nao duoc chon.
+          Chưa có câu hỏi nào được chọn.
         </div>
       )}
     </div>
@@ -222,7 +222,7 @@ function ClassPicker({
 
   return (
     <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-      <Field label="Tim lop hoc" onChange={setSearch} placeholder="Nhap ma lop hoac ten lop" value={search} />
+      <Field label="Tìm lớp học" onChange={setSearch} placeholder="Nhập mã lớp hoặc tên lớp" value={search} />
       <div className="grid gap-3">
         {classesQuery.data?.content.map((schoolClass) => (
           <button
@@ -287,7 +287,7 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
             onClick={() => void classTestsQuery.refetch()}
             type="button"
           >
-            Lam moi
+            Làm mới
           </button>
           {allowCreate ? (
             <button
@@ -295,7 +295,7 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
               onClick={() => navigate('/teacher/class-tests/create')}
               type="button"
             >
-              Tao bai moi
+              Tạo bài mới
             </button>
           ) : null}
         </div>
@@ -305,21 +305,21 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
       {dialog}
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 md:grid-cols-2">
-        <Field label="Tu khoa" onChange={setKeyword} value={keyword} />
+        <Field label="Từ khóa" onChange={setKeyword} value={keyword} />
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Trang thai
+          Trạng thái
           <select
             className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
             onChange={(event) => setStatus(event.target.value as '' | ExamStatus)}
             value={status}
           >
-            <option value="">Tat ca</option>
-            <option value="DRAFT">Draft</option>
-            <option value="SCHEDULED">Scheduled</option>
-            <option value="IN_PROGRESS">In progress</option>
-            <option value="CLOSED">Closed</option>
-            <option value="RESULTS_PUBLISHED">Results published</option>
-            <option value="CANCELLED">Cancelled</option>
+            <option value="">Tất cả</option>
+            <option value="DRAFT">Bản nháp</option>
+            <option value="SCHEDULED">Đã lên lịch</option>
+            <option value="IN_PROGRESS">Đang diễn ra</option>
+            <option value="CLOSED">Đã đóng</option>
+            <option value="RESULTS_PUBLISHED">Đã công bố kết quả</option>
+            <option value="CANCELLED">Đã hủy</option>
           </select>
         </label>
       </div>
@@ -328,12 +328,12 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
         <table className="min-w-full text-left">
           <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">Class test</th>
+              <th className="px-4 py-3">Bài kiểm tra</th>
               <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Open</th>
-              <th className="px-4 py-3">Close</th>
-              <th className="px-4 py-3 text-right">Thao tac</th>
+              <th className="px-4 py-3">Trạng thái</th>
+              <th className="px-4 py-3">Mở lúc</th>
+              <th className="px-4 py-3">Đóng lúc</th>
+              <th className="px-4 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -356,7 +356,7 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
                       onClick={() => navigate(`${basePath}/${exam.id}`)}
                       type="button"
                     >
-                      Chi tiet
+                      Chi tiết
                     </button>
                   </div>
                 </td>
@@ -366,7 +366,7 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
         </table>
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600">
           <span>
-            {classTestsQuery.data?.totalElements ?? 0} class test, trang {classTestsQuery.data?.page ?? 1}/{classTestsQuery.data?.totalPages ?? 1}
+          {classTestsQuery.data?.totalElements ?? 0} bài kiểm tra, trang {classTestsQuery.data?.page ?? 1}/{classTestsQuery.data?.totalPages ?? 1}
           </span>
           <div className="flex gap-2">
             <button
@@ -375,7 +375,7 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
               onClick={() => setPage((current) => current - 1)}
               type="button"
             >
-              Truoc
+            Trước
             </button>
             <button
               className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
@@ -393,11 +393,11 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
 }
 
 export function TeacherClassTestsPage() {
-  return <ClassTestListPage allowCreate basePath="/teacher/class-tests" title="Bai kiem tra tren lop cua toi" />
+  return <ClassTestListPage allowCreate basePath="/teacher/class-tests" title="Bài kiểm tra trên lớp của tôi" />
 }
 
 export function SchoolAdminClassTestsPage() {
-  return <ClassTestListPage allowCreate={false} basePath="/school-admin/class-tests" title="Giam sat bai kiem tra tren lop" />
+  return <ClassTestListPage allowCreate={false} basePath="/school-admin/class-tests" title="Giám sát bài kiểm tra trên lớp" />
 }
 
 export function TeacherClassTestCreatePage() {
@@ -424,6 +424,9 @@ export function TeacherClassTestCreatePage() {
     size: 8,
   })
   const blueprintTemplateQuery = useExamBlueprintQuery(selectedBlueprintId || null)
+  const selectedBlueprintPublishedVersion = [...(blueprintTemplateQuery.data?.versions ?? [])]
+    .reverse()
+    .find((version) => version.status === 'PUBLISHED')
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -434,15 +437,11 @@ export function TeacherClassTestCreatePage() {
       return
     }
 
-    const publishedVersion = [...(blueprintTemplateQuery.data.versions ?? [])]
-      .reverse()
-      .find((version) => version.status === 'PUBLISHED')
-
-    if (!publishedVersion) {
+    if (!selectedBlueprintPublishedVersion) {
       return
     }
 
-    const templateQuestions = publishedVersion.sections.flatMap((section) =>
+    const templateQuestions = selectedBlueprintPublishedVersion.sections.flatMap((section) =>
       section.slots
         .filter((slot) => slot.slotType === 'FIXED' && slot.fixedQuestion?.id)
         .map((slot) => ({
@@ -478,15 +477,15 @@ export function TeacherClassTestCreatePage() {
           question.id && current.findIndex((item) => item.id === question.id) === index,
       ),
     )
-  }, [blueprintTemplateQuery.data, selectedBlueprintId])
+  }, [selectedBlueprintId, selectedBlueprintPublishedVersion])
 
   return (
     <section className="grid gap-6">
       <div>
         <button className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600" onClick={() => navigate(-1)} type="button">
-          Quay lai
+          Quay lại
         </button>
-        <h1 className="text-3xl font-black text-blue-950">Tao bai kiem tra tren lop</h1>
+        <h1 className="text-3xl font-black text-blue-950">Tạo bài kiểm tra trên lớp</h1>
         <p className="mt-2 text-sm font-medium text-slate-600">
           Nhap thong tin bai kiem tra va danh sach question ID theo dung thu tu muon su dung.
         </p>
@@ -504,12 +503,15 @@ export function TeacherClassTestCreatePage() {
             if (!(await confirm({ message: 'Ban co chac muon tao bai kiem tra nay khong?' }))) {
               return
             }
+            const isReuseBlueprintMode = Boolean(selectedBlueprintId && selectedBlueprintPublishedVersion)
             const payload: CreateClassTestRequest = {
               closeAt: closeAt || null,
               description: description || null,
+              existingBlueprintId: isReuseBlueprintMode ? selectedBlueprintId : null,
+              existingBlueprintVersionId: isReuseBlueprintMode ? selectedBlueprintPublishedVersion?.id ?? null : null,
               name,
               openAt: openAt || null,
-              questionIds: selectedQuestions.map((question) => question.id),
+              questionIds: isReuseBlueprintMode ? null : selectedQuestions.map((question) => question.id),
               schoolClassId,
             }
             try {
@@ -536,7 +538,7 @@ export function TeacherClassTestCreatePage() {
             <div>
               <h2 className="text-lg font-black text-slate-950">Bat dau tu blueprint mau</h2>
               <p className="text-sm font-medium text-slate-600">
-                Chon blueprint de nap san cac slot FIXED vao danh sach cau hoi.
+                Chọn blueprint để nạp sẵn các slot FIXED vào danh sách câu hỏi.
               </p>
             </div>
             {selectedBlueprintId ? (
@@ -572,7 +574,7 @@ export function TeacherClassTestCreatePage() {
             ))}
             {blueprintsQuery.data && blueprintsQuery.data.content.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-sm font-semibold text-slate-500 md:col-span-2">
-                Khong tim thay blueprint phu hop.
+                Không tìm thấy blueprint phù hợp.
               </div>
             ) : null}
           </div>
@@ -587,7 +589,7 @@ export function TeacherClassTestCreatePage() {
                 onClick={() => setBlueprintPage((current) => current - 1)}
                 type="button"
               >
-                Truoc
+                Trước
               </button>
               <button
                 className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
@@ -602,11 +604,11 @@ export function TeacherClassTestCreatePage() {
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="grid gap-3">
-            <h2 className="text-lg font-black text-slate-950">Chon lop hoc</h2>
+            <h2 className="text-lg font-black text-slate-950">Chọn lớp học</h2>
             <ClassPicker onChange={setSchoolClassId} value={schoolClassId} />
           </div>
           <div className="grid gap-3">
-            <h2 className="text-lg font-black text-slate-950">Cau hoi da chon</h2>
+            <h2 className="text-lg font-black text-slate-950">Câu hỏi đã chọn</h2>
             <SelectedQuestionsEditor onChange={setSelectedQuestions} selectedQuestions={selectedQuestions} />
           </div>
         </div>
@@ -625,7 +627,7 @@ export function TeacherClassTestCreatePage() {
         </div>
         <div className="flex justify-end">
           <button className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white" disabled={createMutation.isPending} type="submit">
-            Tao bai kiem tra
+            Tạo bài kiểm tra
           </button>
         </div>
       </form>
@@ -666,11 +668,11 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
   }
 
   if (examQuery.isLoading) {
-    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Dang tai class test...</section>
+    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Đang tải bài kiểm tra trên lớp...</section>
   }
 
   if (!exam) {
-    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Khong tim thay class test.</section>
+    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Không tìm thấy bài kiểm tra trên lớp.</section>
   }
 
   const currentQuestions = exam.papers?.flatMap((paper) =>
@@ -716,7 +718,7 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
     <section className="grid gap-6">
       <div>
         <button className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600" onClick={() => navigate(-1)} type="button">
-          Quay lai
+          Quay lại
         </button>
         <h1 className="text-3xl font-black text-blue-950">{title}</h1>
         <p className="mt-2 text-sm font-medium text-slate-600">
@@ -731,14 +733,14 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
         <InfoItem label="Ten" value={exam.name} />
         <InfoItem label="Code" value={exam.code} />
-        <InfoItem label="Trang thai" value={<StatusBadge status={exam.status} />} />
+        <InfoItem label="Trạng thái" value={<StatusBadge status={exam.status} />} />
         <InfoItem label="School class ID" value={formatNullableText(exam.schoolClassId)} />
         <InfoItem label="Open" value={formatDateTime(exam.openAt)} />
         <InfoItem label="Close" value={formatDateTime(exam.closeAt)} />
       </div>
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="text-lg font-black text-slate-950">Danh sach cau hoi hien tai</h2>
+        <h2 className="text-lg font-black text-slate-950">Danh sách câu hỏi hiện tại</h2>
         <SelectedQuestionsEditor onChange={setSelectedQuestions} selectedQuestions={selectedQuestions} />
       </div>
 
@@ -872,7 +874,7 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
                 }}
                 type="button"
               >
-                Xoa bai kiem tra
+                Xóa bài kiểm tra
               </button>
             </div>
           </div>
@@ -883,9 +885,9 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
 }
 
 export function TeacherClassTestDetailPage() {
-  return <ClassTestDetailPage canManage title="Chi tiet bai kiem tra tren lop" />
+  return <ClassTestDetailPage canManage title="Chi tiết bài kiểm tra trên lớp" />
 }
 
 export function SchoolAdminClassTestDetailPage() {
-  return <ClassTestDetailPage canManage={false} title="Chi tiet bai kiem tra tren lop" />
+  return <ClassTestDetailPage canManage={false} title="Chi tiết bài kiểm tra trên lớp" />
 }

@@ -49,7 +49,7 @@ function QuestionStatusBadge({ status }: { status?: QuestionStatus | null }) {
 
 export function QuestionPicker({
   allowStatusChange = true,
-  emptyMessage = 'Khong tim thay cau hoi phu hop.',
+  emptyMessage = 'Không tìm thấy câu hỏi phù hợp.',
   fixedStatus,
   mode = 'multiple',
   onSelect,
@@ -71,17 +71,17 @@ export function QuestionPicker({
       {title ? <h3 className="text-base font-black text-slate-950">{title}</h3> : null}
       <div className={`grid gap-4 ${allowStatusChange && !fixedStatus ? 'md:grid-cols-2' : ''}`}>
         <Field
-          label="Tim cau hoi"
+          label="Tìm câu hỏi"
           onChange={(value) => {
             setKeyword(value)
             setPage(1)
           }}
-          placeholder="Nhap code, noi dung..."
+          placeholder="Nhập mã, nội dung..."
           value={keyword}
         />
         {allowStatusChange && !fixedStatus ? (
           <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Trang thai
+            Trạng thái
             <select
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
               onChange={(event) => {
@@ -90,13 +90,13 @@ export function QuestionPicker({
               }}
               value={status}
             >
-              <option value="">Tat ca</option>
-              <option value="PUBLISHED">Published</option>
-              <option value="APPROVED">Approved</option>
-              <option value="DRAFT">Draft</option>
-              <option value="SUBMITTED_FOR_REVIEW">Submitted</option>
-              <option value="REVISION_REQUESTED">Revision requested</option>
-              <option value="ARCHIVED">Archived</option>
+              <option value="">Tất cả</option>
+              <option value="PUBLISHED">Đã xuất bản</option>
+              <option value="APPROVED">Đã duyệt</option>
+              <option value="DRAFT">Bản nháp</option>
+              <option value="SUBMITTED_FOR_REVIEW">Đã gửi duyệt</option>
+              <option value="REVISION_REQUESTED">Yêu cầu chỉnh sửa</option>
+              <option value="ARCHIVED">Lưu trữ</option>
             </select>
           </label>
         ) : null}
@@ -126,7 +126,7 @@ export function QuestionPicker({
                   onClick={() => onSelect(question)}
                   type="button"
                 >
-                  {mode === 'single' ? (isSelected ? 'Dang chon' : 'Chon') : isSelected ? 'Da chon' : 'Them'}
+                  {mode === 'single' ? (isSelected ? 'Đang chọn' : 'Chọn') : isSelected ? 'Đã chọn' : 'Thêm'}
                 </button>
               </div>
             )
@@ -139,7 +139,7 @@ export function QuestionPicker({
       </div>
       <div className="flex items-center justify-between text-sm font-semibold text-slate-600">
         <span>
-          {questionsQuery.data?.totalElements ?? 0} cau hoi, trang {questionsQuery.data?.page ?? 1}/{questionsQuery.data?.totalPages || 1}
+          {questionsQuery.data?.totalElements ?? 0} câu hỏi, trang {questionsQuery.data?.page ?? 1}/{questionsQuery.data?.totalPages || 1}
         </span>
         <div className="flex gap-2">
           <button
@@ -148,7 +148,7 @@ export function QuestionPicker({
             onClick={() => setPage((current) => current - 1)}
             type="button"
           >
-            Truoc
+            Trước
           </button>
           <button
             className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"

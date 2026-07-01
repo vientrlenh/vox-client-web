@@ -76,16 +76,16 @@ type EvaluationGuideFormState = {
 }
 
 const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: QuestionType }> = [
-  { label: 'Doc to', value: 'READ_ALOUD' },
-  { label: 'Tra loi ngan', value: 'SHORT_ANSWER' },
-  { label: 'Tra loi dai', value: 'LONG_ANSWER' },
-  { label: 'Y kien', value: 'OPINION' },
-  { label: 'Mo ta', value: 'DESCRIPTION' },
+  { label: 'Đọc to', value: 'READ_ALOUD' },
+  { label: 'Trả lời ngắn', value: 'SHORT_ANSWER' },
+  { label: 'Trả lời dài', value: 'LONG_ANSWER' },
+  { label: 'Ý kiến', value: 'OPINION' },
+  { label: 'Mô tả', value: 'DESCRIPTION' },
 ]
 
 const QUESTION_SHARING_OPTIONS: Array<{ label: string; value: QuestionSharing }> = [
-  { label: 'Private', value: 'PRIVATE' },
-  { label: 'School shared', value: 'SCHOOL_SHARED' },
+  { label: 'Riêng tư', value: 'PRIVATE' },
+  { label: 'Chia sẻ trong trường', value: 'SCHOOL_SHARED' },
 ]
 
 const QUESTION_ASSET_TYPE_OPTIONS: Array<{ label: string; value: QuestionAssetType }> = [
@@ -144,7 +144,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Khong the luu cau hoi. Vui long thu lai.'
+  return 'Không thể lưu câu hỏi. Vui lòng thử lại.'
 }
 
 function parsePositiveInt(value: string) {
@@ -309,7 +309,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   if (mode === 'create' && !canCreate) {
     return (
       <section className="grid gap-4 rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm font-semibold text-amber-800">
-        <span>Role hien tai khong duoc tao question.</span>
+        <span>Vai trò hiện tại không được tạo câu hỏi.</span>
       </section>
     )
   }
@@ -317,7 +317,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   if (mode === 'edit' && questionQuery.isLoading) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">
-        Dang tai question...
+        Đang tải câu hỏi...
       </section>
     )
   }
@@ -332,7 +332,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     const maxResponseSeconds = parsePositiveInt(form.maxResponseSeconds)
 
     if (!form.questionText.trim()) {
-      setErrorMessage('Noi dung cau hoi khong duoc de trong.')
+      setErrorMessage('Nội dung câu hỏi không được để trống.')
       return
     }
 
@@ -341,18 +341,18 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       minResponseSeconds == null ||
       maxResponseSeconds == null
     ) {
-      setErrorMessage('Cac truong thoi gian phai la so nguyen khong am.')
+      setErrorMessage('Các trường thời gian phải là số nguyên không âm.')
       return
     }
 
     try {
       if (mode === 'create') {
         if (!selectedBankId || !selectedTopicId) {
-          setErrorMessage('Can chon ngan hang va chu de truoc khi tao.')
+          setErrorMessage('Cần chọn ngân hàng và chủ đề trước khi tạo.')
           return
         }
 
-        if (!(await confirm({ message: 'Ban co chac muon tao question nay khong?' }))) {
+        if (!(await confirm({ message: 'Bạn có chắc muốn tạo câu hỏi này không?' }))) {
           return
         }
 
@@ -380,11 +380,11 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       }
 
       if (!questionId || !canEdit) {
-        setErrorMessage('Ban khong co quyen cap nhat cau hoi nay.')
+        setErrorMessage('Bạn không có quyền cập nhật câu hỏi này.')
         return
       }
 
-      if (!(await confirm({ message: 'Ban co chac muon luu noi dung question nay khong?' }))) {
+      if (!(await confirm({ message: 'Bạn có chắc muốn lưu nội dung câu hỏi này không?' }))) {
         return
       }
 
@@ -409,7 +409,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
           replace: true,
           state: {
             fromView: teacherView,
-            successMessage: `${result.message}. He thong da tao ban clone moi de ban tiep tuc chinh sua.`,
+            successMessage: `${result.message}. Hệ thống đã tạo bản sao mới để bạn tiếp tục chỉnh sửa.`,
           },
         })
         return
@@ -427,17 +427,17 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     setSuccessMessage(null)
 
     if (!questionId || !canManageAssetOrGuide) {
-      setErrorMessage('Ban khong co quyen cap nhat assets cho cau hoi nay.')
+      setErrorMessage('Bạn không có quyền cập nhật tài nguyên cho câu hỏi này.')
       return
     }
 
     const asset = assetForm[index]
     if (!asset.url.trim()) {
-      setErrorMessage('URL asset khong duoc de trong.')
+      setErrorMessage('URL tài nguyên không được để trống.')
       return
     }
 
-    if (!(await confirm({ message: asset.id ? 'Ban co chac muon cap nhat asset nay khong?' : 'Ban co chac muon tao asset nay khong?' }))) {
+    if (!(await confirm({ message: asset.id ? 'Bạn có chắc muốn cập nhật tài nguyên này không?' : 'Bạn có chắc muốn tạo tài nguyên này không?' }))) {
       return
     }
 
@@ -482,7 +482,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     }
 
     if (!questionId || !canManageAssetOrGuide) {
-      setErrorMessage('Ban khong co quyen xoa asset nay.')
+      setErrorMessage('Bạn không có quyền xóa tài nguyên này.')
       return
     }
 
@@ -504,11 +504,11 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     setSuccessMessage(null)
 
     if (!questionId || !canManageAssetOrGuide) {
-      setErrorMessage('Ban khong co quyen cap nhat evaluation guide.')
+      setErrorMessage('Bạn không có quyền cập nhật hướng dẫn chấm.')
       return
     }
 
-    if (!(await confirm({ message: 'Ban co chac muon luu evaluation guide nay khong?' }))) {
+    if (!(await confirm({ message: 'Bạn có chắc muốn lưu hướng dẫn chấm này không?' }))) {
       return
     }
 
@@ -534,7 +534,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
 
   async function handleDeleteQuestion() {
     if (!questionId || !canDelete) {
-      setErrorMessage('Ban khong co quyen xoa cau hoi nay.')
+      setErrorMessage('Bạn không có quyền xóa câu hỏi này.')
       return
     }
 
@@ -544,7 +544,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
         replace: true,
         state: {
           successMessage: result.archivedInstead
-            ? `${result.message}. Backend da archive thay vi xoa.`
+            ? `${result.message}. Hệ thống đã lưu trữ thay vì xóa.`
             : result.message,
         },
       })
@@ -559,7 +559,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     setSuccessMessage(null)
 
     if (!questionId || !workflowAction) {
-      setErrorMessage('Can chon workflow action truoc khi gui.')
+      setErrorMessage('Cần chọn hành động workflow trước khi gửi.')
       return
     }
 
@@ -597,12 +597,12 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             Quay lai
           </button>
           <h1 className="text-3xl font-black text-blue-950">
-            {mode === 'create' ? 'Tao cau hoi moi' : 'Chinh sua cau hoi'}
+            {mode === 'create' ? 'Tạo câu hỏi mới' : 'Chỉnh sửa câu hỏi'}
           </h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
             {mode === 'create'
-              ? 'Tao noi dung, asset va evaluation guide theo contract moi.'
-              : 'Cap nhat noi dung, asset va workflow cua cau hoi.'}
+              ? 'Tạo nội dung, tài nguyên và hướng dẫn chấm theo contract mới.'
+              : 'Cập nhật nội dung, tài nguyên và workflow của câu hỏi.'}
           </p>
         </div>
       </div>
@@ -622,9 +622,9 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-1">
         <div className="flex flex-wrap gap-2">
           {[
-            { id: 'content', label: 'Noi dung' },
-            { id: 'assets', label: 'Assets' },
-            { id: 'guide', label: 'Evaluation guide' },
+            { id: 'content', label: 'Nội dung' },
+            { id: 'assets', label: 'Tài nguyên' },
+            { id: 'guide', label: 'Hướng dẫn chấm' },
             ...(mode === 'edit' ? [{ id: 'workflow', label: 'Workflow' }] : []),
           ].map((tab) => (
             <button
@@ -661,7 +661,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                   }}
                   value={selectedBankId}
                 >
-                  <option value="">Chon ngan hang</option>
+                  <option value="">Chọn ngân hàng</option>
                   {questionBanksQuery.data?.content.map((bank) => (
                     <option key={bank.id} value={bank.id}>
                       {bank.code} - {bank.name}
@@ -677,7 +677,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                   onChange={(event) => setSelectedTopicId(event.target.value)}
                   value={selectedTopicId}
                 >
-                  <option value="">Chon chu de</option>
+                  <option value="">Chọn chủ đề</option>
                   {questionTopicsQuery.data?.content.map((topic) => (
                     <option key={topic.id} value={topic.id}>
                       {topic.code} - {topic.name}
@@ -742,7 +742,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
           </div>
 
           <TextareaField
-            label="Noi dung cau hoi"
+            label="Nội dung câu hỏi"
             onChange={(value) =>
               setForm((current) => ({ ...current, questionText: value }))
             }
@@ -808,7 +808,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                 type="button"
               >
                 <Trash2 aria-hidden="true" className="size-4" />
-                Xoa question
+                Xóa câu hỏi
               </button>
             ) : null}
             <button
@@ -917,7 +917,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                   type="submit"
                 >
                   <Save aria-hidden="true" className="size-4" />
-                  {asset.id ? 'Cap nhat asset' : 'Tao asset'}
+                  {asset.id ? 'Cập nhật tài nguyên' : 'Tạo tài nguyên'}
                 </button>
               </div>
             </form>
@@ -942,7 +942,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
           onSubmit={handleGuideSubmit}
         >
           <TextareaField
-            label="Expected content"
+            label="Nội dung kỳ vọng"
             onChange={(value) =>
               setGuideForm((current) => ({ ...current, expectedContent: value }))
             }
@@ -996,7 +996,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
               type="submit"
             >
               <Save aria-hidden="true" className="size-4" />
-              Luu evaluation guide
+              Lưu hướng dẫn chấm
             </button>
           </div>
         </form>
@@ -1019,13 +1019,13 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
           </div>
 
           <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Action
+            Hành động
             <select
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
               onChange={(event) => setWorkflowAction(event.target.value)}
               value={workflowAction}
             >
-              <option value="">Chon action</option>
+              <option value="">Chọn hành động</option>
               {workflowActions.map((action) => (
                 <option key={action.action} value={action.action}>
                   {action.title}
@@ -1042,7 +1042,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             {workflowActions.find((item) => item.action === workflowAction)?.description ??
-              'Chon mot workflow action de xem mo ta.'}
+              'Chọn một hành động workflow để xem mô tả.'}
           </div>
 
           <div className="flex justify-end">

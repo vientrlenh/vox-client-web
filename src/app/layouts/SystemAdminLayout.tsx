@@ -41,27 +41,27 @@ type NavigationGroup = {
 const navigationItems: NavigationItem[] = [
   {
     icon: Home,
-    label: 'Tong quan',
+    label: 'Tổng quan',
     to: '/system-admin/dashboard',
   },
   {
     icon: ClipboardList,
-    label: 'Quan ly don dang ky',
+    label: 'Quản lý đơn đăng ký',
     to: '/system-admin/registrations',
   },
   {
     icon: Users,
-    label: 'Quan ly nguoi dung',
+    label: 'Quản lý người dùng',
     to: '/system-admin/users',
   },
   {
     icon: Building2,
-    label: 'Quan ly truong hoc',
+    label: 'Quản lý trường học',
     to: '/system-admin/schools',
   },
   {
     icon: Settings,
-    label: 'Cai dat he thong',
+    label: 'Cài đặt hệ thống',
     to: '/system-admin/settings',
   },
 ]
@@ -69,32 +69,32 @@ const navigationItems: NavigationItem[] = [
 const navigationGroups: NavigationGroup[] = [
   {
     icon: FileQuestion,
-    label: 'Question',
+    label: 'Câu hỏi',
     items: [
       {
-        label: 'Ngan hang cau hoi',
+        label: 'Ngân hàng câu hỏi',
         to: '/system-admin/question-banks',
       },
       {
-        label: 'Question tong',
+        label: 'Câu hỏi toàn hệ thống',
         to: '/system-admin/questions/all',
       },
       {
-        label: 'Duyet question',
+        label: 'Duyệt câu hỏi',
         to: '/system-admin/questions/review',
       },
     ],
   },
   {
     icon: ClipboardCheck,
-    label: 'Exam',
+    label: 'Kỳ thi',
     items: [
       {
-        label: 'Giam sat exam',
+        label: 'Giám sát kỳ thi',
         to: '/system-admin/exams',
       },
       {
-        label: 'Giam sat blueprint',
+        label: 'Giám sát blueprint',
         to: '/system-admin/blueprints',
       },
     ],
@@ -218,7 +218,7 @@ function SystemAdminSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Dong menu system admin"
+            aria-label="Đóng menu quản trị hệ thống"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -229,12 +229,12 @@ function SystemAdminSidebar({
       </div>
 
       <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-indigo-100/80">
-        System Admin
+        Quản trị hệ thống
       </p>
 
       <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-2 [mask-image:linear-gradient(to_bottom,black,black_calc(100%-24px),transparent)] [scrollbar-color:rgba(255,255,255,0.28)_transparent] [scrollbar-width:thin]">
         <div className="flex min-h-full flex-col gap-6 pb-6">
-          <nav aria-label="System admin" className="grid gap-3">
+          <nav aria-label="Quản trị hệ thống" className="grid gap-3">
             {navigationItems.map(({ icon: Icon, label, to }) => (
               <NavLink
                 className={({ isActive }) =>
@@ -268,16 +268,16 @@ function SystemAdminSidebar({
               <ShieldCheck aria-hidden="true" className="size-6" />
             </div>
             <p className="mt-4 text-sm font-bold leading-6">
-              He thong an toan va bao mat
+              Hệ thống an toàn và bảo mật
             </p>
             <p className="mt-2 text-xs leading-5 text-indigo-50/80">
-              Du lieu duoc ma hoa va bao ve theo tieu chuan quoc te.
+              Dữ liệu được mã hóa và bảo vệ theo tiêu chuẩn quốc tế.
             </p>
             <button
               className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/35 text-sm font-bold text-white transition hover:bg-white/10"
               type="button"
             >
-              Xem chi tiet
+              Xem chi tiết
             </button>
           </div>
         </div>
@@ -293,7 +293,7 @@ export function SystemAdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const adminEmail = user?.email ?? 'unknown'
-  const adminRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
+  const adminRoles = user?.roles.length ? user.roles.join(', ') : 'Chưa có vai trò'
   const adminInitials = getEmailInitials(adminEmail)
   const reviewQuestionsQuery = useQuestionsQuery('admin', 'review', 1, 1, {
     keyword: '',
@@ -306,7 +306,7 @@ export function SystemAdminLayout() {
     type: '',
   })
   const systemAdminNavigationGroups = navigationGroups.map((group) =>
-    group.label === 'Question'
+    group.label === 'Câu hỏi'
       ? {
           ...group,
           items: group.items.map((item) =>
@@ -335,13 +335,13 @@ export function SystemAdminLayout() {
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Dong menu system admin bang lop phu"
+            aria-label="Đóng menu quản trị hệ thống bằng lớp phủ"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />
           <aside
-            aria-label="Menu system admin"
+            aria-label="Menu quản trị hệ thống"
             aria-modal="true"
             className="relative h-full w-70 max-w-[86vw]"
             role="dialog"
@@ -359,7 +359,7 @@ export function SystemAdminLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mo menu system admin"
+            aria-label="Mở menu quản trị hệ thống"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-blue-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
@@ -373,9 +373,9 @@ export function SystemAdminLayout() {
               className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-blue-900/70"
             />
             <input
-              aria-label="Tim kiem he thong"
+              aria-label="Tìm kiếm hệ thống"
               className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-20 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              placeholder="Tim kiem theo ten truong, email, so dien thoai, ma don..."
+              placeholder="Tìm kiếm theo tên trường, email, số điện thoại, mã đơn..."
               readOnly
               type="search"
             />
@@ -386,7 +386,7 @@ export function SystemAdminLayout() {
 
           <div className="ml-auto flex items-center gap-3">
             <button
-              aria-label="Thong bao"
+              aria-label="Thông báo"
               className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-blue-950 transition hover:border-slate-200 hover:bg-slate-50"
               type="button"
             >
@@ -398,7 +398,7 @@ export function SystemAdminLayout() {
               <button
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
-                aria-label="Mo menu tai khoan"
+                aria-label="Mở menu tài khoản"
                 className="inline-flex items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50"
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
                 type="button"
@@ -432,7 +432,7 @@ export function SystemAdminLayout() {
                     type="button"
                   >
                     <LogOut aria-hidden="true" className="size-4" />
-                    Dang xuat
+                    Đăng xuất
                   </button>
                 </div>
               ) : null}

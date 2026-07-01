@@ -30,40 +30,40 @@ type NavigationGroup = {
 const navigationGroups: NavigationGroup[] = [
   {
     icon: FileQuestion,
-    label: 'Question',
+    label: 'Câu hỏi',
     items: [
       {
-        label: 'Cau hoi cua toi',
+        label: 'Câu hỏi của tôi',
         to: '/teacher/questions/my',
       },
       {
-        label: 'Cau hoi can duyet',
+        label: 'Câu hỏi cần duyệt',
         to: '/teacher/questions/review',
       },
       {
-        label: 'Ngan hang va chu de',
+        label: 'Ngân hàng và chủ đề',
         to: '/teacher/question-banks',
       },
     ],
   },
   {
     icon: ClipboardCheck,
-    label: 'Exam',
+    label: 'Kỳ thi',
     items: [
       {
-        label: 'Kiem tra tap trung',
+        label: 'Kiểm tra tập trung',
         to: '/teacher/exams',
       },
       {
-        label: 'Blueprint de thi',
+        label: 'Blueprint đề thi',
         to: '/teacher/blueprints',
       },
       {
-        label: 'Tao bai tren lop',
+        label: 'Tạo bài trên lớp',
         to: '/teacher/class-tests/create',
       },
       {
-        label: 'Bai tren lop cua toi',
+        label: 'Bài trên lớp của tôi',
         to: '/teacher/class-tests',
       },
     ],
@@ -187,7 +187,7 @@ function TeacherSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Dong menu giao vien"
+            aria-label="Đóng menu giáo viên"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -198,12 +198,12 @@ function TeacherSidebar({
       </div>
 
       <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-indigo-100/80">
-        Giao vien
+        Giáo viên
       </p>
 
       <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-2 [mask-image:linear-gradient(to_bottom,black,black_calc(100%-24px),transparent)] [scrollbar-color:rgba(255,255,255,0.28)_transparent] [scrollbar-width:thin]">
         <div className="flex min-h-full flex-col gap-6 pb-6">
-          <nav aria-label="Teacher" className="grid gap-3">
+          <nav aria-label="Giáo viên" className="grid gap-3">
             {groups.map((group) => (
               <TeacherNavigationGroup
                 {...group}
@@ -218,16 +218,16 @@ function TeacherSidebar({
               <ShieldCheck aria-hidden="true" className="size-6" />
             </div>
             <p className="mt-4 text-sm font-bold leading-6">
-              He thong an toan va bao mat
+              Hệ thống an toàn và bảo mật
             </p>
             <p className="mt-2 text-xs leading-5 text-indigo-50/80">
-              Du lieu duoc ma hoa va bao ve theo tieu chuan quoc te.
+              Dữ liệu được mã hóa và bảo vệ theo tiêu chuẩn quốc tế.
             </p>
             <button
               className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/35 text-sm font-bold text-white transition hover:bg-white/10"
               type="button"
             >
-              Xem chi tiet
+              Xem chi tiết
             </button>
           </div>
         </div>
@@ -243,7 +243,7 @@ export function TeacherLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const teacherEmail = user?.email ?? 'unknown'
-  const teacherRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
+  const teacherRoles = user?.roles.length ? user.roles.join(', ') : 'Chưa có vai trò'
   const teacherInitials = getEmailInitials(teacherEmail)
   const reviewQuestionsQuery = useQuestionsQuery('teacher', 'review', 1, 1, {
     keyword: '',
@@ -256,7 +256,7 @@ export function TeacherLayout() {
     type: '',
   })
   const teacherNavigationGroups = navigationGroups.map((group) =>
-    group.label === 'Question'
+    group.label === 'Câu hỏi'
       ? {
           ...group,
           items: group.items.map((item) =>
@@ -285,13 +285,13 @@ export function TeacherLayout() {
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Dong menu giao vien bang lop phu"
+            aria-label="Đóng menu giáo viên bằng lớp phủ"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />
           <aside
-            aria-label="Menu giao vien"
+            aria-label="Menu giáo viên"
             aria-modal="true"
             className="relative h-full w-70 max-w-[86vw]"
             role="dialog"
@@ -309,7 +309,7 @@ export function TeacherLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mo menu giao vien"
+            aria-label="Mở menu giáo viên"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-blue-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
@@ -323,9 +323,9 @@ export function TeacherLayout() {
               className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-blue-900/70"
             />
             <input
-              aria-label="Tim kiem"
+              aria-label="Tìm kiếm"
               className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-20 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              placeholder="Tim kiem ngan hang, cau hoi..."
+              placeholder="Tìm kiếm ngân hàng, câu hỏi..."
               readOnly
               type="search"
             />
@@ -336,7 +336,7 @@ export function TeacherLayout() {
 
           <div className="ml-auto flex items-center gap-3">
             <button
-              aria-label="Thong bao"
+              aria-label="Thông báo"
               className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-blue-950 transition hover:border-slate-200 hover:bg-slate-50"
               type="button"
             >
@@ -348,7 +348,7 @@ export function TeacherLayout() {
               <button
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
-                aria-label="Mo menu tai khoan"
+                aria-label="Mở menu tài khoản"
                 className="inline-flex items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50"
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
                 type="button"
@@ -382,7 +382,7 @@ export function TeacherLayout() {
                     type="button"
                   >
                     <LogOut aria-hidden="true" className="size-4" />
-                    Dang xuat
+                    Đăng xuất
                   </button>
                 </div>
               ) : null}

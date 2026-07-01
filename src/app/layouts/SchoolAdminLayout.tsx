@@ -32,12 +32,12 @@ type NavigationGroup = {
 const navigationItems = [
   {
     icon: Home,
-    label: 'Tong quan',
+    label: 'Tổng quan',
     to: '/school-admin/dashboard',
   },
   {
     icon: Users,
-    label: 'Quan ly lop hoc',
+    label: 'Quản lý lớp học',
     to: '/school-admin/classes',
   },
 ]
@@ -45,36 +45,36 @@ const navigationItems = [
 const navigationGroups: NavigationGroup[] = [
   {
     icon: FileQuestion,
-    label: 'Question',
+    label: 'Câu hỏi',
     items: [
       {
-        label: 'Ngan hang cau hoi',
+        label: 'Ngân hàng câu hỏi',
         to: '/school-admin/question-banks',
       },
       {
-        label: 'Cau hoi trong truong',
+        label: 'Câu hỏi trong trường',
         to: '/school-admin/questions/all',
       },
       {
-        label: 'Duyet question',
+        label: 'Duyệt câu hỏi',
         to: '/school-admin/questions/review',
       },
     ],
   },
   {
     icon: ClipboardCheck,
-    label: 'Exam',
+    label: 'Kỳ thi',
     items: [
       {
-        label: 'Kiem tra tap trung',
+        label: 'Kiểm tra tập trung',
         to: '/school-admin/exams',
       },
       {
-        label: 'Bai kiem tra tren lop',
+        label: 'Bài kiểm tra trên lớp',
         to: '/school-admin/class-tests',
       },
       {
-        label: 'Blueprint de thi',
+        label: 'Blueprint đề thi',
         to: '/school-admin/blueprints',
       },
     ],
@@ -198,7 +198,7 @@ function SchoolAdminSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Dong menu school admin"
+            aria-label="Đóng menu quản trị trường"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -209,12 +209,12 @@ function SchoolAdminSidebar({
       </div>
 
       <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-cyan-100/80">
-        School Admin
+        Quản trị trường
       </p>
 
       <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-2 [mask-image:linear-gradient(to_bottom,black,black_calc(100%-24px),transparent)] [scrollbar-color:rgba(255,255,255,0.28)_transparent] [scrollbar-width:thin]">
         <div className="flex min-h-full flex-col gap-6 pb-6">
-          <nav aria-label="School admin" className="grid gap-3">
+          <nav aria-label="Quản trị trường" className="grid gap-3">
             {navigationItems.map(({ icon: Icon, label, to }) => (
               <NavLink
                 className={({ isActive }) =>
@@ -247,9 +247,9 @@ function SchoolAdminSidebar({
             <div className="inline-flex size-11 items-center justify-center rounded-xl bg-white text-cyan-700">
               <ShieldCheck aria-hidden="true" className="size-6" />
             </div>
-            <p className="mt-4 text-sm font-bold leading-6">Quan tri lop hoc</p>
+            <p className="mt-4 text-sm font-bold leading-6">Quản trị lớp học</p>
             <p className="mt-2 text-xs leading-5 text-cyan-50/80">
-              Theo doi lop, hoc vien va trang thai tham gia trong truong.
+              Theo dõi lớp, học viên và trạng thái tham gia trong trường.
             </p>
           </div>
         </div>
@@ -265,7 +265,7 @@ export function SchoolAdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const adminEmail = user?.email ?? 'unknown'
-  const adminRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
+  const adminRoles = user?.roles.length ? user.roles.join(', ') : 'Chưa có vai trò'
   const adminInitials = getEmailInitials(adminEmail)
   const reviewQuestionsQuery = useQuestionsQuery('school', 'review', 1, 1, {
     keyword: '',
@@ -278,7 +278,7 @@ export function SchoolAdminLayout() {
     type: '',
   })
   const schoolAdminNavigationGroups = navigationGroups.map((group) =>
-    group.label === 'Question'
+    group.label === 'Câu hỏi'
       ? {
           ...group,
           items: group.items.map((item) =>
@@ -307,13 +307,13 @@ export function SchoolAdminLayout() {
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Dong menu school admin bang lop phu"
+            aria-label="Đóng menu quản trị trường bằng lớp phủ"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />
           <aside
-            aria-label="Menu school admin"
+            aria-label="Menu quản trị trường"
             aria-modal="true"
             className="relative h-full w-70 max-w-[86vw]"
             role="dialog"
@@ -331,7 +331,7 @@ export function SchoolAdminLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mo menu school admin"
+            aria-label="Mở menu quản trị trường"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-slate-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
@@ -345,9 +345,9 @@ export function SchoolAdminLayout() {
               className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500"
             />
             <input
-              aria-label="Tim kiem lop hoc"
+              aria-label="Tìm kiếm lớp học"
               className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              placeholder="Tim theo ma lop, ten lop, hoc vien..."
+              placeholder="Tìm theo mã lớp, tên lớp, học viên..."
               readOnly
               type="search"
             />
@@ -355,7 +355,7 @@ export function SchoolAdminLayout() {
 
           <div className="ml-auto flex items-center gap-3">
             <button
-              aria-label="Thong bao"
+              aria-label="Thông báo"
               className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-slate-950 transition hover:border-slate-200 hover:bg-slate-50"
               type="button"
             >
@@ -367,7 +367,7 @@ export function SchoolAdminLayout() {
               <button
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
-                aria-label="Mo menu tai khoan"
+                aria-label="Mở menu tài khoản"
                 className="inline-flex items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50"
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
                 type="button"
@@ -401,7 +401,7 @@ export function SchoolAdminLayout() {
                     type="button"
                   >
                     <LogOut aria-hidden="true" className="size-4" />
-                    Dang xuat
+                    Đăng xuất
                   </button>
                 </div>
               ) : null}

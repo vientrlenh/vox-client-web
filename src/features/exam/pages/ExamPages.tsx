@@ -9,6 +9,7 @@ import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { QuestionPicker } from '../components/QuestionPicker'
 import {
+  useAttachExamBlueprintMutation,
   useCreateExamMemberMutation,
   useCreateExamMutation,
   useCreateExamPaperMutation,
@@ -21,9 +22,11 @@ import {
   useUpdateExamPaperStatusMutation,
   useUpdateExamStatusMutation,
 } from '../api/useExamMutations'
-import { examQueryKeys, useExamQuery, useExamsQuery } from '../api/useExamQueries'
+import { examQueryKeys, useExamBlueprintQuery, useExamBlueprintsQuery, useExamQuery, useExamsQuery } from '../api/useExamQueries'
 import type {
   CreateExamRequest,
+  ExamBlueprintDto,
+  ExamBlueprintVersionDto,
   CreateExamMemberRequest,
   ExamKind,
   ExamMemberRole,
@@ -41,6 +44,7 @@ import {
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
 const DEFAULT_LANGUAGE_ID = '00000000-0000-0000-0000-000000000001'
+type ExamDetailTab = 'blueprint' | 'papers' | 'people'
 
 function getErrorMessage(error: unknown) {
   if (
@@ -52,7 +56,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Khong the xu ly yeu cau hien tai.'
+  return 'Không thể xử lý yêu cầu hiện tại.'
 }
 
 function StatusBadge({ status }: { status?: string | null }) {
@@ -63,6 +67,31 @@ function StatusBadge({ status }: { status?: string | null }) {
 function PaperStatusBadge({ status }: { status?: string | null }) {
   const display = getExamPaperStatusDisplay(status)
   return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${display.className}`}>{display.label}</span>
+}
+
+function getPublishedBlueprintVersion(blueprint: ExamBlueprintDto | null | undefined) {
+  return [...(blueprint?.versions ?? [])]
+    .reverse()
+    .find((version) => version.status === 'PUBLISHED') ?? null
+}
+
+function getBlueprintVersionById(blueprint: ExamBlueprintDto | null | undefined, blueprintVersionId?: string | null) {
+  if (!blueprintVersionId) {
+    return null
+  }
+
+  return blueprint?.versions?.find((version) => version.id === blueprintVersionId) ?? null
+}
+
+function getBlockingFixedSlots(version: ExamBlueprintVersionDto | null) {
+  return version?.sections.flatMap((section) =>
+    section.slots.filter(
+      (slot) =>
+        slot.slotType === 'FIXED' &&
+        slot.fixedQuestion &&
+        slot.fixedQuestion.status !== 'PUBLISHED',
+    ),
+  ) ?? []
 }
 
 type ExamListPageProps = {
@@ -105,7 +134,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
         <div>
           <h1 className="text-3xl font-black text-blue-950">{title}</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
-            Theo doi danh sach exam va mo chi tiet de thao tac.
+            Theo dõi danh sách kỳ thi và mở chi tiết để thao tác.
           </p>
         </div>
         <div className="flex gap-3">
@@ -114,7 +143,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
             onClick={() => void examsQuery.refetch()}
             type="button"
           >
-            Lam moi
+            Làm mới
           </button>
           {allowCreate ? (
             <button
@@ -122,7 +151,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
               onClick={() => setShowCreate((current) => !current)}
               type="button"
             >
-              {showCreate ? 'Dong form' : 'Tao exam'}
+              {showCreate ? 'Đóng form' : 'Tạo kỳ thi'}
             </button>
           ) : null}
         </div>
@@ -137,7 +166,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
           isSubmitting={createExamMutation.isPending}
           onCancel={() => setShowCreate(false)}
           onSubmit={async (payload) => {
-            if (!(await confirm({ message: 'Ban co chac muon tao exam nay khong?' }))) {
+            if (!(await confirm({ message: 'Bạn có chắc muốn tạo kỳ thi này không?' }))) {
               return
             }
             try {
@@ -154,21 +183,21 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
       ) : null}
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 md:grid-cols-3">
-        <Field label="Tu khoa" value={keyword} onChange={setKeyword} />
+        <Field label="Từ khóa" value={keyword} onChange={setKeyword} />
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Trang thai
+          Trạng thái
           <select
             className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
             onChange={(event) => setStatus(event.target.value as '' | ExamStatus)}
             value={status}
           >
-            <option value="">Tat ca</option>
-            <option value="DRAFT">Draft</option>
-            <option value="SCHEDULED">Scheduled</option>
-            <option value="IN_PROGRESS">In progress</option>
-            <option value="CLOSED">Closed</option>
-            <option value="RESULTS_PUBLISHED">Results published</option>
-            <option value="CANCELLED">Cancelled</option>
+            <option value="">Tất cả</option>
+            <option value="DRAFT">Bản nháp</option>
+            <option value="SCHEDULED">Đã lên lịch</option>
+            <option value="IN_PROGRESS">Đang diễn ra</option>
+            <option value="CLOSED">Đã đóng</option>
+            <option value="RESULTS_PUBLISHED">Đã công bố kết quả</option>
+            <option value="CANCELLED">Đã hủy</option>
           </select>
         </label>
       </div>
@@ -177,12 +206,12 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
         <table className="min-w-full text-left">
           <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">Exam</th>
+              <th className="px-4 py-3">Kỳ thi</th>
               <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Open</th>
-              <th className="px-4 py-3">Close</th>
-              <th className="px-4 py-3 text-right">Thao tac</th>
+              <th className="px-4 py-3">Trạng thái</th>
+              <th className="px-4 py-3">Mở lúc</th>
+              <th className="px-4 py-3">Đóng lúc</th>
+              <th className="px-4 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -205,7 +234,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
                       onClick={() => navigate(`${basePath}/${exam.id}`)}
                       type="button"
                     >
-                      Chi tiet
+                      Chi tiết
                     </button>
                     {!readOnly ? (
                       <button
@@ -224,7 +253,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
                         }}
                         type="button"
                       >
-                        Xoa
+                        Xóa
                       </button>
                     ) : null}
                   </div>
@@ -235,7 +264,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
         </table>
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600">
           <span>
-            {examsQuery.data?.totalElements ?? 0} exam, trang {examsQuery.data?.page ?? 1}/{examsQuery.data?.totalPages ?? 1}
+            {examsQuery.data?.totalElements ?? 0} kỳ thi, trang {examsQuery.data?.page ?? 1}/{examsQuery.data?.totalPages ?? 1}
           </span>
           <div className="flex gap-2">
             <button
@@ -244,7 +273,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
               onClick={() => setPage((current) => current - 1)}
               type="button"
             >
-              Truoc
+              Trước
             </button>
             <button
               className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
@@ -263,6 +292,7 @@ function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: 
 
 type ExamDetailPageProps = {
   basePath: string
+  blueprintBasePath: string
   canManageMembers: boolean
   canManagePapers: boolean
   canManageStatus: boolean
@@ -272,6 +302,7 @@ type ExamDetailPageProps = {
 
 function ExamDetailPage({
   basePath,
+  blueprintBasePath,
   canManageMembers,
   canManagePapers,
   canManageStatus,
@@ -284,9 +315,21 @@ function ExamDetailPage({
   const { examId } = useParams()
   const examQuery = useExamQuery(examId ?? null)
   const exam = examQuery.data
+  const blueprintQuery = useExamBlueprintQuery(exam?.blueprintId ?? null)
+  const blueprint = blueprintQuery.data
+  const availableBlueprintsQuery = useExamBlueprintsQuery({
+    examKind: exam?.kind,
+    isActive: true,
+    keyword: '',
+    page: 1,
+    schoolId: exam?.schoolId ?? user?.schoolId,
+    size: 50,
+  })
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<ExamDetailTab>('blueprint')
   const updateExamMutation = useUpdateExamMutation()
+  const attachBlueprintMutation = useAttachExamBlueprintMutation()
   const updateStatusMutation = useUpdateExamStatusMutation()
   const createMemberMutation = useCreateExamMemberMutation()
   const updateMemberMutation = useUpdateExamMemberMutation()
@@ -300,25 +343,47 @@ function ExamDetailPage({
   const [memberUserId, setMemberUserId] = useState('')
   const [memberRole, setMemberRole] = useState<ExamMemberRole>('AUTHOR')
   const [memberSearch, setMemberSearch] = useState('')
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState('')
+  const [selectedBlueprintVersionId, setSelectedBlueprintVersionId] = useState('')
   const { confirm, dialog } = useConfirmationDialog()
   const schoolUsersQuery = useSchoolUsersBySchoolQuery(1, 8, {
     role: 'TEACHER',
     schoolId: user?.schoolId ?? '',
     search: memberSearch,
   })
+  const selectedBlueprintQuery = useExamBlueprintQuery(selectedBlueprintId || null)
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
   }
 
   if (examQuery.isLoading) {
-    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Dang tai chi tiet exam...</section>
+    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Đang tải chi tiết kỳ thi...</section>
   }
 
   if (!exam) {
-    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Khong tim thay exam.</section>
+    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Không tìm thấy kỳ thi.</section>
   }
 
+  const finalizedBlueprintVersion = getBlueprintVersionById(blueprint, exam.blueprintVersionId)
+  const finalizedBlockingFixedSlots = getBlockingFixedSlots(finalizedBlueprintVersion)
+  const canUsePaperActions = Boolean(exam.blueprintVersionId && finalizedBlueprintVersion) && finalizedBlockingFixedSlots.length === 0
+  const hasBlueprint = Boolean(exam.blueprintId && blueprint)
+  const isSchoolAdmin = user?.roles?.includes('SCHOOL_ADMIN') ?? false
+  const viewerRoles = exam.members
+    ?.filter((member) => member.userId === user?.userId)
+    .map((member) => member.role) ?? []
+  const isAuthor = viewerRoles.includes('AUTHOR')
+  const isChair = viewerRoles.includes('CHAIR')
+  const hasAuthor = exam.members?.some((member) => member.role === 'AUTHOR') ?? false
+  const hasReviewerOrChair = exam.members?.some((member) => member.role === 'REVIEWER' || member.role === 'CHAIR') ?? false
+  const hasChair = exam.members?.some((member) => member.role === 'CHAIR') ?? false
+  const canAttachBlueprint = exam.kind === 'CENTRALIZED' && isAuthor
+  const canFinalizeBlueprintVersion = exam.kind === 'CENTRALIZED' && isChair
+  const canShowExamWorkflow = canManageStatus && exam.kind === 'CENTRALIZED' && isSchoolAdmin
+  const selectedBlueprint = selectedBlueprintQuery.data
+  const selectedBlueprintPublishedVersion = getPublishedBlueprintVersion(selectedBlueprint)
+  const publishedVersions = [...(blueprint?.versions ?? [])].filter((version) => version.status === 'PUBLISHED')
   const examStatusActions: UpdateExamStatusRequest['action'][] = ['SCHEDULE', 'START', 'CLOSE', 'PUBLISH_RESULTS', 'CANCEL']
   const paperStatusActions: UpdateExamPaperStatusRequest['action'][] = ['SUBMIT', 'APPROVE', 'REQUEST_REVISION', 'LOCK']
 
@@ -331,11 +396,11 @@ function ExamDetailPage({
             onClick={() => navigate(-1)}
             type="button"
           >
-            Quay lai
+            Quay lại
           </button>
           <h1 className="text-3xl font-black text-blue-950">{title}</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
-            Theo doi thong tin exam, member va paper trong cung mot man.
+            Theo dõi thông tin kỳ thi, thành viên và đề thi trong cùng một màn.
           </p>
         </div>
       </div>
@@ -345,17 +410,285 @@ function ExamDetailPage({
       {dialog}
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
-        <InfoItem label="Ten exam" value={exam.name} />
+        <InfoItem label="Tên kỳ thi" value={exam.name} />
         <InfoItem label="Code" value={exam.code} />
-        <InfoItem label="Loai" value={exam.kind} />
-        <InfoItem label="Trang thai" value={<StatusBadge status={exam.status} />} />
-        <InfoItem label="Open" value={formatDateTime(exam.openAt)} />
-        <InfoItem label="Close" value={formatDateTime(exam.closeAt)} />
+        <InfoItem label="Loại" value={exam.kind} />
+        <InfoItem label="Trạng thái" value={<StatusBadge status={exam.status} />} />
+        <InfoItem label="Mở lúc" value={formatDateTime(exam.openAt)} />
+        <InfoItem label="Đóng lúc" value={formatDateTime(exam.closeAt)} />
         <InfoItem label="Blueprint ID" value={formatNullableText(exam.blueprintId)} />
         <InfoItem label="School class ID" value={formatNullableText(exam.schoolClassId)} />
       </div>
 
-      {canUpdateInfo ? (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-1">
+        <div className="flex flex-wrap gap-2">
+          <ExamTabButton isActive={activeTab === 'blueprint'} label="Blueprint" onClick={() => setActiveTab('blueprint')} />
+          <ExamTabButton isActive={activeTab === 'papers'} label="Đề thi" onClick={() => setActiveTab('papers')} />
+          <ExamTabButton isActive={activeTab === 'people'} label="Phân công" onClick={() => setActiveTab('people')} />
+        </div>
+      </div>
+
+      {activeTab === 'blueprint' ? (
+        <div className="grid gap-4">
+          <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">Sẵn sàng quy trình</h2>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                AUTHOR gan blueprint, REVIEWER/CHAIR doi trang thai version, CHAIR chot version su dung.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-4">
+              <WorkflowReadinessItem isReady={hasAuthor} readyLabel="AUTHOR ready" missingLabel="Missing AUTHOR" />
+              <WorkflowReadinessItem isReady={hasReviewerOrChair} readyLabel="Version reviewer ready" missingLabel="Missing REVIEWER or CHAIR" />
+              <WorkflowReadinessItem isReady={hasChair} readyLabel="CHAIR ready" missingLabel="Missing CHAIR" />
+              <WorkflowReadinessItem
+                isReady={Boolean(exam.blueprintVersionId)}
+                readyLabel="Paper flow ready"
+                missingLabel="Paper flow locked until blueprintVersionId is chosen"
+              />
+            </div>
+          </div>
+
+          {!hasBlueprint ? (
+            <form
+              className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void (async () => {
+                  if (!selectedBlueprintId) {
+                    setError('Hay chon blueprint truoc khi gan vao exam.')
+                    return
+                  }
+
+                  if (!(await confirm({ message: 'Ban co chac muon gan blueprint nay vao exam khong?' }))) {
+                    return
+                  }
+
+                  try {
+                    const result = await attachBlueprintMutation.mutateAsync({
+                      blueprintId: selectedBlueprintId,
+                      blueprintVersionId: null,
+                      examId: exam.id,
+                    })
+                    await refresh()
+                    setMessage(result)
+                    setError(null)
+                  } catch (submitError) {
+                    setError(getErrorMessage(submitError))
+                  }
+                })()
+              }}
+            >
+              <div className="md:col-span-2">
+                <h2 className="text-lg font-black text-slate-950">Gan blueprint cho exam</h2>
+                <p className="mt-1 text-sm font-medium text-slate-600">
+                  Buoc 1: AUTHOR gan blueprint vao exam. Chua can co version PUBLISHED o buoc nay.
+                </p>
+              </div>
+              {canAttachBlueprint ? (
+                <>
+                  <SelectField
+                    label="Blueprint"
+                    onChange={setSelectedBlueprintId}
+                    options={[
+                      { label: 'Chon blueprint', value: '' },
+                      ...((availableBlueprintsQuery.data?.content ?? []).map((candidate) => ({
+                        label: `${candidate.code} - ${candidate.name}`,
+                        value: candidate.id,
+                      }))),
+                    ]}
+                    value={selectedBlueprintId}
+                  />
+                  <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Trang thai blueprint da chon</p>
+                    <p className="text-sm font-black text-slate-950">
+                      {selectedBlueprint
+                        ? `${selectedBlueprint.code} - ${selectedBlueprint.name}`
+                        : 'Chua chon blueprint'}
+                    </p>
+                    <p className="text-sm font-medium text-slate-600">
+                      {selectedBlueprintId
+                        ? selectedBlueprintPublishedVersion
+                          ? 'Blueprint nay da co version PUBLISHED, CHAIR co the chot version sau khi gan.'
+                          : 'Blueprint nay chua co version PUBLISHED. REVIEWER/CHAIR se doi trang thai version o buoc tiep theo.'
+                        : 'Chi hien blueprint dang hoat dong trong truong hien tai.'}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                  Chi AUTHOR cua exam duoc gan blueprint.
+                </div>
+              )}
+              <div className="md:col-span-2 flex justify-end">
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+                  disabled={!canAttachBlueprint || !selectedBlueprintId}
+                  type="submit"
+                >
+                  AUTHOR gan blueprint
+                </button>
+              </div>
+            </form>
+          ) : null}
+
+          {hasBlueprint && !exam.blueprintVersionId ? (
+            <div className="grid gap-4">
+              <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
+                <InfoItem label="Ten blueprint" value={blueprint?.name ?? '-'} />
+                <InfoItem label="Code" value={blueprint?.code ?? '-'} />
+                <InfoItem label="Blueprint ID" value={formatNullableText(exam.blueprintId)} />
+                <InfoItem label="Version dang duoc chot" value="Chua chot" />
+              </div>
+
+              {!hasReviewerOrChair ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                  Exam nay chua co actor doi trang thai version.
+                </div>
+              ) : null}
+
+              {!hasChair ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                  Exam nay chua co CHAIR de chot version su dung.
+                </div>
+              ) : null}
+
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800">
+                Buoc 2: REVIEWER/CHAIR doi trang thai version trong blueprint detail. Buoc 3: CHAIR quay lai exam nay de chot version su dung.
+              </div>
+
+              <div className="flex flex-wrap justify-between gap-3">
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700"
+                  onClick={() => navigate(`${blueprintBasePath}/${blueprint?.id}`)}
+                  type="button"
+                >
+                  Mo blueprint de doi trang thai version
+                </button>
+              </div>
+
+              {canFinalizeBlueprintVersion ? (
+                <form
+                  className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void (async () => {
+                      if (!selectedBlueprintVersionId) {
+                        setError('Hay chon version PUBLISHED truoc khi chot.')
+                        return
+                      }
+
+                      if (!(await confirm({ message: 'Ban co chac muon chot version nay cho exam khong?' }))) {
+                        return
+                      }
+
+                      try {
+                        const result = await attachBlueprintMutation.mutateAsync({
+                          blueprintId: null,
+                          blueprintVersionId: selectedBlueprintVersionId,
+                          examId: exam.id,
+                        })
+                        await refresh()
+                        setMessage(result)
+                        setError(null)
+                      } catch (submitError) {
+                        setError(getErrorMessage(submitError))
+                      }
+                    })()
+                  }}
+                >
+                  <div className="md:col-span-2">
+                    <h2 className="text-lg font-black text-slate-950">Chot version su dung</h2>
+                    <p className="mt-1 text-sm font-medium text-slate-600">
+                      Buoc 3: CHAIR chot blueprintVersionId. Exam paper chi mo sau khi CHAIR chot version.
+                    </p>
+                  </div>
+                  <SelectField
+                    label="Version PUBLISHED"
+                    onChange={setSelectedBlueprintVersionId}
+                    options={[
+                      { label: 'Chon version PUBLISHED', value: '' },
+                      ...publishedVersions.map((version) => ({
+                        label: `Version ${version.version} - ${version.code}`,
+                        value: version.id,
+                      })),
+                    ]}
+                    value={selectedBlueprintVersionId}
+                  />
+                  <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Readiness chot version</p>
+                    <p className="text-sm font-black text-slate-950">
+                      {selectedBlueprintVersionId
+                        ? `Version duoc chon: ${publishedVersions.find((version) => version.id === selectedBlueprintVersionId)?.code ?? selectedBlueprintVersionId}`
+                        : 'Chua chon version'}
+                    </p>
+                    <p className="text-sm font-medium text-slate-600">
+                      {publishedVersions.length
+                        ? 'Chi liet ke cac version dang PUBLISHED.'
+                        : 'Chua co version PUBLISHED de CHAIR chot.'}
+                    </p>
+                  </div>
+                  <div className="md:col-span-2 flex justify-end">
+                    <button
+                      className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+                      disabled={!selectedBlueprintVersionId || !publishedVersions.length}
+                      type="submit"
+                    >
+                      CHAIR chot version su dung
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                  Chi CHAIR cua exam duoc chot version su dung.
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {hasBlueprint && exam.blueprintVersionId ? (
+            <div className="grid gap-4">
+              <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
+                <InfoItem label="Ten blueprint" value={blueprint?.name ?? '-'} />
+                <InfoItem label="Code" value={blueprint?.code ?? '-'} />
+                <InfoItem
+                  label="Version dang duoc chot"
+                  value={finalizedBlueprintVersion ? `Version ${finalizedBlueprintVersion.version} - ${finalizedBlueprintVersion.code}` : 'Khong tim thay version'}
+                />
+                <InfoItem label="Blueprint version ID" value={formatNullableText(exam.blueprintVersionId)} />
+              </div>
+
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                Version nay dang duoc su dung de tao exam paper.
+              </div>
+
+              {!finalizedBlueprintVersion ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  Khong tai duoc version da chot tu blueprint hien tai. Hay mo blueprint de kiem tra lai version.
+                </div>
+              ) : null}
+
+              {finalizedBlockingFixedSlots.length ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  Version da chot van co slot FIXED tro toi question chua PUBLISHED, nen paper flow dang bi khoa.
+                </div>
+              ) : null}
+
+              <div className="flex justify-end">
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+                  onClick={() => navigate(`${blueprintBasePath}/${blueprint?.id}`)}
+                  type="button"
+                >
+                  Mo chi tiet blueprint
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {activeTab === 'blueprint' && hasBlueprint && canUpdateInfo ? (
         <form
           className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2"
           onSubmit={(event) => {
@@ -391,7 +724,7 @@ function ExamDetailPage({
         </form>
       ) : null}
 
-      {canManageStatus ? (
+      {activeTab === 'blueprint' && canShowExamWorkflow ? (
         <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-6">
           <h2 className="text-lg font-black text-slate-950">Workflow exam</h2>
           <div className="flex flex-wrap gap-3">
@@ -423,7 +756,8 @@ function ExamDetailPage({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6">
+        {activeTab === 'people' ? (
         <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-slate-950">Thanh vien exam</h2>
@@ -564,13 +898,21 @@ function ExamDetailPage({
             ))}
           </div>
         </div>
+        ) : null}
 
+        {activeTab === 'papers' ? (
         <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-slate-950">De thi / Papers</h2>
+            <div>
+              <h2 className="text-lg font-black text-slate-950">De thi / Papers</h2>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                Exam paper chi mo sau khi CHAIR chot version su dung.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <button
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700"
+                className={`inline-flex h-10 items-center justify-center rounded-lg border px-4 text-sm font-bold ${canUsePaperActions ? 'border-slate-200 text-slate-700' : 'border-slate-200 text-slate-400'}`}
+                disabled={!canUsePaperActions}
                 onClick={() => navigate(`${basePath}/${exam.id}/papers`)}
                 type="button"
               >
@@ -578,9 +920,13 @@ function ExamDetailPage({
               </button>
               {canManagePapers ? (
                 <button
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+                  className={`inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-bold text-white ${canUsePaperActions ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                  disabled={!canUsePaperActions}
                   onClick={() => {
                     void (async () => {
+                      if (!canUsePaperActions) {
+                        return
+                      }
                       try {
                         const result = await createPaperMutation.mutateAsync(exam.id)
                         await refresh()
@@ -598,6 +944,21 @@ function ExamDetailPage({
               ) : null}
             </div>
           </div>
+          {!exam.blueprintVersionId ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+              CHAIR can chot blueprint version truoc khi tao paper.
+            </div>
+          ) : null}
+          {exam.blueprintVersionId && !finalizedBlueprintVersion ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              Khong tim thay version da chot tu blueprint hien tai, nen paper flow dang bi khoa.
+            </div>
+          ) : null}
+          {finalizedBlockingFixedSlots.length ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              Version da chot van co slot FIXED tro toi question chua PUBLISHED, nen cac thao tac voi paper dang bi khoa.
+            </div>
+          ) : null}
           <div className="grid gap-4">
             {exam.papers?.map((paper) => (
               <div className="grid gap-4 rounded-lg border border-slate-200 p-4" key={paper.id}>
@@ -610,10 +971,14 @@ function ExamDetailPage({
                     <div className="flex flex-wrap gap-2">
                       {paperStatusActions.map((action) => (
                         <button
-                          className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                          className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold ${canUsePaperActions ? 'border-slate-200 text-slate-700' : 'border-slate-200 text-slate-400'}`}
+                          disabled={!canUsePaperActions}
                           key={action}
                           onClick={() => {
                             void (async () => {
+                              if (!canUsePaperActions) {
+                                return
+                              }
                               try {
                                 const result = await updatePaperStatusMutation.mutateAsync({
                                   paperId: paper.id,
@@ -633,16 +998,21 @@ function ExamDetailPage({
                         </button>
                       ))}
                       <button
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                        className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold ${canUsePaperActions ? 'border-slate-200 text-slate-700' : 'border-slate-200 text-slate-400'}`}
+                        disabled={!canUsePaperActions}
                         onClick={() => navigate(`${basePath}/${exam.id}/papers/${paper.id}`)}
                         type="button"
                       >
                         Chi tiet paper
                       </button>
                       <button
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-bold text-red-600"
+                        className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold ${canUsePaperActions ? 'border-red-200 text-red-600' : 'border-slate-200 text-slate-400'}`}
+                        disabled={!canUsePaperActions}
                         onClick={() => {
                           void (async () => {
+                            if (!canUsePaperActions) {
+                              return
+                            }
                             try {
                               const result = await deletePaperMutation.mutateAsync(paper.id)
                               await refresh()
@@ -676,7 +1046,7 @@ function ExamDetailPage({
                     </p>
                     {section.items.map((item) => (
                       <PaperItemEditor
-                        canEdit={canManagePapers}
+                        canEdit={canManagePapers && canUsePaperActions}
                         item={item}
                         key={item.id}
                         onSave={async (questionId) => {
@@ -701,6 +1071,7 @@ function ExamDetailPage({
             ))}
           </div>
         </div>
+        ) : null}
       </div>
     </section>
   )
@@ -850,6 +1221,45 @@ function InfoItem({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
+function WorkflowReadinessItem({
+  isReady,
+  missingLabel,
+  readyLabel,
+}: {
+  isReady: boolean
+  missingLabel: string
+  readyLabel: string
+}) {
+  return (
+    <div className={`rounded-lg border px-4 py-3 text-sm font-black ${isReady ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
+      {isReady ? readyLabel : missingLabel}
+    </div>
+  )
+}
+
+function ExamTabButton({
+  isActive,
+  label,
+  onClick,
+}: {
+  isActive: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      className={[
+        'rounded-lg px-4 py-2 text-sm font-bold transition',
+        isActive ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-white',
+      ].join(' ')}
+      onClick={onClick}
+      type="button"
+    >
+      {label}
+    </button>
+  )
+}
+
 export function SchoolAdminExamsPage() {
   return <ExamListPage allowCreate basePath="/school-admin/exams" kind="CENTRALIZED" title="Kiem tra tap trung" />
 }
@@ -858,6 +1268,7 @@ export function SchoolAdminExamDetailPage() {
   return (
     <ExamDetailPage
       basePath="/school-admin/exams"
+      blueprintBasePath="/school-admin/blueprints"
       canManageMembers
       canManagePapers={false}
       canManageStatus
@@ -875,9 +1286,10 @@ export function TeacherExamDetailPage() {
   return (
     <ExamDetailPage
       basePath="/teacher/exams"
+      blueprintBasePath="/teacher/blueprints"
       canManageMembers={false}
       canManagePapers
-      canManageStatus
+      canManageStatus={false}
       canUpdateInfo={false}
       title="Chi tiet exam duoc giao"
     />
@@ -892,6 +1304,7 @@ export function SystemAdminExamDetailPage() {
   return (
     <ExamDetailPage
       basePath="/system-admin/exams"
+      blueprintBasePath="/system-admin/blueprints"
       canManageMembers={false}
       canManagePapers={false}
       canManageStatus={false}

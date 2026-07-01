@@ -313,10 +313,9 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
             Nhap cau hoi tu Excel
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-            Chon ngan hang + chu de, tai file len. He thong tu nhan dien cot theo
-            ten header va gui thang xuong server - neu sai dau muc hay nham cot,
-            BE se bao loi cu the tung dong. Cau hoi tao tu import vao thang hang
-            doi cho duyet (SUBMITTED_FOR_REVIEW).
+            Chọn ngân hàng và chủ đề, rồi tải file lên. Hệ thống tự nhận diện cột theo
+            tên header và gửi xuống server. Nếu sai đầu mục hay nhầm cột, backend sẽ
+            báo lỗi cụ thể từng dòng. Câu hỏi tạo từ import sẽ vào hàng đợi chờ duyệt.
           </p>
         </div>
         <div className="flex gap-3">
@@ -356,7 +355,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
                 }}
                 value={questionBankId}
               >
-                <option value="">Chon ngan hang</option>
+                <option value="">Chọn ngân hàng</option>
                 {questionBanksQuery.data?.content.map((bank) => (
                   <option key={bank.id} value={bank.id}>
                     {bank.name} ({bank.code})
@@ -372,7 +371,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
                 onChange={(event) => setQuestionTopicId(event.target.value)}
                 value={questionTopicId}
               >
-                <option value="">Chon chu de</option>
+                <option value="">Chọn chủ đề</option>
                 {questionTopicsQuery.data?.content.map((topic) => (
                   <option key={topic.id} value={topic.id}>
                     {topic.name} ({topic.code})
@@ -384,7 +383,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
 
           <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5">
             <div>
-              <h2 className="text-lg font-black text-slate-950">Chon file import</h2>
+              <h2 className="text-lg font-black text-slate-950">Chọn file import</h2>
               <p className="mt-1 text-sm font-medium text-slate-500">
                 Ho tro file .csv, .xlsx va .xls. Phai chon ngan hang + chu de truoc.
               </p>
@@ -398,7 +397,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
               }`}
             >
               <span className="text-sm font-black text-slate-950">
-                Chon file CSV hoac Excel
+                Chọn file CSV hoặc Excel
               </span>
               <input
                 accept=".csv,.xlsx,.xls"
@@ -440,7 +439,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
                   }}
                   type="button"
                 >
-                  Chon file khac
+                  Chọn file khác
                 </button>
                 <button
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"

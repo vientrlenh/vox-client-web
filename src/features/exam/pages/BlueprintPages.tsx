@@ -42,11 +42,11 @@ import {
 const DEFAULT_LANGUAGE_ID = '00000000-0000-0000-0000-000000000001'
 
 const QUESTION_TYPE_OPTIONS = [
-  { label: 'Doc to', value: 'READ_ALOUD' },
-  { label: 'Tra loi ngan', value: 'SHORT_ANSWER' },
-  { label: 'Tra loi dai', value: 'LONG_ANSWER' },
-  { label: 'Y kien', value: 'OPINION' },
-  { label: 'Mo ta', value: 'DESCRIPTION' },
+  { label: 'Đọc to', value: 'READ_ALOUD' },
+  { label: 'Trả lời ngắn', value: 'SHORT_ANSWER' },
+  { label: 'Trả lời dài', value: 'LONG_ANSWER' },
+  { label: 'Ý kiến', value: 'OPINION' },
+  { label: 'Mô tả', value: 'DESCRIPTION' },
 ] as const
 
 function getErrorMessage(error: unknown) {
@@ -59,7 +59,28 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Khong the xu ly blueprint.'
+  return 'Không thể xử lý blueprint.'
+}
+
+function getVersionWorkflowErrorMessage(error: unknown) {
+  if (error && typeof error === 'object' && 'status' in error && error.status === 403) {
+    if ('message' in error && typeof error.message === 'string') {
+      const normalized = error.message.toLowerCase()
+
+      if (
+        normalized.includes('creator') ||
+        normalized.includes('author') ||
+        normalized.includes('chinh minh') ||
+        normalized.includes('tac gia')
+      ) {
+        return 'Người tạo version không được tự đổi trạng thái version của chính mình.'
+      }
+    }
+
+    return 'Chỉ CHAIR hoặc REVIEWER của exam đã gán blueprint này mới được đổi trạng thái version.'
+  }
+
+  return getErrorMessage(error)
 }
 
 function createSelectionSpec(): QuestionSelectionSpec {
@@ -169,12 +190,13 @@ function getPublishBlockers(version: ExamBlueprintVersionDto) {
 }
 
 type BlueprintListPageProps = {
+  allowCreate?: boolean
   basePath: string
   readOnly?: boolean
   title: string
 }
 
-function BlueprintListPage({ basePath, readOnly = false, title }: BlueprintListPageProps) {
+function BlueprintListPage({ allowCreate = false, basePath, readOnly = false, title }: BlueprintListPageProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [keyword, setKeyword] = useState('')
@@ -196,7 +218,7 @@ function BlueprintListPage({ basePath, readOnly = false, title }: BlueprintListP
         <div>
           <h1 className="text-3xl font-black text-blue-950">{title}</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
-            Quan ly danh sach blueprint va version cua de thi.
+            Quản lý danh sách blueprint và version của đề thi.
           </p>
         </div>
         <div className="flex gap-3">
@@ -205,15 +227,15 @@ function BlueprintListPage({ basePath, readOnly = false, title }: BlueprintListP
             onClick={() => void blueprintsQuery.refetch()}
             type="button"
           >
-            Lam moi
+            Làm mới
           </button>
-          {!readOnly ? (
+          {!readOnly && allowCreate ? (
             <button
               className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
               onClick={() => setShowCreate((current) => !current)}
               type="button"
             >
-              {showCreate ? 'Dong form' : 'Tao blueprint'}
+              {showCreate ? 'Đóng form' : 'Tạo blueprint'}
             </button>
           ) : null}
         </div>
@@ -230,7 +252,7 @@ function BlueprintListPage({ basePath, readOnly = false, title }: BlueprintListP
             event.preventDefault()
             const formElement = event.currentTarget
             void (async () => {
-              if (!(await confirm({ message: 'Ban co chac muon tao blueprint nay khong?' }))) {
+              if (!(await confirm({ message: 'Bạn có chắc muốn tạo blueprint này không?' }))) {
                 return
               }
               const form = new FormData(formElement)
@@ -243,7 +265,7 @@ function BlueprintListPage({ basePath, readOnly = false, title }: BlueprintListP
               try {
                 const result = await createMutation.mutateAsync(payload)
                 await refresh()
-                setMessage(result)
+                setMessage(result.message)
                 setError(null)
                 setShowCreate(false)
               } catch (submitError) {
@@ -619,7 +641,12 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-black text-slate-950">Versions</h2>
+          <div>
+            <h2 className="text-lg font-black text-slate-950">Versions</h2>
+            <p className="mt-1 text-sm font-medium text-slate-600">
+              Buoc nay danh cho REVIEWER/CHAIR doi trang thai version. AUTHOR khong tu doi trang thai version cua chinh minh.
+            </p>
+          </div>
         </div>
         <div className="grid gap-4">
           {blueprint.versions?.map((version) => {
@@ -641,48 +668,52 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                   </div>
                   {canEdit ? (
                     <div className="flex gap-2">
-                      <button
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              const result = await updateVersionStatusMutation.mutateAsync({
-                                payload: { action: 'PUBLISH' },
-                                versionId: version.id,
-                              })
-                              await refresh()
-                              setMessage(result)
-                              setError(null)
-                            } catch (submitError) {
-                              setError(getErrorMessage(submitError))
-                            }
-                          })()
-                        }}
-                        type="button"
-                      >
-                        Publish
-                      </button>
-                      <button
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              const result = await updateVersionStatusMutation.mutateAsync({
-                                payload: { action: 'ARCHIVE' },
-                                versionId: version.id,
-                              })
-                              await refresh()
-                              setMessage(result)
-                              setError(null)
-                            } catch (submitError) {
-                              setError(getErrorMessage(submitError))
-                            }
-                          })()
-                        }}
-                        type="button"
-                      >
-                        Archive
-                      </button>
+                      {version.status !== 'PUBLISHED' ? (
+                        <button
+                          className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                const result = await updateVersionStatusMutation.mutateAsync({
+                                  payload: { action: 'PUBLISH' },
+                                  versionId: version.id,
+                                })
+                                await refresh()
+                                setMessage(result)
+                                setError(null)
+                              } catch (submitError) {
+                                setError(getVersionWorkflowErrorMessage(submitError))
+                              }
+                            })()
+                          }}
+                          type="button"
+                        >
+                          REVIEWER/CHAIR doi sang PUBLISHED
+                        </button>
+                      ) : null}
+                      {version.status === 'PUBLISHED' ? (
+                        <button
+                          className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                const result = await updateVersionStatusMutation.mutateAsync({
+                                  payload: { action: 'ARCHIVE' },
+                                  versionId: version.id,
+                                })
+                                await refresh()
+                                setMessage(result)
+                                setError(null)
+                              } catch (submitError) {
+                                setError(getVersionWorkflowErrorMessage(submitError))
+                              }
+                            })()
+                          }}
+                          type="button"
+                        >
+                          REVIEWER/CHAIR dua ve ARCHIVED
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -920,6 +951,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                                   </div>
                                   <QuestionPicker
                                     allowStatusChange={false}
+                                    fixedStatus="PUBLISHED"
                                     mode="single"
                                     onSelect={(question) => {
                                       const nextSlot = {
@@ -1235,6 +1267,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                         </p>
                         <QuestionPicker
                           allowStatusChange={false}
+                          fixedStatus="PUBLISHED"
                           mode="single"
                           onSelect={(question) =>
                             updateCreateSlot(sectionIndex, slotIndex, (currentSlot) => ({
@@ -1507,7 +1540,7 @@ function Notice({ children, tone }: { children: ReactNode; tone: 'error' | 'succ
 }
 
 export function TeacherBlueprintsPage() {
-  return <BlueprintListPage basePath="/teacher/blueprints" title="Blueprint de thi" />
+  return <BlueprintListPage allowCreate basePath="/teacher/blueprints" title="Blueprint de thi" />
 }
 
 export function TeacherBlueprintDetailPage() {
