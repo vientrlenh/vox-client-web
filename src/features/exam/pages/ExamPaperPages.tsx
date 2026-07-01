@@ -463,6 +463,7 @@ export function TeacherExamPaperEditPage() {
                     <QuestionPicker
                       allowStatusChange={false}
                       fixedStatus="PUBLISHED"
+                      forExamPaper
                       mode="single"
                       onSelect={(question) => {
                         void (async () => {

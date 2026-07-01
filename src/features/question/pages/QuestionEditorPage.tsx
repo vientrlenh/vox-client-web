@@ -4,14 +4,18 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
+import { useSchoolUsersBySchoolQuery } from '@/features/classes/api/useSchoolUsersBySchoolQuery'
 import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
 import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { useQuestionQuery } from '../api/useQuestionQuery'
 import {
+  useCreateQuestionCollaboratorMutation,
   useCreateQuestionMutation,
+  useDeleteQuestionCollaboratorMutation,
   useDeleteQuestionMutation,
+  useUpdateQuestionCollaboratorMutation,
   useUpdateQuestionMutation,
 } from '../api/useQuestionMutations'
 import { questionQueryKeys } from '../api/useQuestionsQuery'
@@ -27,20 +31,28 @@ import {
   canDeleteQuestion,
   canEditQuestion,
   canEditQuestionAssetsOrGuide,
+  canManageQuestionSharing,
   getQuestionActorRole,
   getQuestionReviewActions,
   resolveTeacherQuestionContext,
 } from '../permissions'
 import type {
   CreateQuestionRequest,
+  QuestionCollaboratorPermission,
+  QuestionDto,
   QuestionAssetType,
   QuestionSharing,
   QuestionType,
   UpdateQuestionStatusRequest,
 } from '../types'
-import { formatNullableText } from '../types'
+import {
+  formatNullableText,
+  formatQuestionDate,
+  getQuestionCollaboratorPermissionDisplay,
+  getQuestionSharingDisplay,
+} from '../types'
 
-type TabKey = 'assets' | 'content' | 'guide' | 'workflow'
+type TabKey = 'assets' | 'content' | 'guide' | 'sharing' | 'workflow'
 
 type EditorFormState = {
   instructionText: string
@@ -180,6 +192,9 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const updateAssetMutation = useUpdateQuestionAssetMutation()
   const deleteAssetMutation = useDeleteQuestionAssetMutation()
   const upsertGuideMutation = useUpsertQuestionEvaluationGuideMutation()
+  const createCollaboratorMutation = useCreateQuestionCollaboratorMutation()
+  const updateCollaboratorMutation = useUpdateQuestionCollaboratorMutation()
+  const deleteCollaboratorMutation = useDeleteQuestionCollaboratorMutation()
 
   const [activeTab, setActiveTab] = useState<TabKey>('content')
   const [selectedBankId, setSelectedBankId] = useState(searchParams.get('bankId') ?? '')
@@ -191,6 +206,10 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(locationSuccessMessage)
   const [workflowAction, setWorkflowAction] = useState('')
   const [workflowNote, setWorkflowNote] = useState('')
+  const [teacherSearch, setTeacherSearch] = useState('')
+  const [newUserId, setNewUserId] = useState('')
+  const [newPermission, setNewPermission] =
+    useState<QuestionCollaboratorPermission>('READ_ONLY')
   const { confirm, dialog } = useConfirmationDialog()
 
   const actorRole = getQuestionActorRole(user?.roles)
@@ -198,6 +217,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     teacherView,
     questionQuery.data,
     user?.userId,
+    user?.email,
   )
   const canCreate = canCreateQuestion(actorRole)
   const canEdit = canEditQuestion(
@@ -213,11 +233,18 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     teacherContext,
     user?.userId,
   )
+  const canManageSharing = canManageQuestionSharing(
+    questionQuery.data,
+    actorRole,
+    user?.userId,
+    user?.email,
+  )
   const workflowActions = getQuestionReviewActions(
     questionQuery.data,
     actorRole,
     teacherContext,
     user?.userId,
+    user?.email,
   )
 
   const questionBanksQuery = useQuestionBanksQuery(
@@ -239,6 +266,11 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     mode === 'create' && Boolean(selectedBankId),
     { status: 'PUBLISHED' },
   )
+  const schoolUsersQuery = useSchoolUsersBySchoolQuery(1, 8, {
+    role: 'TEACHER',
+    schoolId: user?.schoolId ?? '',
+    search: teacherSearch,
+  })
 
   useEffect(() => {
     if (!locationSuccessMessage) {
@@ -625,7 +657,12 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             { id: 'content', label: 'Nội dung' },
             { id: 'assets', label: 'Tài nguyên' },
             { id: 'guide', label: 'Hướng dẫn chấm' },
-            ...(mode === 'edit' ? [{ id: 'workflow', label: 'Workflow' }] : []),
+            ...(mode === 'edit'
+              ? [
+                  { id: 'sharing', label: 'Assign collaborator' },
+                  { id: 'workflow', label: 'Workflow' },
+                ]
+              : []),
           ].map((tab) => (
             <button
               className={[
@@ -1002,6 +1039,36 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
         </form>
       ) : null}
 
+      {mode === 'edit' && activeTab === 'sharing' && questionQuery.data ? (
+        <QuestionSharingPanel
+          canManage={canManageSharing}
+          createCollaboratorMutation={createCollaboratorMutation}
+          deleteCollaboratorMutation={deleteCollaboratorMutation}
+          errorMessage={errorMessage}
+          message={successMessage}
+          newPermission={newPermission}
+          newUserId={newUserId}
+          onCloseError={() => setErrorMessage(null)}
+          onCloseMessage={() => setSuccessMessage(null)}
+          onPermissionChange={setNewPermission}
+          onRefresh={() => void refreshQuestionData(questionId)}
+          onSearchChange={setTeacherSearch}
+          onSelectUser={setNewUserId}
+          onSuccess={(message) => {
+            setSuccessMessage(message)
+            setErrorMessage(null)
+            setNewUserId('')
+            setTeacherSearch('')
+          }}
+          onUpdateError={setErrorMessage}
+          question={questionQuery.data}
+          schoolUsers={schoolUsersQuery.data?.content ?? []}
+          teacherSearch={teacherSearch}
+          updateCollaboratorMutation={updateCollaboratorMutation}
+          updateQuestionMutation={updateMutation}
+        />
+      ) : null}
+
       {mode === 'edit' && activeTab === 'workflow' ? (
         <form
           className="grid gap-6 rounded-lg border border-slate-200 bg-white p-6"
@@ -1060,6 +1127,342 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   )
 }
 
+function QuestionSharingPanel({
+  canManage,
+  createCollaboratorMutation,
+  deleteCollaboratorMutation,
+  errorMessage,
+  message,
+  newPermission,
+  newUserId,
+  onCloseError,
+  onCloseMessage,
+  onPermissionChange,
+  onRefresh,
+  onSearchChange,
+  onSelectUser,
+  onSuccess,
+  onUpdateError,
+  question,
+  schoolUsers,
+  teacherSearch,
+  updateCollaboratorMutation,
+  updateQuestionMutation,
+}: {
+  canManage: boolean
+  createCollaboratorMutation: ReturnType<typeof useCreateQuestionCollaboratorMutation>
+  deleteCollaboratorMutation: ReturnType<typeof useDeleteQuestionCollaboratorMutation>
+  errorMessage: string | null
+  message: string | null
+  newPermission: QuestionCollaboratorPermission
+  newUserId: string
+  onCloseError: () => void
+  onCloseMessage: () => void
+  onPermissionChange: (value: QuestionCollaboratorPermission) => void
+  onRefresh: () => void
+  onSearchChange: (value: string) => void
+  onSelectUser: (value: string) => void
+  onSuccess: (message: string) => void
+  onUpdateError: (message: string) => void
+  question: QuestionDto
+  schoolUsers: Array<{
+    id: string
+    userId?: string | null
+    user?: {
+      email?: string | null
+      fullName?: string | null
+      id?: string | null
+    } | null
+  }>
+  teacherSearch: string
+  updateCollaboratorMutation: ReturnType<typeof useUpdateQuestionCollaboratorMutation>
+  updateQuestionMutation: ReturnType<typeof useUpdateQuestionMutation>
+}) {
+  const [sharing, setSharing] = useState(question.sharing)
+  const [collaboratorPermissions, setCollaboratorPermissions] = useState<
+    Record<string, QuestionCollaboratorPermission>
+  >({})
+  const { confirm, dialog } = useConfirmationDialog()
+
+  useEffect(() => {
+    setSharing(question.sharing)
+  }, [question.sharing])
+
+  useEffect(() => {
+    setCollaboratorPermissions(
+      Object.fromEntries(
+        (question.collaborators ?? []).map((collaborator) => [
+          collaborator.id,
+          collaborator.permission,
+        ]),
+      ),
+    )
+  }, [question.collaborators])
+
+  return (
+    <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
+      <FeedbackToast message={message} onClose={onCloseMessage} tone="success" />
+      <FeedbackToast message={errorMessage} onClose={onCloseError} tone="error" />
+      {dialog}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <ReadOnlyItem
+          label="Chia sẻ hiện tại"
+          value={getQuestionSharingDisplay(question.sharing)}
+        />
+        <ReadOnlyItem
+          label="Số cộng tác viên"
+          value={String(question.collaborators?.length ?? 0)}
+        />
+      </div>
+
+      {canManage ? (
+        <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4">
+            <div>
+              <h3 className="text-base font-black text-slate-950">Quyền riêng tư và chia sẻ chung</h3>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                Cấu hình quyền truy cập chung cho question này.
+              </p>
+            </div>
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Quyền truy cập chung
+              <select
+                className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950"
+                onChange={(event) => setSharing(event.target.value as QuestionDto['sharing'])}
+                value={sharing}
+              >
+                <option value="PRIVATE">Riêng tư</option>
+                <option value="SCHOOL_SHARED">Chia sẻ trong trường</option>
+              </select>
+            </label>
+            <div className="self-end">
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+                onClick={() => {
+                  void (async () => {
+                    if (!(await confirm({ message: 'Bạn có chắc muốn lưu thay đổi chia sẻ này không?' }))) {
+                      return
+                    }
+                    try {
+                      const result = await updateQuestionMutation.mutateAsync({
+                        id: question.id,
+                        payload: { sharing },
+                      })
+                      onSuccess(result.message)
+                      onRefresh()
+                    } catch (submitError) {
+                      onUpdateError(getErrorMessage(submitError))
+                    }
+                  })()
+                }}
+                type="button"
+              >
+                Lưu chia sẻ
+              </button>
+            </div>
+          </div>
+          </div>
+
+          <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4">
+            <div>
+              <h3 className="text-base font-black text-slate-950">Gán giáo viên cộng tác</h3>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                Tìm giáo viên, chọn quyền và thêm vào danh sách cộng tác viên.
+              </p>
+            </div>
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Tìm giáo viên
+              <input
+                className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950"
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="Nhập tên hoặc email"
+                value={teacherSearch}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Quyền
+              <select
+                className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950"
+                onChange={(event) =>
+                  onPermissionChange(event.target.value as QuestionCollaboratorPermission)
+                }
+                value={newPermission}
+              >
+                <option value="READ_ONLY">Chỉ xem</option>
+                <option value="CAN_USE">Được sử dụng</option>
+                <option value="CAN_EDIT">Được chỉnh sửa</option>
+              </select>
+            </label>
+            <div className="self-end">
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
+                onClick={() => {
+                  void (async () => {
+                    if (!(await confirm({ message: 'Bạn có chắc muốn thêm cộng tác viên này không?' }))) {
+                      return
+                    }
+                    try {
+                      const result = await createCollaboratorMutation.mutateAsync({
+                        payload: {
+                          permission: newPermission,
+                          userId: newUserId,
+                        },
+                        questionId: question.id,
+                      })
+                      onSuccess(result)
+                      onRefresh()
+                    } catch (submitError) {
+                      onUpdateError(getErrorMessage(submitError))
+                    }
+                  })()
+                }}
+                type="button"
+              >
+                Thêm cộng tác viên
+              </button>
+            </div>
+          </div>
+
+          {newUserId ? (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700">
+              Đã chọn người dùng: {newUserId}
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {schoolUsers.map((schoolUser) => {
+              const displayUserId = schoolUser.userId ?? schoolUser.user?.id ?? ''
+              const displayName =
+                schoolUser.user?.fullName?.trim() ||
+                schoolUser.user?.email ||
+                displayUserId
+
+              return (
+                <button
+                  className={`grid gap-1 rounded-lg border bg-white px-4 py-3 text-left transition ${newUserId === displayUserId ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}
+                  key={schoolUser.id}
+                  onClick={() => onSelectUser(displayUserId)}
+                  type="button"
+                >
+                  <span className="text-sm font-black text-slate-950">{displayName}</span>
+                  <span className="text-xs font-semibold text-slate-500">
+                    {schoolUser.user?.email ?? displayUserId}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          </div>
+        </div>
+      ) : (
+        <EmptyState text="Chỉ giáo viên tạo câu hỏi mới có thể gán cộng tác viên." />
+      )}
+
+      {question.collaborators?.length ? (
+        <div className="grid gap-3">
+          {question.collaborators.map((collaborator) => (
+            <div
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4"
+              key={collaborator.id}
+            >
+              <div>
+                <p className="text-sm font-bold text-slate-950">
+                  {collaborator.user?.fullName?.trim() ||
+                    collaborator.user?.email ||
+                    collaborator.userId}
+                </p>
+                <p className="text-xs font-medium text-slate-500">
+                  {collaborator.user?.email ?? collaborator.userId} - Gán lúc:{' '}
+                  {formatQuestionDate(collaborator.assignedAt)}
+                </p>
+              </div>
+              {canManage ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
+                    onChange={(event) => {
+                      void (async () => {
+                        const nextPermission =
+                          event.target.value as QuestionCollaboratorPermission
+                        const previousPermission =
+                          collaboratorPermissions[collaborator.id] ?? collaborator.permission
+
+                        setCollaboratorPermissions((current) => ({
+                          ...current,
+                          [collaborator.id]: nextPermission,
+                        }))
+
+                        if (!(await confirm({ message: 'Bạn có chắc muốn cập nhật quyền cộng tác viên này không?' }))) {
+                          setCollaboratorPermissions((current) => ({
+                            ...current,
+                            [collaborator.id]: previousPermission,
+                          }))
+                          return
+                        }
+                        try {
+                          const result = await updateCollaboratorMutation.mutateAsync({
+                            collaboratorId: collaborator.id,
+                            payload: {
+                              permission: nextPermission,
+                            },
+                            questionId: question.id,
+                          })
+                          onSuccess(result)
+                          onRefresh()
+                        } catch (submitError) {
+                          setCollaboratorPermissions((current) => ({
+                            ...current,
+                            [collaborator.id]: previousPermission,
+                          }))
+                          onUpdateError(getErrorMessage(submitError))
+                        }
+                      })()
+                    }}
+                    value={collaboratorPermissions[collaborator.id] ?? collaborator.permission}
+                  >
+                    <option value="READ_ONLY">Chỉ xem</option>
+                    <option value="CAN_USE">Được sử dụng</option>
+                    <option value="CAN_EDIT">Được chỉnh sửa</option>
+                  </select>
+                  <button
+                    className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 px-4 text-sm font-bold text-red-600"
+                    onClick={() => {
+                      void (async () => {
+                        try {
+                          const result = await deleteCollaboratorMutation.mutateAsync({
+                            collaboratorId: collaborator.id,
+                            questionId: question.id,
+                          })
+                          onSuccess(result)
+                          onRefresh()
+                        } catch (submitError) {
+                          onUpdateError(getErrorMessage(submitError))
+                        }
+                      })()
+                    }}
+                    type="button"
+                  >
+                    Xóa
+                  </button>
+                </div>
+              ) : (
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700">
+                  {getQuestionCollaboratorPermissionDisplay(collaborator.permission)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState text="Chưa có cộng tác viên nào được gán riêng." />
+      )}
+    </div>
+  )
+}
+
 function updateAssetForm(
   index: number,
   value: Partial<AssetFormState>,
@@ -1079,6 +1482,14 @@ function ReadOnlyItem({ label, value }: { label: string; value: string }) {
         {label}
       </p>
       <p className="mt-2 break-words text-sm font-bold text-slate-950">{value}</p>
+    </div>
+  )
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">
+      {text}
     </div>
   )
 }
@@ -1151,3 +1562,4 @@ export function SystemAdminCreateQuestionPage() {
 export function SystemAdminEditQuestionPage() {
   return <QuestionEditorPage basePath="/system-admin" mode="edit" />
 }
+

@@ -64,7 +64,7 @@ function SampleRowsTable({ preview }: { preview: PreviewQuestionImportResponse }
   if (!preview.sampleRows.length || !preview.originalHeaders.length) {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm font-semibold text-slate-500">
-        Khong co du lieu mau de hien thi.
+Không có dữ liệu mẫu để hiển thị.
       </div>
     )
   }
@@ -72,11 +72,11 @@ function SampleRowsTable({ preview }: { preview: PreviewQuestionImportResponse }
   return (
     <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5">
       <div>
-        <h2 className="text-lg font-black text-slate-950">Du lieu mau</h2>
+        <h2 className="text-lg font-black text-slate-950">Dữ liệu mẫu</h2>
         <p className="mt-1 text-sm font-medium text-slate-500">
-          Kiem tra nhanh mot so dong dau tien truoc khi import. He thong tu nhan
-          dien cot theo ten header, khong can tu ghep tay - neu sai cot/thieu
-          truong bat buoc, BE se bao loi cu the khi xac nhan.
+          Kiểm tra nhanh một số dòng đầu tiên trước khi import. Hệ thống tự nhận
+          diện cột theo tên header, không cần tự ghép tay - nếu sai cột/ Thiếu
+          trường bắt buộc, BE sẽ báo lỗi cụ thể khi xác nhận.
         </p>
       </div>
       <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -110,7 +110,13 @@ function SampleRowsTable({ preview }: { preview: PreviewQuestionImportResponse }
   )
 }
 
-function ImportProgressPanel({ sessionId }: { sessionId: string }) {
+function ImportProgressPanel({
+  basePath,
+  sessionId,
+}: {
+  basePath: string
+  sessionId: string
+}) {
   const sessionQuery = useImportSessionQuery(sessionId, { poll: true })
   const session = sessionQuery.data
   const isFinished = session
@@ -126,15 +132,14 @@ function ImportProgressPanel({ sessionId }: { sessionId: string }) {
   if (sessionQuery.isError) {
     return (
       <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">
-        Khong tai duoc trang thai phien import: {getErrorMessage(sessionQuery.error) ?? 'Loi khong xac dinh.'}
+        không tải được trạng thái phiên import: {getErrorMessage(sessionQuery.error) ?? 'Loi khong xac dinh.'}
         <div className="mt-3">
           <button
             className="inline-flex h-10 items-center justify-center rounded-lg border border-red-300 bg-white px-4 text-sm font-bold text-red-700"
             onClick={() => void sessionQuery.refetch()}
             type="button"
           >
-            Thu lai
-          </button>
+Thử lại          </button>
         </div>
       </section>
     )
@@ -143,7 +148,7 @@ function ImportProgressPanel({ sessionId }: { sessionId: string }) {
   if (sessionQuery.isLoading || !session) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">
-        Dang tai trang thai phien import...
+        Đang tải trạng thái phiên import...
       </section>
     )
   }
@@ -152,25 +157,24 @@ function ImportProgressPanel({ sessionId }: { sessionId: string }) {
     <section className="grid gap-5 rounded-lg border border-indigo-200 bg-indigo-50 p-5">
       <div>
         <h2 className="text-lg font-black text-indigo-950">
-          {isFinished ? 'Import hoan tat' : 'Dang xu ly import...'}
+          {isFinished ? 'Import hoàn tất' : 'Đang xử lý import...'}
         </h2>
         <p className="mt-1 text-sm font-semibold text-indigo-800">
-          Trang thai phien import: {session.status}
+          Trạng thái phiên import: {session.status}
           {session.failureReason ? ` - ${session.failureReason}` : ''}
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard label="Tong so dong" value={session.totalRows} />
-        <SummaryCard label="Da import" value={session.importedRows} />
-        <SummaryCard label="Dong loi" value={session.invalidRows} />
-        <SummaryCard label="Bo qua (trung)" value={session.skippedRows} />
+        <SummaryCard label="ổng số dòng" value={session.totalRows} />
+        <SummaryCard label="Đã import" value={session.importedRows} />
+        <SummaryCard label="òng lỗi" value={session.invalidRows} />
+        <SummaryCard label="Bỏ qua (trùng)" value={session.skippedRows} />
       </div>
 
       {!isFinished ? (
         <p className="text-sm font-semibold text-indigo-700">
-          Dang xu ly o nen, trang nay se tu cap nhat khi co ket qua moi.
-        </p>
+Đang xử lý        </p>
       ) : null}
 
       {isFinished && session.invalidRows > 0 ? (
@@ -200,9 +204,9 @@ function ImportProgressPanel({ sessionId }: { sessionId: string }) {
       {isFinished ? (
         <Link
           className="inline-flex h-11 w-fit items-center justify-center rounded-lg bg-indigo-700 px-4 text-sm font-bold text-white transition hover:bg-indigo-800"
-          to="../questions/all"
+          to={`${basePath}/questions/all`}
         >
-          Quay lai danh sach cau hoi
+Quay lại danh sách câu hỏi
         </Link>
       ) : null}
     </section>
@@ -245,13 +249,13 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
     }
 
     if (!questionBankId || !questionTopicId) {
-      setError('Vui long chon ngan hang cau hoi va chu de truoc khi tai file.')
+      setError('Vui lòng chọn ngân hàng câu hỏi và chủ đề trước khi tải file.')
       return
     }
 
     if (!isAcceptedFile(file)) {
       setPreview(null)
-      setError('File khong hop le. Vui long chon file CSV hoac Excel.')
+      setError('File không hợp lệ. Vui lòng chọn file CSV hoac Excel.')
       return
     }
 
@@ -269,7 +273,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
       setPreview(null)
       setError(
         getErrorMessage(submitError) ??
-          'Khong the doc file import. Vui long kiem tra lai file.',
+          'Import file thất bại do lỗi hệ thống hoặc file không đọc được, không chỉ là lỗi nghiệp vụ. Vui lòng kiểm tra định dạng file, cột dữ liệu và thử lại.',
       )
     }
   }
@@ -291,7 +295,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
     } catch (submitError) {
       setError(
         getErrorMessage(submitError) ??
-          'Khong the xac nhan import. Vui long thu lai.',
+          'không thể xác nhận import vì hệ thống xử lý thất bại hoặc file có vấn đề ngoài nghiệp vụ. Vui lòng thử lại sau.',
       )
     }
   }
@@ -340,12 +344,12 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
       <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
 
       {sessionId ? (
-        <ImportProgressPanel sessionId={sessionId} />
+        <ImportProgressPanel basePath={basePath} sessionId={sessionId} />
       ) : (
         <>
           <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5 md:grid-cols-2">
             <label className="grid gap-2 text-sm font-bold text-slate-700">
-              Ngan hang cau hoi
+              Ngân hàng câu hỏi
               <select
                 className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
                 disabled={Boolean(preview)}
@@ -364,7 +368,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
               </select>
             </label>
             <label className="grid gap-2 text-sm font-bold text-slate-700">
-              Chu de
+              Chủ đề
               <select
                 className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
                 disabled={Boolean(preview) || !questionBankId}
@@ -385,7 +389,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
             <div>
               <h2 className="text-lg font-black text-slate-950">Chọn file import</h2>
               <p className="mt-1 text-sm font-medium text-slate-500">
-                Ho tro file .csv, .xlsx va .xls. Phai chon ngan hang + chu de truoc.
+                Hỗ trợ file .csv, .xlsx và .xls. Phải chọn ngân hàng + chủ đề trước.
               </p>
             </div>
 
@@ -413,7 +417,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
 
             {previewMutation.isPending ? (
               <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
-                Dang doc file import...
+                Đang đọc file import...
               </div>
             ) : null}
           </section>
@@ -421,10 +425,10 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
           {preview ? (
             <>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <SummaryCard label="Ten file" value={preview.fileName} />
-                <SummaryCard label="Tong so dong" value={preview.totalRows} />
-                <SummaryCard label="So cot" value={preview.originalHeaders.length} />
-                <SummaryCard label="Het han" value={preview.expiresAt ?? '-'} />
+                <SummaryCard label="Tên file" value={preview.fileName} />
+                <SummaryCard label="Tổng số dòng" value={preview.totalRows} />
+                <SummaryCard label="Số cột" value={preview.originalHeaders.length} />
+                <SummaryCard label="Hết hạn" value={preview.expiresAt ?? '-'} />
               </div>
 
               <SampleRowsTable preview={preview} />

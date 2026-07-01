@@ -40,33 +40,33 @@ export function QuestionTopicTable({
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-6 py-5">
-        <h2 className="text-lg font-black text-blue-950">Danh sach chu de</h2>
+        <h2 className="text-lg font-black text-blue-950">Danh sách chủ đề</h2>
       </div>
 
       {isLoading ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-          Dang tai danh sach chu de...
+Đang tải danh sách chủ đề...
         </div>
       ) : null}
 
       {isError ? (
         <div className="flex min-h-80 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
           <p className="text-sm font-bold text-red-600">
-            {errorMessage ?? 'Khong the tai danh sach chu de.'}
+            {errorMessage ?? 'không thể tải danh sách chủ đề.'}
           </p>
           <button
             className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
             onClick={onRetry}
             type="button"
           >
-            Thu lai
+            Thử lại
           </button>
         </div>
       ) : null}
 
       {!isLoading && !isError && questionTopics.length === 0 ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-          Chua co chu de nao
+          Chưa có chủ đề nào
         </div>
       ) : null}
 
@@ -75,11 +75,11 @@ export function QuestionTopicTable({
           <table className="w-full min-w-220 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
-                <th className="px-6 py-4">Chu de</th>
-                <th className="px-4 py-4">Ma</th>
-                <th className="px-4 py-4">Mo ta</th>
-                <th className="px-4 py-4">Trang thai</th>
-                <th className="px-4 py-4 text-center">Hanh dong</th>
+                <th className="px-6 py-4">Chủ đề</th>
+                <th className="px-4 py-4">Mã</th>
+                <th className="px-4 py-4">Mô tả</th>
+                <th className="px-4 py-4">Trạng thái</th>
+                <th className="px-4 py-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody>
@@ -114,19 +114,19 @@ export function QuestionTopicTable({
                     <td className="px-4 py-4">
                       <div className="flex justify-center">
                         <ActionMenuButton
-                          ariaLabel={`Mo hanh dong cho ${formatNullableText(topic.name)}`}
+                          ariaLabel={`Mở hành động cho ${formatNullableText(topic.name)}`}
                           items={[
                             {
                               icon: Eye,
                               id: 'view',
-                              label: 'Xem chi tiet',
+                              label: 'Xem chi tiết',
                               onSelect: () => onSelect(topic.id),
                               tone: 'primary',
                             },
                             {
                               icon: HelpCircle,
                               id: 'questions',
-                              label: 'Xem cau hoi',
+                              label: 'Xem câu hỏi',
                               onSelect: () => onViewQuestions(topic),
                               tone: 'default',
                             },
@@ -135,7 +135,7 @@ export function QuestionTopicTable({
                                   {
                                     icon: Pencil,
                                     id: 'edit',
-                                    label: 'Chinh sua',
+                                    label: 'Chỉnh sửa',
                                     onSelect: () => onEdit(topic),
                                     tone: 'default' as const,
                                   },

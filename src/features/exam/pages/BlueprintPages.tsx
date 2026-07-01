@@ -338,7 +338,7 @@ function BlueprintListPage({ allowCreate = false, basePath, readOnly = false, ti
                         }}
                         type="button"
                       >
-                        Xoa
+                        Xóa
                       </button>
                     ) : null}
                   </div>
@@ -468,11 +468,11 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
 
   async function handleSaveDraftSection(versionId: string, section: ExamBlueprintSectionDto) {
     if (!section.title.trim()) {
-      setError('Tieu de section khong duoc de trong.')
+      setError('Tiêu đề section không được để trống.')
       return
     }
 
-    if (!(await confirm({ message: 'Ban co chac muon luu section draft nay khong?' }))) {
+    if (!(await confirm({ message: 'Bạn có chắc muốn lưu section draft này không?' }))) {
       return
     }
 
@@ -525,11 +525,11 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
 
   async function handleSaveDraftSlot(slotId: string, slot: ExamBlueprintSlotDto) {
     if (slot.slotType === 'FIXED' && !slot.fixedQuestionId) {
-      setError('Slot FIXED can chon fixed question truoc khi luu.')
+      setError('Slot FIXED cần chọn fixed question trước khi lưu.')
       return
     }
 
-    if (!(await confirm({ message: 'Ban co chac muon luu slot draft nay khong?' }))) {
+    if (!(await confirm({ message: 'Bạn có chắc muốn lưu slot draft này không?' }))) {
       return
     }
 
@@ -591,7 +591,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
         </button>
         <h1 className="text-3xl font-black text-blue-950">{title}</h1>
         <p className="mt-2 text-sm font-medium text-slate-600">
-          Xem thong tin blueprint, version va soan editor chi tiet cho draft version.
+          Xem thông tin blueprint, version và soạn editor chi tiết cho draft version.
         </p>
       </div>
 
@@ -633,7 +633,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
           <Field label="Mo ta" name="blueprint-description" onValueChange={setDescription} value={description} />
           <div className="md:col-span-2 flex justify-end">
             <button className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white" type="submit">
-              Luu thong tin
+Lưu thông tin
             </button>
           </div>
         </form>
@@ -644,7 +644,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
           <div>
             <h2 className="text-lg font-black text-slate-950">Versions</h2>
             <p className="mt-1 text-sm font-medium text-slate-600">
-              Buoc nay danh cho REVIEWER/CHAIR doi trang thai version. AUTHOR khong tu doi trang thai version cua chinh minh.
+              Bước này dành cho REVIEWER/CHAIR đổi trạng thái version. AUTHOR không tự đổi trạng thái version của chính mình.
             </p>
           </div>
         </div>
@@ -688,7 +688,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                           }}
                           type="button"
                         >
-                          REVIEWER/CHAIR doi sang PUBLISHED
+                          REVIEWER/CHAIR đưa về PUBLISHED
                         </button>
                       ) : null}
                       {version.status === 'PUBLISHED' ? (
@@ -711,7 +711,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                           }}
                           type="button"
                         >
-                          REVIEWER/CHAIR dua ve ARCHIVED
+                          REVIEWER/CHAIR đưa về ARCHIVED
                         </button>
                       ) : null}
                     </div>
@@ -736,7 +736,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                       <div>
                         <h3 className="text-base font-black text-slate-950">Editor draft version</h3>
                         <p className="mt-1 text-sm font-medium text-slate-600">
-                          Them, sua, xoa section va slot ngay tren version DRAFT nay.
+                          Thêm, sửa, xóa section và slot ngay trên version DRAFT nay.
                         </p>
                       </div>
                       <button
@@ -744,7 +744,7 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
                         onClick={() => void handleAddDraftSection(version)}
                         type="button"
                       >
-                        Them section
+                        Thêm Section
                       </button>
                     </div>
 
@@ -1540,7 +1540,7 @@ function Notice({ children, tone }: { children: ReactNode; tone: 'error' | 'succ
 }
 
 export function TeacherBlueprintsPage() {
-  return <BlueprintListPage allowCreate basePath="/teacher/blueprints" title="Blueprint de thi" />
+  return <BlueprintListPage allowCreate={false} basePath="/teacher/blueprints" title="Blueprint de thi" />
 }
 
 export function TeacherBlueprintDetailPage() {

@@ -50,6 +50,22 @@ function getCurrentUserPermission(
   return collaborator?.permission ?? null
 }
 
+function isQuestionOwner(
+  question: QuestionDto | null | undefined,
+  userId?: string | null,
+  email?: string | null,
+) {
+  if (!question?.createdBy) {
+    return false
+  }
+
+  const createdBy = question.createdBy.trim().toLowerCase()
+  const normalizedUserId = userId?.trim().toLowerCase()
+  const normalizedEmail = email?.trim().toLowerCase()
+
+  return createdBy === normalizedUserId || createdBy === normalizedEmail
+}
+
 export function getQuestionActorRole(
   roles?: RoleCode[] | null,
 ): QuestionActorRole {
@@ -86,8 +102,9 @@ export function resolveTeacherQuestionContext(
   view: 'all' | 'my' | 'review' | null | undefined,
   question: QuestionDto | null | undefined,
   userId?: string | null,
+  email?: string | null,
 ): TeacherQuestionContext {
-  if (question?.createdBy && userId && question.createdBy === userId) {
+  if (isQuestionOwner(question, userId, email)) {
     return 'owner'
   }
 
@@ -106,12 +123,13 @@ export function canManageQuestionSharing(
   question: QuestionDto | null | undefined,
   role: QuestionActorRole,
   userId?: string | null,
+  email?: string | null,
 ) {
   if (!question) {
     return false
   }
 
-  return role === 'TEACHER' && Boolean(question.createdBy && userId && question.createdBy === userId)
+  return role === 'TEACHER' && isQuestionOwner(question, userId, email)
 }
 
 export function canEditQuestion(
@@ -176,12 +194,13 @@ export function getQuestionReviewActions(
   role: QuestionActorRole,
   teacherContext: TeacherQuestionContext,
   userId?: string | null,
+  email?: string | null,
 ) {
   if (!question) {
     return [] as ReviewActionOption[]
   }
 
-  const isOwner = Boolean(question.createdBy && userId && question.createdBy === userId)
+  const isOwner = isQuestionOwner(question, userId, email)
   const collaboratorPermission = getCurrentUserPermission(question, userId)
 
   if (role === 'SYSTEM_ADMIN') {
@@ -233,6 +252,39 @@ export function getQuestionReviewActions(
         title: 'Reject',
       },
     )
+  }
+
+  if (
+    (teacherContext === 'owner' || collaboratorPermission === 'CAN_EDIT') &&
+    question.status === 'APPROVED'
+  ) {
+    actions.push({
+      action: 'PUBLISH',
+      description: 'Xuat ban cau hoi da duyet de dua vao su dung ngay.',
+      title: 'Publish',
+    })
+  }
+
+  if (
+    (teacherContext === 'owner' || collaboratorPermission === 'CAN_EDIT') &&
+    question.status === 'PUBLISHED'
+  ) {
+    actions.push({
+      action: 'ARCHIVE',
+      description: 'Luu tru cau hoi da xuat ban khi tam ngung su dung.',
+      title: 'Archive',
+    })
+  }
+
+  if (
+    (teacherContext === 'owner' || collaboratorPermission === 'CAN_EDIT') &&
+    question.status === 'ARCHIVED'
+  ) {
+    actions.push({
+      action: 'PUBLISH',
+      description: 'Xuat ban lai cau hoi tu trang thai luu tru.',
+      title: 'Republish',
+    })
   }
 
   return actions

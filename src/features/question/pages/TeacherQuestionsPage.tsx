@@ -1,10 +1,12 @@
 import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { exportQuestions } from '../api/useQuestionExport'
+import { useReviewQuestionMutation } from '../api/useQuestionReviewMutation'
 import { useQuestionsQuery, type QuestionQueryFilters } from '../api/useQuestionsQuery'
 import { QuestionPageHeader } from '../components/QuestionPageHeader'
 import { QuestionPagination } from '../components/QuestionPagination'
@@ -21,6 +23,8 @@ import type {
   QuestionStatus,
   QuestionType,
 } from '../types'
+import { questionQueryKeys } from '../api/useQuestionsQuery'
+import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
@@ -37,7 +41,7 @@ const EMPTY_FILTERS: QuestionQueryFilters = {
 }
 
 const QUESTION_STATUS_OPTIONS: Array<{ label: string; value: '' | QuestionStatus }> = [
-  { label: 'Tat ca trang thai', value: '' },
+  { label: 'Tất cả trạng thái', value: '' },
   { label: 'Bản nháp', value: 'DRAFT' },
   { label: 'Submitted for review', value: 'SUBMITTED_FOR_REVIEW' },
   { label: 'Revision requested', value: 'REVISION_REQUESTED' },
@@ -48,7 +52,7 @@ const QUESTION_STATUS_OPTIONS: Array<{ label: string; value: '' | QuestionStatus
 ]
 
 const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: '' | QuestionType }> = [
-  { label: 'Tat ca loai', value: '' },
+  { label: 'Tất cả loại', value: '' },
   { label: 'Read aloud', value: 'READ_ALOUD' },
   { label: 'Short answer', value: 'SHORT_ANSWER' },
   { label: 'Long answer', value: 'LONG_ANSWER' },
@@ -57,7 +61,7 @@ const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: '' | QuestionType }> 
 ]
 
 const QUESTION_SHARING_OPTIONS: Array<{ label: string; value: '' | QuestionSharing }> = [
-  { label: 'Tat ca chia se', value: '' },
+  { label: 'Tất cả chia sẻ', value: '' },
   { label: 'Private', value: 'PRIVATE' },
   { label: 'School shared', value: 'SCHOOL_SHARED' },
 ]
@@ -97,22 +101,22 @@ function getDescription(
   topicName?: string,
 ) {
   if (topicName) {
-    return `Danh sach cau hoi thuoc chu de ${topicName}.`
+    return `Danh sách câu hỏi thuộc chủ đề ${topicName}.`
   }
 
   if (view === 'review') {
-    return 'Hang doi cac cau hoi can ban duyet hoac phan hoi.'
+    return 'Hàng đợi các câu hỏi cần bạn duyệt hoặc phản hồi.'
   }
 
   if (teacherScopeTab === 'MINE') {
-    return 'Tap hop cau hoi ban tao va dang quan ly.'
+    return 'Tập hợp câu hỏi bạn tạo và đang quản lý.'
   }
 
   if (teacherScopeTab === 'COLLABORATING') {
     return 'Câu hỏi được chia sẻ riêng với bạn theo cơ chế cộng tác.'
   }
 
-  return 'Tat ca cau hoi ban duoc phep xem trong truong.'
+  return 'Tất cả câu hỏi bạn được phép xem trong trường.'
 }
 
 type QuestionListView = 'all' | 'my' | 'review'
@@ -130,16 +134,21 @@ function QuestionsPage({
   scope,
   view,
 }: QuestionsPageProps) {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const user = useAppSelector((state) => state.auth.user)
   const [searchParams] = useSearchParams()
+  const reviewMutation = useReviewQuestionMutation()
+  const { confirm, dialog } = useConfirmationDialog()
   const initialStatus: '' | QuestionStatus =
     view === 'review' ? 'SUBMITTED_FOR_REVIEW' : ''
   const [page, setPage] = useState(DEFAULT_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [isExporting, setIsExporting] = useState(false)
+  const [isBulkApproving, setIsBulkApproving] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [bulkSelection, setBulkSelection] = useState<string[]>([])
   const [draftFilters, setDraftFilters] = useState<QuestionQueryFilters>({
     ...EMPTY_FILTERS,
     questionBankId: searchParams.get('bankId') ?? '',
@@ -202,6 +211,12 @@ function QuestionsPage({
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
   }, [flashMessage, location.pathname, location.search, navigate])
 
+  useEffect(() => {
+    setBulkSelection((current) =>
+      current.filter((id) => questionsQuery.data?.content.some((question) => question.id === id)),
+    )
+  }, [questionsQuery.data?.content])
+
   async function handleExport() {
     setIsExporting(true)
     setExportError(null)
@@ -231,6 +246,58 @@ function QuestionsPage({
     setPage(DEFAULT_PAGE)
     setDraftFilters(next)
     setFilters(next)
+  }
+
+  async function handleBulkApprove() {
+    const selectedQuestions = (questionsQuery.data?.content ?? []).filter((question) =>
+      bulkSelection.includes(question.id),
+    )
+
+    if (!selectedQuestions.length) {
+      setExportError('Hãy chọn ít nhất một câu hỏi để duyệt hàng loạt.')
+      return
+    }
+
+    if (
+      !(await confirm({
+        message: `Bạn có chắc muốn duyệt ${selectedQuestions.length} câu hỏi đã chọn không?`,
+      }))
+    ) {
+      return
+    }
+
+    setIsBulkApproving(true)
+    setExportError(null)
+
+    let successCount = 0
+    const failedCodes: string[] = []
+
+    try {
+      for (const question of selectedQuestions) {
+        try {
+          await reviewMutation.mutateAsync({
+            payload: { action: 'APPROVE', note: null },
+            questionId: question.id,
+          })
+          successCount += 1
+        } catch {
+          failedCodes.push(question.code)
+        }
+      }
+
+      await queryClient.invalidateQueries({ queryKey: questionQueryKeys.all })
+      setBulkSelection([])
+
+      if (failedCodes.length) {
+        setExportError(
+          `Đã duyệt ${successCount}/${selectedQuestions.length} câu hỏi. Thất bại: ${failedCodes.join(', ')}`,
+        )
+      } else {
+        setToastMessage(`Đã duyệt hàng loạt ${successCount} câu hỏi.`)
+      }
+    } finally {
+      setIsBulkApproving(false)
+    }
   }
 
   return (
@@ -290,23 +357,24 @@ function QuestionsPage({
         onClose={() => setExportError(null)}
         tone="error"
       />
+      {dialog}
 
       {allowTeacherTabs && view !== 'review' ? (
         <div className="rounded-lg border border-slate-200 bg-white p-1">
           <div className="flex flex-wrap gap-2">
             <TabButton
               isActive={teacherScopeTab === 'MINE'}
-              label="Cua toi"
+              label="Của tôi"
               onClick={() => navigate(`${basePath}/questions/my?tab=mine`)}
             />
             <TabButton
               isActive={teacherScopeTab === 'COLLABORATING'}
-              label="Duoc chia se"
+              label="Được chia sẻ"
               onClick={() => navigate(`${basePath}/questions/my?tab=collaborating`)}
             />
             <TabButton
               isActive={teacherScopeTab === 'ALL'}
-              label="Toan truong"
+              label="Tất cả tôi thấy"
               onClick={() => navigate(`${basePath}/questions/my?tab=all`)}
             />
           </div>
@@ -318,15 +386,15 @@ function QuestionsPage({
         onSubmit={handleFilterSubmit}
       >
         <div>
-          <h2 className="text-base font-black text-blue-950">Tim kiem question</h2>
+          <h2 className="text-base font-black text-blue-950">Tìm kiếm câu hỏi</h2>
           <p className="text-sm text-slate-600">
-            Loc danh sach theo trang thai, loai, chia se va tu khoa.
+            Lọc danh sách theo trạng thái, loại, chia sẻ và từ khóa.
           </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Tu khoa
+            Từ khóa
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
               onChange={(event) =>
@@ -335,7 +403,7 @@ function QuestionsPage({
                   keyword: event.target.value,
                 }))
               }
-              placeholder="Ma, noi dung, prompt..."
+              placeholder="Mã, nội dung, prompt..."
               value={draftFilters.keyword}
             />
           </label>
@@ -361,7 +429,7 @@ function QuestionsPage({
           </label>
 
           <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Loai cau hoi
+            Loại câu hỏi
             <select
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
               onChange={(event) =>
@@ -381,7 +449,7 @@ function QuestionsPage({
           </label>
 
           <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Chia se
+            Chia sẻ
             <select
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
               onChange={(event) =>
@@ -413,10 +481,38 @@ function QuestionsPage({
             className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
             type="submit"
           >
-            Tim kiem
+            Tìm kiếm
           </button>
         </div>
       </form>
+
+      {view === 'review' ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+          <div className="text-sm font-semibold text-indigo-900">
+            Đang chọn {bulkSelection.length} câu hỏi trên trang hiện tại để duyệt hàng loạt.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-indigo-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
+              disabled={!bulkSelection.length}
+              onClick={() => setBulkSelection([])}
+              type="button"
+            >
+              Bo chon
+            </button>
+            <button
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:bg-slate-300"
+              disabled={!bulkSelection.length || isBulkApproving}
+              onClick={() => {
+                void handleBulkApprove()
+              }}
+              type="button"
+            >
+              {isBulkApproving ? 'Dang approve...' : 'Bulk approve'}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <QuestionTable
         canEdit={(question) =>
@@ -439,12 +535,21 @@ function QuestionsPage({
             totalPages={questionsQuery.data?.totalPages ?? 0}
           />
         }
+        isBulkSelectable={view === 'review'}
         isError={questionsQuery.isError}
         isLoading={questionsQuery.isLoading}
         onEdit={(question) => {
           navigate(`${basePath}/questions/${question.id}/edit`, {
             state: { fromView: view },
           })
+        }}
+        onSelectAllQuestions={(checked) => {
+          if (!checked) {
+            setBulkSelection([])
+            return
+          }
+
+          setBulkSelection((questionsQuery.data?.content ?? []).map((question) => question.id))
         }}
         onRetry={() => {
           void questionsQuery.refetch()
@@ -454,7 +559,15 @@ function QuestionsPage({
             state: { fromView: view },
           })
         }}
+        onToggleQuestionSelection={(questionId, checked) => {
+          setBulkSelection((current) =>
+            checked
+              ? [...current, questionId].filter((value, index, array) => array.indexOf(value) === index)
+              : current.filter((id) => id !== questionId),
+          )
+        }}
         questions={questionsQuery.data?.content ?? []}
+        selectedIds={bulkSelection}
         selectedId={null}
       />
     </section>

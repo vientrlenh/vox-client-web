@@ -67,12 +67,12 @@ export function QuestionTopicFormDialog({
     const values = trimFormState(form)
 
     if (isCreateMode && !values.code) {
-      setValidationMessage('Ma chu de khong duoc de trong.')
+      setValidationMessage('Mã chủ đề không được để trống.')
       return
     }
 
     if (!values.name) {
-      setValidationMessage('Ten chu de khong duoc de trong.')
+      setValidationMessage('Tên chủ đề không được để trống.')
       return
     }
 
@@ -105,16 +105,16 @@ export function QuestionTopicFormDialog({
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
           <div>
             <h2 className="text-lg font-black text-blue-950">
-              {isCreateMode ? 'Tao chu de moi' : 'Chinh sua chu de'}
+              {isCreateMode ? 'Tạo chủ đề mới' : 'Chỉnh sửa chủ đề'}
             </h2>
             <p className="mt-1 text-sm font-medium text-slate-500">
               {isCreateMode
-                ? 'Nhap code, ten va mo ta cho chu de moi.'
-                : 'Chi cap nhat ten va mo ta khi topic dang o DRAFT.'}
+                ? 'Nhập mã, tên và mô tả cho chủ đề mới.'
+                : 'Chỉ cập nhật tên và mô tả khi chủ đề đang ở trạng thái DRAFT.'}
             </p>
           </div>
           <button
-            aria-label="Dong"
+            aria-label="Đóng"
             className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50"
             disabled={isSubmitting}
             onClick={onClose}
@@ -129,7 +129,7 @@ export function QuestionTopicFormDialog({
             <form className="grid gap-5" onSubmit={handleSubmit}>
               {isCreateMode ? (
                 <Field
-                  label="Ma chu de"
+                  label="Mã chủ đề"
                   onChange={(value) => {
                     setForm((current) => ({ ...current, code: value }))
                     setValidationMessage(null)
@@ -178,7 +178,7 @@ export function QuestionTopicFormDialog({
                   onClick={onClose}
                   type="button"
                 >
-                  Huy
+                  Hủy
                 </button>
                 <button
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-sm font-black text-white transition hover:opacity-90"
@@ -193,15 +193,15 @@ export function QuestionTopicFormDialog({
           ) : (
             <div className="grid gap-5">
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                Vui long xac nhan thong tin truoc khi luu.
+                Vui lòng xác nhận thông tin trước khi lưu.
               </div>
 
               <dl className="grid gap-3 rounded-lg border border-slate-200 px-4 py-4">
                 {isCreateMode ? (
-                  <ConfirmItem label="Ma chu de" value={form.code || '-'} />
+                  <ConfirmItem label="Mã chủ đề" value={form.code || '-'} />
                 ) : null}
-                <ConfirmItem label="Ten chu de" value={form.name || '-'} />
-                <ConfirmItem label="Mo ta" value={form.description || '-'} />
+                <ConfirmItem label="Tên chủ đề" value={form.name || '-'} />
+                <ConfirmItem label="Mô tả" value={form.description || '-'} />
               </dl>
 
               {errorMessage ? (
@@ -218,7 +218,7 @@ export function QuestionTopicFormDialog({
                   type="button"
                 >
                   <ChevronLeft className="size-4" />
-                  Quay lai
+                  Quay lại
                 </button>
                 <button
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-sm font-black text-white transition hover:opacity-90"
@@ -227,7 +227,7 @@ export function QuestionTopicFormDialog({
                   type="button"
                 >
                   <Check className="size-4" />
-                  {isSubmitting ? 'Dang xu ly...' : isCreateMode ? 'Xac nhan tao' : 'Xac nhan cap nhat'}
+                  {isSubmitting ? 'Dang xu ly...' : isCreateMode ? 'Xác nhận tạo' : 'Xác nhận cập nhật'}
                 </button>
               </div>
             </div>

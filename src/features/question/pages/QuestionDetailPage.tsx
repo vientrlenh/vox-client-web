@@ -1,5 +1,5 @@
 import { ArrowLeft, Pencil } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { useSchoolUsersBySchoolQuery } from '@/features/classes/api/useSchoolUsersBySchoolQuery'
@@ -68,6 +68,7 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
     teacherView,
     question,
     user?.userId,
+    user?.email,
   )
   const canEdit = canEditQuestion(question, primaryRole, teacherContext, user?.userId)
   const reviewActions = getQuestionReviewActions(
@@ -75,8 +76,14 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
     primaryRole,
     teacherContext,
     user?.userId,
+    user?.email,
   )
-  const canManageSharing = canManageQuestionSharing(question, primaryRole, user?.userId)
+  const canManageSharing = canManageQuestionSharing(
+    question,
+    primaryRole,
+    user?.userId,
+    user?.email,
+  )
 
   if (questionQuery.isLoading) {
     return (
@@ -113,11 +120,11 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
             type="button"
           >
             <ArrowLeft aria-hidden="true" className="size-4" />
-            Quay lai
+            Quay lại
           </button>
           <h1 className="text-3xl font-black text-blue-950">Chi tiet cau hoi</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
-            Xem thong tin, tai lieu dinh kem, huong dan cham va chia se.
+            Xem thông tin, tài liệu đính kèm, hướng dẫn chấm và chia sẻ.
           </p>
         </div>
 
@@ -152,10 +159,10 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-1">
           <div className="flex flex-wrap gap-2">
             {[
-              { id: 'content', label: 'Noi dung' },
-              { id: 'assets', label: 'Assets' },
-              { id: 'guide', label: 'Evaluation guide' },
-              { id: 'sharing', label: 'Chia se' },
+              { id: 'content', label: 'Nội dung' },
+              { id: 'assets', label: 'Tài liệu đính kèm' },
+              { id: 'guide', label: 'Hướng dẫn chấm' },
+              { id: 'sharing', label: 'Chia sẻ' },
             ].map((tab) => (
               <button
                 className={[
@@ -177,38 +184,38 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
         {activeTab === 'content' ? (
           <div className="grid gap-6">
             <div className="grid gap-4 md:grid-cols-2">
-              <DetailItem label="Loai cau hoi" value={getQuestionTypeDisplay(question.type)} />
-              <DetailItem label="Chia se" value={getQuestionSharingDisplay(question.sharing)} />
+              <DetailItem label="Loại câu hỏi" value={getQuestionTypeDisplay(question.type)} />
+              <DetailItem label="Chia sẻ" value={getQuestionSharingDisplay(question.sharing)} />
               <DetailItem
-                label="Bao mat"
+                label="Bảo mật"
                 value={getQuestionConfidentialityDisplay(question.confidentiality)}
               />
-              <DetailItem label="Chu de" value={formatNullableText(question.topic?.name)} />
+              <DetailItem label="Chủ đề" value={formatNullableText(question.topic?.name)} />
               <DetailItem
-                label="Ngan hang"
+                label="Ngân hàng"
                 value={formatNullableText(question.bank?.name)}
               />
-              <DetailItem label="Ngay tao" value={formatQuestionDate(question.createdAt)} />
-              <DetailItem label="Cap nhat" value={formatQuestionDate(question.updatedAt)} />
+              <DetailItem label="Ngày tạo" value={formatQuestionDate(question.createdAt)} />
+              <DetailItem label="Cập nhật" value={formatQuestionDate(question.updatedAt)} />
               <DetailItem label="Created by" value={formatNullableText(question.createdBy)} />
             </div>
 
-            <DetailBlock label="Noi dung cau hoi" value={question.questionText} />
+            <DetailBlock label="Nội dung câu hỏi" value={question.questionText} />
             <DetailBlock label="Instruction" value={question.instructionText} />
             <DetailBlock label="Prompt" value={question.promptText} />
             <DetailBlock label="Preparation" value={question.preparationText} />
 
             <div className="grid gap-4 md:grid-cols-3">
               <DetailItem
-                label="Thoi gian chuan bi"
+                label="Thời gian chuẩn bị"
                 value={formatDuration(question.preparationTimeSeconds)}
               />
               <DetailItem
-                label="Phan hoi toi thieu"
+                label="Phản hồi tối thiểu"
                 value={formatDuration(question.minResponseSeconds)}
               />
               <DetailItem
-                label="Phan hoi toi da"
+                label="Phản hồi tối đa"
                 value={formatDuration(question.maxResponseSeconds)}
               />
             </div>
@@ -232,18 +239,18 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
                   <div className="grid gap-4 md:grid-cols-2">
                     <DetailItem label="URL" value={formatNullableText(asset.url)} />
                     <DetailItem
-                      label="Thoi luong"
+                      label="Thời lượng"
                       value={formatDuration(asset.durationSeconds)}
                     />
                     <DetailItem label="Alt text" value={formatNullableText(asset.altText)} />
-                    <DetailItem label="Thu tu" value={String(asset.order)} />
+                    <DetailItem label="Thứ tự" value={String(asset.order)} />
                   </div>
-                  <DetailBlock label="Mo ta" value={asset.description} />
+                  <DetailBlock label="Mô tả" value={asset.description} />
                   <DetailBlock label="Transcript" value={asset.transcript} />
                 </div>
               ))
             ) : (
-              <EmptyState text="Chua co asset nao cho cau hoi nay." />
+              <EmptyState text="Chưa có tài nguyên nào cho câu hỏi này." />
             )}
           </div>
         ) : null}
@@ -274,7 +281,7 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
               />
             </div>
           ) : (
-            <EmptyState text="Chua co evaluation guide cho cau hoi nay." />
+            <EmptyState text="Chưa có evaluation guide cho câu hỏi này." />
           )
         ) : null}
 
@@ -345,6 +352,9 @@ function QuestionSharingPanel({
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sharing, setSharing] = useState(question.sharing)
+  const [collaboratorPermissions, setCollaboratorPermissions] = useState<
+    Record<string, QuestionCollaboratorPermission>
+  >({})
   const [teacherSearch, setTeacherSearch] = useState('')
   const [newUserId, setNewUserId] = useState('')
   const [newPermission, setNewPermission] = useState<QuestionCollaboratorPermission>('READ_ONLY')
@@ -354,6 +364,17 @@ function QuestionSharingPanel({
     schoolId: user?.schoolId ?? '',
     search: teacherSearch,
   })
+
+  useEffect(() => {
+    setCollaboratorPermissions(
+      Object.fromEntries(
+        (question.collaborators ?? []).map((collaborator) => [
+          collaborator.id,
+          collaborator.permission,
+        ]),
+      ),
+    )
+  }, [question.collaborators])
 
   return (
     <div className="grid gap-4">
@@ -379,6 +400,13 @@ function QuestionSharingPanel({
 
       {canManage ? (
         <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4">
+            <div>
+              <h3 className="text-base font-black text-slate-950">Quyền riêng tư và chia sẻ chung</h3>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                Cấu hình quyền truy cập chung cho question này.
+              </p>
+            </div>
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
             <label className="grid gap-2 text-sm font-bold text-slate-700">
               Quyền truy cập chung
@@ -418,7 +446,15 @@ function QuestionSharingPanel({
               </button>
             </div>
           </div>
+          </div>
 
+          <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4">
+            <div>
+              <h3 className="text-base font-black text-slate-950">Gán giáo viên cộng tác</h3>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                Tìm giáo viên, chọn quyền và thêm vào danh sách cộng tác viên.
+              </p>
+            </div>
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
             <label className="grid gap-2 text-sm font-bold text-slate-700">
               Tìm giáo viên
@@ -499,6 +535,7 @@ function QuestionSharingPanel({
               )
             })}
           </div>
+          </div>
         </div>
       ) : null}
 
@@ -523,14 +560,28 @@ function QuestionSharingPanel({
                     className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
                     onChange={(event) => {
                       void (async () => {
+                        const nextPermission =
+                          event.target.value as QuestionCollaboratorPermission
+                        const previousPermission =
+                          collaboratorPermissions[collaborator.id] ?? collaborator.permission
+
+                        setCollaboratorPermissions((current) => ({
+                          ...current,
+                          [collaborator.id]: nextPermission,
+                        }))
+
                         if (!(await confirm({ message: 'Bạn có chắc muốn cập nhật quyền cộng tác viên này không?' }))) {
+                          setCollaboratorPermissions((current) => ({
+                            ...current,
+                            [collaborator.id]: previousPermission,
+                          }))
                           return
                         }
                         try {
                           const result = await updateCollaboratorMutation.mutateAsync({
                             collaboratorId: collaborator.id,
                             payload: {
-                              permission: event.target.value as QuestionCollaboratorPermission,
+                              permission: nextPermission,
                             },
                             questionId: question.id,
                           })
@@ -538,11 +589,15 @@ function QuestionSharingPanel({
                           setError(null)
                           onRefresh()
                         } catch (submitError) {
+                          setCollaboratorPermissions((current) => ({
+                            ...current,
+                            [collaborator.id]: previousPermission,
+                          }))
                           setError(getErrorMessage(submitError))
                         }
                       })()
                     }}
-                    value={collaborator.permission}
+                    value={collaboratorPermissions[collaborator.id] ?? collaborator.permission}
                   >
                     <option value="READ_ONLY">Chỉ xem</option>
                     <option value="CAN_USE">Được sử dụng</option>
@@ -598,3 +653,4 @@ export function SchoolAdminQuestionDetailPage() {
 export function SystemAdminQuestionDetailPage() {
   return <QuestionDetailPage basePath="/system-admin" />
 }
+

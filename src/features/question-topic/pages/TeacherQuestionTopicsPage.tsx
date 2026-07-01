@@ -57,7 +57,7 @@ type QuestionTopicsPageProps = {
 function QuestionTopicsPage({
   basePath,
   scope,
-  title = 'Chu de cau hoi',
+  title = 'Chủ đề câu hỏi',
 }: QuestionTopicsPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -103,14 +103,14 @@ function QuestionTopicsPage({
       <section className="grid gap-6">
         <div className="flex min-h-80 flex-col items-center justify-center px-6 py-12 text-center">
           <p className="text-sm font-bold text-red-600">
-            Khong tim thay ngan hang cau hoi. Vui long chon mot ngan hang truoc.
+            Không tìm thấy ngân hàng câu hỏi. Vui lòng chọn một ngân hàng trước.
           </p>
           <button
             className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
             onClick={() => navigate(`${basePath}/question-banks`)}
             type="button"
           >
-            Quay lai danh sach ngan hang
+            Quay lại danh sách ngân hàng
           </button>
         </div>
       </section>
@@ -147,7 +147,7 @@ function QuestionTopicsPage({
       setPageMessage(message)
     } catch (error) {
       setDialogError(
-        getErrorMessage(error) ?? 'Khong the luu question topic. Vui long thu lai.',
+        getErrorMessage(error) ?? 'không thể lưu question topic. Vui lòng thử lại.',
       )
     }
   }
@@ -156,7 +156,7 @@ function QuestionTopicsPage({
     <section aria-labelledby="teacher-question-topics-title" className="grid gap-6">
       <QuestionTopicPageHeader
         bankName={bankName}
-        description="Danh sach chu de thuoc ngan hang cau hoi theo quyen cua ban."
+        description="Danh sách chủ đề thuộc ngân hàng câu hỏi theo quyền của bạn."
         isRefreshing={questionTopicsQuery.isFetching}
         onBack={() => navigate(`${basePath}/question-banks`)}
         onCreate={canManage ? () => setDialogMode('create') : undefined}
@@ -208,7 +208,7 @@ function QuestionTopicsPage({
                       } catch (error) {
                         setPageMessage(
                           getErrorMessage(error) ??
-                            'Khong the cap nhat trang thai question topic.',
+                            'không thể cập nhật trạng thái question topic.',
                         )
                       }
                     })()
@@ -225,7 +225,7 @@ function QuestionTopicsPage({
                       } catch (error) {
                         setPageMessage(
                           getErrorMessage(error) ??
-                            'Khong the cap nhat trang thai question topic.',
+                            'không thể cập nhật trạng thái question topic.',
                         )
                       }
                     })()
@@ -235,7 +235,7 @@ function QuestionTopicsPage({
                   ? [
                       {
                         id: `delete-${topic.id}`,
-                        label: 'Xoa',
+                        label: 'Xóa',
                         onSelect: () => {
                           void (async () => {
                             try {
@@ -245,7 +245,7 @@ function QuestionTopicsPage({
                             } catch (error) {
                               setPageMessage(
                                 getErrorMessage(error) ??
-                                  'Khong the xoa question topic.',
+                                  'không thể xóa question topic.',
                               )
                             }
                           })()

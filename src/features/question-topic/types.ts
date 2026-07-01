@@ -56,17 +56,17 @@ export function getQuestionTopicStatusDisplay(status?: string | null) {
     case 'PUBLISHED':
       return {
         className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        label: 'Da xuat ban',
+        label: 'Đã xuất bản',
       }
     case 'DRAFT':
       return {
         className: 'border-amber-200 bg-amber-50 text-amber-700',
-        label: 'Ban nhap',
+        label: 'Bản nháp',
       }
     case 'ARCHIVED':
       return {
         className: 'border-slate-200 bg-slate-50 text-slate-500',
-        label: 'Luu tru',
+        label: 'Lưu trữ',
       }
     default:
       return {

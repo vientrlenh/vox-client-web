@@ -111,6 +111,42 @@ const QUESTIONS_QUERY = `
   }
 `
 
+const QUESTIONS_FOR_EXAM_PAPER_QUERY = `
+  query QuestionsForExamPaper(
+    $questionBankId: ID
+    $questionTopicId: ID
+    $topicName: String
+    $status: QuestionStatus
+    $type: QuestionType
+    $sharing: QuestionSharing
+    $scope: QuestionScope
+    $keyword: String
+    $page: Int!
+    $size: Int!
+  ) {
+    questionsForExamPaper(
+      questionBankId: $questionBankId
+      questionTopicId: $questionTopicId
+      topicName: $topicName
+      status: $status
+      type: $type
+      sharing: $sharing
+      scope: $scope
+      keyword: $keyword
+      page: $page
+      size: $size
+    ) {
+      content {
+        ${QUESTION_FIELDS}
+      }
+      page
+      size
+      totalElements
+      totalPages
+    }
+  }
+`
+
 type QuestionsQueryData = {
   questions: QuestionPage
 }
@@ -194,6 +230,49 @@ export function useQuestionsQuery(
         size,
       }),
     queryKey: questionQueryKeys.questions(view, page, size, resolvedFilters),
+    select: (data) => ({
+      ...data,
+      page: data.page + 1,
+    }),
+  })
+}
+
+async function fetchQuestionsForExamPaper({
+  filters,
+  page,
+  size,
+}: FetchQuestionsInput) {
+  const data = await graphQLRequest<{ questionsForExamPaper: QuestionPage }>(
+    QUESTIONS_FOR_EXAM_PAPER_QUERY,
+    {
+      keyword: filters.keyword || undefined,
+      page,
+      questionBankId: filters.questionBankId || undefined,
+      questionTopicId: filters.questionTopicId || undefined,
+      scope: filters.scope || undefined,
+      sharing: filters.sharing || undefined,
+      size,
+      status: filters.status || undefined,
+      topicName: filters.topicName || undefined,
+      type: filters.type || undefined,
+    },
+  )
+  return data.questionsForExamPaper
+}
+
+export function useQuestionsForExamPaperQuery(
+  page: number,
+  size: number,
+  filters: QuestionQueryFilters,
+) {
+  return useQuery({
+    queryFn: () =>
+      fetchQuestionsForExamPaper({
+        filters,
+        page: page - 1,
+        size,
+      }),
+    queryKey: [...questionQueryKeys.all, 'exam-paper', page, size, filters],
     select: (data) => ({
       ...data,
       page: data.page + 1,

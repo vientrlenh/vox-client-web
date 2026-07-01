@@ -44,7 +44,7 @@ import {
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
 const DEFAULT_LANGUAGE_ID = '00000000-0000-0000-0000-000000000001'
-type ExamDetailTab = 'blueprint' | 'papers' | 'people'
+type ExamDetailTab = 'blueprint' | 'workflow' | 'papers' | 'people'
 
 function getErrorMessage(error: unknown) {
   if (
@@ -92,6 +92,23 @@ function getBlockingFixedSlots(version: ExamBlueprintVersionDto | null) {
         slot.fixedQuestion.status !== 'PUBLISHED',
     ),
   ) ?? []
+}
+
+function getExamActionLabel(action: UpdateExamStatusRequest['action']) {
+  switch (action) {
+    case 'SCHEDULE':
+      return 'Lên lịch thi'
+    case 'START':
+      return 'Bắt đầu thi'
+    case 'CLOSE':
+      return 'Đóng kỳ thi'
+    case 'PUBLISH_RESULTS':
+      return 'Công bố kết quả'
+    case 'CANCEL':
+      return 'Hủy kỳ thi'
+    default:
+      return action
+  }
 }
 
 type ExamListPageProps = {
@@ -343,10 +360,12 @@ function ExamDetailPage({
   const [memberUserId, setMemberUserId] = useState('')
   const [memberRole, setMemberRole] = useState<ExamMemberRole>('AUTHOR')
   const [memberSearch, setMemberSearch] = useState('')
+  const [memberPage, setMemberPage] = useState(1)
+  const [memberListPage, setMemberListPage] = useState(1)
   const [selectedBlueprintId, setSelectedBlueprintId] = useState('')
   const [selectedBlueprintVersionId, setSelectedBlueprintVersionId] = useState('')
   const { confirm, dialog } = useConfirmationDialog()
-  const schoolUsersQuery = useSchoolUsersBySchoolQuery(1, 8, {
+  const schoolUsersQuery = useSchoolUsersBySchoolQuery(memberPage, 8, {
     role: 'TEACHER',
     schoolId: user?.schoolId ?? '',
     search: memberSearch,
@@ -386,6 +405,8 @@ function ExamDetailPage({
   const publishedVersions = [...(blueprint?.versions ?? [])].filter((version) => version.status === 'PUBLISHED')
   const examStatusActions: UpdateExamStatusRequest['action'][] = ['SCHEDULE', 'START', 'CLOSE', 'PUBLISH_RESULTS', 'CANCEL']
   const paperStatusActions: UpdateExamPaperStatusRequest['action'][] = ['SUBMIT', 'APPROVE', 'REQUEST_REVISION', 'LOCK']
+  const pagedMembers = (exam.members ?? []).slice((memberListPage - 1) * 6, memberListPage * 6)
+  const totalMemberPages = Math.max(1, Math.ceil((exam.members?.length ?? 0) / 6))
 
   return (
     <section className="grid gap-6">
@@ -423,6 +444,7 @@ function ExamDetailPage({
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-1">
         <div className="flex flex-wrap gap-2">
           <ExamTabButton isActive={activeTab === 'blueprint'} label="Blueprint" onClick={() => setActiveTab('blueprint')} />
+          <ExamTabButton isActive={activeTab === 'workflow'} label="Workflow" onClick={() => setActiveTab('workflow')} />
           <ExamTabButton isActive={activeTab === 'papers'} label="Đề thi" onClick={() => setActiveTab('papers')} />
           <ExamTabButton isActive={activeTab === 'people'} label="Phân công" onClick={() => setActiveTab('people')} />
         </div>
@@ -724,9 +746,20 @@ function ExamDetailPage({
         </form>
       ) : null}
 
-      {activeTab === 'blueprint' && canShowExamWorkflow ? (
+      {activeTab === 'workflow' ? (
         <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-6">
           <h2 className="text-lg font-black text-slate-950">Workflow exam</h2>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <WorkflowReadinessItem isReady readyLabel="DRAFT" missingLabel="DRAFT" />
+            <WorkflowReadinessItem isReady={exam.status === 'SCHEDULED' || exam.status === 'IN_PROGRESS' || exam.status === 'CLOSED' || exam.status === 'RESULTS_PUBLISHED'} readyLabel="SCHEDULED" missingLabel="SCHEDULED" />
+            <WorkflowReadinessItem isReady={exam.status === 'IN_PROGRESS' || exam.status === 'CLOSED' || exam.status === 'RESULTS_PUBLISHED'} readyLabel="IN_PROGRESS" missingLabel="IN_PROGRESS" />
+            <WorkflowReadinessItem isReady={exam.status === 'CLOSED' || exam.status === 'RESULTS_PUBLISHED'} readyLabel="CLOSED" missingLabel="CLOSED" />
+            <WorkflowReadinessItem isReady={exam.status === 'RESULTS_PUBLISHED'} readyLabel="RESULTS_PUBLISHED" missingLabel={exam.status === 'CANCELLED' ? 'CANCELLED' : 'RESULTS_PUBLISHED'} />
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">
+            {'Flow chuan: DRAFT -> SCHEDULED -> IN_PROGRESS -> CLOSED -> RESULTS_PUBLISHED. Can popup xac nhan truoc khi chuyen trang thai.'}
+          </div>
+          {canShowExamWorkflow ? (
           <div className="flex flex-wrap gap-3">
             {examStatusActions.map((action) => (
               <button
@@ -735,6 +768,9 @@ function ExamDetailPage({
                 onClick={() => {
                   void (async () => {
                     try {
+                      if (!(await confirm({ message: `Báº¡n cÃ³ cháº¯c muá»‘n ${getExamActionLabel(action).toLowerCase()}?` }))) {
+                        return
+                      }
                       const result = await updateStatusMutation.mutateAsync({
                         examId: exam.id,
                         payload: { action },
@@ -749,10 +785,15 @@ function ExamDetailPage({
                 }}
                 type="button"
               >
-                {action}
+                {getExamActionLabel(action)}
               </button>
             ))}
           </div>
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+              Chá»‰ SCHOOL_ADMIN Ä‘Æ°á»£c Ä‘iá»u khiá»ƒn workflow exam táº­p trung.
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -788,7 +829,15 @@ function ExamDetailPage({
               }}
             >
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
-                <Field label="Tim giao vien" value={memberSearch} onChange={setMemberSearch} placeholder="Nhap ten hoac email" />
+                <Field
+                  label="Tim giao vien"
+                  value={memberSearch}
+                  onChange={(value) => {
+                    setMemberSearch(value)
+                    setMemberPage(1)
+                  }}
+                  placeholder="Nhap ten hoac email"
+                />
                 <SelectField
                   label="Role"
                   value={memberRole}
@@ -800,10 +849,13 @@ function ExamDetailPage({
                   ]}
                 />
                 <div className="self-end">
-                  <button className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white" type="submit">
+                  <button className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:bg-slate-300" disabled={!memberUserId} type="submit">
                     Them
                   </button>
                 </div>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                Chon giao vien o danh sach ben duoi, sau do chon role va bam Them. Exam can du AUTHOR, REVIEWER va CHAIR de workflow chay dung.
               </div>
               {memberUserId ? (
                 <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700">
@@ -827,11 +879,34 @@ function ExamDetailPage({
                   )
                 })}
               </div>
+              <div className="flex items-center justify-between text-sm font-semibold text-slate-600">
+                <span>
+                  {schoolUsersQuery.data?.totalElements ?? 0} giao vien, trang {schoolUsersQuery.data?.page ?? 1}/{schoolUsersQuery.data?.totalPages ?? 1}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
+                    disabled={memberPage <= 1}
+                    onClick={() => setMemberPage((current) => current - 1)}
+                    type="button"
+                  >
+                    Truoc
+                  </button>
+                  <button
+                    className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
+                    disabled={memberPage >= (schoolUsersQuery.data?.totalPages ?? 1)}
+                    onClick={() => setMemberPage((current) => current + 1)}
+                    type="button"
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
             </form>
           ) : null}
 
           <div className="grid gap-3">
-            {exam.members?.map((member) => (
+            {pagedMembers.map((member) => (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4" key={member.id}>
                 <div>
                   <p className="text-sm font-black text-slate-950">
@@ -843,17 +918,20 @@ function ExamDetailPage({
                 </div>
                 {canManageMembers ? (
                   <div className="flex gap-2">
-                    <button
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
-                      onClick={() => {
-                        const nextRole: ExamMemberRole =
-                          member.role === 'AUTHOR'
-                            ? 'REVIEWER'
-                            : member.role === 'REVIEWER'
-                              ? 'CHAIR'
-                              : 'AUTHOR'
+                    <select
+                      className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700 transition focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                      onChange={(event) => {
+                        const nextRole = event.target.value as ExamMemberRole
+
+                        if (nextRole === member.role) {
+                          return
+                        }
+
                         void (async () => {
                           try {
+                            if (!(await confirm({ message: `Ban co chac muon doi role thanh ${nextRole}?` }))) {
+                              return
+                            }
                             const result = await updateMemberMutation.mutateAsync({
                               examId: exam.id,
                               memberId: member.id,
@@ -867,15 +945,20 @@ function ExamDetailPage({
                           }
                         })()
                       }}
-                      type="button"
+                      value={member.role}
                     >
-                      Doi role
-                    </button>
+                      <option value="AUTHOR">Author</option>
+                      <option value="REVIEWER">Reviewer</option>
+                      <option value="CHAIR">Chair</option>
+                    </select>
                     <button
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-bold text-red-600"
+                      className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-bold text-red-600 transition hover:bg-red-50"
                       onClick={() => {
                         void (async () => {
                           try {
+                            if (!(await confirm({ message: 'Ban co chac muon go thanh vien nay khoi exam khong?' }))) {
+                              return
+                            }
                             const result = await deleteMemberMutation.mutateAsync({
                               examId: exam.id,
                               memberId: member.id,
@@ -896,6 +979,29 @@ function ExamDetailPage({
                 ) : null}
               </div>
             ))}
+          </div>
+          <div className="flex items-center justify-between text-sm font-semibold text-slate-600">
+            <span>
+              {exam.members?.length ?? 0} thÃ nh viÃªn, trang {memberListPage}/{totalMemberPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
+                disabled={memberListPage <= 1}
+                onClick={() => setMemberListPage((current) => current - 1)}
+                type="button"
+              >
+                Truoc
+              </button>
+              <button
+                className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
+                disabled={memberListPage >= totalMemberPages}
+                onClick={() => setMemberListPage((current) => current + 1)}
+                type="button"
+              >
+                Sau
+              </button>
+            </div>
           </div>
         </div>
         ) : null}
@@ -1145,6 +1251,8 @@ function PaperItemEditor({
       {canEdit ? (
         <QuestionPicker
           allowStatusChange={false}
+          basePath="/teacher"
+          canEditQuestion={() => true}
           fixedStatus="PUBLISHED"
           mode="single"
           onSelect={(question) => {

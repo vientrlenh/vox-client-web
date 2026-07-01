@@ -87,17 +87,17 @@ export function getQuestionBankStatusDisplay(status?: QuestionBankStatus | null)
     case 'DRAFT':
       return {
         className: 'border-amber-200 bg-amber-50 text-amber-700',
-        label: 'Ban nhap',
+        label: 'Bản nháp',
       }
     case 'PUBLISHED':
       return {
         className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        label: 'Da xuat ban',
+        label: 'Đã xuất bản',
       }
     case 'ARCHIVED':
       return {
         className: 'border-slate-200 bg-slate-50 text-slate-500',
-        label: 'Luu tru',
+        label: 'Lưu trữ',
       }
     default:
       return {
@@ -111,10 +111,10 @@ export function getActiveStatusDisplay(isActive: boolean) {
   return isActive
     ? {
         className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        label: 'Hoat dong',
+        label: 'Hoạt động',
       }
     : {
         className: 'border-slate-200 bg-slate-50 text-slate-500',
-        label: 'Ngung hoat dong',
+        label: 'Ngừng hoạt động',
       }
 }

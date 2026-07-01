@@ -146,9 +146,13 @@ function QuestionStatusBadge({ status }: { status?: QuestionStatus | null }) {
 }
 
 function SelectedQuestionsEditor({
+  allowEdit = false,
+  basePath,
   onChange,
   selectedQuestions,
 }: {
+  allowEdit?: boolean
+  basePath?: string
   onChange: (questions: QuestionDto[]) => void
   selectedQuestions: QuestionDto[]
 }) {
@@ -170,6 +174,22 @@ function SelectedQuestionsEditor({
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              {basePath ? (
+                <a
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                  href={`${basePath}/questions/${question.id}`}
+                >
+                  Xem detail
+                </a>
+              ) : null}
+              {basePath && allowEdit ? (
+                <a
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-indigo-200 px-3 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50"
+                  href={`${basePath}/questions/${question.id}/edit`}
+                >
+                  Sua
+                </a>
+              ) : null}
               <button
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 disabled:opacity-50"
                 disabled={index === 0}
@@ -213,7 +233,8 @@ function ClassPicker({
   value: string
 }) {
   const [search, setSearch] = useState('')
-  const classesQuery = useSchoolClassesQuery(0, 20, {
+  const [page, setPage] = useState(0)
+  const classesQuery = useSchoolClassesQuery(page, 10, {
     languageId: '',
     schoolGradeId: '',
     search,
@@ -222,19 +243,68 @@ function ClassPicker({
 
   return (
     <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-      <Field label="Tìm lớp học" onChange={setSearch} placeholder="Nhập mã lớp hoặc tên lớp" value={search} />
-      <div className="grid gap-3">
-        {classesQuery.data?.content.map((schoolClass) => (
+      <Field
+        label="Tìm lớp học"
+        onChange={(nextValue) => {
+          setSearch(nextValue)
+          setPage(0)
+        }}
+        placeholder="Nhập mã lớp hoặc tên lớp"
+        value={search}
+      />
+      <div className="overflow-hidden rounded-lg border border-slate-200">
+        <table className="min-w-full text-left">
+          <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
+            <tr>
+              <th className="px-4 py-3">Chọn</th>
+              <th className="px-4 py-3">Lớp học</th>
+              <th className="px-4 py-3">Mã lớp</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {classesQuery.data?.content.map((schoolClass) => (
+              <tr
+                className={value === schoolClass.id ? 'bg-indigo-50' : 'hover:bg-slate-50'}
+                key={schoolClass.id}
+              >
+                <td className="px-4 py-3">
+                  <button
+                    className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold transition ${value === schoolClass.id ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                    onClick={() => onChange(schoolClass.id)}
+                    type="button"
+                  >
+                    {value === schoolClass.id ? 'Đã chọn' : 'Chọn'}
+                  </button>
+                </td>
+                <td className="px-4 py-3 text-sm font-black text-slate-950">{schoolClass.name}</td>
+                <td className="px-4 py-3 text-sm font-semibold text-slate-500">{schoolClass.code}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center justify-between text-sm font-semibold text-slate-600">
+        <span>
+          {classesQuery.data?.totalElements ?? 0} lớp học, trang {(classesQuery.data?.page ?? 0) + 1}/{classesQuery.data?.totalPages ?? 1}
+        </span>
+        <div className="flex gap-2">
           <button
-            className={`grid gap-1 rounded-lg border px-4 py-3 text-left transition ${value === schoolClass.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}
-            key={schoolClass.id}
-            onClick={() => onChange(schoolClass.id)}
+            className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
+            disabled={page <= 0}
+            onClick={() => setPage((current) => current - 1)}
             type="button"
           >
-            <span className="text-sm font-black text-slate-950">{schoolClass.name}</span>
-            <span className="text-xs font-semibold text-slate-500">{schoolClass.code}</span>
+            Trước
           </button>
-        ))}
+          <button
+            className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
+            disabled={page >= ((classesQuery.data?.totalPages ?? 1) - 1)}
+            onClick={() => setPage((current) => current + 1)}
+            type="button"
+          >
+            Sau
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -278,7 +348,7 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
         <div>
           <h1 className="text-3xl font-black text-blue-950">{title}</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
-            Theo doi danh sach bai kiem tra tren lop va mo chi tiet de thao tac.
+            Theo dõi danh sách bài kiểm tra trên lớp và mở chi tiết để thao tác.
           </p>
         </div>
         <div className="flex gap-3">
@@ -609,13 +679,16 @@ export function TeacherClassTestCreatePage() {
           </div>
           <div className="grid gap-3">
             <h2 className="text-lg font-black text-slate-950">Câu hỏi đã chọn</h2>
-            <SelectedQuestionsEditor onChange={setSelectedQuestions} selectedQuestions={selectedQuestions} />
+            <SelectedQuestionsEditor allowEdit basePath="/teacher" onChange={setSelectedQuestions} selectedQuestions={selectedQuestions} />
           </div>
         </div>
         <div className="grid gap-3">
           <h2 className="text-lg font-black text-slate-950">Them cau hoi</h2>
           <QuestionPicker
             allowStatusChange={false}
+            basePath="/teacher"
+            canEditQuestion={() => true}
+            forExamPaper
             mode="multiple"
             onSelect={(question) =>
               setSelectedQuestions((current) =>
@@ -741,7 +814,7 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
         <h2 className="text-lg font-black text-slate-950">Danh sách câu hỏi hiện tại</h2>
-        <SelectedQuestionsEditor onChange={setSelectedQuestions} selectedQuestions={selectedQuestions} />
+        <SelectedQuestionsEditor allowEdit={canManage} basePath={canManage ? '/teacher' : '/school-admin'} onChange={setSelectedQuestions} selectedQuestions={selectedQuestions} />
       </div>
 
       {canManage ? (
@@ -814,6 +887,9 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
             <h2 className="text-lg font-black text-slate-950">Sua danh sach cau hoi</h2>
             <QuestionPicker
               allowStatusChange={false}
+              basePath="/teacher"
+              canEditQuestion={() => true}
+              forExamPaper
               mode="multiple"
               onSelect={(question) =>
                 setSelectedQuestions((current) =>

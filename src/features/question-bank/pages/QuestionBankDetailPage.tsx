@@ -17,7 +17,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Khong the tai chi tiet question bank.'
+  return 'không thể tải chi tiết question bank.'
 }
 
 function QuestionBankDetailPage({ basePath }: QuestionBankDetailPageProps) {
@@ -29,7 +29,7 @@ function QuestionBankDetailPage({ basePath }: QuestionBankDetailPageProps) {
   if (questionBankQuery.isLoading) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">
-        Dang tai chi tiet question bank...
+Đang tải chi tiết question bank...
       </section>
     )
   }
@@ -43,7 +43,7 @@ function QuestionBankDetailPage({ basePath }: QuestionBankDetailPageProps) {
           onClick={() => navigate(-1)}
           type="button"
         >
-          Quay lai
+          Quay lại
         </button>
       </section>
     )
@@ -61,11 +61,11 @@ function QuestionBankDetailPage({ basePath }: QuestionBankDetailPageProps) {
             type="button"
           >
             <ArrowLeft aria-hidden="true" className="size-4" />
-            Quay lai
+            Quay lại
           </button>
-          <h1 className="text-3xl font-black text-blue-950">Chi tiet question bank</h1>
+          <h1 className="text-3xl font-black text-blue-950">Chi tiết question bank</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
-            Xem thong tin tong quan, status va cac topic thuoc ngan hang.
+            Xem thông tin tổng quan, status và các topic thuộc ngân hàng.
           </p>
         </div>
 
@@ -94,18 +94,18 @@ function QuestionBankDetailPage({ basePath }: QuestionBankDetailPageProps) {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <DetailItem label="Ten question bank" value={formatNullableText(questionBank.name)} />
+          <DetailItem label="Tên question bank" value={formatNullableText(questionBank.name)} />
           <DetailItem label="Owner type" value={formatNullableText(questionBank.ownerType)} />
           <DetailItem label="Language ID" value={formatNullableText(questionBank.languageId)} />
           <DetailItem label="School ID" value={formatNullableText(questionBank.schoolId)} />
-          <DetailItem label="Ngay tao" value={formatQuestionBankDate(questionBank.createdAt)} />
-          <DetailItem label="Cap nhat" value={formatQuestionBankDate(questionBank.updatedAt)} />
+          <DetailItem label="Ngày tạo" value={formatQuestionBankDate(questionBank.createdAt)} />
+          <DetailItem label="Cập nhật" value={formatQuestionBankDate(questionBank.updatedAt)} />
           <DetailItem label="Created by" value={formatNullableText(questionBank.createdBy)} />
           <DetailItem label="Updated by" value={formatNullableText(questionBank.updatedBy)} />
         </div>
 
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Mo ta</p>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Mô tả</p>
           <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-medium leading-6 text-slate-800">
             {formatNullableText(questionBank.description)}
           </div>

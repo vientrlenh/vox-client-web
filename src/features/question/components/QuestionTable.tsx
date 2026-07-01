@@ -16,12 +16,16 @@ type QuestionTableProps = {
   canEdit?: (question: QuestionDto) => boolean
   errorMessage?: string
   footer?: ReactNode
+  isBulkSelectable?: boolean
   isError: boolean
   isLoading: boolean
   onEdit?: (question: QuestionDto) => void
+  onSelectAllQuestions?: (checked: boolean) => void
+  onToggleQuestionSelection?: (questionId: string, checked: boolean) => void
   onRetry: () => void
   onSelect: (id: string) => void
   questions: QuestionDto[]
+  selectedIds?: string[]
   selectedId: string | null
 }
 
@@ -44,23 +48,30 @@ export function QuestionTable({
   canEdit,
   errorMessage,
   footer,
+  isBulkSelectable = false,
   isError,
   isLoading,
   onEdit,
+  onSelectAllQuestions,
+  onToggleQuestionSelection,
   onRetry,
   onSelect,
   questions,
+  selectedIds = [],
   selectedId,
 }: QuestionTableProps) {
+  const allSelected =
+    isBulkSelectable && questions.length > 0 && questions.every((question) => selectedIds.includes(question.id))
+
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-6 py-5">
-        <h2 className="text-lg font-black text-blue-950">Danh sach cau hoi</h2>
+        <h2 className="text-lg font-black text-blue-950">Danh sách câu hỏi</h2>
       </div>
 
       {isLoading ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-          Dang tai danh sach cau hoi...
+          Đang tải danh sách câu hỏi...
         </div>
       ) : null}
 
@@ -74,14 +85,14 @@ export function QuestionTable({
             onClick={onRetry}
             type="button"
           >
-            Thu lai
+            Thử lại
           </button>
         </div>
       ) : null}
 
       {!isLoading && !isError && questions.length === 0 ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-          Chua co cau hoi nao
+                Chưa có câu hỏi nào
         </div>
       ) : null}
 
@@ -90,20 +101,31 @@ export function QuestionTable({
           <table className="w-full min-w-280 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
-                <th className="px-6 py-4">Cau hoi</th>
-                <th className="px-4 py-4">Ma</th>
-                <th className="px-4 py-4">Loai</th>
-                <th className="px-4 py-4">Chia se</th>
-                <th className="px-4 py-4">Bao mat</th>
-                <th className="px-4 py-4">Thoi luong</th>
-                <th className="px-4 py-4">Trang thai</th>
-                <th className="px-4 py-4">Cap nhat</th>
-                <th className="px-4 py-4 text-center">Hanh dong</th>
+                {isBulkSelectable ? (
+                  <th className="w-14 px-4 py-4 text-center">
+                    <input
+                      checked={allSelected}
+                      className="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      onChange={(event) => onSelectAllQuestions?.(event.target.checked)}
+                      type="checkbox"
+                    />
+                  </th>
+                ) : null}
+                <th className="px-6 py-4">âu hỏi</th>
+                <th className="px-4 py-4">Mã</th>
+                <th className="px-4 py-4">Loại</th>
+                <th className="px-4 py-4">Chia sẻ</th>
+                <th className="px-4 py-4">ảo mật</th>
+                <th className="px-4 py-4">Thời lượng</th>
+                <th className="px-4 py-4">Trạng thái</th>
+                <th className="px-4 py-4">Cập nhật</th>
+                <th className="px-4 py-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody>
               {questions.map((question) => {
                 const isSelected = question.id === selectedId
+                const isChecked = selectedIds.includes(question.id)
 
                 return (
                   <tr
@@ -113,6 +135,18 @@ export function QuestionTable({
                     ].join(' ')}
                     key={question.id}
                   >
+                    {isBulkSelectable ? (
+                      <td className="px-4 py-5 text-center">
+                        <input
+                          checked={isChecked}
+                          className="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          onChange={(event) =>
+                            onToggleQuestionSelection?.(question.id, event.target.checked)
+                          }
+                          type="checkbox"
+                        />
+                      </td>
+                    ) : null}
                     <td className="max-w-90 px-6 py-5">
                       <div className="grid gap-1">
                         <span className="font-bold">
@@ -152,12 +186,12 @@ export function QuestionTable({
                     <td className="px-4 py-4">
                       <div className="flex justify-center">
                         <ActionMenuButton
-                          ariaLabel="Mo hanh dong cho cau hoi"
+                          ariaLabel="Mở hành động cho câu hỏi"
                           items={[
                             {
                               icon: Eye,
                               id: 'view',
-                              label: 'Xem chi tiet',
+                              label: 'Xem chi tiết',
                               onSelect: () => onSelect(question.id),
                               tone: 'primary',
                             },
@@ -166,7 +200,7 @@ export function QuestionTable({
                                   {
                                     icon: Pencil,
                                     id: 'edit',
-                                    label: 'Chinh sua',
+                                    label: 'Chỉnh sửa',
                                     onSelect: () => onEdit(question),
                                     tone:
                                       canEdit?.(question) ?? true

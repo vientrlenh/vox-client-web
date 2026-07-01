@@ -57,13 +57,13 @@ export function QuestionBankTable({
     <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-6 py-5">
         <h2 className="text-lg font-black text-blue-950">
-          Danh sach ngan hang cau hoi
+          Danh sách ngân hàng câu hỏi
         </h2>
       </div>
 
       {isLoading ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-          Dang tai danh sach ngan hang cau hoi...
+          Đang tải danh sách ngân hàng câu hỏi...
         </div>
       ) : null}
 
@@ -93,12 +93,12 @@ export function QuestionBankTable({
           <table className="w-full min-w-200 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
-                <th className="px-6 py-4">Ten ngan hang</th>
-                <th className="px-4 py-4">Mo ta</th>
-                <th className="px-4 py-4">Ma</th>
-                <th className="px-4 py-4">Trang thai</th>
-                <th className="px-4 py-4">Ngay tao</th>
-                <th className="px-4 py-4 text-center">Hanh dong</th>
+                <th className="px-6 py-4">Tên ngân hàng</th>
+                <th className="px-4 py-4">Mô tả</th>
+                <th className="px-4 py-4">Mã</th>
+                <th className="px-4 py-4">Trạng thái</th>
+                <th className="px-4 py-4">Ngày tạo</th>
+                <th className="px-4 py-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody>
@@ -131,19 +131,19 @@ export function QuestionBankTable({
                     <td className="px-4 py-4">
                       <div className="flex justify-center">
                         <ActionMenuButton
-                          ariaLabel={`Mo hanh dong cho ${formatNullableText(bank.name)}`}
+                          ariaLabel={`Mở hành động cho ${formatNullableText(bank.name)}`}
                           items={[
                             {
                               icon: Eye,
                               id: 'view',
-                              label: 'Xem chi tiet',
+                              label: 'Xem chi tiết',
                               onSelect: () => onSelect(bank.id),
                               tone: 'primary',
                             },
                             {
                               icon: FolderOpen,
                               id: 'topics',
-                              label: 'Xem chu de',
+                              label: 'Xem chủ đề',
                               onSelect: () => onViewTopics(bank),
                               tone: 'default',
                             },
@@ -152,7 +152,7 @@ export function QuestionBankTable({
                                   {
                                     icon: Pencil,
                                     id: 'edit',
-                                    label: 'Chinh sua',
+                                    label: 'Chỉnh sửa',
                                     onSelect: () => onEdit(bank),
                                     tone: 'default' as const,
                                   },

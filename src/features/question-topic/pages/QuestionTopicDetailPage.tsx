@@ -59,7 +59,7 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
           onClick={() => navigate(-1)}
           type="button"
         >
-          Quay lai
+          Quay lại
         </button>
       </section>
     )
@@ -83,11 +83,11 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
             type="button"
           >
             <ArrowLeft aria-hidden="true" className="size-4" />
-            Quay lai
+            Quay lại
           </button>
-          <h1 className="text-3xl font-black text-blue-950">Chi tiet question topic</h1>
+          <h1 className="text-3xl font-black text-blue-950">Chi tiết question topic</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
-            Xem thong tin topic va cap nhat workflow theo quyen hien tai.
+Xem thông tin và cập nhật workflow theo quyền hiện tại.
           </p>
         </div>
 
@@ -101,7 +101,7 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
           type="button"
         >
           <HelpCircle aria-hidden="true" className="size-4" />
-          Xem cau hoi
+          Xem câu hỏi
         </button>
       </div>
 
@@ -116,7 +116,7 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <DetailItem label="Ten topic" value={formatNullableText(topic.name)} />
+          <DetailItem label="Tên topic" value={formatNullableText(topic.name)} />
           <DetailItem
             label="Question bank"
             value={formatNullableText(bankName || topic.bank?.name || topic.questionBankId)}
@@ -126,7 +126,7 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
         </div>
 
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Mo ta</p>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Mô tả</p>
           <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-medium leading-6 text-slate-800">
             {formatNullableText(topic.description)}
           </div>
@@ -138,7 +138,7 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
           <div>
             <h2 className="text-lg font-black text-slate-950">Workflow</h2>
             <p className="mt-1 text-sm font-medium text-slate-600">
-              Cac thao tac status hop le cho topic hien tai.
+              Các thao tác status hợp lệ cho topic hiện tại.
             </p>
           </div>
 
@@ -156,7 +156,7 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
                   } catch (error) {
                     setPageMessage(
                       getErrorMessage(error) ??
-                        'Khong the cap nhat trang thai question topic.',
+                        'không thể cập nhật trạng thái question topic.',
                     )
                   }
                 })()
@@ -173,7 +173,7 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
                   } catch (error) {
                     setPageMessage(
                       getErrorMessage(error) ??
-                        'Khong the cap nhat trang thai question topic.',
+                        'không thể cập nhật trạng thái question topic.',
                     )
                   }
                 })()

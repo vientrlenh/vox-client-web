@@ -56,7 +56,7 @@ type QuestionBanksPageProps = {
 function QuestionBanksPage({
   basePath,
   scope,
-  title = 'Ngan hang cau hoi',
+  title = 'Ngân hàng câu hỏi',
 }: QuestionBanksPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -139,13 +139,13 @@ function QuestionBanksPage({
       setPageMessage(message)
     } catch (error) {
       setDialogError(
-        getErrorMessage(error) ?? 'Khong the luu question bank. Vui long thu lai.',
+        getErrorMessage(error) ?? 'không thể cập nhật question bank.',
       )
     }
   }
 
   async function handleDeleteBank(bank: QuestionBankDto) {
-    if (!window.confirm(`Xoa question bank "${bank.name}"?`)) {
+    if (!window.confirm(`Xóa question bank "${bank.name}"?`)) {
       return
     }
 
@@ -154,18 +154,18 @@ function QuestionBanksPage({
       await refreshBanks()
       setPageMessage(
         result.archivedInstead
-          ? `${result.message}. Backend da archive thay vi xoa.`
+          ? `${result.message}. Backend đã archive thay vì xóa.`
           : result.message,
       )
     } catch (error) {
-      setPageMessage(getErrorMessage(error) ?? 'Khong the xoa question bank.')
+      setPageMessage(getErrorMessage(error) ?? 'không thể xóa question bank.')
     }
   }
 
   return (
     <section aria-labelledby="teacher-question-banks-title" className="grid gap-6">
       <QuestionBankPageHeader
-        description="Danh sach ngan hang cau hoi duoc phep xem theo quyen cua ban."
+        description="Danh sách ngân hàng câu hỏi được phép xem theo quyền của bạn."
         isRefreshing={questionBanksQuery.isFetching}
         onCreate={canManage ? () => setDialogMode('create') : undefined}
         onRefresh={() => {
@@ -218,7 +218,7 @@ function QuestionBanksPage({
                       } catch (error) {
                         setPageMessage(
                           getErrorMessage(error) ??
-                            'Khong the cap nhat trang thai question bank.',
+                            'không thể cập nhật trạng thái question bank.',
                         )
                       }
                     })()
@@ -227,7 +227,7 @@ function QuestionBanksPage({
                 })),
                 {
                   id: `delete-${bank.id}`,
-                  label: 'Xoa',
+                  label: 'Xóa',
                   onSelect: () => {
                     void handleDeleteBank(bank)
                   },
