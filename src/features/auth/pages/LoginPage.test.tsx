@@ -10,7 +10,6 @@ import { LoginPage } from './LoginPage'
 jest.mock('@/shared/api', () => ({
   AUTH_TOKEN_STORAGE_KEYS: {
     accessToken: 'vox.accessToken',
-    refreshToken: 'vox.refreshToken',
   },
   apiClient: {
     post: jest.fn(),
@@ -105,9 +104,6 @@ describe('LoginPage', () => {
     expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBe(
       responseData.accessToken,
     )
-    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)).toBe(
-      responseData.refreshToken,
-    )
   })
 
   it('stores tokens and authenticates a SCHOOL_ADMIN login', async () => {
@@ -141,9 +137,6 @@ describe('LoginPage', () => {
     )
     expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBe(
       responseData.accessToken,
-    )
-    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)).toBe(
-      responseData.refreshToken,
     )
   })
 
@@ -182,7 +175,6 @@ describe('LoginPage', () => {
       /vai trò hiện chưa được hỗ trợ/i,
     )
     expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBeNull()
-    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)).toBeNull()
   })
 
   it('shows the API error message when credentials are rejected', async () => {

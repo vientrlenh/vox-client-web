@@ -19,7 +19,7 @@ import {
   type SchoolClassFormMode,
 } from '../components/SchoolClassFormDialog'
 import { SchoolGradePickerDialog } from '../components/SchoolGradePickerDialog'
-import type { SchoolGrade } from '../components/SchoolGradePickerDialog'
+import type { SelectedGrade } from '../components/SchoolGradePickerDialog'
 import {
   useCreateSchoolClassMutation,
   useDeleteSchoolClassMutation,
@@ -378,7 +378,7 @@ export function SchoolAdminClassesPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isGradePickerOpen, setIsGradePickerOpen] = useState(false)
   const [selectedFilterGrade, setSelectedFilterGrade] =
-    useState<SchoolGrade | null>(null)
+    useState<SelectedGrade | null>(null)
 
   const classesQuery = useSchoolClassesQuery(page, pageSize, filters)
   const languagesQuery = useSupportedLanguagesQuery(
@@ -401,7 +401,7 @@ export function SchoolAdminClassesPage() {
     setPage(DEFAULT_PAGE)
   }
 
-  function handleSelectFilterGrade(grade: SchoolGrade) {
+  function handleSelectFilterGrade(grade: SelectedGrade) {
     setSelectedFilterGrade(grade)
     handleFilterChange('schoolGradeId', grade.id)
     setIsGradePickerOpen(false)

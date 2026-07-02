@@ -56,7 +56,6 @@ function saveSession() {
       userId: 'admin-1',
     }),
   )
-  localStorage.setItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken, 'refresh-token')
 }
 
 describe('school user GraphQL API', () => {

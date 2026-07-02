@@ -7,7 +7,7 @@ import { formatGradeDateOnly, getGradeStatusDisplay } from '@/features/grades/ty
 
 export type { SchoolGrade }
 
-type SelectedGrade = {
+export type SelectedGrade = {
   code: string
   id: string
   name: string
