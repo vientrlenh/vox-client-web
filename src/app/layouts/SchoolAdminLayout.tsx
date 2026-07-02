@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   FileQuestion,
   FileSpreadsheet,
+  GraduationCap,
   Home,
   Layers,
   LogOut,
@@ -14,7 +15,7 @@ import {
   Search,
   ShieldCheck,
   UserRound,
-  Users,
+  Presentation,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -62,9 +63,14 @@ const navigationItems = [
     to: '/school-admin/imports',
   },
   {
-    icon: Users,
-    label: 'Quản lý Người dùng',
+    icon: GraduationCap,
+    label: 'Quản lý Học sinh',
     to: '/school-admin/students',
+  },
+  {
+    icon: Presentation,
+    label: 'Quản lý Giáo viên',
+    to: '/school-admin/teachers',
   },
 ]
 

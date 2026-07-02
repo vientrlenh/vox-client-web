@@ -21,21 +21,25 @@ type SchoolUserFormState = {
   startDate: string
 }
 
-const emptyUserForm: SchoolUserFormState = {
-  address: '',
-  dateOfBirth: '',
-  email: '',
-  endDate: '',
-  fullName: '',
-  phone: '',
-  roleCode: 'STUDENT',
-  startDate: '',
+function createEmptyForm(roleCode: SchoolUserRole): SchoolUserFormState {
+  return {
+    address: '',
+    dateOfBirth: '',
+    email: '',
+    endDate: '',
+    fullName: '',
+    phone: '',
+    roleCode,
+    startDate: '',
+  }
 }
 
 type SchoolUserFormDialogProps = {
   errorMessage?: string
   isOpen: boolean
   isSubmitting: boolean
+  /** When set, the role is fixed to this value and the role selector is hidden. */
+  lockedRole?: SchoolUserRole
   mode: SchoolUserFormMode
   onClose: () => void
   onCreate: (payload: CreateSchoolUserRequest) => void
@@ -56,10 +60,11 @@ type FieldInputProps = {
 
 function toEditForm(schoolUser: SchoolUser): SchoolUserFormState {
   const profile = schoolUser.user
-  const roleCode =
-    profile?.schoolRoles?.[0]?.code?.toUpperCase() === 'TEACHER'
-      ? 'TEACHER'
-      : 'STUDENT'
+  const roleCode = profile?.roles?.some(
+    (role) => role.code?.toUpperCase() === 'TEACHER',
+  )
+    ? 'TEACHER'
+    : 'STUDENT'
 
   return {
     address: profile?.address ?? '',
@@ -104,6 +109,7 @@ export function SchoolUserFormDialog({
   errorMessage,
   isOpen,
   isSubmitting,
+  lockedRole,
   mode,
   onClose,
   onCreate,
@@ -119,6 +125,7 @@ export function SchoolUserFormDialog({
       errorMessage={errorMessage}
       isSubmitting={isSubmitting}
       key={`${mode}-${schoolUser?.userId ?? 'new'}`}
+      lockedRole={lockedRole}
       mode={mode}
       onClose={onClose}
       onCreate={onCreate}
@@ -131,6 +138,7 @@ export function SchoolUserFormDialog({
 function SchoolUserFormDialogContent({
   errorMessage,
   isSubmitting,
+  lockedRole,
   mode,
   onClose,
   onCreate,
@@ -139,7 +147,9 @@ function SchoolUserFormDialogContent({
 }: Omit<SchoolUserFormDialogProps, 'isOpen'>) {
   const isEdit = mode === 'edit'
   const [form, setForm] = useState<SchoolUserFormState>(
-    isEdit && schoolUser ? toEditForm(schoolUser) : emptyUserForm,
+    isEdit && schoolUser
+      ? toEditForm(schoolUser)
+      : createEmptyForm(lockedRole ?? 'STUDENT'),
   )
   const [validationError, setValidationError] = useState<string | null>(null)
 
@@ -301,7 +311,7 @@ function SchoolUserFormDialogContent({
             value={form.dateOfBirth}
           />
 
-          {isEdit ? null : (
+          {isEdit || lockedRole ? null : (
             <label className="grid gap-2 text-sm font-bold text-slate-700">
               Vai trò
               <select

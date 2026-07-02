@@ -131,9 +131,15 @@ const SchoolAdminGradeImportPage = lazy(() =>
   })),
 )
 
-const SchoolAdminSchoolUsersPage = lazy(() =>
+const SchoolAdminStudentsPage = lazy(() =>
   import("@/features/school-users").then((module) => ({
-    default: module.SchoolAdminSchoolUsersPage,
+    default: module.SchoolAdminStudentsPage,
+  })),
+);
+
+const SchoolAdminTeachersPage = lazy(() =>
+  import("@/features/school-users").then((module) => ({
+    default: module.SchoolAdminTeachersPage,
   })),
 );
 
@@ -455,7 +461,7 @@ export function AppRoutes() {
             />
             <Route
               path="school-admin/students"
-              element={<SchoolAdminSchoolUsersPage />}
+              element={<SchoolAdminStudentsPage />}
             />
             <Route
               path="school-admin/students/import"
@@ -463,6 +469,14 @@ export function AppRoutes() {
             />
             <Route
               path="school-admin/students/:userId"
+              element={<SchoolAdminSchoolUserDetailPage />}
+            />
+            <Route
+              path="school-admin/teachers"
+              element={<SchoolAdminTeachersPage />}
+            />
+            <Route
+              path="school-admin/teachers/:userId"
               element={<SchoolAdminSchoolUserDetailPage />}
             />
             <Route

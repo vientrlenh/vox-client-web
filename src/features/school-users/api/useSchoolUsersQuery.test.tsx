@@ -2,7 +2,7 @@ import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import type { PageResult, SchoolUser } from '../types'
 import { fetchSchoolUser } from './useSchoolUserQuery'
-import { fetchSchoolUsers } from './useSchoolUsersQuery'
+import { fetchSchoolUsersByRole } from './useSchoolUsersQuery'
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
 
@@ -22,7 +22,7 @@ const mockSchoolUser: SchoolUser = {
     gender: 'MALE',
     id: 'user-1',
     phone: '0901234567',
-    schoolRoles: [{ code: 'STUDENT', id: 'role-1', name: 'Học sinh' }],
+    roles: [{ code: 'STUDENT', id: 'role-1', name: 'Học sinh' }],
   },
   userId: 'user-1',
 }
@@ -65,18 +65,18 @@ describe('school user GraphQL API', () => {
     saveSession()
   })
 
-  it('fetches school users with search/role/status and the current schoolId', async () => {
+  it('fetches school students with search/status and the current schoolId', async () => {
     mockedPost.mockResolvedValue({
       data: {
         data: {
-          schoolUsersBySchool: mockPage,
+          schoolStudentsBySchool: mockPage,
         },
       },
     })
 
     await expect(
-      fetchSchoolUsers({
-        filters: { role: 'STUDENT', search: 'nguyen', status: 'ACTIVE' },
+      fetchSchoolUsersByRole('schoolStudentsBySchool', {
+        filters: { search: 'nguyen', status: 'ACTIVE' },
         page: 1,
         size: 10,
       }),
@@ -87,10 +87,9 @@ describe('school user GraphQL API', () => {
       variables: Record<string, unknown>
     }
 
-    expect(requestBody.query).toContain('schoolUsersBySchool')
+    expect(requestBody.query).toContain('schoolStudentsBySchool')
     expect(requestBody.variables).toEqual({
       page: 1,
-      role: 'STUDENT',
       schoolId,
       search: 'nguyen',
       size: 10,
@@ -100,11 +99,11 @@ describe('school user GraphQL API', () => {
 
   it('sends nulls for empty filters', async () => {
     mockedPost.mockResolvedValue({
-      data: { data: { schoolUsersBySchool: mockPage } },
+      data: { data: { schoolTeachersBySchool: mockPage } },
     })
 
-    await fetchSchoolUsers({
-      filters: { role: '', search: '   ', status: '' },
+    await fetchSchoolUsersByRole('schoolTeachersBySchool', {
+      filters: { search: '   ', status: '' },
       page: 2,
       size: 20,
     })
@@ -115,7 +114,6 @@ describe('school user GraphQL API', () => {
 
     expect(requestBody.variables).toEqual({
       page: 2,
-      role: null,
       schoolId,
       search: null,
       size: 20,

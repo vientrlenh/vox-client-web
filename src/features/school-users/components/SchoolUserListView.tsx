@@ -1,34 +1,30 @@
+import type { ComponentType } from 'react'
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import type { UseQueryResult } from '@tanstack/react-query'
 import { Edit, Plus, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
-import { RoleBadges } from '../components/SchoolUserBadges'
-import {
-  SchoolUserFormDialog,
-  type SchoolUserFormMode,
-} from '../components/SchoolUserFormDialog'
 import {
   useCreateSchoolUserMutation,
   useDeleteSchoolUserMutation,
   useUpdateSchoolUserMutation,
 } from '../api/useSchoolUserMutations'
-import {
-  schoolUserManagementQueryKeys,
-  useSchoolUsersQuery,
-} from '../api/useSchoolUsersQuery'
+import { schoolUserManagementQueryKeys } from '../api/useSchoolUsersQuery'
+import { SchoolUserFormDialog, type SchoolUserFormMode } from './SchoolUserFormDialog'
 import type {
   CreateSchoolUserRequest,
+  PageResult,
   SchoolUser,
   SchoolUserFilters,
+  SchoolUserRole,
   UpdateSchoolUserInput,
 } from '../types'
-import { formatNullableText } from '../types'
+import { formatNullableText, formatUserDate } from '../types'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
 const EMPTY_FILTERS: SchoolUserFilters = {
-  role: '',
   search: '',
   status: '',
 }
@@ -209,7 +205,7 @@ function UserTable({
             <tr>
               <th className="px-4 py-3">Người dùng</th>
               <th className="px-4 py-3">Số điện thoại</th>
-              <th className="px-4 py-3">Vai trò</th>
+              <th className="px-4 py-3">Ngày bắt đầu</th>
               <th className="px-4 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -232,8 +228,8 @@ function UserTable({
                   <td className="px-4 py-4 text-sm font-semibold text-slate-600">
                     {formatNullableText(schoolUser.user?.phone)}
                   </td>
-                  <td className="px-4 py-4">
-                    <RoleBadges roles={schoolUser.user?.schoolRoles} />
+                  <td className="px-4 py-4 text-sm font-semibold text-slate-600">
+                    {formatUserDate(schoolUser.startDate)}
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex justify-end">
@@ -332,7 +328,33 @@ function Pagination({
   )
 }
 
-export function SchoolAdminSchoolUsersPage() {
+export type SchoolUserListViewProps = {
+  basePath: string
+  createLabel: string
+  eyebrow: string
+  icon: ComponentType<{ 'aria-hidden'?: boolean; className?: string }>
+  importPath?: string
+  lockedRole: SchoolUserRole
+  subtitle: string
+  title: string
+  useListQuery: (
+    page: number,
+    size: number,
+    filters: SchoolUserFilters,
+  ) => UseQueryResult<PageResult<SchoolUser>>
+}
+
+export function SchoolUserListView({
+  basePath,
+  createLabel,
+  eyebrow,
+  icon: Icon,
+  importPath,
+  lockedRole,
+  subtitle,
+  title,
+  useListQuery,
+}: SchoolUserListViewProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(DEFAULT_PAGE)
@@ -351,7 +373,7 @@ export function SchoolAdminSchoolUsersPage() {
     status: showDisabled ? 'DISABLED' : filters.status,
   }
 
-  const usersQuery = useSchoolUsersQuery(page, pageSize, effectiveFilters)
+  const usersQuery = useListQuery(page, pageSize, effectiveFilters)
   const schoolUsers = usersQuery.data?.content ?? []
   const createMutation = useCreateSchoolUserMutation()
   const updateMutation = useUpdateSchoolUserMutation()
@@ -410,8 +432,7 @@ export function SchoolAdminSchoolUsersPage() {
       setDialogTarget(null)
     } catch (error) {
       setDialogError(
-        getErrorMessage(error) ??
-          'Không thể lưu người dùng. Vui lòng thử lại.',
+        getErrorMessage(error) ?? 'Không thể lưu người dùng. Vui lòng thử lại.',
       )
     }
   }
@@ -427,8 +448,7 @@ export function SchoolAdminSchoolUsersPage() {
       setDialogTarget(null)
     } catch (error) {
       setDialogError(
-        getErrorMessage(error) ??
-          'Không thể lưu người dùng. Vui lòng thử lại.',
+        getErrorMessage(error) ?? 'Không thể lưu người dùng. Vui lòng thử lại.',
       )
     }
   }
@@ -466,34 +486,38 @@ export function SchoolAdminSchoolUsersPage() {
       : 'border-red-200 bg-red-50 text-red-700'
 
   return (
-    <section
-      aria-labelledby="school-admin-users-title"
-      className="grid gap-6"
-    >
+    <section aria-labelledby="school-admin-users-title" className="grid gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-black uppercase text-cyan-700">
-            Quản lý người dùng
-          </p>
-          <h1
-            className="mt-2 text-3xl font-black tracking-0 text-slate-950"
-            id="school-admin-users-title"
-          >
-            Người dùng trong nhà trường
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-            Tạo, cập nhật, lọc và quản lý học sinh, giáo viên trong trường.
-          </p>
+        <div className="flex items-start gap-4">
+          <span className="mt-1 inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-cyan-50 text-cyan-700">
+            <Icon aria-hidden={true} className="size-6" />
+          </span>
+          <div>
+            <p className="text-sm font-black uppercase text-cyan-700">
+              {eyebrow}
+            </p>
+            <h1
+              className="mt-1 text-3xl font-black tracking-0 text-slate-950"
+              id="school-admin-users-title"
+            >
+              {title}
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
+              {subtitle}
+            </p>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
-            onClick={() => navigate('/school-admin/students/import')}
-            type="button"
-          >
-            <Upload aria-hidden="true" className="size-4" />
-            Import người dùng
-          </button>
+        <div className="flex flex-wrap gap-3">
+          {importPath ? (
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
+              onClick={() => navigate(importPath)}
+              type="button"
+            >
+              <Upload aria-hidden="true" className="size-4" />
+              Import người dùng
+            </button>
+          ) : null}
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
             disabled={usersQuery.isFetching}
@@ -511,7 +535,7 @@ export function SchoolAdminSchoolUsersPage() {
             type="button"
           >
             <Plus aria-hidden="true" className="size-4" />
-            Tạo người dùng
+            {createLabel}
           </button>
         </div>
       </div>
@@ -525,7 +549,7 @@ export function SchoolAdminSchoolUsersPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[minmax(180px,1fr)_180px_180px]">
+      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[minmax(180px,1fr)_180px]">
         <label className="grid gap-2 text-sm font-bold text-slate-700">
           Tìm kiếm
           <span className="relative">
@@ -545,25 +569,11 @@ export function SchoolAdminSchoolUsersPage() {
           </span>
         </label>
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Vai trò
-          <select
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            onChange={(event) => handleFilterChange('role', event.target.value)}
-            value={filters.role}
-          >
-            <option value="">Tất cả vai trò</option>
-            <option value="STUDENT">Học sinh</option>
-            <option value="TEACHER">Giáo viên</option>
-          </select>
-        </label>
-        <label className="grid gap-2 text-sm font-bold text-slate-700">
           Trạng thái
           <select
             className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 disabled:bg-slate-100 disabled:text-slate-500"
             disabled={showDisabled}
-            onChange={(event) =>
-              handleFilterChange('status', event.target.value)
-            }
+            onChange={(event) => handleFilterChange('status', event.target.value)}
             value={filters.status}
           >
             <option value="">Tất cả</option>
@@ -597,9 +607,7 @@ export function SchoolAdminSchoolUsersPage() {
           onRetry={() => {
             void usersQuery.refetch()
           }}
-          onView={(schoolUser) =>
-            navigate(`/school-admin/students/${schoolUser.userId}`)
-          }
+          onView={(schoolUser) => navigate(`${basePath}/${schoolUser.userId}`)}
           schoolUsers={schoolUsers}
         />
         <Pagination
@@ -617,6 +625,7 @@ export function SchoolAdminSchoolUsersPage() {
         errorMessage={dialogError ?? undefined}
         isOpen={Boolean(dialogMode)}
         isSubmitting={isSaving}
+        lockedRole={lockedRole}
         mode={dialogMode ?? 'create'}
         onClose={closeDialog}
         onCreate={(payload) => {

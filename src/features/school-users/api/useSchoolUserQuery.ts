@@ -20,7 +20,7 @@ const SCHOOL_USER_QUERY = `
         dateOfBirth
         address
         avatarUrl
-        schoolRoles { id code name }
+        roles { id code name }
       }
     }
   }
