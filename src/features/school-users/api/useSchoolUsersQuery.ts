@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest, requireSchoolId } from '@/shared/api'
 import type { PageResult, SchoolUser, SchoolUserFilters } from '../types'
 
-const SCHOOL_USER_FIELDS = `
+/** Shared selection set for SchoolUser rows (list + detail). */
+export const SCHOOL_USER_FIELDS = `
   id
   schoolId
   userId
@@ -17,89 +17,98 @@ const SCHOOL_USER_FIELDS = `
     dateOfBirth
     address
     avatarUrl
-    schoolRoles { id code name }
+    roles { id code name }
   }
 `
 
-const SCHOOL_USERS_QUERY = `
-  query SchoolUsers(
-    $schoolId: ID!
-    $page: Int!
-    $size: Int!
-    $search: String
-    $role: String
-    $status: String
-  ) {
-    schoolUsersBySchool(
-      schoolId: $schoolId
-      page: $page
-      size: $size
-      search: $search
-      role: $role
-      status: $status
-    ) {
-      content {
-        ${SCHOOL_USER_FIELDS}
-      }
-      page
-      size
-      totalElements
-      totalPages
-    }
-  }
-`
-
-type SchoolUsersQueryData = {
-  schoolUsersBySchool: PageResult<SchoolUser>
+export const schoolUserManagementQueryKeys = {
+  all: ['school-user-management'] as const,
+  classesByUser: (userId: string | null, page: number, size: number) =>
+    [
+      ...schoolUserManagementQueryKeys.all,
+      'classes-by-user',
+      userId,
+      page,
+      size,
+    ] as const,
+  detail: (userId: string | null) =>
+    [...schoolUserManagementQueryKeys.all, 'detail', userId] as const,
+  students: (page: number, size: number, filters: SchoolUserFilters) =>
+    [
+      ...schoolUserManagementQueryKeys.all,
+      'students',
+      page,
+      size,
+      filters.search,
+      filters.status,
+    ] as const,
+  teachers: (page: number, size: number, filters: SchoolUserFilters) =>
+    [
+      ...schoolUserManagementQueryKeys.all,
+      'teachers',
+      page,
+      size,
+      filters.search,
+      filters.status,
+    ] as const,
 }
 
-type FetchSchoolUsersInput = {
+export type SchoolUsersByRoleField =
+  | 'schoolStudentsBySchool'
+  | 'schoolTeachersBySchool'
+
+type FetchSchoolUsersByRoleInput = {
   filters: SchoolUserFilters
   page: number
   size: number
 }
 
-export const schoolUserManagementQueryKeys = {
-  all: ['school-user-management'] as const,
-  detail: (userId: string | null) =>
-    [...schoolUserManagementQueryKeys.all, 'detail', userId] as const,
-  list: (page: number, size: number, filters: SchoolUserFilters) =>
-    [
-      ...schoolUserManagementQueryKeys.all,
-      'list',
-      page,
-      size,
-      filters.search,
-      filters.role,
-      filters.status,
-    ] as const,
-}
-
-export async function fetchSchoolUsers({
-  filters,
-  page,
-  size,
-}: FetchSchoolUsersInput) {
-  const schoolId = requireSchoolId()
-  const data = await graphQLRequest<SchoolUsersQueryData>(SCHOOL_USERS_QUERY, {
-    page,
-    role: filters.role || null,
-    schoolId,
-    search: filters.search.trim() || null,
-    size,
-    status: filters.status || null,
-  })
-
-  return data.schoolUsersBySchool
-}
-
-export function useSchoolUsersQuery(
-  page: number,
-  size: number,
-  filters: SchoolUserFilters,
+/**
+ * Fetches school users for a role-specific query. `schoolStudentsBySchool` and
+ * `schoolTeachersBySchool` share the same variables and response shape, differing
+ * only by the root field name.
+ */
+export async function fetchSchoolUsersByRole(
+  field: SchoolUsersByRoleField,
+  { filters, page, size }: FetchSchoolUsersByRoleInput,
 ) {
-  return useQuery({
-    queryFn: () => fetchSchoolUsers({ filters, page, size }),
-    queryKey: schoolUserManagementQueryKeys.list(page, size, filters),
-  })
+  const schoolId = requireSchoolId()
+  const query = `
+    query SchoolUsersByRole(
+      $schoolId: ID!
+      $page: Int!
+      $size: Int!
+      $search: String
+      $status: String
+    ) {
+      ${field}(
+        schoolId: $schoolId
+        page: $page
+        size: $size
+        search: $search
+        status: $status
+      ) {
+        content {
+          ${SCHOOL_USER_FIELDS}
+        }
+        page
+        size
+        totalElements
+        totalPages
+      }
+    }
+  `
+
+  const data = await graphQLRequest<Record<string, PageResult<SchoolUser>>>(
+    query,
+    {
+      page,
+      schoolId,
+      search: filters.search.trim() || null,
+      size,
+      status: filters.status || null,
+    },
+  )
+
+  return data[field]
 }

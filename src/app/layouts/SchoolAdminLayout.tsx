@@ -4,15 +4,22 @@ import {
   BookOpen,
   ChevronDown,
   FileSpreadsheet,
+  GraduationCap,
   Home,
   Layers,
   LogOut,
   Menu,
+<<<<<<< Updated upstream
   MonitorPlay,
   Search,
   ShieldCheck,
   UserRound,
   Users,
+=======
+  Presentation,
+  Search,
+  ShieldCheck,
+>>>>>>> Stashed changes
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
@@ -49,9 +56,14 @@ const navigationItems = [
     to: '/school-admin/imports',
   },
   {
-    icon: Users,
-    label: 'Quản lý Người dùng',
+    icon: GraduationCap,
+    label: 'Quản lý Học sinh',
     to: '/school-admin/students',
+  },
+  {
+    icon: Presentation,
+    label: 'Quản lý Giáo viên',
+    to: '/school-admin/teachers',
   },
 ]
 

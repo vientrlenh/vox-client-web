@@ -25,7 +25,7 @@ export type SchoolUserProfile = {
   gender?: string | null
   id?: string
   phone: string | null
-  schoolRoles: Role[] | null
+  roles: Role[] | null
 }
 
 export type SchoolUser = {
@@ -38,7 +38,6 @@ export type SchoolUser = {
 }
 
 export type SchoolUserFilters = {
-  role: '' | SchoolUserRole
   search: string
   status: '' | SchoolUserStatus
 }
