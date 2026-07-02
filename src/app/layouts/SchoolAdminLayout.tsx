@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Bell,
   BookOpen,
@@ -139,12 +139,12 @@ function SchoolAdminNavigationGroup({
   const location = useLocation()
   const isGroupActive = items.some(({ to }) => location.pathname.startsWith(to))
   const [isOpen, setIsOpen] = useState(isGroupActive)
+  const [prevIsGroupActive, setPrevIsGroupActive] = useState(isGroupActive)
 
-  useEffect(() => {
-    if (isGroupActive) {
-      setIsOpen(true)
-    }
-  }, [isGroupActive])
+  if (isGroupActive !== prevIsGroupActive) {
+    setPrevIsGroupActive(isGroupActive)
+    setIsOpen(isGroupActive)
+  }
 
   return (
     <div className="grid gap-2">
