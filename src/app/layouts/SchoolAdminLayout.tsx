@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Bell,
   BookOpen,
   ChevronDown,
+  ClipboardCheck,
+  FileQuestion,
   FileSpreadsheet,
   Home,
   Layers,
@@ -15,12 +17,23 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { NavLink, Outlet, useNavigate } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import logoImage from '@/assets/images/logo.png'
 import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
 import { useProfileQuery } from '@/features/profile'
+import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
+
+type NavigationGroup = {
+  icon: typeof Home
+  label: string
+  items: Array<{
+    badgeCount?: number
+    label: string
+    to: string
+  }>
+}
 
 const navigationItems = [
   {
@@ -55,6 +68,45 @@ const navigationItems = [
   },
 ]
 
+const navigationGroups: NavigationGroup[] = [
+  {
+    icon: FileQuestion,
+    label: 'Câu hỏi',
+    items: [
+      {
+        label: 'Ngân hàng câu hỏi',
+        to: '/school-admin/question-banks',
+      },
+      {
+        label: 'Câu hỏi trong trường',
+        to: '/school-admin/questions/all',
+      },
+      {
+        label: 'Duyệt câu hỏi',
+        to: '/school-admin/questions/review',
+      },
+    ],
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Kỳ thi',
+    items: [
+      {
+        label: 'Kiểm tra tập trung',
+        to: '/school-admin/exams',
+      },
+      {
+        label: 'Bài kiểm tra trên lớp',
+        to: '/school-admin/class-tests',
+      },
+      {
+        label: 'Blueprint đề thi',
+        to: '/school-admin/blueprints',
+      },
+    ],
+  },
+]
+
 function getEmailInitials(email?: string) {
   if (!email) {
     return 'SA'
@@ -78,11 +130,82 @@ type SchoolAdminSidebarProps = {
   showCloseButton?: boolean
 }
 
+function SchoolAdminNavigationGroup({
+  icon: Icon,
+  items,
+  label,
+  onNavigate,
+}: NavigationGroup & { onNavigate?: () => void }) {
+  const location = useLocation()
+  const isGroupActive = items.some(({ to }) => location.pathname.startsWith(to))
+  const [isOpen, setIsOpen] = useState(isGroupActive)
+
+  useEffect(() => {
+    if (isGroupActive) {
+      setIsOpen(true)
+    }
+  }, [isGroupActive])
+
+  return (
+    <div className="grid gap-2">
+      <button
+        aria-expanded={isOpen}
+        className={[
+          'flex min-h-12 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-bold transition',
+          isGroupActive ? 'bg-white/10 text-white' : 'text-cyan-50/90',
+        ].join(' ')}
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <Icon aria-hidden="true" className="size-5 shrink-0" />
+        <span className="flex-1">{label}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className={[
+            'size-4 shrink-0 transition-transform',
+            isOpen ? 'rotate-180' : '',
+          ].join(' ')}
+        />
+      </button>
+
+      {isOpen ? (
+        <div className="ml-4 grid gap-2 border-l border-white/10 pl-4">
+          {items.map(({ badgeCount, label: itemLabel, to }) => (
+            <NavLink
+              className={({ isActive }) =>
+                [
+                  'flex min-h-11 items-center rounded-lg px-4 py-2.5 text-sm font-bold transition',
+                  isActive
+                    ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20'
+                    : 'text-cyan-50/90 hover:bg-white/10 hover:text-white',
+                ].join(' ')
+              }
+              key={to}
+              onClick={onNavigate}
+              to={to}
+            >
+              <span className="flex flex-1 items-center justify-between gap-3">
+                <span>{itemLabel}</span>
+                {badgeCount && badgeCount > 0 ? (
+                  <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-black text-white">
+                    {badgeCount}
+                  </span>
+                ) : null}
+              </span>
+            </NavLink>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function SchoolAdminSidebar({
+  groups,
   onClose,
   onNavigate,
   showCloseButton = false,
-}: SchoolAdminSidebarProps) {
+}: SchoolAdminSidebarProps & { groups: NavigationGroup[] }) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-cyan-950 via-blue-900 to-indigo-900 px-6 py-7 text-white">
       <div className="flex items-center justify-between">
@@ -115,28 +238,38 @@ function SchoolAdminSidebar({
         Quản trị nhà trường
       </p>
 
-      <nav aria-label="School admin" className="mt-6 grid gap-2">
-        {navigationItems.map(({ icon: Icon, label, to }) => (
-          <NavLink
-            className={({ isActive }) =>
-              [
-                'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
-                isActive
-                  ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20'
-                  : 'text-cyan-50/90 hover:bg-white/10 hover:text-white',
-              ].join(' ')
-            }
-            key={`${label}-${to}`}
-            onClick={onNavigate}
-            to={to}
-          >
-            <Icon aria-hidden="true" className="size-5 shrink-0" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-      </nav>
+      <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-color:rgba(255,255,255,0.28)_transparent] scrollbar-thin">
+        <nav aria-label="School admin" className="grid gap-2 pb-4">
+          {navigationItems.map(({ icon: Icon, label, to }) => (
+            <NavLink
+              className={({ isActive }) =>
+                [
+                  'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
+                  isActive
+                    ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20'
+                    : 'text-cyan-50/90 hover:bg-white/10 hover:text-white',
+                ].join(' ')
+              }
+              key={`${label}-${to}`}
+              onClick={onNavigate}
+              to={to}
+            >
+              <Icon aria-hidden="true" className="size-5 shrink-0" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
 
-      <div className="mt-auto rounded-lg border border-white/15 bg-white/10 p-5 text-white backdrop-blur">
+          {groups.map((group) => (
+            <SchoolAdminNavigationGroup
+              {...group}
+              key={group.label}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </nav>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-white/15 bg-white/10 p-5 text-white backdrop-blur">
         <div className="inline-flex size-11 items-center justify-center rounded-lg bg-white text-cyan-700">
           <ShieldCheck aria-hidden="true" className="size-6" />
         </div>
@@ -158,6 +291,28 @@ export function SchoolAdminLayout() {
   const adminEmail = user?.email ?? 'unknown'
   const adminInitials = getEmailInitials(adminEmail)
   const { data: profile } = useProfileQuery()
+  const reviewQuestionsQuery = useQuestionsQuery('school', 'review', 1, 1, {
+    keyword: '',
+    questionBankId: '',
+    questionTopicId: '',
+    scope: '',
+    sharing: '',
+    status: 'SUBMITTED_FOR_REVIEW',
+    topicName: '',
+    type: '',
+  })
+  const schoolAdminNavigationGroups = navigationGroups.map((group) =>
+    group.label === 'Câu hỏi'
+      ? {
+          ...group,
+          items: group.items.map((item) =>
+            item.to === '/school-admin/questions/review'
+              ? { ...item, badgeCount: reviewQuestionsQuery.data?.totalElements ?? 0 }
+              : item,
+          ),
+        }
+      : group,
+  )
 
   function handleLogout() {
     setIsMobileMenuOpen(false)
@@ -170,7 +325,7 @@ export function SchoolAdminLayout() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950 lg:pl-70">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-70 lg:block">
-        <SchoolAdminSidebar />
+        <SchoolAdminSidebar groups={schoolAdminNavigationGroups} />
       </aside>
 
       {isMobileMenuOpen ? (
@@ -188,6 +343,7 @@ export function SchoolAdminLayout() {
             role="dialog"
           >
             <SchoolAdminSidebar
+              groups={schoolAdminNavigationGroups}
               onClose={() => setIsMobileMenuOpen(false)}
               onNavigate={() => setIsMobileMenuOpen(false)}
               showCloseButton
