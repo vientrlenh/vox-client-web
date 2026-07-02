@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
-import { apiClient } from '@/shared/api'
-import type { ApiResponse, SendResetPasswordOtpRequest } from '../types'
+import { type ApiResponse, apiClient } from '@/shared/api'
+import type { SendResetPasswordOtpRequest } from '../types'
 
 export async function sendResetPasswordOtp(
   payload: SendResetPasswordOtpRequest,

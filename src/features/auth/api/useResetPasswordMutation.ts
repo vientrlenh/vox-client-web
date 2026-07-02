@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
-import { apiClient } from '@/shared/api'
-import type { ApiResponse, ResetPasswordRequest } from '../types'
+import { type ApiResponse, apiClient } from '@/shared/api'
+import type { ResetPasswordRequest } from '../types'
 
 export async function resetPassword(payload: ResetPasswordRequest) {
   const response = await apiClient.patch<ApiResponse<null>>(

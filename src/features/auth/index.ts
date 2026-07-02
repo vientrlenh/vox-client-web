@@ -2,7 +2,6 @@ export { LoginPage } from './pages/LoginPage'
 export { ResetPasswordPage } from './pages/ResetPasswordPage'
 export { SetupPasswordPage } from './pages/SetupPasswordPage'
 export type {
-  ApiResponse,
   AuthUser,
   LoginRequest,
   LoginResponse,

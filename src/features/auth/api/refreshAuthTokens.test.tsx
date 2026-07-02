@@ -1,6 +1,6 @@
 import type { AxiosResponse } from 'axios'
-import { apiClient } from '@/shared/api'
-import type { ApiResponse, RefreshResponse } from '../types'
+import { type ApiResponse, apiClient } from '@/shared/api'
+import type { RefreshResponse } from '../types'
 import { refreshAuthTokens } from './refreshAuthTokens'
 
 jest.mock('@/shared/api', () => ({
