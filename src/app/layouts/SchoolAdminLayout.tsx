@@ -9,17 +9,11 @@ import {
   Layers,
   LogOut,
   Menu,
-<<<<<<< Updated upstream
   MonitorPlay,
   Search,
   ShieldCheck,
   UserRound,
-  Users,
-=======
   Presentation,
-  Search,
-  ShieldCheck,
->>>>>>> Stashed changes
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
