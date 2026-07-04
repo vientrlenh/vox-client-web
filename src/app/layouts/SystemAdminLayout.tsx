@@ -3,7 +3,6 @@ import {
   Bell,
   Building2,
   ChevronDown,
-  ClipboardCheck,
   ClipboardList,
   FileQuestion,
   Home,
@@ -96,20 +95,6 @@ const navigationGroups: NavigationGroup[] = [
       {
         label: 'Duyệt câu hỏi',
         to: '/system-admin/questions/review',
-      },
-    ],
-  },
-  {
-    icon: ClipboardCheck,
-    label: 'Kỳ thi',
-    items: [
-      {
-        label: 'Giám sát kỳ thi',
-        to: '/system-admin/exams',
-      },
-      {
-        label: 'Giám sát blueprint',
-        to: '/system-admin/blueprints',
       },
     ],
   },

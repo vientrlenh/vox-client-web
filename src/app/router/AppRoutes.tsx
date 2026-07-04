@@ -287,72 +287,6 @@ const SystemAdminQuestionImportPage = lazy(() =>
   import("@/features/question").then((m) => ({ default: m.SystemAdminQuestionImportPage })),
 );
 
-// exam: blueprints
-const TeacherBlueprintsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherBlueprintsPage })),
-);
-const TeacherBlueprintDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherBlueprintDetailPage })),
-);
-const SchoolAdminBlueprintsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminBlueprintsPage })),
-);
-const SchoolAdminBlueprintDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminBlueprintDetailPage })),
-);
-const SystemAdminBlueprintsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SystemAdminBlueprintsPage })),
-);
-const SystemAdminBlueprintDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SystemAdminBlueprintDetailPage })),
-);
-
-// exam: exams
-const TeacherExamsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherExamsPage })),
-);
-const TeacherExamDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherExamDetailPage })),
-);
-const TeacherExamPapersPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherExamPapersPage })),
-);
-const TeacherExamPaperDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherExamPaperDetailPage })),
-);
-const TeacherExamPaperEditPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherExamPaperEditPage })),
-);
-const SchoolAdminExamsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminExamsPage })),
-);
-const SchoolAdminExamDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminExamDetailPage })),
-);
-const SystemAdminExamsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SystemAdminExamsPage })),
-);
-const SystemAdminExamDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SystemAdminExamDetailPage })),
-);
-
-// exam: class tests
-const TeacherClassTestsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherClassTestsPage })),
-);
-const TeacherClassTestCreatePage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherClassTestCreatePage })),
-);
-const TeacherClassTestDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherClassTestDetailPage })),
-);
-const SchoolAdminClassTestsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminClassTestsPage })),
-);
-const SchoolAdminClassTestDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminClassTestDetailPage })),
-);
-
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -407,10 +341,6 @@ export function AppRoutes() {
             <Route path="system-admin/questions/create" element={<SystemAdminCreateQuestionPage />} />
             <Route path="system-admin/questions/:questionId/edit" element={<SystemAdminEditQuestionPage />} />
             <Route path="system-admin/questions/:questionId" element={<SystemAdminQuestionDetailPage />} />
-            <Route path="system-admin/blueprints" element={<SystemAdminBlueprintsPage />} />
-            <Route path="system-admin/blueprints/:blueprintId" element={<SystemAdminBlueprintDetailPage />} />
-            <Route path="system-admin/exams" element={<SystemAdminExamsPage />} />
-            <Route path="system-admin/exams/:examId" element={<SystemAdminExamDetailPage />} />
           </Route>
         </Route>
         <Route element={<RequireRole role="SCHOOL_ADMIN" />}>
@@ -500,12 +430,6 @@ export function AppRoutes() {
             <Route path="school-admin/questions/create" element={<SchoolAdminCreateQuestionPage />} />
             <Route path="school-admin/questions/:questionId/edit" element={<SchoolAdminEditQuestionPage />} />
             <Route path="school-admin/questions/:questionId" element={<SchoolAdminQuestionDetailPage />} />
-            <Route path="school-admin/blueprints" element={<SchoolAdminBlueprintsPage />} />
-            <Route path="school-admin/blueprints/:blueprintId" element={<SchoolAdminBlueprintDetailPage />} />
-            <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
-            <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
-            <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
-            <Route path="school-admin/class-tests/:examId" element={<SchoolAdminClassTestDetailPage />} />
           </Route>
         </Route>
         <Route element={<RequireRole role="TEACHER" />}>
@@ -533,16 +457,6 @@ export function AppRoutes() {
             <Route path="teacher/questions/create" element={<TeacherCreateQuestionPage />} />
             <Route path="teacher/questions/:questionId/edit" element={<TeacherEditQuestionPage />} />
             <Route path="teacher/questions/:questionId" element={<TeacherQuestionDetailPage />} />
-            <Route path="teacher/blueprints" element={<TeacherBlueprintsPage />} />
-            <Route path="teacher/blueprints/:blueprintId" element={<TeacherBlueprintDetailPage />} />
-            <Route path="teacher/exams" element={<TeacherExamsPage />} />
-            <Route path="teacher/exams/:examId/papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
-            <Route path="teacher/exams/:examId/papers/:paperId" element={<TeacherExamPaperDetailPage />} />
-            <Route path="teacher/exams/:examId/papers" element={<TeacherExamPapersPage />} />
-            <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
-            <Route path="teacher/class-tests/create" element={<TeacherClassTestCreatePage />} />
-            <Route path="teacher/class-tests/:examId" element={<TeacherClassTestDetailPage />} />
-            <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

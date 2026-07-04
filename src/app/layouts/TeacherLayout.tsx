@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   Bell,
   ChevronDown,
-  ClipboardCheck,
   FileQuestion,
   LogOut,
   Menu,
@@ -54,28 +53,6 @@ const navigationGroups: NavigationGroup[] = [
       {
         label: 'Ngân hàng và chủ đề',
         to: '/teacher/question-banks',
-      },
-    ],
-  },
-  {
-    icon: ClipboardCheck,
-    label: 'Kỳ thi',
-    items: [
-      {
-        label: 'Kiểm tra tập trung',
-        to: '/teacher/exams',
-      },
-      {
-        label: 'Blueprint đề thi',
-        to: '/teacher/blueprints',
-      },
-      {
-        label: 'Tạo bài trên lớp',
-        to: '/teacher/class-tests/create',
-      },
-      {
-        label: 'Bài trên lớp của tôi',
-        to: '/teacher/class-tests',
       },
     ],
   },
