@@ -11,6 +11,7 @@ type BlueprintAttachPanelProps = {
   canManage: boolean
   examId: string
   onOpenBlueprint: (blueprintId: string) => void
+  optional?: boolean
 }
 
 export function BlueprintAttachPanel({
@@ -19,6 +20,7 @@ export function BlueprintAttachPanel({
   canManage,
   examId,
   onOpenBlueprint,
+  optional = false,
 }: BlueprintAttachPanelProps) {
   const queryClient = useQueryClient()
   const [keyword, setKeyword] = useState('')
@@ -40,6 +42,11 @@ export function BlueprintAttachPanel({
     return (
       <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5.5">
         <h3 className="text-[15px] font-extrabold text-slate-900">Chọn blueprint để gắn vào kỳ thi</h3>
+        {optional ? (
+          <p className="mt-1 text-[13px] text-slate-500">
+            Không bắt buộc — bạn có thể bỏ qua bước này và thêm câu hỏi trực tiếp ở tab Đề bài.
+          </p>
+        ) : null}
         <input
           className="mt-3 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
           onChange={(event) => setKeyword(event.target.value)}

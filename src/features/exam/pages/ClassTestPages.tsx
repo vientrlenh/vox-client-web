@@ -70,21 +70,23 @@ const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
 
 function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; steps: WorkflowStep[] } {
   const hasBlueprint = Boolean(exam.blueprintVersionId)
+  const hasQuestions = exam.papers.some((paper) => paper.sections.some((section) => section.items.length > 0))
   const totalPapers = exam.papers.length
   const readyPapers = exam.papers.filter((paper) => paper.status === 'LOCKED' || paper.status === 'APPROVED').length
-  const papersReady = hasBlueprint ? totalPapers > 0 && readyPapers === totalPapers : totalPapers > 0 && readyPapers === totalPapers
+  const papersReady = totalPapers > 0 && readyPapers === totalPapers
   const isPublished = exam.status === 'RESULTS_PUBLISHED' || exam.status === 'CLOSED'
 
-  const step1Done = hasBlueprint || totalPapers > 0
+  // Blueprint is optional for bài trên lớp: soạn đề trực tiếp bằng câu hỏi cũng coi là hoàn tất bước này.
+  const step1Done = hasBlueprint || hasQuestions
   const step2Done = papersReady
   const step3Done = isPublished
 
   const steps: WorkflowStep[] = [
     {
       icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
-      label: 'Gắn blueprint',
+      label: 'Soạn đề bài',
       state: step1Done ? 'done' : 'current',
-      sublabel: step1Done ? 'Hoàn tất' : 'Chưa gắn blueprint',
+      sublabel: hasBlueprint ? 'Đã gắn blueprint' : step1Done ? 'Đã thêm câu hỏi trực tiếp' : 'Chưa gắn blueprint hoặc thêm câu hỏi',
     },
     {
       icon: step2Done ? <Check size={26} /> : <FilePenLine size={24} />,
@@ -162,11 +164,13 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
           classTestsQuery.data?.content.map((exam) => {
             const statusDisplay = getClassTestStatusDisplay(exam.status)
             const { steps } = getClassTestWorkflowSteps(exam)
+            const hasContent =
+              exam.blueprintId || exam.papers.some((paper) => paper.sections.some((section) => section.items.length > 0))
             const metaItems = [
               { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
-              exam.blueprintId
+              hasContent
                 ? { icon: <LayoutList aria-hidden="true" className="size-3.5" />, label: formatNullableText(exam.description) }
-                : { icon: <Clock aria-hidden="true" className="size-3.5" />, label: 'Chưa gắn blueprint', tone: 'warning' as const },
+                : { icon: <Clock aria-hidden="true" className="size-3.5" />, label: 'Chưa soạn đề bài', tone: 'warning' as const },
             ]
             return (
               <ExamListRow
@@ -332,7 +336,10 @@ export function TeacherClassTestCreatePage() {
   return (
     <section className="mx-auto max-w-220">
       <h1 className="text-[26px] font-extrabold text-slate-900">Tạo bài trên lớp</h1>
-      <p className="mt-1.5 text-sm text-slate-500">Nhập thông tin bài và chọn câu hỏi theo đúng thứ tự muốn sử dụng.</p>
+      <p className="mt-1.5 text-sm text-slate-500">
+        Nhập thông tin bài và chọn câu hỏi theo đúng thứ tự muốn sử dụng. Bạn có thể tạo thẳng đề bài bằng câu hỏi ở
+        đây mà không cần gắn blueprint — có thể gắn blueprint sau (không bắt buộc) trong trang chi tiết bài.
+      </p>
       {dialog}
 
       <div className="mt-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-6">
@@ -504,7 +511,12 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
   const nextAction =
     completedCount === 0
-      ? { ctaLabel: 'Gắn blueprint', description: 'Chọn blueprint ở tab Blueprint để bắt đầu soạn đề.', onClick: () => setTab('blueprint'), title: 'Chưa gắn blueprint' }
+      ? {
+          ctaLabel: 'Soạn đề bài',
+          description: 'Bấm "Thêm câu hỏi" ở tab Đề bài để soạn trực tiếp, hoặc gắn blueprint (không bắt buộc) ở tab Blueprint.',
+          onClick: () => setTab('papers'),
+          title: 'Chưa soạn đề bài',
+        }
       : completedCount === 1
         ? {
             ctaLabel: 'Mở đề thi',
@@ -555,7 +567,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           items={[
             { label: 'Đề bài', value: 'papers' },
             { label: 'Học sinh', value: 'students' },
-            { label: 'Blueprint', value: 'blueprint' },
+            { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
             { icon: <Smartphone aria-hidden="true" className="size-4" />, label: 'Phân lịch', value: 'schedule' },
           ]}
           onChange={setTab}
@@ -610,6 +622,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           canManage={canManage}
           examId={exam.id}
           onOpenBlueprint={(blueprintId) => navigate(`/teacher/blueprints/${blueprintId}`)}
+          optional
         />
       ) : null}
 
