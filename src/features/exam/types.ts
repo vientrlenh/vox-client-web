@@ -175,6 +175,7 @@ export type ExamScheduleDto = {
 export type ExamCandidateDto = {
   examId: string
   id: string
+  paperId?: string | null
   roomId?: string | null
   scheduleId?: string | null
   sbd: string

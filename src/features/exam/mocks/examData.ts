@@ -38,6 +38,7 @@ function makeCandidates(
   return Array.from({ length: count }, (_, index) => ({
     examId,
     id: `${examId}-cand-${startSbd + index}`,
+    paperId: null,
     roomId: roomId ?? null,
     scheduleId: scheduleId ?? null,
     sbd: String(startSbd + index).padStart(6, '0'),
@@ -371,6 +372,29 @@ export const mockClassTests: ExamDto[] = [
     members: [{ id: 'mem-cw3-1', userId: MOCK_COUNCIL.authorMinh.id, role: 'AUTHOR', grantedAt: '2024-12-15T00:00:00Z', user: MOCK_COUNCIL.authorMinh }],
     papers: [paper('cw-u3-11a', 'paper-cw3-a', 1, 'LOCKED', 'bpv-speak-11-v3')],
   },
+  {
+    blueprintId: 'bp-speak-11', blueprintVersionId: 'bpv-speak-11-v3', closeAt: todayAt(16, 0),
+    code: 'CW-2025-MID-11B', createdAt: '2025-01-10T00:00:00Z', deliveryMode: 'LAB',
+    description: 'Kiểm tra nói giữa kỳ, thực hiện tại phòng máy của trường.', id: 'cw-mid-11b',
+    kind: 'CLASS_TEST', languageId: MOCK_LANGUAGE_ID, name: 'Kiểm tra nói giữa kỳ — Lớp 11B',
+    openAt: todayAt(7, 30), schoolClassId: 'class-11b', schoolClassName: 'Lớp 11B', schoolId: MOCK_SCHOOL_ID, status: 'IN_PROGRESS',
+    teacherName: 'Lê Hoàng Nam', updatedAt: '2025-01-10T08:00:00Z',
+    members: [{ id: 'mem-cwmid-1', userId: MOCK_COUNCIL.authorNam.id, role: 'AUTHOR', grantedAt: '2025-01-10T00:00:00Z', user: MOCK_COUNCIL.authorNam }],
+    papers: [
+      paper('cw-mid-11b', 'paper-cwmid-a', 1, 'LOCKED', 'bpv-speak-11-v3'),
+      paper('cw-mid-11b', 'paper-cwmid-b', 2, 'LOCKED', 'bpv-speak-11-v3'),
+    ],
+  },
+  {
+    blueprintId: 'bp-speak-11', blueprintVersionId: 'bpv-speak-11-v3', closeAt: null,
+    code: 'CW-2025-U6-11C', createdAt: '2025-01-11T00:00:00Z', deliveryMode: 'LAB',
+    description: 'Kiểm tra nói Unit 6, xếp phòng máy — đang chờ xếp nốt học sinh còn lại.', id: 'cw-u6-11c',
+    kind: 'CLASS_TEST', languageId: MOCK_LANGUAGE_ID, name: 'Kiểm tra nói Unit 6 — Lớp 11C',
+    openAt: null, schoolClassId: 'class-11c', schoolClassName: 'Lớp 11C', schoolId: MOCK_SCHOOL_ID, status: 'SCHEDULED',
+    teacherName: 'Lê Hoàng Nam', updatedAt: '2025-01-11T00:00:00Z',
+    members: [{ id: 'mem-cwu6-1', userId: MOCK_COUNCIL.authorNam.id, role: 'AUTHOR', grantedAt: '2025-01-11T00:00:00Z', user: MOCK_COUNCIL.authorNam }],
+    papers: [paper('cw-u6-11c', 'paper-cwu6-a', 1, 'APPROVED', 'bpv-speak-11-v3')],
+  },
 ]
 
 function todayAt(hour: number, minute: number) {
@@ -387,6 +411,9 @@ export const mockRooms: ExamRoomDto[] = [
   { id: 'room-p204-1', capacity: 25, code: 'P.204', occupied: 18, scheduleId: 'sched-k11-3' },
   { id: 'room-p202-2', capacity: 25, code: 'P.202', occupied: 21, scheduleId: 'sched-k11-4' },
   { id: 'room-p301-1', capacity: 25, code: 'P.301', occupied: 24, scheduleId: 'sched-ielts-1' },
+  { id: 'room-lab1-1', capacity: 20, code: 'Phòng máy 1', occupied: 18, scheduleId: 'sched-cwmid-1' },
+  { id: 'room-lab1-2', capacity: 20, code: 'Phòng máy 2', occupied: 14, scheduleId: 'sched-cwmid-2' },
+  { id: 'room-lab2-1', capacity: 20, code: 'Phòng máy 3', occupied: 10, scheduleId: 'sched-cwu6-1' },
 ]
 
 const proctorsCa1: ExamProctorDto[] = [
@@ -439,6 +466,23 @@ export const mockSchedules: ExamScheduleDto[] = [
     ],
     requiredProctorCount: 2, roomIds: ['room-p301-1'], startDate: '2025-01-12T09:00:00Z', status: 'PUBLISHED',
   },
+  {
+    candidateCount: 18, endDate: todayAt(9, 30), examId: 'cw-mid-11b', id: 'sched-cwmid-1',
+    label: 'Ca 1 · Sáng',
+    proctors: [{ id: 'proc-cwmid-1', scheduleId: 'sched-cwmid-1', teacherId: MOCK_COUNCIL.authorNam.id, teacherName: MOCK_COUNCIL.authorNam.fullName }],
+    requiredProctorCount: 1, roomIds: ['room-lab1-1'], startDate: todayAt(7, 30), status: 'PUBLISHED',
+  },
+  {
+    candidateCount: 14, endDate: todayAt(15, 30), examId: 'cw-mid-11b', id: 'sched-cwmid-2',
+    label: 'Ca 2 · Chiều',
+    proctors: [{ id: 'proc-cwmid-2', scheduleId: 'sched-cwmid-2', teacherId: MOCK_COUNCIL.authorMinh.id, teacherName: MOCK_COUNCIL.authorMinh.fullName }],
+    requiredProctorCount: 1, roomIds: ['room-lab1-2'], startDate: todayAt(13, 30), status: 'PUBLISHED',
+  },
+  {
+    candidateCount: 15, endDate: '2025-01-14T10:30:00Z', examId: 'cw-u6-11c', id: 'sched-cwu6-1',
+    label: 'Ca duy nhất', proctors: [], requiredProctorCount: 1,
+    roomIds: ['room-lab2-1'], startDate: '2025-01-14T09:00:00Z', status: 'DRAFT',
+  },
 ]
 
 export const mockCandidates: ExamCandidateDto[] = [
@@ -449,4 +493,8 @@ export const mockCandidates: ExamCandidateDto[] = [
   ...makeCandidates('exam-fin12', 'Lớp 12A', 'class-12a', 128, 130001, 'COMPLETED'),
   ...makeCandidates('cw-u4-11a', 'Lớp 11A', 'class-11a', 32, 210001, 'ASSIGNED'),
   ...makeCandidates('cw-u3-11a', 'Lớp 11A', 'class-11a', 32, 220001, 'COMPLETED'),
+  ...makeCandidates('cw-mid-11b', 'Lớp 11B', 'class-11b', 18, 310001, 'ASSIGNED', 'sched-cwmid-1', 'room-lab1-1'),
+  ...makeCandidates('cw-mid-11b', 'Lớp 11B', 'class-11b', 14, 310019, 'ASSIGNED', 'sched-cwmid-2', 'room-lab1-2'),
+  ...makeCandidates('cw-u6-11c', 'Lớp 11C', 'class-11c', 10, 320001, 'ASSIGNED', 'sched-cwu6-1', 'room-lab2-1'),
+  ...makeCandidates('cw-u6-11c', 'Lớp 11C', 'class-11c', 5, 320011, 'ASSIGNED', 'sched-cwu6-1'),
 ]

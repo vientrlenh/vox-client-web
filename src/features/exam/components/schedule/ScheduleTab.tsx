@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { DoorOpen, Laptop, Lock, MonitorSmartphone, Plus, Search, Wand2 } from 'lucide-react'
+import { Laptop, Lock, MonitorSmartphone, Plus, Search, UserPlus, Wand2, X } from 'lucide-react'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import {
   useAddRoomToScheduleMutation,
+  useAssignCandidateToRoomMutation,
   useAutoFillRoomsMutation,
   useCreateScheduleMutation,
+  useRemoveCandidateFromRoomMutation,
 } from '../../api/useExamMutations'
 import {
   examQueryKeys,
@@ -14,6 +16,8 @@ import {
   useExamSchedulesQuery,
 } from '../../api/useExamQueries'
 import type { ExamDeliveryMode, ExamPaperDto } from '../../types'
+import { AddStudentToRoomModal } from './AddStudentToRoomModal'
+import { PaperAssignmentPanel } from './PaperAssignmentPanel'
 import { RoomChip } from './RoomChip'
 import { SessionRow } from './SessionRow'
 
@@ -41,6 +45,11 @@ export function ScheduleTab({
   const queryClient = useQueryClient()
   const [subTab, setSubTab] = useState<ScheduleSubTab>('sessions')
   const [roomSearch, setRoomSearch] = useState('')
+  const [scheduleFilterId, setScheduleFilterId] = useState('all')
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [studentSearch, setStudentSearch] = useState('')
+  const [studentClassFilter, setStudentClassFilter] = useState('all')
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false)
 
   const schedulesQuery = useExamSchedulesQuery(examId)
   const roomsQuery = useExamRoomsQuery(examId)
@@ -48,6 +57,8 @@ export function ScheduleTab({
   const createScheduleMutation = useCreateScheduleMutation()
   const addRoomMutation = useAddRoomToScheduleMutation()
   const autoFillMutation = useAutoFillRoomsMutation()
+  const assignCandidateMutation = useAssignCandidateToRoomMutation()
+  const removeCandidateMutation = useRemoveCandidateFromRoomMutation()
 
   const schedules = schedulesQuery.data ?? []
   const rooms = roomsQuery.data ?? []
@@ -56,7 +67,22 @@ export function ScheduleTab({
 
   const totalProctors = schedules.reduce((sum, schedule) => sum + schedule.proctors.length, 0)
   const requiredProctors = schedules.reduce((sum, schedule) => sum + schedule.requiredProctorCount, 0)
-  const filteredRooms = rooms.filter((room) => room.code.toLowerCase().includes(roomSearch.trim().toLowerCase()))
+  const filteredRooms = rooms.filter((room) => {
+    const matchesSearch = room.code.toLowerCase().includes(roomSearch.trim().toLowerCase())
+    const matchesSchedule = scheduleFilterId === 'all' || room.scheduleId === scheduleFilterId
+    return matchesSearch && matchesSchedule
+  })
+  const selectedRoom = (selectedRoomId ? rooms.find((room) => room.id === selectedRoomId) : undefined) ?? filteredRooms[0]
+  const selectedRoomSchedule = selectedRoom ? schedules.find((schedule) => schedule.id === selectedRoom.scheduleId) : undefined
+  const roomCandidates = selectedRoom ? candidates.filter((candidate) => candidate.roomId === selectedRoom.id) : []
+  const roomClassOptions = Array.from(new Set(roomCandidates.map((candidate) => candidate.schoolClassName)))
+  const visibleRoomCandidates = roomCandidates.filter((candidate) => {
+    const keyword = studentSearch.trim().toLowerCase()
+    const matchesKeyword =
+      !keyword || candidate.studentName.toLowerCase().includes(keyword) || candidate.sbd.toLowerCase().includes(keyword)
+    const matchesClass = studentClassFilter === 'all' || candidate.schoolClassName === studentClassFilter
+    return matchesKeyword && matchesClass
+  })
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -86,6 +112,19 @@ export function ScheduleTab({
 
   async function handleAutoFill(scheduleId: string) {
     await autoFillMutation.mutateAsync({ examId, scheduleId })
+    await invalidate()
+  }
+
+  async function handleAssignCandidate(candidateId: string) {
+    if (!selectedRoom) {
+      return
+    }
+    await assignCandidateMutation.mutateAsync({ candidateId, roomId: selectedRoom.id, scheduleId: selectedRoom.scheduleId })
+    await invalidate()
+  }
+
+  async function handleRemoveFromRoom(candidateId: string) {
+    await removeCandidateMutation.mutateAsync({ candidateId })
     await invalidate()
   }
 
@@ -182,6 +221,11 @@ export function ScheduleTab({
           Học sinh làm bài trực tiếp trên thiết bị cá nhân trong khung giờ mở – đóng bài đã cấu hình ở phần thông tin
           chung. Không cần xếp ca thi/phòng máy.
         </div>
+        <div className="grid gap-3.5 sm:grid-cols-2">
+          <StatBlock label="Thí sinh" value={candidates.length} />
+          <StatBlock label="Mã đề đã khóa" value={papers.filter((paper) => paper.status === 'LOCKED').length} />
+        </div>
+        <PaperAssignmentPanel candidates={candidates} onApplied={() => void invalidate()} papers={papers} rooms={[]} />
       </div>
     )
   }
@@ -200,12 +244,16 @@ export function ScheduleTab({
       <TabPillGroup
         items={[
           { label: '1 · Ca thi', value: 'sessions' },
-          { label: '2 · Phòng', value: 'rooms' },
+          { label: '2 · Phòng & học sinh', value: 'rooms' },
           { label: '3 · Phân đề', value: 'assign' },
         ]}
         onChange={setSubTab}
         value={subTab}
       />
+
+      <p className="text-[13px] text-slate-500">
+        Quy trình: Tạo ca thi → thêm phòng thi vào ca → thêm học sinh vào phòng → phân đề cho học sinh.
+      </p>
 
       {subTab === 'sessions' ? (
         <div className="grid gap-3">
@@ -242,6 +290,18 @@ export function ScheduleTab({
       {subTab === 'rooms' ? (
         <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
           <div className="grid gap-2.5 self-start">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Chọn phòng thi</p>
+              {schedules.length ? (
+                <button
+                  className="text-xs font-bold text-indigo-600 hover:underline"
+                  onClick={() => void handleAddRoom(scheduleFilterId !== 'all' ? scheduleFilterId : schedules[0].id)}
+                  type="button"
+                >
+                  + Thêm phòng
+                </button>
+              ) : null}
+            </div>
             <div className="relative">
               <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -251,57 +311,154 @@ export function ScheduleTab({
                 value={roomSearch}
               />
             </div>
-            <p className="text-xs text-slate-400">{filteredRooms.length} phòng</p>
+            <select
+              className="h-9.5 rounded-lg border border-slate-200 px-2.5 text-[13px] text-slate-900"
+              onChange={(event) => setScheduleFilterId(event.target.value)}
+              value={scheduleFilterId}
+            >
+              <option value="all">Tất cả ca</option>
+              {schedules.map((schedule) => (
+                <option key={schedule.id} value={schedule.id}>
+                  {schedule.label}
+                </option>
+              ))}
+            </select>
+            <div className="grid gap-2">
+              {filteredRooms.length === 0 ? (
+                <p className="px-1 text-xs text-slate-400">Không tìm thấy phòng phù hợp.</p>
+              ) : (
+                filteredRooms.map((room) => {
+                  const roomSchedule = schedules.find((schedule) => schedule.id === room.scheduleId)
+                  return (
+                    <RoomChip
+                      active={selectedRoom?.id === room.id}
+                      key={room.id}
+                      onClick={() => setSelectedRoomId(room.id)}
+                      room={room}
+                      sessionLabel={roomSchedule?.label}
+                    />
+                  )
+                })
+              )}
+            </div>
           </div>
-          <div className="grid gap-4">
-            {schedules.map((schedule) => {
-              const scheduleRooms = filteredRooms.filter((room) => room.scheduleId === schedule.id)
-              const unassignedCount = candidates.filter(
-                (candidate) => candidate.scheduleId === schedule.id && !candidate.roomId,
-              ).length
-              if (roomSearch && scheduleRooms.length === 0) {
-                return null
-              }
-              return (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4.5" key={schedule.id}>
-                  <div className="flex flex-wrap items-center justify-between gap-2.5">
-                    <div className="text-sm font-extrabold text-slate-900">{schedule.label}</div>
-                    <div className="flex gap-2">
-                      {unassignedCount > 0 ? (
-                        <button
-                          className="inline-flex h-8.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-3.5 text-xs font-bold text-white"
-                          onClick={() => handleAutoFill(schedule.id)}
-                          type="button"
-                        >
-                          <Wand2 aria-hidden="true" className="size-3.5" />
-                          Tự động xếp {unassignedCount} học sinh
-                        </button>
-                      ) : null}
-                      <button
-                        className="inline-flex h-8.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                        onClick={() => handleAddRoom(schedule.id)}
-                        type="button"
-                      >
-                        <DoorOpen aria-hidden="true" className="size-3.5" />
-                        Thêm phòng
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                    {scheduleRooms.length === 0 ? (
-                      <p className="col-span-full text-xs text-slate-400">Chưa có phòng nào cho ca này.</p>
-                    ) : (
-                      scheduleRooms.map((room) => <RoomChip key={room.id} room={room} />)
-                    )}
+
+          {selectedRoom ? (
+            <div className="grid gap-3.5 self-start rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-lg font-extrabold text-slate-900">{selectedRoom.code}</div>
+                  <div className="mt-1 text-[13px] text-slate-500">
+                    {selectedRoomSchedule?.label ?? '—'} · Sức chứa {selectedRoom.capacity} · Đã thêm {selectedRoom.occupied}
                   </div>
                 </div>
-              )
-            })}
-          </div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedRoomSchedule &&
+                  candidates.some((candidate) => candidate.scheduleId === selectedRoomSchedule.id && !candidate.roomId) ? (
+                    <button
+                      className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                      onClick={() => void handleAutoFill(selectedRoomSchedule.id)}
+                      type="button"
+                    >
+                      <Wand2 aria-hidden="true" className="size-3.5" />
+                      Tự động xếp
+                    </button>
+                  ) : null}
+                  <button
+                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
+                    onClick={() => setShowAddStudentModal(true)}
+                    type="button"
+                  >
+                    <UserPlus aria-hidden="true" className="size-4" />
+                    Thêm học sinh vào phòng
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2.5">
+                <div className="relative min-w-50 flex-1">
+                  <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
+                    onChange={(event) => setStudentSearch(event.target.value)}
+                    placeholder="Tìm theo tên hoặc SBD…"
+                    value={studentSearch}
+                  />
+                </div>
+                <select
+                  className="h-9.5 rounded-lg border border-slate-200 px-2.5 text-[13px] text-slate-900"
+                  onChange={(event) => setStudentClassFilter(event.target.value)}
+                  value={studentClassFilter}
+                >
+                  <option value="all">Tất cả lớp</option>
+                  {roomClassOptions.map((className) => (
+                    <option key={className} value={className}>
+                      {className}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                <div className="grid grid-cols-[110px_1fr_80px_90px_36px] gap-2.5 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  <span>SBD</span>
+                  <span>Họ tên</span>
+                  <span>Lớp</span>
+                  <span>Mã đề</span>
+                  <span />
+                </div>
+                <div className="max-h-100 overflow-y-auto">
+                  {visibleRoomCandidates.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-xs text-slate-400">Chưa có học sinh nào trong phòng này.</div>
+                  ) : (
+                    visibleRoomCandidates.map((candidate) => {
+                      const candidatePaper = papers.find((paper) => paper.id === candidate.paperId)
+                      return (
+                        <div
+                          className="grid grid-cols-[110px_1fr_80px_90px_36px] items-center gap-2.5 border-t border-slate-100 px-4 py-2.5"
+                          key={candidate.id}
+                        >
+                          <span className="font-mono text-xs font-bold text-slate-900">{candidate.sbd}</span>
+                          <span className="text-[13px] text-slate-900">{candidate.studentName}</span>
+                          <span className="text-[13px] text-slate-500">{candidate.schoolClassName}</span>
+                          <span className="text-[13px] font-semibold text-indigo-700">
+                            {candidatePaper ? candidatePaper.code : '-'}
+                          </span>
+                          <button
+                            aria-label={`Bỏ ${candidate.studentName} khỏi phòng`}
+                            className="inline-flex size-6 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-red-600"
+                            onClick={() => void handleRemoveFromRoom(candidate.id)}
+                            type="button"
+                          >
+                            <X aria-hidden="true" className="size-4" />
+                          </button>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-[13px] text-slate-400">
+              Chưa có phòng thi nào. Thêm phòng ở bước Ca thi để bắt đầu xếp học sinh.
+            </div>
+          )}
         </div>
       ) : null}
 
-      {subTab === 'assign' ? <AssignPapersView candidates={candidates} papers={papers} rooms={rooms} schedules={schedules} /> : null}
+      {subTab === 'assign' ? (
+        <PaperAssignmentPanel candidates={candidates} onApplied={() => void invalidate()} papers={papers} rooms={rooms} />
+      ) : null}
+
+      {showAddStudentModal && selectedRoom ? (
+        <AddStudentToRoomModal
+          candidates={candidates}
+          onAssign={(candidateId) => void handleAssignCandidate(candidateId)}
+          onClose={() => setShowAddStudentModal(false)}
+          room={selectedRoom}
+        />
+      ) : null}
     </div>
   )
 }
@@ -311,67 +468,6 @@ function StatBlock({ label, value }: { label: string; value: number | string }) 
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className="mt-1.5 text-[22px] font-extrabold text-slate-900">{value}</div>
-    </div>
-  )
-}
-
-function AssignPapersView({
-  candidates,
-  papers,
-  rooms,
-  schedules,
-}: {
-  candidates: ReturnType<typeof useExamCandidatesQuery>['data']
-  papers: ExamPaperDto[]
-  rooms: ReturnType<typeof useExamRoomsQuery>['data']
-  schedules: ReturnType<typeof useExamSchedulesQuery>['data']
-}) {
-  const lockedPapers = useMemo(() => (papers ?? []).filter((paper) => paper.status === 'LOCKED'), [papers])
-  const allRooms = rooms ?? []
-  const allCandidates = candidates ?? []
-
-  if (lockedPapers.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-[13px] text-slate-400">
-        Cần khóa ít nhất một mã đề ở tab Đề thi trước khi phân đề theo phòng.
-      </div>
-    )
-  }
-
-  return (
-    <div className="grid gap-3">
-      <p className="text-[13px] text-slate-500">
-        Mỗi phòng được gán một mã đề cố định để tránh học sinh ngồi cạnh nhau làm cùng đề.
-      </p>
-      {(schedules ?? []).map((schedule) => {
-        const scheduleRooms = allRooms.filter((room) => room.scheduleId === schedule.id)
-        if (!scheduleRooms.length) {
-          return null
-        }
-        return (
-          <div className="rounded-2xl border border-slate-200 bg-white p-4.5" key={schedule.id}>
-            <div className="text-sm font-extrabold text-slate-900">{schedule.label}</div>
-            <div className="mt-3 grid gap-2">
-              {scheduleRooms.map((room, index) => {
-                const paper = lockedPapers[index % lockedPapers.length]
-                const roomCandidates = allCandidates.filter((candidate) => candidate.roomId === room.id)
-                return (
-                  <div
-                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5"
-                    key={room.id}
-                  >
-                    <span className="text-[13px] font-bold text-slate-900">{room.code}</span>
-                    <span className="text-xs text-slate-500">{roomCandidates.length} học sinh</span>
-                    <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-bold text-indigo-700">
-                      {paper.code} · Mã đề {paper.variant}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })}
     </div>
   )
 }

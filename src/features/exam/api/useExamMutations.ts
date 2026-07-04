@@ -4,6 +4,7 @@ import {
   addExamMember,
   addProctorToSchedule,
   addRoomToSchedule,
+  applyPaperAssignments,
   assignCandidateToRoom,
   attachExamBlueprint,
   autoFillRooms,
@@ -21,6 +22,7 @@ import {
   deleteBlueprintSlot,
   deleteExam,
   deleteExamPaper,
+  removeCandidateFromRoom,
   removeExamMember,
   removeProctorFromSchedule,
   setExamDeliveryMode,
@@ -315,6 +317,19 @@ export function useAssignCandidateToRoomMutation() {
   return useMutation({
     mutationFn: ({ candidateId, roomId, scheduleId }: { candidateId: string; roomId: string; scheduleId: string }) =>
       withDelay(() => assignCandidateToRoom(candidateId, roomId, scheduleId)),
+  })
+}
+
+export function useRemoveCandidateFromRoomMutation() {
+  return useMutation({
+    mutationFn: ({ candidateId }: { candidateId: string }) => withDelay(() => removeCandidateFromRoom(candidateId)),
+  })
+}
+
+export function useApplyPaperAssignmentsMutation() {
+  return useMutation({
+    mutationFn: (assignments: { candidateId: string; paperId: string }[]) =>
+      withDelay(() => applyPaperAssignments(assignments)),
   })
 }
 

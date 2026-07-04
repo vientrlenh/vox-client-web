@@ -644,6 +644,7 @@ export function addCandidate(examId: string, input: { schoolClassId: string; sch
   const candidate: ExamCandidateDto = {
     examId,
     id: genId('cand'),
+    paperId: null,
     roomId: null,
     scheduleId: null,
     sbd: nextSbd,
@@ -669,6 +670,31 @@ export function assignCandidateToRoom(candidateId: string, roomId: string, sched
     room.occupied += 1
   }
   return candidate
+}
+
+export function removeCandidateFromRoom(candidateId: string) {
+  const candidate = state.candidates.find((item) => item.id === candidateId)
+  if (!candidate) {
+    throw new Error('Không tìm thấy thí sinh.')
+  }
+  if (candidate.roomId) {
+    const room = state.rooms.find((item) => item.id === candidate.roomId)
+    if (room) {
+      room.occupied = Math.max(0, room.occupied - 1)
+    }
+  }
+  candidate.roomId = null
+  return candidate
+}
+
+export function applyPaperAssignments(assignments: { candidateId: string; paperId: string }[]) {
+  for (const { candidateId, paperId } of assignments) {
+    const candidate = state.candidates.find((item) => item.id === candidateId)
+    if (candidate) {
+      candidate.paperId = paperId
+    }
+  }
+  return assignments.length
 }
 
 export function autoFillRooms(examId: string, scheduleId: string) {
