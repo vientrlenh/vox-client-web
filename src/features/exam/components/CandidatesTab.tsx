@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { FileUp, Search, UserPlus } from 'lucide-react'
+import { Pagination } from '@/shared/components/Pagination'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { examQueryKeys, useExamCandidatesQuery, useExamRoomsQuery } from '../api/useExamQueries'
 import { useAddCandidateMutation } from '../api/useExamMutations'
 import { getCandidateStatusDisplay } from '../types'
+
+const PAGE_SIZE = 10
 
 type CandidatesTabProps = {
   examId: string
@@ -18,6 +21,7 @@ export function CandidatesTab({ examId }: CandidatesTabProps) {
   const addCandidateMutation = useAddCandidateMutation()
   const [search, setSearch] = useState('')
   const [classFilter, setClassFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
   const roomCodeById = useMemo(
@@ -28,16 +32,33 @@ export function CandidatesTab({ examId }: CandidatesTabProps) {
     () => Array.from(new Set(candidates.map((candidate) => candidate.schoolClassName))),
     [candidates],
   )
-  const visibleCandidates = candidates.filter((candidate) => {
-    const keyword = search.trim().toLowerCase()
-    const matchesKeyword =
-      !keyword ||
-      candidate.studentName.toLowerCase().includes(keyword) ||
-      candidate.sbd.toLowerCase().includes(keyword)
-    const matchesClass = classFilter === 'all' || candidate.schoolClassName === classFilter
-    return matchesKeyword && matchesClass
-  })
+  const filteredCandidates = useMemo(
+    () =>
+      candidates.filter((candidate) => {
+        const keyword = search.trim().toLowerCase()
+        const matchesKeyword =
+          !keyword ||
+          candidate.studentName.toLowerCase().includes(keyword) ||
+          candidate.sbd.toLowerCase().includes(keyword)
+        const matchesClass = classFilter === 'all' || candidate.schoolClassName === classFilter
+        return matchesKeyword && matchesClass
+      }),
+    [candidates, classFilter, search],
+  )
+  const totalPages = Math.max(1, Math.ceil(filteredCandidates.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const visibleCandidates = filteredCandidates.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   const assignedCount = candidates.filter((candidate) => candidate.roomId).length
+
+  function handleSearchChange(value: string) {
+    setSearch(value)
+    setPage(1)
+  }
+
+  function handleClassFilterChange(value: string) {
+    setClassFilter(value)
+    setPage(1)
+  }
 
   async function handleAddCandidate() {
     const studentName = window.prompt('Tên học sinh mới:')
@@ -96,14 +117,14 @@ export function CandidatesTab({ examId }: CandidatesTabProps) {
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => handleSearchChange(event.target.value)}
               placeholder="Tìm theo tên hoặc SBD…"
               value={search}
             />
           </div>
           <select
             className="h-9.5 rounded-lg border border-slate-200 px-2.5 text-[13px] text-slate-900"
-            onChange={(event) => setClassFilter(event.target.value)}
+            onChange={(event) => handleClassFilterChange(event.target.value)}
             value={classFilter}
           >
             <option value="all">Tất cả lớp</option>
@@ -147,6 +168,14 @@ export function CandidatesTab({ examId }: CandidatesTabProps) {
             })
           )}
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          itemName="thí sinh"
+          onPageChange={setPage}
+          totalElements={filteredCandidates.length}
+          totalPages={totalPages}
+        />
       </div>
     </div>
   )

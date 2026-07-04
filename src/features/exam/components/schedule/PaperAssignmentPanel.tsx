@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Check, RefreshCw, Sparkles } from 'lucide-react'
+import { Check, RefreshCw, Search, Sparkles } from 'lucide-react'
+import { Pagination } from '@/shared/components/Pagination'
 import { useApplyPaperAssignmentsMutation } from '../../api/useExamMutations'
 import type { ExamCandidateDto, ExamPaperDto, ExamRoomDto } from '../../types'
+
+const PAGE_SIZE = 8
 
 const PAPER_COLORS = [
   { chip: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' },
@@ -73,12 +76,46 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
     [eligibleCandidates],
   )
   const paperIds = useMemo(() => lockedPapers.map((paper) => paper.id), [lockedPapers])
+  const classOptions = useMemo(
+    () => Array.from(new Set(sortedCandidates.map((candidate) => candidate.schoolClassName))),
+    [sortedCandidates],
+  )
 
   const [assignments, setAssignments] = useState<Map<string, string>>(() =>
     computeAssignments(sortedCandidates, paperIds, byRoom, false),
   )
   const [applied, setApplied] = useState(false)
+  const [search, setSearch] = useState('')
+  const [classFilter, setClassFilter] = useState('all')
+  const [page, setPage] = useState(1)
   const applyMutation = useApplyPaperAssignmentsMutation()
+
+  const filteredCandidates = useMemo(
+    () =>
+      sortedCandidates.filter((candidate) => {
+        const keyword = search.trim().toLowerCase()
+        const matchesKeyword =
+          !keyword ||
+          candidate.studentName.toLowerCase().includes(keyword) ||
+          candidate.sbd.toLowerCase().includes(keyword)
+        const matchesClass = classFilter === 'all' || candidate.schoolClassName === classFilter
+        return matchesKeyword && matchesClass
+      }),
+    [classFilter, search, sortedCandidates],
+  )
+  const totalPages = Math.max(1, Math.ceil(filteredCandidates.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pagedCandidates = filteredCandidates.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  function handleSearchChange(value: string) {
+    setSearch(value)
+    setPage(1)
+  }
+
+  function handleClassFilterChange(value: string) {
+    setClassFilter(value)
+    setPage(1)
+  }
 
   function handleShuffle() {
     setAssignments(computeAssignments(sortedCandidates, paperIds, byRoom, true))
@@ -122,8 +159,6 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
   const counts = new Map<string, number>()
   assignments.forEach((paperId) => counts.set(paperId, (counts.get(paperId) ?? 0) + 1))
 
-  const previewLimit = 8
-  const previewCandidates = sortedCandidates.slice(0, previewLimit)
   const summaryColsClass =
     lockedPapers.length >= 4 ? 'sm:grid-cols-4' : lockedPapers.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
   const rowGridClass = byRoom ? 'grid-cols-[110px_1fr_100px_110px]' : 'grid-cols-[110px_1fr_110px]'
@@ -159,7 +194,7 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4.5 py-3.5">
           <p className="text-[13px] text-slate-500">
-            Xem trước {previewCandidates.length}/{sortedCandidates.length} học sinh · bấm vào chip mã đề để chỉnh tay
+            {filteredCandidates.length}/{sortedCandidates.length} học sinh · bấm vào chip mã đề để chỉnh tay
           </p>
           <div className="flex gap-2">
             <button
@@ -188,6 +223,30 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
           </div>
         ) : null}
 
+        <div className="flex flex-wrap gap-2.5 border-b border-slate-200 px-4.5 py-3.5">
+          <div className="relative min-w-50 flex-1">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
+              onChange={(event) => handleSearchChange(event.target.value)}
+              placeholder="Tìm theo tên hoặc SBD…"
+              value={search}
+            />
+          </div>
+          <select
+            className="h-9.5 rounded-lg border border-slate-200 px-2.5 text-[13px] text-slate-900"
+            onChange={(event) => handleClassFilterChange(event.target.value)}
+            value={classFilter}
+          >
+            <option value="all">Tất cả lớp</option>
+            {classOptions.map((className) => (
+              <option key={className} value={className}>
+                {className}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div
           className={[
             'grid gap-2.5 bg-slate-50 px-4.5 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500',
@@ -199,35 +258,47 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
           {byRoom ? <span>Phòng</span> : null}
           <span>Mã đề</span>
         </div>
-        {previewCandidates.map((candidate) => {
-          const paperId = assignments.get(candidate.id)
-          const paperIndex = paperId ? paperIds.indexOf(paperId) : -1
-          const candidatePaper = paperIndex >= 0 ? lockedPapers[paperIndex] : undefined
-          const color = paperIndex >= 0 ? PAPER_COLORS[paperIndex % PAPER_COLORS.length] : undefined
-          const room = rooms.find((item) => item.id === candidate.roomId)
-          return (
-            <div
-              className={['items-center gap-2.5 border-t border-slate-100 px-4.5 py-2.5', 'grid', rowGridClass].join(
-                ' ',
-              )}
-              key={candidate.id}
-            >
-              <span className="font-mono text-xs font-bold text-slate-900">{candidate.sbd}</span>
-              <span className="text-[13px] text-slate-900">{candidate.studentName}</span>
-              {byRoom ? <span className="text-[13px] text-slate-500">{room?.code ?? '-'}</span> : null}
-              <button
-                className={[
-                  'inline-flex h-7 w-fit items-center justify-self-start gap-1 rounded-full px-2.5 text-xs font-bold transition hover:opacity-80',
-                  color ? color.chip : 'bg-slate-100 text-slate-500',
-                ].join(' ')}
-                onClick={() => handleCycle(candidate.id)}
-                type="button"
+        {pagedCandidates.length === 0 ? (
+          <div className="px-4.5 py-6 text-center text-xs text-slate-400">Không tìm thấy học sinh phù hợp.</div>
+        ) : (
+          pagedCandidates.map((candidate) => {
+            const paperId = assignments.get(candidate.id)
+            const paperIndex = paperId ? paperIds.indexOf(paperId) : -1
+            const candidatePaper = paperIndex >= 0 ? lockedPapers[paperIndex] : undefined
+            const color = paperIndex >= 0 ? PAPER_COLORS[paperIndex % PAPER_COLORS.length] : undefined
+            const room = rooms.find((item) => item.id === candidate.roomId)
+            return (
+              <div
+                className={['items-center gap-2.5 border-t border-slate-100 px-4.5 py-2.5', 'grid', rowGridClass].join(
+                  ' ',
+                )}
+                key={candidate.id}
               >
-                {candidatePaper ? candidatePaper.code : '-'}
-              </button>
-            </div>
-          )
-        })}
+                <span className="font-mono text-xs font-bold text-slate-900">{candidate.sbd}</span>
+                <span className="text-[13px] text-slate-900">{candidate.studentName}</span>
+                {byRoom ? <span className="text-[13px] text-slate-500">{room?.code ?? '-'}</span> : null}
+                <button
+                  className={[
+                    'inline-flex h-7 w-fit items-center justify-self-start gap-1 rounded-full px-2.5 text-xs font-bold transition hover:opacity-80',
+                    color ? color.chip : 'bg-slate-100 text-slate-500',
+                  ].join(' ')}
+                  onClick={() => handleCycle(candidate.id)}
+                  type="button"
+                >
+                  {candidatePaper ? candidatePaper.code : '-'}
+                </button>
+              </div>
+            )
+          })
+        )}
+
+        <Pagination
+          currentPage={currentPage}
+          itemName="học sinh"
+          onPageChange={setPage}
+          totalElements={filteredCandidates.length}
+          totalPages={totalPages}
+        />
       </div>
     </div>
   )
