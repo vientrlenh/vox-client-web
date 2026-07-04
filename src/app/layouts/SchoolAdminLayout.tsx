@@ -3,6 +3,7 @@ import {
   Bell,
   BookOpen,
   ChevronDown,
+  ClipboardCheck,
   FileQuestion,
   FileSpreadsheet,
   GraduationCap,
@@ -89,6 +90,24 @@ const navigationGroups: NavigationGroup[] = [
       {
         label: 'Duyệt câu hỏi',
         to: '/school-admin/questions/review',
+      },
+    ],
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Kỳ thi',
+    items: [
+      {
+        label: 'Kiểm tra tập trung',
+        to: '/school-admin/exams',
+      },
+      {
+        label: 'Bài kiểm tra trên lớp',
+        to: '/school-admin/class-tests',
+      },
+      {
+        label: 'Blueprint đề thi',
+        to: '/school-admin/blueprints',
       },
     ],
   },
