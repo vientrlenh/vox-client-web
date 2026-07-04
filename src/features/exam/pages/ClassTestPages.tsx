@@ -1,6 +1,16 @@
-import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import {
+  CalendarClock,
+  Check,
+  ChevronRight,
+  CircleCheck,
+  Clock4,
+  FilePenLine,
+  NotebookPen,
+  PlayCircle,
+  SquareCheckBig,
+} from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { useMySchoolClassesQuery } from '@/features/classes/api/useMySchoolClassesQuery'
@@ -8,6 +18,9 @@ import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQu
 import type { QuestionDto, QuestionStatus } from '@/features/question/types'
 import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { StatCard } from '@/shared/ui/StatCard'
+import { StatusBadge as SharedStatusBadge } from '@/shared/ui/StatusBadge'
+import { WorkflowStepper, type WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import {
   formatNullableText as formatQuestionNullableText,
   getQuestionStatusDisplay,
@@ -46,8 +59,42 @@ function getErrorMessage(error: unknown) {
 
 function StatusBadge({ status }: { status?: string | null }) {
   const display = getExamStatusDisplay(status)
-  return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${display.className}`}>{display.label}</span>
+  return <SharedStatusBadge label={display.label} tone={display.tone} />
 }
+
+/** Derives the 3-step classwork lifecycle (blueprint → soạn & giao đề → mở bài & chấm) shown as a WorkflowStepper. */
+function getClassTestWorkflowSteps(exam: { blueprintId?: string | null; status: string }): WorkflowStep[] {
+  const hasBlueprint = Boolean(exam.blueprintId)
+  const opsStarted = ['SCHEDULED', 'IN_PROGRESS', 'CLOSED', 'RESULTS_PUBLISHED'].includes(exam.status)
+  const opsDone = ['CLOSED', 'RESULTS_PUBLISHED'].includes(exam.status)
+
+  return [
+    {
+      icon: hasBlueprint ? <Check size={18} /> : <SquareCheckBig size={18} />,
+      label: 'Gắn blueprint',
+      state: hasBlueprint ? 'done' : 'current',
+      sublabel: hasBlueprint ? 'Hoàn tất' : undefined,
+    },
+    {
+      icon: opsStarted ? <Check size={18} /> : <FilePenLine size={18} />,
+      label: 'Soạn & giao đề',
+      state: opsStarted ? 'done' : hasBlueprint ? 'current' : 'upcoming',
+    },
+    {
+      icon: opsDone ? <Check size={18} /> : <PlayCircle size={18} />,
+      label: 'Mở bài & chấm',
+      state: opsDone ? 'done' : opsStarted ? 'current' : 'upcoming',
+    },
+  ]
+}
+
+const CLASS_TEST_STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
+  { label: 'Tất cả', value: '' },
+  { label: 'Bản nháp', value: 'DRAFT' },
+  { label: 'Đã lên lịch', value: 'SCHEDULED' },
+  { label: 'Đang diễn ra', value: 'IN_PROGRESS' },
+  { label: 'Đã công bố kết quả', value: 'RESULTS_PUBLISHED' },
+]
 
 function Field({
   label,
@@ -118,15 +165,6 @@ function TextAreaField({
         value={value}
       />
     </label>
-  )
-}
-
-function InfoItem({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-      <div className="mt-2 text-sm font-bold text-slate-950">{value}</div>
-    </div>
   )
 }
 
@@ -369,6 +407,10 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
     size: 10,
     status: status || undefined,
   })
+  const totalCountQuery = useClassTestsQuery({ page: 1, size: 1 })
+  const inProgressCountQuery = useClassTestsQuery({ page: 1, size: 1, status: 'IN_PROGRESS' })
+  const draftCountQuery = useClassTestsQuery({ page: 1, size: 1, status: 'DRAFT' })
+  const publishedCountQuery = useClassTestsQuery({ page: 1, size: 1, status: 'RESULTS_PUBLISHED' })
 
   useEffect(() => {
     if (!flashMessage) {
@@ -411,88 +453,101 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
       {dialog}
 
-      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 md:grid-cols-2">
-        <Field label="Từ khóa" onChange={setKeyword} value={keyword} />
-        <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Trạng thái
-          <select
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
-            onChange={(event) => setStatus(event.target.value as '' | ExamStatus)}
-            value={status}
-          >
-            <option value="">Tất cả</option>
-            <option value="DRAFT">Bản nháp</option>
-            <option value="SCHEDULED">Đã lên lịch</option>
-            <option value="IN_PROGRESS">Đang diễn ra</option>
-            <option value="CLOSED">Đã đóng</option>
-            <option value="RESULTS_PUBLISHED">Đã công bố kết quả</option>
-            <option value="CANCELLED">Đã hủy</option>
-          </select>
-        </label>
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard icon={<NotebookPen size={19} />} iconTone="indigo" label="Tổng bài" value={totalCountQuery.data?.totalElements ?? '-'} />
+        <StatCard icon={<PlayCircle size={19} />} iconTone="violet" label="Đang mở" value={inProgressCountQuery.data?.totalElements ?? '-'} />
+        <StatCard icon={<Clock4 size={19} />} iconTone="amber" label="Chờ chấm" value={draftCountQuery.data?.totalElements ?? '-'} />
+        <StatCard icon={<CircleCheck size={19} />} iconTone="emerald" label="Đã trả điểm" value={publishedCountQuery.data?.totalElements ?? '-'} />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <table className="min-w-full text-left">
-          <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Bài kiểm tra</th>
-              <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Mở lúc</th>
-              <th className="px-4 py-3">Đóng lúc</th>
-              <th className="px-4 py-3 text-right">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {classTestsQuery.data?.content.map((exam) => (
-              <tr key={exam.id}>
-                <td className="px-4 py-4">
-                  <div className="grid gap-1">
-                    <span className="text-sm font-black text-slate-950">{exam.name}</span>
-                    <span className="text-xs font-medium text-slate-500">{formatNullableText(exam.description)}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-4 font-mono text-xs font-semibold text-slate-600">{exam.code}</td>
-                <td className="px-4 py-4"><StatusBadge status={exam.status} /></td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-600">{formatDateTime(exam.openAt)}</td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-600">{formatDateTime(exam.closeAt)}</td>
-                <td className="px-4 py-4">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
-                      onClick={() => navigate(`${basePath}/${exam.id}`)}
-                      type="button"
-                    >
-                      Chi tiết
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600">
-          <span>
-          {classTestsQuery.data?.totalElements ?? 0} bài kiểm tra, trang {classTestsQuery.data?.page ?? 1}/{classTestsQuery.data?.totalPages ?? 1}
-          </span>
-          <div className="flex gap-2">
+      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 md:grid-cols-[minmax(0,1fr)_auto]">
+        <Field label="Từ khóa" onChange={setKeyword} value={keyword} />
+        <div className="flex flex-wrap items-end gap-2">
+          {CLASS_TEST_STATUS_FILTERS.map((filter) => (
             <button
-              className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                status === filter.value
+                  ? 'bg-indigo-600 text-white'
+                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+              key={filter.value}
+              onClick={() => setStatus(filter.value)}
               type="button"
             >
-            Trước
+              {filter.label}
             </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3.5">
+        {classTestsQuery.data?.content.map((exam) => {
+          const steps = getClassTestWorkflowSteps(exam)
+          const barToneClassName: Record<string, string> = {
+            DRAFT: 'bg-amber-500',
+            SCHEDULED: 'bg-blue-500',
+            IN_PROGRESS: 'bg-violet-600',
+            CLOSED: 'bg-slate-400',
+            RESULTS_PUBLISHED: 'bg-emerald-500',
+            CANCELLED: 'bg-red-500',
+          }
+
+          return (
             <button
-              className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
-              disabled={page >= (classTestsQuery.data?.totalPages ?? 1)}
-              onClick={() => setPage((current) => current + 1)}
+              className="flex overflow-hidden rounded-2xl border border-slate-200 bg-white text-left transition hover:-translate-y-0.5 hover:shadow-lg"
+              key={exam.id}
+              onClick={() => navigate(`${basePath}/${exam.id}`)}
               type="button"
             >
-              Sau
+              <div className={`w-1.5 ${barToneClassName[exam.status] ?? 'bg-slate-300'}`} />
+              <div className="flex flex-1 flex-wrap items-center gap-5 px-5 py-4">
+                <div className="min-w-60 flex-1">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="text-base font-bold text-slate-900">{exam.name}</span>
+                    <StatusBadge status={exam.status} />
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-3.5 text-[13px] font-medium text-slate-500">
+                    <span className="font-mono font-semibold">{exam.code}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <CalendarClock size={15} />
+                      {formatDateTime(exam.openAt)} → {formatDateTime(exam.closeAt)}
+                    </span>
+                  </div>
+                </div>
+                <WorkflowStepper steps={steps} variant="compact" />
+                <ChevronRight className="text-slate-300" size={20} />
+              </div>
             </button>
+          )
+        })}
+        {classTestsQuery.data?.content.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm font-semibold text-slate-500">
+            Không có bài kiểm tra phù hợp.
           </div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">
+        <span>
+          {classTestsQuery.data?.totalElements ?? 0} bài kiểm tra, trang {classTestsQuery.data?.page ?? 1}/{classTestsQuery.data?.totalPages ?? 1}
+        </span>
+        <div className="flex gap-2">
+          <button
+            className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
+            disabled={page <= 1}
+            onClick={() => setPage((current) => current - 1)}
+            type="button"
+          >
+            Trước
+          </button>
+          <button
+            className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
+            disabled={page >= (classTestsQuery.data?.totalPages ?? 1)}
+            onClick={() => setPage((current) => current + 1)}
+            type="button"
+          >
+            Sau
+          </button>
         </div>
       </div>
     </section>
@@ -840,13 +895,22 @@ function ClassTestDetailPage({ canManage, title }: ClassTestDetailPageProps) {
       <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
       {dialog}
 
-      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
-        <InfoItem label="Ten" value={exam.name} />
-        <InfoItem label="Code" value={exam.code} />
-        <InfoItem label="Trạng thái" value={<StatusBadge status={exam.status} />} />
-        <InfoItem label="School class ID" value={formatNullableText(exam.schoolClassId)} />
-        <InfoItem label="Open" value={formatDateTime(exam.openAt)} />
-        <InfoItem label="Close" value={formatDateTime(exam.closeAt)} />
+      <div className="rounded-[18px] border border-slate-200 bg-white p-6">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">{exam.name}</h2>
+          <StatusBadge status={exam.status} />
+        </div>
+        <div className="mt-2.5 flex flex-wrap items-center gap-4 text-[13px] font-medium text-slate-500">
+          <span className="font-mono font-semibold">{exam.code}</span>
+          <span>{formatNullableText(exam.schoolClassId)}</span>
+          <span>
+            {formatDateTime(exam.openAt)} – {formatDateTime(exam.closeAt)}
+          </span>
+        </div>
+      </div>
+
+      <div className="rounded-[18px] border border-slate-200 bg-white p-6">
+        <WorkflowStepper steps={getClassTestWorkflowSteps(exam)} />
       </div>
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">

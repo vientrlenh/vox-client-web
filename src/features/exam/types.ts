@@ -1,3 +1,5 @@
+import type { StatusTone } from '@/shared/ui/StatusBadge'
+
 export type ExamKind = 'CENTRALIZED' | 'CLASS_TEST'
 export type ExamStatus =
   | 'DRAFT'
@@ -321,49 +323,49 @@ export function formatDateTime(value?: string | null) {
   }).format(date)
 }
 
-export function getExamStatusDisplay(status?: string | null) {
+export function getExamStatusDisplay(status?: string | null): { tone: StatusTone; label: string } {
   switch (status) {
     case 'DRAFT':
-      return { className: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Bản nháp' }
+      return { tone: 'warning', label: 'Bản nháp' }
     case 'SCHEDULED':
-      return { className: 'border-blue-200 bg-blue-50 text-blue-700', label: 'Đã lên lịch' }
+      return { tone: 'info', label: 'Đã lên lịch' }
     case 'IN_PROGRESS':
-      return { className: 'border-violet-200 bg-violet-50 text-violet-700', label: 'Đang diễn ra' }
+      return { tone: 'violet', label: 'Đang diễn ra' }
     case 'CLOSED':
-      return { className: 'border-slate-200 bg-slate-100 text-slate-700', label: 'Đã đóng' }
+      return { tone: 'neutral', label: 'Đã đóng' }
     case 'RESULTS_PUBLISHED':
-      return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Đã công bố kết quả' }
+      return { tone: 'success', label: 'Đã công bố kết quả' }
     case 'CANCELLED':
-      return { className: 'border-red-200 bg-red-50 text-red-700', label: 'Đã hủy' }
+      return { tone: 'danger', label: 'Đã hủy' }
     default:
-      return { className: 'border-slate-200 bg-slate-50 text-slate-600', label: String(status ?? '-') }
+      return { tone: 'neutral', label: String(status ?? '-') }
   }
 }
 
-export function getExamPaperStatusDisplay(status?: string | null) {
+export function getExamPaperStatusDisplay(status?: string | null): { tone: StatusTone; label: string } {
   switch (status) {
     case 'DRAFT':
-      return { className: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Bản nháp' }
+      return { tone: 'warning', label: 'Bản nháp' }
     case 'IN_REVIEW':
-      return { className: 'border-blue-200 bg-blue-50 text-blue-700', label: 'Đang duyệt' }
+      return { tone: 'info', label: 'Đang duyệt' }
     case 'APPROVED':
-      return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Đã duyệt' }
+      return { tone: 'success', label: 'Đã duyệt' }
     case 'LOCKED':
-      return { className: 'border-slate-200 bg-slate-100 text-slate-700', label: 'Đã khóa' }
+      return { tone: 'neutral', label: 'Đã khóa' }
     default:
-      return { className: 'border-slate-200 bg-slate-50 text-slate-600', label: String(status ?? '-') }
+      return { tone: 'neutral', label: String(status ?? '-') }
   }
 }
 
-export function getBlueprintVersionStatusDisplay(status?: string | null) {
+export function getBlueprintVersionStatusDisplay(status?: string | null): { tone: StatusTone; label: string } {
   switch (status) {
     case 'DRAFT':
-      return { className: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Bản nháp' }
+      return { tone: 'warning', label: 'Bản nháp' }
     case 'PUBLISHED':
-      return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Đã xuất bản' }
+      return { tone: 'success', label: 'Đã xuất bản' }
     case 'ARCHIVED':
-      return { className: 'border-slate-200 bg-slate-100 text-slate-700', label: 'Lưu trữ' }
+      return { tone: 'neutral', label: 'Lưu trữ' }
     default:
-      return { className: 'border-slate-200 bg-slate-50 text-slate-600', label: String(status ?? '-') }
+      return { tone: 'neutral', label: String(status ?? '-') }
   }
 }

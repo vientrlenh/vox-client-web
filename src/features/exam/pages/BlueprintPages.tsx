@@ -1,11 +1,13 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { LayoutList, Plus } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
 import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { StatusBadge as SharedStatusBadge } from '@/shared/ui/StatusBadge'
 import { QuestionPicker } from '../components/QuestionPicker'
 import {
   useCreateBlueprintMutation,
@@ -231,10 +233,11 @@ function BlueprintListPage({ allowCreate = false, basePath, readOnly = false, ti
           </button>
           {!readOnly && allowCreate ? (
             <button
-              className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4.5 text-sm font-semibold text-white"
               onClick={() => setShowCreate((current) => !current)}
               type="button"
             >
+              <Plus size={18} />
               {showCreate ? 'Đóng form' : 'Tạo blueprint'}
             </button>
           ) : null}
@@ -247,7 +250,7 @@ function BlueprintListPage({ allowCreate = false, basePath, readOnly = false, ti
 
       {showCreate ? (
         <form
-          className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-3"
+          className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 md:grid-cols-3"
           onSubmit={(event) => {
             event.preventDefault()
             const formElement = event.currentTarget
@@ -278,75 +281,69 @@ function BlueprintListPage({ allowCreate = false, basePath, readOnly = false, ti
           <Field label="Ten blueprint" name="name" />
           <Field label="Mo ta" name="description" />
           <div className="md:col-span-3 flex justify-end">
-            <button className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white" type="submit">
-              Tao blueprint
+            <button className="inline-flex h-10 items-center justify-center rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4.5 text-sm font-semibold text-white" type="submit">
+              Tạo blueprint
             </button>
           </div>
         </form>
       ) : null}
 
-      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5">
+      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5">
         <Field label="Tu khoa" name="keyword" onValueChange={setKeyword} value={keyword} />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <table className="min-w-full text-left">
-          <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Blueprint</th>
-              <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Active</th>
-              <th className="px-4 py-3">Updated</th>
-              <th className="px-4 py-3 text-right">Thao tac</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {blueprintsQuery.data?.content.map((blueprint) => (
-              <tr key={blueprint.id}>
-                <td className="px-4 py-4">
-                  <div className="grid gap-1">
-                    <span className="text-sm font-black text-slate-950">{blueprint.name}</span>
-                    <span className="text-xs font-medium text-slate-500">{formatNullableText(blueprint.description)}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-4 font-mono text-xs font-semibold text-slate-600">{blueprint.code}</td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-600">{blueprint.isActive ? 'Yes' : 'No'}</td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-600">{formatDateTime(blueprint.updatedAt)}</td>
-                <td className="px-4 py-4">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
-                      onClick={() => navigate(`${basePath}/${blueprint.id}`)}
-                      type="button"
-                    >
-                      Chi tiet
-                    </button>
-                    {!readOnly ? (
-                      <button
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-bold text-red-600"
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              const result = await deleteMutation.mutateAsync(blueprint.id)
-                              await refresh()
-                              setMessage(result)
-                              setError(null)
-                            } catch (submitError) {
-                              setError(getErrorMessage(submitError))
-                            }
-                          })()
-                        }}
-                        type="button"
-                      >
-                        Xóa
-                      </button>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="grid gap-4 md:grid-cols-2">
+        {blueprintsQuery.data?.content.map((blueprint) => (
+          <div
+            className="rounded-2xl border border-slate-200 bg-white p-5.5 transition hover:-translate-y-0.5 hover:shadow-lg"
+            key={blueprint.id}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <span className={`flex h-12 w-12 items-center justify-center rounded-[13px] ${blueprint.isActive ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                <LayoutList size={24} />
+              </span>
+              <SharedStatusBadge label={blueprint.isActive ? 'Đang hoạt động' : 'Ngừng hoạt động'} tone={blueprint.isActive ? 'success' : 'neutral'} />
+            </div>
+            <div className="mt-3.5 text-base font-extrabold text-slate-900">{blueprint.name}</div>
+            <div className="mt-0.5 font-mono text-xs font-semibold text-slate-500">{blueprint.code}</div>
+            {blueprint.description ? <p className="mt-2 text-xs font-medium text-slate-500">{formatNullableText(blueprint.description)}</p> : null}
+            <div className="mt-3.5 flex items-center gap-2 text-xs font-medium text-slate-500">Cập nhật: {formatDateTime(blueprint.updatedAt)}</div>
+            <div className="mt-3.5 flex gap-2">
+              <button
+                className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 px-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => navigate(`${basePath}/${blueprint.id}`)}
+                type="button"
+              >
+                Chi tiết
+              </button>
+              {!readOnly ? (
+                <button
+                  className="inline-flex h-9 items-center justify-center rounded-full border border-red-200 px-3.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        const result = await deleteMutation.mutateAsync(blueprint.id)
+                        await refresh()
+                        setMessage(result)
+                        setError(null)
+                      } catch (submitError) {
+                        setError(getErrorMessage(submitError))
+                      }
+                    })()
+                  }}
+                  type="button"
+                >
+                  Xóa
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ))}
+        {blueprintsQuery.data?.content.length ? null : (
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm font-semibold text-slate-500 md:col-span-2">
+            Chưa có blueprint nào.
+          </div>
+        )}
       </div>
     </section>
   )
@@ -599,11 +596,22 @@ function BlueprintDetailPage({ canEdit, title }: BlueprintDetailPageProps) {
       <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
       {dialog}
 
-      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
-        <InfoItem label="Ten" value={blueprint.name} />
-        <InfoItem label="Code" value={blueprint.code} />
-        <InfoItem label="Active" value={blueprint.isActive ? 'Yes' : 'No'} />
-        <InfoItem label="Updated" value={formatDateTime(blueprint.updatedAt)} />
+      <div className="rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="flex flex-wrap items-center gap-3.5">
+          <span className={`flex h-12 w-12 items-center justify-center rounded-[13px] ${blueprint.isActive ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+            <LayoutList size={24} />
+          </span>
+          <div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-xl font-extrabold text-slate-900">{blueprint.name}</h2>
+              <SharedStatusBadge label={blueprint.isActive ? 'Đang hoạt động' : 'Ngừng hoạt động'} tone={blueprint.isActive ? 'success' : 'neutral'} />
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs font-medium text-slate-500">
+              <span className="font-mono font-semibold">{blueprint.code}</span>
+              <span>Cập nhật: {formatDateTime(blueprint.updatedAt)}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {canEdit ? (
@@ -639,11 +647,11 @@ Lưu thông tin
         </form>
       ) : null}
 
-      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
+      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Versions</h2>
-            <p className="mt-1 text-sm font-medium text-slate-600">
+            <h2 className="text-lg font-extrabold text-slate-900">Phiên bản</h2>
+            <p className="mt-1 text-sm font-medium text-slate-500">
               Bước này dành cho REVIEWER/CHAIR đổi trạng thái version. AUTHOR không tự đổi trạng thái version của chính mình.
             </p>
           </div>
@@ -655,12 +663,12 @@ Lưu thông tin
             const draftSections = draftSectionsByVersion[version.id] ?? version.sections
 
             return (
-              <div className="grid gap-4 rounded-lg border border-slate-200 p-4" key={version.id}>
+              <div className="grid gap-4 rounded-2xl border border-slate-200 p-4" key={version.id}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="grid gap-2">
                     <p className="text-sm font-black text-slate-950">Version {version.version} - {version.code}</p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${status.className}`}>{status.label}</span>
+                      <SharedStatusBadge label={status.label} tone={status.tone} />
                       <span className="text-xs font-semibold text-slate-500">
                         Tong thoi gian: {version.totalTimeLimitSeconds ?? 0} giay
                       </span>
@@ -1522,14 +1530,6 @@ function SelectionSpecEditor({
   )
 }
 
-function InfoItem({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-      <div className="mt-2 text-sm font-bold text-slate-950">{value}</div>
-    </div>
-  )
-}
 
 function Notice({ children, tone }: { children: ReactNode; tone: 'error' | 'success' }) {
   return (
