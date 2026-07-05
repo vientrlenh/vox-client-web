@@ -54,6 +54,9 @@ import {
 
 type TabKey = 'assets' | 'content' | 'guide' | 'sharing' | 'workflow'
 
+// Tạm ẩn tab "Tài nguyên" khỏi UI (chưa cho người dùng tương tác) — logic/mutations giữ nguyên, chỉ bật lại bằng cách đổi hằng số này.
+const ASSETS_TAB_ENABLED = false
+
 type EditorFormState = {
   instructionText: string
   maxResponseSeconds: string
@@ -654,7 +657,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
         <div className="flex flex-wrap gap-2">
           {[
             { id: 'content', label: 'Nội dung' },
-            { id: 'assets', label: 'Tài nguyên' },
+            ...(ASSETS_TAB_ENABLED ? [{ id: 'assets', label: 'Tài nguyên' }] : []),
             { id: 'guide', label: 'Hướng dẫn chấm' },
             ...(mode === 'edit'
               ? [
