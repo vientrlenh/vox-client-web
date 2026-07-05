@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, UserPlus } from 'lucide-react'
-import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { examQueryKeys } from '../api/useExamQueries'
 import { useCreateExamMemberMutation, useDeleteExamMemberMutation, useUpdateExamMemberMutation } from '../api/useExamMutations'
 import { TeacherPickerModal } from './TeacherPickerModal'
@@ -133,17 +132,7 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
         ) : (
           <div className="grid gap-2.5">
             {members.map((member) => {
-              const actionItems: ActionMenuItem[] = ROLE_ORDER.filter((role) => role !== member.role).map((role) => ({
-                id: `set-${role}`,
-                label: `Chuyển sang ${getMemberRoleDisplay(role)}`,
-                onSelect: () => void handleChangeRole(member.id, role),
-              }))
-              actionItems.push({
-                id: 'remove',
-                label: 'Xóa khỏi hội đồng',
-                onSelect: () => void handleRemove(member.id),
-                tone: 'danger',
-              })
+              const isBusy = busyMemberId === member.id
               return (
                 <div className="flex items-center gap-3.5 rounded-xl border border-slate-200 px-3.5 py-3" key={member.id}>
                   <span
@@ -158,15 +147,34 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
                     <div className="text-sm font-bold text-slate-900">{member.user?.fullName ?? member.userId}</div>
                     <div className="text-xs text-slate-500">{member.user?.email ?? '-'}</div>
                   </div>
-                  <span className="rounded-full bg-indigo-50 px-3.5 py-1 text-xs font-bold text-indigo-700">
-                    {getMemberRoleDisplay(member.role)}
-                  </span>
                   {canManage ? (
-                    <ActionMenuButton
-                      ariaLabel={`Thao tác cho ${member.user?.fullName ?? member.userId}`}
-                      disabled={busyMemberId === member.id}
-                      items={actionItems}
-                    />
+                    <select
+                      className="h-8.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isBusy}
+                      onChange={(event) => void handleChangeRole(member.id, event.target.value as ExamMemberRole)}
+                      value={member.role}
+                    >
+                      {ROLE_ORDER.map((role) => (
+                        <option key={role} value={role}>
+                          {getMemberRoleDisplay(role)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="rounded-full bg-indigo-50 px-3.5 py-1 text-xs font-bold text-indigo-700">
+                      {getMemberRoleDisplay(member.role)}
+                    </span>
+                  )}
+                  {canManage ? (
+                    <button
+                      aria-label={`Xóa ${member.user?.fullName ?? member.userId} khỏi hội đồng`}
+                      className="inline-flex h-8.5 items-center justify-center rounded-full border border-red-200 px-3 text-xs font-bold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isBusy}
+                      onClick={() => void handleRemove(member.id)}
+                      type="button"
+                    >
+                      Xóa
+                    </button>
                   ) : null}
                 </div>
               )

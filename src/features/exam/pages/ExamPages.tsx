@@ -395,6 +395,7 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
 
 type ExamDetailPageProps = {
   basePath: string
+  canManageBlueprint: boolean
   canManageInfo: boolean
   canManageMembers: boolean
   canManagePapers: boolean
@@ -403,7 +404,7 @@ type ExamDetailPageProps = {
 
 type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
 
-function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePapers, canManageStatus }: ExamDetailPageProps) {
+function ExamDetailPage({ basePath, canManageBlueprint, canManageInfo, canManageMembers, canManagePapers, canManageStatus }: ExamDetailPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { examId } = useParams()
@@ -501,15 +502,15 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
                 className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
                 onClick={() => {
                   void (async () => {
-                    const sourceInput = window.prompt('Nguồn tạo mã đề (BLUEPRINT / BLANK / COPY):', 'BLUEPRINT')
-                    const source = sourceInput?.trim().toUpperCase()
+                    const sourceInput = window.prompt('Nguồn tạo mã đề (blueprint / copy):', 'blueprint')
+                    const source = sourceInput?.trim().toLowerCase()
 
-                    if (!source || !['BLUEPRINT', 'BLANK', 'COPY'].includes(source)) {
+                    if (!source || !['blueprint', 'copy'].includes(source)) {
                       return
                     }
 
                     const copyFromPaperId =
-                      source === 'COPY'
+                      source === 'copy'
                         ? window.prompt('Nhập paperId cần sao chép:', exam.papers[0]?.id ?? '')
                         : null
 
@@ -517,7 +518,7 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
                       examId: exam.id,
                       payload: {
                         copyFromPaperId: copyFromPaperId?.trim() || null,
-                        source: source as 'BLUEPRINT' | 'BLANK' | 'COPY',
+                        source: source as 'blueprint' | 'copy',
                       },
                     })
                     await invalidate()
@@ -574,7 +575,7 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
         <BlueprintAttachPanel
           blueprintId={exam.blueprintId}
           blueprintVersionId={exam.blueprintVersionId}
-          canManage={canManageInfo}
+          canManage={canManageBlueprint}
           examId={exam.id}
           onOpenBlueprint={(blueprintId) => navigate(`${basePath.replace(/\/exams$/, '')}/blueprints/${blueprintId}`)}
         />
@@ -674,6 +675,7 @@ export function TeacherExamDetailPage() {
   return (
     <ExamDetailPage
       basePath="/teacher/exams"
+      canManageBlueprint
       canManageInfo={false}
       canManageMembers={false}
       canManagePapers
@@ -686,6 +688,7 @@ export function SchoolAdminExamDetailPage() {
   return (
     <ExamDetailPage
       basePath="/school-admin/exams"
+      canManageBlueprint
       canManageInfo
       canManageMembers
       canManagePapers={false}

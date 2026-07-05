@@ -18,7 +18,7 @@ export type ExamBlueprintVersionStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 
 export type ExamBlueprintSlotType = 'FIXED' | 'SELECTION'
 
-export type CreateExamPaperSource = 'BLUEPRINT' | 'BLANK' | 'COPY'
+export type CreateExamPaperSource = 'blueprint' | 'copy'
 
 export type ExamCandidateStatus = 'ASSIGNED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED'
 

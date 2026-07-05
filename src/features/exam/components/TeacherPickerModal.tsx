@@ -45,6 +45,11 @@ export function TeacherPickerModal({ excludeUserIds, onClose, onSelect }: Teache
           </button>
         </div>
 
+        <p className="border-b border-slate-200 bg-amber-50 px-6 py-2.5 text-xs font-semibold text-amber-700">
+          Chỉ hiện giáo viên đã kích hoạt tài khoản (đã đặt mật khẩu). Giáo viên vừa tạo cần đặt mật khẩu qua email trước khi
+          xuất hiện ở đây.
+        </p>
+
         <div className="grid gap-3 border-b border-slate-200 px-6 py-3.5 sm:grid-cols-[1fr_auto]">
           <div className="relative">
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />

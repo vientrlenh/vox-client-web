@@ -134,9 +134,10 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
 
 type BlueprintListPageProps = {
   basePath: string
+  canCreate: boolean
 }
 
-function BlueprintListPage({ basePath }: BlueprintListPageProps) {
+function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
   const navigate = useNavigate()
   const [showCreate, setShowCreate] = useState(false)
   const [page, setPage] = useState(1)
@@ -146,14 +147,20 @@ function BlueprintListPage({ basePath }: BlueprintListPageProps) {
     <section className="mx-auto max-w-290">
       <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">Blueprint de thi</h1>
       <p className="mt-2 text-[15px] text-slate-500">Khuon mau cau truc de: phan, o cau hoi, trong so va thoi luong.</p>
-      <button
-        className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
-        onClick={() => setShowCreate(true)}
-        type="button"
-      >
-        <Plus aria-hidden="true" className="size-4.5" />
-        Tao blueprint
-      </button>
+      {canCreate ? (
+        <button
+          className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+          onClick={() => setShowCreate(true)}
+          type="button"
+        >
+          <Plus aria-hidden="true" className="size-4.5" />
+          Tao blueprint
+        </button>
+      ) : (
+        <p className="mt-5 text-[13px] text-slate-400">
+          Giáo viên tạo blueprint mới ngay trong lúc gắn vào kỳ thi (tab Blueprint của kỳ thi bạn là AUTHOR).
+        </p>
+      )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {blueprintsQuery.data?.content.map((blueprint) => {
@@ -213,11 +220,11 @@ function BlueprintListPage({ basePath }: BlueprintListPageProps) {
 }
 
 export function TeacherBlueprintsPage() {
-  return <BlueprintListPage basePath="/teacher/blueprints" />
+  return <BlueprintListPage basePath="/teacher/blueprints" canCreate={false} />
 }
 
 export function SchoolAdminBlueprintsPage() {
-  return <BlueprintListPage basePath="/school-admin/blueprints" />
+  return <BlueprintListPage basePath="/school-admin/blueprints" canCreate />
 }
 
 const STATUS_ORDER: ExamBlueprintVersionStatus[] = ['DRAFT', 'PUBLISHED', 'ARCHIVED']

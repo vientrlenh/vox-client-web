@@ -297,6 +297,22 @@ function ClassPicker({ onChange, value }: { onChange: (id: string, name: string)
   )
 }
 
+let classTestKeySeed = 0
+function nextClassTestKey(prefix: string) {
+  classTestKeySeed += 1
+  return `${prefix}-${classTestKeySeed}`
+}
+
+type ClassTestSectionDraft = {
+  key: string
+  questions: QuestionDto[]
+  title: string
+}
+
+function newClassTestSection(order: number): ClassTestSectionDraft {
+  return { key: nextClassTestKey('cts'), questions: [], title: `Phần ${order}` }
+}
+
 export function TeacherClassTestCreatePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -307,14 +323,63 @@ export function TeacherClassTestCreatePage() {
   const [schoolClassName, setSchoolClassName] = useState('')
   const [openAt, setOpenAt] = useState('')
   const [closeAt, setCloseAt] = useState('')
-  const [selectedQuestions, setSelectedQuestions] = useState<QuestionDto[]>([])
-  const [showQuestionPicker, setShowQuestionPicker] = useState(false)
+  const [sections, setSections] = useState<ClassTestSectionDraft[]>([newClassTestSection(1)])
+  const [pickerForSectionKey, setPickerForSectionKey] = useState<string | null>(null)
   const { confirm, dialog } = useConfirmationDialog()
+
+  function addSection() {
+    setSections((current) => [...current, newClassTestSection(current.length + 1)])
+  }
+
+  function removeSection(sectionKey: string) {
+    setSections((current) => current.filter((section) => section.key !== sectionKey))
+  }
+
+  function updateSectionTitle(sectionKey: string, title: string) {
+    setSections((current) => current.map((section) => (section.key === sectionKey ? { ...section, title } : section)))
+  }
+
+  function addQuestionToSection(sectionKey: string, question: QuestionDto) {
+    setSections((current) =>
+      current.map((section) =>
+        section.key === sectionKey && !section.questions.some((existing) => existing.id === question.id)
+          ? { ...section, questions: [...section.questions, question] }
+          : section,
+      ),
+    )
+  }
+
+  function removeQuestionFromSection(sectionKey: string, questionId: string) {
+    setSections((current) =>
+      current.map((section) =>
+        section.key === sectionKey
+          ? { ...section, questions: section.questions.filter((question) => question.id !== questionId) }
+          : section,
+      ),
+    )
+  }
+
+  const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0)
+  const pickerSection = pickerForSectionKey ? sections.find((section) => section.key === pickerForSectionKey) : null
 
   async function handleSubmit() {
     if (!name.trim() || !schoolClassId) {
       window.alert('Vui lòng nhập tên bài và chọn lớp học.')
       return
+    }
+    if (sections.length === 0 || sections.every((section) => section.questions.length === 0)) {
+      window.alert('Phải có ít nhất một phần với ít nhất một câu hỏi.')
+      return
+    }
+    for (const section of sections) {
+      if (!section.title.trim()) {
+        window.alert('Mỗi phần phải có tên.')
+        return
+      }
+      if (section.questions.length === 0) {
+        window.alert(`Phần "${section.title}" phải có ít nhất một câu hỏi.`)
+        return
+      }
     }
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo bài trên lớp này không?' }))) {
       return
@@ -325,8 +390,11 @@ export function TeacherClassTestCreatePage() {
         description: description || null,
         name,
         openAt: toIsoDateTime(openAt),
-        questionIds: selectedQuestions.map((question) => question.id),
         schoolClassId,
+        sections: sections.map((section) => ({
+          questionIds: section.questions.map((question) => question.id),
+          title: section.title.trim(),
+        })),
       },
       schoolClassName,
     })
@@ -396,40 +464,72 @@ export function TeacherClassTestCreatePage() {
 
         <div>
           <div className="flex items-center justify-between">
-            <h2 className="text-[15px] font-extrabold text-slate-900">Câu hỏi đã chọn ({selectedQuestions.length})</h2>
+            <h2 className="text-[15px] font-extrabold text-slate-900">Các phần và câu hỏi ({totalQuestions} câu)</h2>
             <button
               className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-indigo-600 hover:bg-slate-50"
-              onClick={() => setShowQuestionPicker(true)}
+              onClick={addSection}
               type="button"
             >
               <Plus aria-hidden="true" className="size-4" />
-              Thêm câu hỏi
+              Thêm phần
             </button>
           </div>
-          {selectedQuestions.length === 0 ? (
-            <div className="mt-2.5 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
-              Chưa có câu hỏi nào được chọn.
-            </div>
-          ) : (
-            <div className="mt-2.5 grid gap-2">
-              {selectedQuestions.map((question, index) => (
-                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5" key={question.id}>
-                  <span className="text-sm font-semibold text-slate-800">
-                    {index + 1}. {question.code} — {formatNullableText(question.questionText)}
-                  </span>
+
+          <div className="mt-2.5 grid gap-3">
+            {sections.map((section) => (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5" key={section.key}>
+                <div className="flex items-center gap-2.5">
+                  <input
+                    className="h-9.5 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
+                    onChange={(event) => updateSectionTitle(section.key, event.target.value)}
+                    value={section.title}
+                  />
                   <button
-                    className="inline-flex h-8 items-center justify-center rounded-full border border-red-200 px-3 text-xs font-bold text-red-600 hover:bg-red-50"
-                    onClick={() =>
-                      setSelectedQuestions((current) => current.filter((item) => item.id !== question.id))
-                    }
+                    className="inline-flex h-9.5 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+                    onClick={() => setPickerForSectionKey(section.key)}
                     type="button"
                   >
-                    Bỏ
+                    + Câu hỏi
                   </button>
+                  {sections.length > 1 ? (
+                    <button
+                      aria-label={`Xóa ${section.title}`}
+                      className="inline-flex size-9.5 items-center justify-center rounded-full border border-red-200 text-red-600 hover:bg-red-50"
+                      onClick={() => removeSection(section.key)}
+                      type="button"
+                    >
+                      <Trash2 aria-hidden="true" className="size-4" />
+                    </button>
+                  ) : null}
                 </div>
-              ))}
-            </div>
-          )}
+                {section.questions.length === 0 ? (
+                  <div className="mt-2.5 rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
+                    Chưa có câu hỏi nào trong phần này.
+                  </div>
+                ) : (
+                  <div className="mt-2.5 grid gap-1.5">
+                    {section.questions.map((question, index) => (
+                      <div
+                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm"
+                        key={question.id}
+                      >
+                        <span className="font-semibold text-slate-800">
+                          {index + 1}. {question.code} — {formatNullableText(question.questionText)}
+                        </span>
+                        <button
+                          className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                          onClick={() => removeQuestionFromSection(section.key, question.id)}
+                          type="button"
+                        >
+                          Bỏ
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="flex justify-end">
@@ -444,16 +544,12 @@ export function TeacherClassTestCreatePage() {
         </div>
       </div>
 
-      {showQuestionPicker ? (
+      {pickerSection ? (
         <QuestionPicker
-          onClose={() => setShowQuestionPicker(false)}
-          onSelect={(question) => {
-            setSelectedQuestions((current) =>
-              current.some((item) => item.id === question.id) ? current : [...current, question],
-            )
-          }}
+          onClose={() => setPickerForSectionKey(null)}
+          onSelect={(question) => addQuestionToSection(pickerSection.key, question)}
           scope="teacher"
-          selectedQuestionIds={selectedQuestions.map((question) => question.id)}
+          selectedQuestionIds={pickerSection.questions.map((question) => question.id)}
         />
       ) : null}
     </section>
@@ -478,24 +574,76 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const setDeliveryModeMutation = useSetExamDeliveryModeMutation()
   const [tab, setTab] = useState<DetailTab>('papers')
   const [message, setMessage] = useState<string | null>(null)
-  const [showQuestionPicker, setShowQuestionPicker] = useState(false)
+  const [pickerMode, setPickerMode] = useState<{ kind: 'existing'; sectionIndex: number } | { kind: 'new'; title: string } | null>(null)
   const { confirm, dialog } = useConfirmationDialog()
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
   }
 
-  async function handleAddQuestion(questionId: string) {
+  const paperSections = exam?.papers[0]?.sections ?? []
+
+  function currentSectionsPayload() {
+    return paperSections.map((section) => ({
+      questionIds: (section.items.map((item) => item.questionId).filter(Boolean) as string[]),
+      title: section.title?.trim() || 'Phần',
+    }))
+  }
+
+  function handleOpenAddSection() {
+    const title = window.prompt('Tên phần mới (VD: Phần 2 · Ngữ pháp):', `Phần ${paperSections.length + 1}`)
+    if (!title?.trim()) {
+      return
+    }
+    setPickerMode({ kind: 'new', title: title.trim() })
+  }
+
+  async function handlePickQuestion(question: QuestionDto) {
+    if (!exam || !pickerMode) {
+      return
+    }
+    const current = currentSectionsPayload()
+    const next =
+      pickerMode.kind === 'new'
+        ? [...current, { questionIds: [question.id], title: pickerMode.title }]
+        : current.map((section, index) =>
+            index === pickerMode.sectionIndex && !section.questionIds.includes(question.id)
+              ? { ...section, questionIds: [...section.questionIds, question.id] }
+              : section,
+          )
+    await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+    await invalidate()
+    setPickerMode(null)
+    setMessage('Đã cập nhật câu hỏi.')
+  }
+
+  async function handleRemoveQuestion(sectionIndex: number, questionId: string) {
     if (!exam) {
       return
     }
-    const existingIds = exam.papers[0]?.sections.flatMap((section) => section.items.map((item) => item.questionId)).filter(Boolean) as string[] ?? []
-    if (existingIds.includes(questionId)) {
+    const current = currentSectionsPayload()
+    const next = current.map((section, index) =>
+      index === sectionIndex ? { ...section, questionIds: section.questionIds.filter((id) => id !== questionId) } : section,
+    )
+    await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+    await invalidate()
+  }
+
+  async function handleRemoveSection(sectionIndex: number) {
+    if (!exam) {
       return
     }
-    await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { questionIds: [...existingIds, questionId] } })
+    const current = currentSectionsPayload()
+    if (current.length <= 1) {
+      window.alert('Bài phải có ít nhất 1 phần — không thể xóa phần cuối cùng.')
+      return
+    }
+    if (!(await confirm({ message: 'Xóa phần này? Toàn bộ câu hỏi trong phần cũng sẽ bị xóa.' }))) {
+      return
+    }
+    const next = current.filter((_, index) => index !== sectionIndex)
+    await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
     await invalidate()
-    setMessage('Đã thêm câu hỏi vào bài trên lớp.')
   }
 
   if (examQuery.isLoading) {
@@ -578,16 +726,78 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       {tab === 'papers' ? (
         <div className="mt-4 grid gap-3.5">
-          {canManage ? (
-            <div className="flex justify-end">
-              <button
-                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-indigo-600 hover:bg-slate-50"
-                onClick={() => setShowQuestionPicker(true)}
-                type="button"
-              >
-                <Plus aria-hidden="true" className="size-4" />
-                Thêm câu hỏi
-              </button>
+          {canManage && !exam.blueprintId ? (
+            <div className="grid gap-2.5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[15px] font-extrabold text-slate-900">Các phần và câu hỏi</h2>
+                <button
+                  className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-indigo-600 hover:bg-slate-50"
+                  onClick={handleOpenAddSection}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" className="size-4" />
+                  Thêm phần
+                </button>
+              </div>
+              {paperSections.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
+                  Chưa có phần nào — bấm "Thêm phần" để bắt đầu soạn đề.
+                </div>
+              ) : (
+                paperSections.map((section, sectionIndex) => (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5" key={section.id}>
+                    <div className="flex items-center justify-between gap-2.5">
+                      <span className="text-sm font-bold text-slate-900">{section.title || `Phần ${sectionIndex + 1}`}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          className="inline-flex h-8.5 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+                          onClick={() => setPickerMode({ kind: 'existing', sectionIndex })}
+                          type="button"
+                        >
+                          + Câu hỏi
+                        </button>
+                        {paperSections.length > 1 ? (
+                          <button
+                            aria-label={`Xóa ${section.title ?? `phần ${sectionIndex + 1}`}`}
+                            className="inline-flex size-8.5 items-center justify-center rounded-full border border-red-200 text-red-600 hover:bg-red-50"
+                            onClick={() => void handleRemoveSection(sectionIndex)}
+                            type="button"
+                          >
+                            <Trash2 aria-hidden="true" className="size-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                    {section.items.length === 0 ? (
+                      <div className="mt-2.5 rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
+                        Chưa có câu hỏi nào trong phần này.
+                      </div>
+                    ) : (
+                      <div className="mt-2.5 grid gap-1.5">
+                        {section.items.map((item, index) => (
+                          <div
+                            className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm"
+                            key={item.id}
+                          >
+                            <span className="font-semibold text-slate-800">
+                              {index + 1}. {item.question?.code} — {formatNullableText(item.question?.questionText)}
+                            </span>
+                            {section.items.length > 1 && item.questionId ? (
+                              <button
+                                className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                                onClick={() => void handleRemoveQuestion(sectionIndex, item.questionId as string)}
+                                type="button"
+                              >
+                                Bỏ
+                              </button>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           ) : null}
           {exam.papers.map((paper) => (
@@ -606,13 +816,13 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         </div>
       ) : null}
 
-      {showQuestionPicker ? (
+      {pickerMode ? (
         <QuestionPicker
-          onClose={() => setShowQuestionPicker(false)}
-          onSelect={(question) => void handleAddQuestion(question.id)}
+          onClose={() => setPickerMode(null)}
+          onSelect={(question) => void handlePickQuestion(question)}
           scope="teacher"
           selectedQuestionIds={
-            (exam.papers[0]?.sections.flatMap((section) => section.items.map((item) => item.questionId)).filter(Boolean) as string[]) ?? []
+            paperSections.flatMap((section) => section.items.map((item) => item.questionId)).filter(Boolean) as string[]
           }
         />
       ) : null}

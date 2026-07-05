@@ -81,6 +81,10 @@ function newSection(order: number): SectionDraft {
   }
 }
 
+function sectionWeightOf(section: SectionDraft): number {
+  return section.sectionWeight.trim() ? Number(section.sectionWeight) : 1
+}
+
 function slotFromDto(slot: ExamBlueprintSectionDto['slots'][number]): SlotDraft {
   return {
     difficulty: slot.selectionSpec?.difficulty ?? 'MEDIUM',
@@ -167,7 +171,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
   const [pickerForSlotKey, setPickerForSlotKey] = useState<string | null>(null)
 
   const detailPath = `${basePath}/${blueprint.id}`
-  const weightSum = sections.reduce((sum, section) => sum + (Number(section.sectionWeight) || 0), 0)
+  const weightSum = sections.reduce((sum, section) => sum + sectionWeightOf(section), 0)
 
   function updateSection(sectionKey: string, patch: Partial<SectionDraft>) {
     setSections((current) => current.map((section) => (section.key === sectionKey ? { ...section, ...patch } : section)))
@@ -232,7 +236,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
       instruction: section.instruction.trim() || null,
       order: sectionIndex + 1,
       sectionTimeLimitSeconds: section.sectionTimeLimitMinutes.trim() ? Number(section.sectionTimeLimitMinutes) * 60 : null,
-      sectionWeight: section.sectionWeight.trim() ? Number(section.sectionWeight) : 1,
+      sectionWeight: sectionWeightOf(section),
       slots: section.slots.map((slot, slotIndex): UpdateBlueprintVersionSlotInput => ({
         id: slot.id ?? null,
         fixedQuestionId: slot.slotType === 'FIXED' ? slot.fixedQuestion?.id ?? null : null,

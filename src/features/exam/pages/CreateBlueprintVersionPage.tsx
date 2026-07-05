@@ -71,6 +71,10 @@ function newSection(order: number): SectionDraft {
   }
 }
 
+function sectionWeightOf(section: SectionDraft): number {
+  return section.sectionWeight.trim() ? Number(section.sectionWeight) : 1
+}
+
 type CreateBlueprintVersionPageProps = {
   basePath: string
 }
@@ -88,7 +92,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
   const blueprint = blueprintQuery.data
   const detailPath = blueprintId ? `${basePath}/${blueprintId}` : basePath
 
-  const weightSum = sections.reduce((sum, section) => sum + (Number(section.sectionWeight) || 0), 0)
+  const weightSum = sections.reduce((sum, section) => sum + sectionWeightOf(section), 0)
 
   function updateSection(sectionKey: string, patch: Partial<SectionDraft>) {
     setSections((current) => current.map((section) => (section.key === sectionKey ? { ...section, ...patch } : section)))
@@ -152,7 +156,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
       instruction: section.instruction.trim() || null,
       order: sectionIndex + 1,
       sectionTimeLimitSeconds: section.sectionTimeLimitMinutes.trim() ? Number(section.sectionTimeLimitMinutes) * 60 : null,
-      sectionWeight: section.sectionWeight.trim() ? Number(section.sectionWeight) : 1,
+      sectionWeight: sectionWeightOf(section),
       slots: section.slots.map((slot, slotIndex): CreateBlueprintVersionSlotInput => ({
         fixedQuestionId: slot.slotType === 'FIXED' ? slot.fixedQuestion?.id ?? null : null,
         order: slotIndex + 1,
