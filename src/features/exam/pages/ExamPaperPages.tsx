@@ -1,16 +1,22 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CircleCheck, FilePenLine } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
+import { CircleCheck, FilePenLine, Trash2 } from 'lucide-react'
+import { useLocation, useNavigate, useParams } from 'react-router'
+import { StatusBadge } from '@/shared/ui/StatusBadge'
+import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { QuestionPicker } from '../components/QuestionPicker'
 import { examQueryKeys, useExamPaperQuery, useExamQuery } from '../api/useExamQueries'
-import { useUpdateExamPaperItemMutation, useUpdateExamPaperStatusMutation } from '../api/useExamMutations'
+import {
+  useDeleteExamPaperMutation,
+  useUpdateExamPaperItemMutation,
+  useUpdateExamPaperStatusMutation,
+} from '../api/useExamMutations'
 import { formatNullableText, getExamPaperStatusDisplay, type UpdateExamPaperStatusRequest } from '../types'
-import { StatusBadge } from '@/shared/ui/StatusBadge'
 
 const STATUS_ACTION_LABEL: Record<UpdateExamPaperStatusRequest['action'], string> = {
   APPROVE: 'Duyệt mã đề',
   LOCK: 'Khóa mã đề',
+  REOPEN: 'Mở lại mã đề',
   REQUEST_REVISION: 'Yêu cầu sửa lại',
   SUBMIT: 'Nộp duyệt',
 }
@@ -19,6 +25,12 @@ const NEXT_ACTIONS: Partial<Record<string, UpdateExamPaperStatusRequest['action'
   APPROVED: ['LOCK'],
   DRAFT: ['SUBMIT'],
   IN_REVIEW: ['APPROVE', 'REQUEST_REVISION'],
+  LOCKED: ['REOPEN'],
+}
+
+type ExamPaperPageLocationState = {
+  examId?: string
+  paperId?: string
 }
 
 type ExamPaperPageProps = {
@@ -27,14 +39,24 @@ type ExamPaperPageProps = {
 
 function ExamPaperPage({ canManage }: ExamPaperPageProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { paperId } = useParams()
   const queryClient = useQueryClient()
-  const paperQuery = useExamPaperQuery(paperId ?? null)
-  const paper = paperQuery.data
-  const examQuery = useExamQuery(paper?.examId ?? null)
+  const state = (location.state ?? {}) as ExamPaperPageLocationState
+  const resolvedPaperId = paperId ?? state.paperId ?? null
+  const paperQuery = useExamPaperQuery(resolvedPaperId)
+  const paper = paperQuery.data ?? null
+  // state.examId chỉ là fast-path (khởi động song song useExamQuery lúc điều hướng trong app);
+  // khi F5/dán thẳng URL thì state rỗng, paper.examId (từ server) tự thay thế — không còn phụ thuộc bắt buộc.
+  const examId = paper?.examId ?? state.examId ?? null
+  const examQuery = useExamQuery(examId)
   const updateItemMutation = useUpdateExamPaperItemMutation()
   const updateStatusMutation = useUpdateExamPaperStatusMutation()
+  const deleteMutation = useDeleteExamPaperMutation()
+  const { confirm, dialog } = useConfirmationDialog()
   const [pickerItemId, setPickerItemId] = useState<string | null>(null)
+
+  const exam = examQuery.data
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -48,7 +70,6 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
     return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy mã đề.</section>
   }
 
-  const exam = examQuery.data
   const backPath = exam
     ? exam.kind === 'CLASS_TEST'
       ? canManage
@@ -79,6 +100,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
       >
         ← Quay lại
       </button>
+      {dialog}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center gap-3">
@@ -155,6 +177,32 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
         </div>
       ) : null}
 
+      {canManage && paper.status === 'DRAFT' ? (
+        <div className="mt-3">
+          <button
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-red-200 px-4 text-xs font-bold text-red-600 hover:bg-red-50"
+            onClick={() => {
+              void (async () => {
+                if (!(await confirm({ message: 'Bạn có chắc muốn xóa mã đề này không?' }))) {
+                  return
+                }
+                await deleteMutation.mutateAsync(paper.id)
+                await invalidate()
+                if (backPath) {
+                  navigate(backPath)
+                } else {
+                  navigate(-1)
+                }
+              })()
+            }}
+            type="button"
+          >
+            <Trash2 aria-hidden="true" className="size-4" />
+            Xóa mã đề
+          </button>
+        </div>
+      ) : null}
+
       {pickerItemId ? (
         <QuestionPicker
           onClose={() => setPickerItemId(null)}
@@ -164,6 +212,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
               .then(() => invalidate())
               .then(() => setPickerItemId(null))
           }}
+          publishedOnly
           scope="teacher"
           selectedQuestionIds={existingQuestionIds}
         />

@@ -4,9 +4,11 @@ import { Check, UserPlus } from 'lucide-react'
 import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { examQueryKeys } from '../api/useExamQueries'
 import { useCreateExamMemberMutation, useDeleteExamMemberMutation, useUpdateExamMemberMutation } from '../api/useExamMutations'
+import { TeacherPickerModal } from './TeacherPickerModal'
 import { getMemberRoleDisplay, type ExamMemberDto, type ExamMemberRole } from '../types'
 
 const ROLE_ORDER: ExamMemberRole[] = ['CHAIR', 'AUTHOR', 'REVIEWER']
+const REQUIRED_ROLES: ExamMemberRole[] = ['CHAIR', 'AUTHOR']
 
 const ROLE_AVATAR_COLOR: Record<ExamMemberRole, string> = {
   AUTHOR: 'bg-cyan-600',
@@ -36,6 +38,7 @@ type MembersTabProps = {
 export function MembersTab({ canManage, examId, members }: MembersTabProps) {
   const queryClient = useQueryClient()
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
+  const [showTeacherPicker, setShowTeacherPicker] = useState(false)
   const addMemberMutation = useCreateExamMemberMutation()
   const updateRoleMutation = useUpdateExamMemberMutation()
   const removeMemberMutation = useDeleteExamMemberMutation()
@@ -44,22 +47,10 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
   }
 
-  async function handleAddMember() {
-    const fullName = window.prompt('Họ tên thành viên mới:')
-    if (!fullName?.trim()) {
-      return
-    }
-    const roleInput = window.prompt('Vai trò (CHAIR / AUTHOR / REVIEWER):', 'AUTHOR')
-    const role = (roleInput?.trim().toUpperCase() as ExamMemberRole) || 'AUTHOR'
-    if (!ROLE_ORDER.includes(role)) {
-      window.alert('Vai trò không hợp lệ.')
-      return
-    }
-    await addMemberMutation.mutateAsync({
-      examId,
-      payload: { fullName: fullName.trim(), role, userId: `user-${Date.now()}` },
-    })
+  async function handleAddMember(userId: string, role: ExamMemberRole) {
+    await addMemberMutation.mutateAsync({ examId, payload: { role, userId } })
     await invalidate()
+    setShowTeacherPicker(false)
   }
 
   async function handleChangeRole(memberId: string, role: ExamMemberRole) {
@@ -82,26 +73,37 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
         {ROLE_ORDER.map((role) => {
           const count = members.filter((member) => member.role === role).length
           const isSatisfied = count > 0
+          const isRequired = REQUIRED_ROLES.includes(role)
+          const toneClass = isSatisfied ? 'emerald' : isRequired ? 'amber' : 'slate'
           return (
             <div
               className={[
                 'flex items-center gap-3 rounded-2xl border bg-white p-4',
-                isSatisfied ? 'border-emerald-200' : 'border-amber-200',
+                toneClass === 'emerald' ? 'border-emerald-200' : toneClass === 'amber' ? 'border-amber-200' : 'border-slate-200',
               ].join(' ')}
               key={role}
             >
               <span
                 className={[
                   'flex size-9 items-center justify-center rounded-full',
-                  isSatisfied ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700',
+                  toneClass === 'emerald'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : toneClass === 'amber'
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-slate-100 text-slate-500',
                 ].join(' ')}
               >
                 <Check aria-hidden="true" className="size-4.5" />
               </span>
               <div>
                 <div className="text-[13px] font-bold text-slate-900">{role}</div>
-                <div className={['text-xs font-semibold', isSatisfied ? 'text-emerald-600' : 'text-amber-700'].join(' ')}>
-                  {isSatisfied ? `Đủ · ${count} người` : 'Chưa có'}
+                <div
+                  className={[
+                    'text-xs font-semibold',
+                    toneClass === 'emerald' ? 'text-emerald-600' : toneClass === 'amber' ? 'text-amber-700' : 'text-slate-500',
+                  ].join(' ')}
+                >
+                  {isSatisfied ? `Đủ · ${count} người` : isRequired ? 'Chưa có' : 'Không bắt buộc'}
                 </div>
               </div>
             </div>
@@ -115,7 +117,7 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
           {canManage ? (
             <button
               className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-4 text-[13px] font-semibold text-white transition hover:bg-indigo-700"
-              onClick={() => void handleAddMember()}
+              onClick={() => setShowTeacherPicker(true)}
               type="button"
             >
               <UserPlus aria-hidden="true" className="size-4" />
@@ -172,6 +174,19 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
           </div>
         )}
       </div>
+
+      {showTeacherPicker ? (
+        <TeacherPickerModal
+          excludeUserIds={members.map((member) => member.userId)}
+          onClose={() => setShowTeacherPicker(false)}
+          onSelect={(teacher, role) => {
+            if (!teacher.userId) {
+              return
+            }
+            void handleAddMember(teacher.userId, role)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

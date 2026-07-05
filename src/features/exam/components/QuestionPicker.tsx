@@ -13,20 +13,21 @@ import { StatusBadge } from '@/shared/ui/StatusBadge'
 type QuestionPickerProps = {
   onClose: () => void
   onSelect: (question: QuestionDto) => void
+  publishedOnly?: boolean
   scope: QuestionModuleScope
   selectedQuestionIds: string[]
 }
 
 const PAGE_SIZE = 8
 
-export function QuestionPicker({ onClose, onSelect, scope, selectedQuestionIds }: QuestionPickerProps) {
+export function QuestionPicker({ onClose, onSelect, publishedOnly = false, scope, selectedQuestionIds }: QuestionPickerProps) {
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
   const questionsQuery = useQuestionsQuery(scope, 'all', page, PAGE_SIZE, {
     keyword,
     scope: '',
     sharing: '',
-    status: 'PUBLISHED',
+    status: publishedOnly ? 'PUBLISHED' : '',
     topicName: '',
     type: '',
   })

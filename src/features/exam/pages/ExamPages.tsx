@@ -15,8 +15,10 @@ import {
   Rocket,
   Trash2,
   Users,
+  X,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
+import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { Pagination } from '@/shared/components/Pagination'
 import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -37,6 +39,7 @@ import {
   useCreateExamMutation,
   useCreateExamPaperMutation,
   useDeleteExamMutation,
+  useUpdateExamMutation,
   useUpdateExamPaperStatusMutation,
   useUpdateExamStatusMutation,
 } from '../api/useExamMutations'
@@ -45,9 +48,13 @@ import {
   formatNullableText,
   getExamStatusDisplay,
   getExamPaperStatusDisplay,
+  toDateTimeLocalValue,
+  toIsoDateTime,
   type ExamDto,
   type ExamStatus,
 } from '../types'
+
+const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
 const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
   { label: 'Tất cả', value: '' },
@@ -200,20 +207,22 @@ export function SchoolAdminExamCreatePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createMutation = useCreateExamMutation()
+  const languagesQuery = useSupportedLanguagesQuery(1, 100, ACTIVE_LANGUAGE_FILTERS)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [description, setDescription] = useState('')
+  const [languageId, setLanguageId] = useState('')
   const { confirm, dialog } = useConfirmationDialog()
 
   async function handleSubmit() {
-    if (!name.trim() || !code.trim()) {
+    if (!name.trim() || !code.trim() || !languageId) {
       window.alert('Vui lòng nhập tên và mã kỳ thi.')
       return
     }
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo kỳ thi này không?' }))) {
       return
     }
-    await createMutation.mutateAsync({ code: code.trim(), description: description || null, languageId: 'lang-en', name })
+    await createMutation.mutateAsync({ code: code.trim(), description: description || null, languageId, name })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
     navigate('/school-admin/exams')
   }
@@ -250,6 +259,21 @@ export function SchoolAdminExamCreatePage() {
             value={description}
           />
         </label>
+        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          Ngôn ngữ
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+            onChange={(event) => setLanguageId(event.target.value)}
+            value={languageId}
+          >
+            <option value="">Chọn ngôn ngữ</option>
+            {languagesQuery.data?.content.map((language) => (
+              <option key={language.id} value={language.id}>
+                {language.name ?? language.code ?? language.id}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="flex justify-end">
           <button
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
@@ -262,6 +286,110 @@ export function SchoolAdminExamCreatePage() {
         </div>
       </div>
     </section>
+  )
+}
+
+type EditExamModalProps = {
+  exam: ExamDto
+  onClose: () => void
+  onSaved: () => void
+}
+
+function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
+  const updateMutation = useUpdateExamMutation()
+  const [name, setName] = useState(exam.name)
+  const [description, setDescription] = useState(exam.description ?? '')
+  const [openAt, setOpenAt] = useState(toDateTimeLocalValue(exam.openAt))
+  const [closeAt, setCloseAt] = useState(toDateTimeLocalValue(exam.closeAt))
+
+  async function handleSubmit() {
+    if (!name.trim()) {
+      window.alert('Vui lòng nhập tên kỳ thi.')
+      return
+    }
+    await updateMutation.mutateAsync({
+      examId: exam.id,
+      payload: {
+        closeAt: toIsoDateTime(closeAt),
+        description: description || null,
+        name: name.trim(),
+        openAt: toIsoDateTime(openAt),
+      },
+    })
+    onSaved()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
+      <section className="w-full max-w-md rounded-2xl bg-white shadow-2xl" role="dialog">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+          <h2 className="text-lg font-black text-slate-900">Sửa thông tin kỳ thi</h2>
+          <button
+            aria-label="Đóng"
+            className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+            onClick={onClose}
+            type="button"
+          >
+            <X aria-hidden="true" className="size-4" />
+          </button>
+        </div>
+        <div className="grid gap-3.5 px-6 py-5">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Tên kỳ thi
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setName(event.target.value)}
+              value={name}
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Mô tả
+            <textarea
+              className="min-h-20 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900"
+              onChange={(event) => setDescription(event.target.value)}
+              value={description}
+            />
+          </label>
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Mở lúc
+              <input
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setOpenAt(event.target.value)}
+                type="datetime-local"
+                value={openAt}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Đóng lúc
+              <input
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setCloseAt(event.target.value)}
+                type="datetime-local"
+                value={closeAt}
+              />
+            </label>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2.5 border-t border-slate-200 px-6 py-4">
+          <button
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            onClick={onClose}
+            type="button"
+          >
+            Hủy
+          </button>
+          <button
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white disabled:opacity-60"
+            disabled={updateMutation.isPending}
+            onClick={() => void handleSubmit()}
+            type="button"
+          >
+            Lưu
+          </button>
+        </div>
+      </section>
+    </div>
   )
 }
 
@@ -287,6 +415,7 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
   const deleteMutation = useDeleteExamMutation()
   const [tab, setTab] = useState<ExamDetailTab>('papers')
   const [message, setMessage] = useState<string | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
   const { confirm, dialog } = useConfirmationDialog()
 
   async function invalidate() {
@@ -342,7 +471,7 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
           { icon: <Languages aria-hidden="true" className="size-3.5" />, label: 'Tiếng Anh' },
           { icon: <Calendar aria-hidden="true" className="size-3.5" />, label: `${formatDateTime(exam.openAt)} – ${formatDateTime(exam.closeAt)}` },
         ]}
-        onEdit={canManageInfo ? () => setMessage('Chỉnh sửa thông tin sẽ sớm ra mắt.') : undefined}
+        onEdit={canManageInfo ? () => setShowEditModal(true) : undefined}
         statusLabel={statusDisplay.label}
         statusTone={statusDisplay.tone}
         title={exam.name}
@@ -370,9 +499,30 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
             <div className="flex justify-end">
               <button
                 className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
-                onClick={() =>
-                  void createPaperMutation.mutateAsync(exam.id).then(() => invalidate())
-                }
+                onClick={() => {
+                  void (async () => {
+                    const sourceInput = window.prompt('Nguồn tạo mã đề (BLUEPRINT / BLANK / COPY):', 'BLUEPRINT')
+                    const source = sourceInput?.trim().toUpperCase()
+
+                    if (!source || !['BLUEPRINT', 'BLANK', 'COPY'].includes(source)) {
+                      return
+                    }
+
+                    const copyFromPaperId =
+                      source === 'COPY'
+                        ? window.prompt('Nhập paperId cần sao chép:', exam.papers[0]?.id ?? '')
+                        : null
+
+                    await createPaperMutation.mutateAsync({
+                      examId: exam.id,
+                      payload: {
+                        copyFromPaperId: copyFromPaperId?.trim() || null,
+                        source: source as 'BLUEPRINT' | 'BLANK' | 'COPY',
+                      },
+                    })
+                    await invalidate()
+                  })()
+                }}
                 type="button"
               >
                 <Plus aria-hidden="true" className="size-4" />
@@ -400,7 +550,12 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
                 <PaperCard
                   actions={actions}
                   key={paper.id}
-                  onOpen={() => navigate(canManagePapers ? `/teacher/exam-papers/${paper.id}/edit` : `${basePath.replace(/\/exams$/, '')}/exam-papers/${paper.id}`)}
+                  onOpen={() =>
+                    navigate(
+                      canManagePapers ? `/teacher/exam-papers/${paper.id}/edit` : `${basePath.replace(/\/exams$/, '')}/exam-papers/${paper.id}`,
+                      { state: { examId: exam.id, paperId: paper.id } },
+                    )
+                  }
                   openLabel={canManagePapers ? 'Soạn đề' : 'Xem đề'}
                   paper={paper}
                   subtitle={paperStatusDisplay.label}
@@ -499,6 +654,17 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
             Xóa kỳ thi
           </button>
         </div>
+      ) : null}
+
+      {showEditModal ? (
+        <EditExamModal
+          exam={exam}
+          onClose={() => setShowEditModal(false)}
+          onSaved={() => {
+            void invalidate()
+            setShowEditModal(false)
+          }}
+        />
       ) : null}
     </section>
   )

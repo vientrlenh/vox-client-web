@@ -55,6 +55,7 @@ import {
   formatDateTime,
   formatNullableText,
   getClassTestStatusDisplay,
+  toIsoDateTime,
   type ExamDeliveryMode,
   type ExamDto,
   type ExamStatus,
@@ -320,10 +321,10 @@ export function TeacherClassTestCreatePage() {
     }
     await createMutation.mutateAsync({
       payload: {
-        closeAt: closeAt || null,
+        closeAt: toIsoDateTime(closeAt),
         description: description || null,
         name,
-        openAt: openAt || null,
+        openAt: toIsoDateTime(openAt),
         questionIds: selectedQuestions.map((question) => question.id),
         schoolClassId,
       },
@@ -593,7 +594,10 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
             <PaperCard
               key={paper.id}
               onOpen={() =>
-                navigate(canManage ? `/teacher/exam-papers/${paper.id}/edit` : `/school-admin/exam-papers/${paper.id}`)
+                navigate(
+                  canManage ? `/teacher/exam-papers/${paper.id}/edit` : `/school-admin/exam-papers/${paper.id}`,
+                  { state: { examId: exam.id, paperId: paper.id } },
+                )
               }
               openLabel={canManage ? 'Soạn đề' : 'Xem đề'}
               paper={paper}

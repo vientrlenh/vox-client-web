@@ -340,6 +340,24 @@ const SchoolAdminBlueprintsPage = lazy(() =>
 const SchoolAdminBlueprintDetailPage = lazy(() =>
   import("@/features/exam").then((m) => ({ default: m.SchoolAdminBlueprintDetailPage })),
 );
+const TeacherCreateBlueprintVersionPage = lazy(() =>
+  import("@/features/exam").then((m) => ({ default: m.TeacherCreateBlueprintVersionPage })),
+);
+const SchoolAdminCreateBlueprintVersionPage = lazy(() =>
+  import("@/features/exam").then((m) => ({ default: m.SchoolAdminCreateBlueprintVersionPage })),
+);
+const TeacherBlueprintVersionDetailPage = lazy(() =>
+  import("@/features/exam").then((m) => ({ default: m.TeacherBlueprintVersionDetailPage })),
+);
+const TeacherEditBlueprintVersionPage = lazy(() =>
+  import("@/features/exam").then((m) => ({ default: m.TeacherEditBlueprintVersionPage })),
+);
+const SchoolAdminBlueprintVersionDetailPage = lazy(() =>
+  import("@/features/exam").then((m) => ({ default: m.SchoolAdminBlueprintVersionDetailPage })),
+);
+const SchoolAdminEditBlueprintVersionPage = lazy(() =>
+  import("@/features/exam").then((m) => ({ default: m.SchoolAdminEditBlueprintVersionPage })),
+);
 
 export function AppRoutes() {
   return (
@@ -490,6 +508,15 @@ export function AppRoutes() {
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
             <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
             <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
+            <Route path="school-admin/blueprints/:blueprintId/versions/new" element={<SchoolAdminCreateBlueprintVersionPage />} />
+            <Route
+              path="school-admin/blueprints/:blueprintId/versions/:versionId/edit"
+              element={<SchoolAdminEditBlueprintVersionPage />}
+            />
+            <Route
+              path="school-admin/blueprints/:blueprintId/versions/:versionId"
+              element={<SchoolAdminBlueprintVersionDetailPage />}
+            />
             <Route path="school-admin/blueprints/:blueprintId" element={<SchoolAdminBlueprintDetailPage />} />
             <Route path="school-admin/blueprints" element={<SchoolAdminBlueprintsPage />} />
           </Route>
@@ -525,6 +552,9 @@ export function AppRoutes() {
             <Route path="teacher/exam-papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
             <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
             <Route path="teacher/exams" element={<TeacherExamsPage />} />
+            <Route path="teacher/blueprints/:blueprintId/versions/new" element={<TeacherCreateBlueprintVersionPage />} />
+            <Route path="teacher/blueprints/:blueprintId/versions/:versionId/edit" element={<TeacherEditBlueprintVersionPage />} />
+            <Route path="teacher/blueprints/:blueprintId/versions/:versionId" element={<TeacherBlueprintVersionDetailPage />} />
             <Route path="teacher/blueprints/:blueprintId" element={<TeacherBlueprintDetailPage />} />
             <Route path="teacher/blueprints" element={<TeacherBlueprintsPage />} />
           </Route>

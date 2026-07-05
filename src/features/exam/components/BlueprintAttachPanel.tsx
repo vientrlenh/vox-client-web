@@ -24,7 +24,8 @@ export function BlueprintAttachPanel({
 }: BlueprintAttachPanelProps) {
   const queryClient = useQueryClient()
   const [keyword, setKeyword] = useState('')
-  const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword, page: 1, size: 50 })
+  const [page, setPage] = useState(1)
+  const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword, page, size: 10 })
   const attachedBlueprintQuery = useExamBlueprintQuery(blueprintId ?? null)
   const attachMutation = useAttachExamBlueprintMutation()
   const { confirm, dialog } = useConfirmationDialog()
@@ -49,7 +50,10 @@ export function BlueprintAttachPanel({
         ) : null}
         <input
           className="mt-3 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
-          onChange={(event) => setKeyword(event.target.value)}
+          onChange={(event) => {
+            setKeyword(event.target.value)
+            setPage(1)
+          }}
           placeholder="Tìm blueprint theo mã hoặc tên…"
           value={keyword}
         />
@@ -71,6 +75,29 @@ export function BlueprintAttachPanel({
             ))
           )}
         </div>
+        {blueprintsQuery.data && blueprintsQuery.data.totalElements > 0 ? (
+          <div className="mt-3.5 flex items-center justify-between text-xs font-semibold text-slate-500">
+            <span>{blueprintsQuery.data.totalElements} blueprint</span>
+            <div className="flex gap-2">
+              <button
+                className="h-8 rounded-lg border border-slate-200 px-3 disabled:opacity-40"
+                disabled={page <= 1}
+                onClick={() => setPage((current) => current - 1)}
+                type="button"
+              >
+                Trước
+              </button>
+              <button
+                className="h-8 rounded-lg border border-slate-200 px-3 disabled:opacity-40"
+                disabled={page >= blueprintsQuery.data.totalPages}
+                onClick={() => setPage((current) => current + 1)}
+                type="button"
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     )
   }

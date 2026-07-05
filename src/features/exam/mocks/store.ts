@@ -308,6 +308,7 @@ export function updateExamPaperStatus(paperId: string, payload: UpdateExamPaperS
   const nextStatus: Record<UpdateExamPaperStatusRequest['action'], ExamPaperDto['status']> = {
     APPROVE: 'APPROVED',
     LOCK: 'LOCKED',
+    REOPEN: 'DRAFT',
     REQUEST_REVISION: 'DRAFT',
     SUBMIT: 'IN_REVIEW',
   }

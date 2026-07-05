@@ -18,6 +18,8 @@ export type ExamBlueprintVersionStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 
 export type ExamBlueprintSlotType = 'FIXED' | 'SELECTION'
 
+export type CreateExamPaperSource = 'BLUEPRINT' | 'BLANK' | 'COPY'
+
 export type ExamCandidateStatus = 'ASSIGNED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED'
 
 export type ExamScheduleStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'MOVED' | 'CANCELLED'
@@ -124,23 +126,29 @@ export type ExamBlueprintVersionDto = {
   effectiveFrom?: string | null
   effectiveTo?: string | null
   id: string
+  sectionCount?: number
   sections: ExamBlueprintSectionDto[]
+  slotCount?: number
   status: ExamBlueprintVersionStatus
   totalTimeLimitSeconds?: number | null
   version: number
+  weightSum?: number | null
 }
 
 export type ExamBlueprintDto = {
   code: string
+  currentVersion?: ExamBlueprintVersionDto | null
   createdAt?: string | null
   description?: string | null
   id: string
   isActive: boolean
   languageId: string
   name: string
+  sectionCount?: number
   schoolGradeLevelId?: string | null
   schoolId: string
   updatedAt?: string | null
+  versionCount?: number
   versions: ExamBlueprintVersionDto[]
 }
 
@@ -210,10 +218,19 @@ export type ExamDto = {
 }
 
 export type CreateExamRequest = {
+  assessmentPolicyId?: string | null
+  blueprintId?: string | null
+  closeAt?: string | null
   code: string
   description?: string | null
   languageId: string
   name: string
+  openAt?: string | null
+}
+
+export type ClassTestSectionInput = {
+  questionIds: string[]
+  title: string
 }
 
 export type CreateClassTestRequest = {
@@ -224,6 +241,7 @@ export type CreateClassTestRequest = {
   name: string
   openAt?: string | null
   questionIds?: string[] | null
+  sections?: ClassTestSectionInput[] | null
   schoolClassId: string
 }
 
@@ -253,7 +271,13 @@ export type CreateExamBlueprintRequest = {
 }
 
 export type UpdateClassTestQuestionsRequest = {
-  questionIds: string[]
+  questionIds?: string[]
+  sections?: ClassTestSectionInput[]
+}
+
+export type CreateExamPaperRequest = {
+  copyFromPaperId?: string | null
+  source?: CreateExamPaperSource | null
 }
 
 export type UpdateExamPaperItemRequest = {
@@ -261,8 +285,28 @@ export type UpdateExamPaperItemRequest = {
 }
 
 export type UpdateExamPaperStatusRequest = {
-  action: 'APPROVE' | 'LOCK' | 'REQUEST_REVISION' | 'SUBMIT'
+  action: 'APPROVE' | 'LOCK' | 'REOPEN' | 'REQUEST_REVISION' | 'SUBMIT'
   note?: string | null
+}
+
+export type CreateBlueprintInlineRequest = {
+  code: string
+  description?: string | null
+  languageId: string
+  name: string
+  schoolGradeLevelId?: string | null
+}
+
+export type AttachExamBlueprintRequest = {
+  blueprintId?: string | null
+  blueprintVersionId?: string | null
+  newBlueprint?: CreateBlueprintInlineRequest | null
+}
+
+export type CreateClassTestResponse = {
+  candidateCount: number
+  exam: ExamDto
+  paperId: string
 }
 
 export type UpdateExamBlueprintVersionStatusRequest = {
@@ -292,6 +336,26 @@ export function formatDateTime(value?: string | null) {
     month: '2-digit',
     year: 'numeric',
   }).format(date)
+}
+
+export function toIsoDateTime(value: string): string | null {
+  if (!value) {
+    return null
+  }
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+export function toDateTimeLocalValue(value?: string | null): string {
+  if (!value) {
+    return ''
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 export function formatDate(value?: string | null) {
