@@ -892,7 +892,6 @@ export function TeacherClassTestCreatePage() {
             setSelectionAssignments((current) => ({ ...current, [selectionPickerSlotId]: question }))
             setSelectionPickerSlotId(null)
           }}
-          publishedOnly
           scope="teacher"
           selectedQuestionIds={
             selectionAssignments[selectionPickerSlotId] ? [selectionAssignments[selectionPickerSlotId].id] : []
@@ -1226,11 +1225,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   }
 
   function handleOpenAddSection() {
-    const title = window.prompt('Tên phần mới (VD: Phần 2 · Ngữ pháp):', `Phần ${paperSections.length + 1}`)
-    if (!title?.trim()) {
-      return
-    }
-    setPickerMode({ kind: 'new', title: title.trim() })
+    setPickerMode({ kind: 'new', title: `Phần ${paperSections.length + 1}` })
   }
 
   async function handlePickQuestion(question: QuestionDto) {

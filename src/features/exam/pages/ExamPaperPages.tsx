@@ -361,7 +361,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
               .then(() => invalidate())
               .then(() => setPickerItemId(null))
           }}
-          publishedOnly
+          publishedOnly={exam?.kind === 'CENTRALIZED'}
           scope="teacher"
           selectedQuestionIds={existingQuestionIds}
         />
