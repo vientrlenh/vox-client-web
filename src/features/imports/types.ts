@@ -37,6 +37,13 @@ export type ImportSessionSummary = {
   validRows: number
 }
 
+export type ImportSessionStatus = {
+  id: string
+  importedRows: number
+  status: string
+  totalRows: number
+}
+
 export type ImportSessionDetails = ImportSessionSummary & {
   confirmedMapping: ImportMappingEntry[]
   failureReason: string | null

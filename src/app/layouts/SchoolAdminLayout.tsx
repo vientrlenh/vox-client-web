@@ -3,6 +3,8 @@ import {
   Bell,
   BookOpen,
   ChevronDown,
+  ClipboardCheck,
+  ClipboardList,
   FileSpreadsheet,
   Home,
   LogOut,
@@ -38,6 +40,16 @@ const navigationItems = [
     icon: Users,
     label: 'Quản lý Người dùng',
     to: '/school-admin/students',
+  },
+  {
+    icon: ClipboardList,
+    label: 'Quản lý Rubrics',
+    to: '/school-admin/rubrics',
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Quản lý Assessment Policy',
+    to: '/school-admin/assessment-policies',
   },
 ]
 

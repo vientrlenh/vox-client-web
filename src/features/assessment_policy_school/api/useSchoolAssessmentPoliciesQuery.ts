@@ -1,0 +1,124 @@
+// src/features/assessment_policy_school/api/useSchoolAssessmentPoliciesQuery.ts
+
+import { useQuery } from '@tanstack/react-query';
+import { graphQLRequest } from '@/shared/api/graphqlClient';
+import type { AssessmentPolicyPage } from '../types';
+
+export type SchoolAssessmentPolicyFilter = {
+  status?: string | null;
+  languageId?: string | null;
+};
+
+export const assessmentPolicyQueryKeys = {
+  all: ['school-assessment-policies'] as const,
+  lists: () => [...assessmentPolicyQueryKeys.all, 'list'] as const,
+  list: (schoolId: string, filter: SchoolAssessmentPolicyFilter, page: number, size: number) =>
+    [...assessmentPolicyQueryKeys.lists(), schoolId, filter, page, size] as const,
+};
+
+const GET_SCHOOL_ASSESSMENT_POLICIES = `
+  query GetSchoolAssessmentPolicies($schoolId: ID!, $status: String, $languageId: ID, $page: Int, $size: Int) {
+    viewSchoolAssessmentPolicies(schoolId: $schoolId, status: $status, languageId: $languageId, page: $page, size: $size) {
+      content {
+        id
+        languageId
+        frameworkVersionId
+        rubricVersionId
+        targetFrameworkBandId
+        minimumFrameworkBandId
+        passingScore
+        strictness
+        version
+        status
+        effectiveFrom
+        effectiveTo
+        createdAt
+        updatedAt
+        language {
+          name
+        }
+        frameworkVersion {
+          code
+          name
+          version
+          status
+          effectiveFrom
+          effectiveTo
+        }
+        rubricVersion {
+          code
+          name
+          version
+          status
+          effectiveFrom
+          effectiveTo
+        }
+        targetFrameworkBand {
+          code
+          label
+        }
+        minimumFrameworkBand {
+          code
+          label
+        }
+        school {
+          id
+          code
+          name
+        }
+        schoolGradeLevel {
+          id
+          code
+          name
+        }
+        schoolGrade {
+          id
+          code
+          name
+        }
+        schoolClass {
+          id
+          code
+          name
+        }
+      }
+      page
+      size
+      totalElements
+      totalPages
+    }
+  }
+`;
+
+async function fetchSchoolAssessmentPolicies(
+  schoolId: string,
+  filter: SchoolAssessmentPolicyFilter,
+  page: number,
+  size: number
+): Promise<AssessmentPolicyPage> {
+  const data = await graphQLRequest<{ viewSchoolAssessmentPolicies: AssessmentPolicyPage }>(
+    GET_SCHOOL_ASSESSMENT_POLICIES,
+    { schoolId, status: filter.status || null, languageId: filter.languageId || null, page, size }
+  );
+
+  const response = data.viewSchoolAssessmentPolicies;
+
+  return {
+    ...response,
+    page: response.page + 1,
+  };
+}
+
+export function useSchoolAssessmentPoliciesQuery(
+  schoolId: string | undefined,
+  filter: SchoolAssessmentPolicyFilter,
+  page: number,
+  size: number
+) {
+  return useQuery({
+    queryKey: assessmentPolicyQueryKeys.list(schoolId || '', filter, page, size),
+    queryFn: () => fetchSchoolAssessmentPolicies(schoolId!, filter, page, size),
+    enabled: Boolean(schoolId),
+    placeholderData: (previousData) => previousData,
+  });
+}
