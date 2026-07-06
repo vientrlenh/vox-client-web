@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react'
 import { FileText } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { getExamPaperStatusDisplay, type ExamPaperDto } from '../types'
+import { getExamPaperStatusDisplay, type ExamKind, type ExamPaperDto } from '../types'
 
 type PaperCardAction = {
   disabled?: boolean
@@ -14,14 +14,15 @@ type PaperCardAction = {
 
 type PaperCardProps = {
   actions?: PaperCardAction[]
+  examKind?: ExamKind
   onOpen: () => void
   openLabel?: string
   paper: ExamPaperDto
   subtitle?: string
 }
 
-export function PaperCard({ actions = [], onOpen, openLabel = 'Xem đề', paper, subtitle }: PaperCardProps): ReactNode {
-  const statusDisplay = getExamPaperStatusDisplay(paper.status)
+export function PaperCard({ actions = [], examKind, onOpen, openLabel = 'Xem đề', paper, subtitle }: PaperCardProps): ReactNode {
+  const statusDisplay = getExamPaperStatusDisplay(paper.status, examKind)
   const totalItems = paper.sections.reduce((sum, section) => sum + section.items.length, 0)
   const filledItems = paper.sections.reduce(
     (sum, section) => sum + section.items.filter((item) => item.questionId).length,

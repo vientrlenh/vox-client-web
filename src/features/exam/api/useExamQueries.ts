@@ -310,7 +310,7 @@ async function fetchExam(id: string) {
   return data.exam
 }
 
-async function fetchExamPaper(id: string) {
+export async function fetchExamPaper(id: string) {
   const data = await graphQLRequest<{ examPaper: ExamPaperDto | null }>(EXAM_PAPER_QUERY, { id })
   return data.examPaper
 }

@@ -136,6 +136,9 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
   )
   const allowedActionsForRole = myRole ? ROLE_ACTIONS[myRole] ?? [] : []
   const nextActions = canManage ? (NEXT_ACTIONS[paper.status] ?? []).filter((action) => allowedActionsForRole.includes(action)) : []
+  // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED (không dùng luồng duyệt) nên LOCKED không chặn sửa ở đây.
+  const canEditPaperContent =
+    canManage && exam?.status !== 'IN_PROGRESS' && (exam?.kind === 'CLASS_TEST' || paper.status !== 'LOCKED')
   const existingQuestionIds = paper.sections
     .flatMap((section) => section.items.map((item) => item.questionId))
     .filter(Boolean) as string[]
@@ -209,7 +212,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
                   <h3 className="text-[15px] font-extrabold text-slate-900">{section.title}</h3>
                   {section.instruction ? <p className="mt-1 text-xs text-slate-500">{section.instruction}</p> : null}
                 </div>
-                {canManage && paper.status !== 'LOCKED' ? (
+                {canEditPaperContent ? (
                   <button
                     aria-label={`Sửa phần ${section.title}`}
                     className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -254,7 +257,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
                       <Eye aria-hidden="true" className="size-4" />
                     </a>
                   ) : null}
-                  {canManage && paper.status !== 'LOCKED' ? (
+                  {canEditPaperContent ? (
                     <button
                       className="inline-flex h-8.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-slate-50"
                       onClick={() => setPickerItemId(item.id)}

@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { type ApiResponse, apiClient } from '@/shared/api'
 import type {
   AttachExamBlueprintRequest,
+  ChangeClassTestBlueprintRequest,
   ClassTestSectionInput,
   CreateBlueprintInlineRequest,
   CreateClassTestRequest,
@@ -447,6 +448,15 @@ export function useUpdateClassTestMutation() {
   return useMutation({
     mutationFn: async ({ examId, payload }: { examId: string; payload: UpdateExamRequest }) => {
       const response = await apiClient.put<ApiResponse<ExamDto>>(`/v1/class-tests/${examId}`, payload)
+      return unwrap(response)
+    },
+  })
+}
+
+export function useChangeClassTestBlueprintMutation() {
+  return useMutation({
+    mutationFn: async ({ examId, payload }: { examId: string; payload: ChangeClassTestBlueprintRequest }) => {
+      const response = await apiClient.patch<ApiResponse<ExamDto>>(`/v1/class-tests/${examId}/blueprint`, payload)
       return unwrap(response)
     },
   })

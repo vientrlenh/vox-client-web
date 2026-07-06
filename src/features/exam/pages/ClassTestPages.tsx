@@ -11,6 +11,7 @@ import {
   Hash,
   Languages,
   LayoutList,
+  Pencil,
   PlayCircle,
   Plus,
   RefreshCw,
@@ -31,7 +32,6 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
-import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
 import { CandidatesTab } from '../components/CandidatesTab'
 import { DetailHeaderCard } from '../components/DetailHeaderCard'
 import { ExamListRow } from '../components/ExamListRow'
@@ -42,22 +42,28 @@ import { ScheduleTab } from '../components/schedule/ScheduleTab'
 import { WorkflowTrackerCard } from '../components/WorkflowTrackerCard'
 import {
   examQueryKeys,
+  fetchExamPaper,
   useClassTestStatsQuery,
   useClassTestsQuery,
+  useExamBlueprintQuery,
   useExamBlueprintsQuery,
   useExamQuery,
 } from '../api/useExamQueries'
 import {
+  useChangeClassTestBlueprintMutation,
   useCreateClassTestMutation,
   useDeleteClassTestMutation,
   useSetExamDeliveryModeMutation,
+  useUpdateClassTestMutation,
   useUpdateClassTestQuestionsMutation,
   useUpdateClassTestStatusMutation,
+  useUpdateExamPaperItemMutation,
 } from '../api/useExamMutations'
 import {
   formatDateTime,
   formatNullableText,
   getClassTestStatusDisplay,
+  toDateTimeLocalValue,
   toIsoDateTime,
   type ExamBlueprintDto,
   type ExamBlueprintVersionDto,
@@ -75,15 +81,15 @@ const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
 ]
 
 function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; steps: WorkflowStep[] } {
-  const hasBlueprint = Boolean(exam.blueprintVersionId)
+  // exam.blueprintId/blueprintVersionId luôn có giá trị cho bài trên lớp (kể cả khi soạn câu hỏi trực tiếp,
+  // hệ thống tự sinh 1 blueprint riêng ẩn) — nên không dùng được để biết đề đã có nội dung thật hay chưa.
   const hasQuestions = exam.papers.some((paper) => paper.sections.some((section) => section.items.length > 0))
   const totalPapers = exam.papers.length
   const readyPapers = exam.papers.filter((paper) => paper.status === 'LOCKED' || paper.status === 'APPROVED').length
   const papersReady = totalPapers > 0 && readyPapers === totalPapers
   const isPublished = exam.status === 'RESULTS_PUBLISHED' || exam.status === 'CLOSED'
 
-  // Blueprint is optional for bài trên lớp: soạn đề trực tiếp bằng câu hỏi cũng coi là hoàn tất bước này.
-  const step1Done = hasBlueprint || hasQuestions
+  const step1Done = hasQuestions
   const step2Done = papersReady
   const step3Done = isPublished
 
@@ -92,7 +98,7 @@ function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; ste
       icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
       label: 'Soạn đề bài',
       state: step1Done ? 'done' : 'current',
-      sublabel: hasBlueprint ? 'Đã gắn blueprint' : step1Done ? 'Đã thêm câu hỏi trực tiếp' : 'Chưa gắn blueprint hoặc thêm câu hỏi',
+      sublabel: step1Done ? 'Đã có câu hỏi trong đề' : 'Chưa gắn blueprint hoặc thêm câu hỏi',
     },
     {
       icon: step2Done ? <Check size={26} /> : <FilePenLine size={24} />,
@@ -170,8 +176,7 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
           classTestsQuery.data?.content.map((exam) => {
             const statusDisplay = getClassTestStatusDisplay(exam.status)
             const { steps } = getClassTestWorkflowSteps(exam)
-            const hasContent =
-              exam.blueprintId || exam.papers.some((paper) => paper.sections.some((section) => section.items.length > 0))
+            const hasContent = exam.papers.some((paper) => paper.sections.some((section) => section.items.length > 0))
             const metaItems = [
               { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
               hasContent
@@ -340,6 +345,9 @@ export function TeacherClassTestCreatePage() {
   const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword: blueprintKeyword, page: blueprintPage, size: 8 })
   const { confirm, dialog } = useConfirmationDialog()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [selectionAssignments, setSelectionAssignments] = useState<Record<string, QuestionDto>>({})
+  const [selectionPickerSlotId, setSelectionPickerSlotId] = useState<string | null>(null)
+  const updateItemMutation = useUpdateExamPaperItemMutation()
   const hasSelectionSlot = selectedVersion?.sections.some((section) =>
     section.slots.some((slot) => slot.slotType === 'SELECTION'),
   )
@@ -363,13 +371,12 @@ export function TeacherClassTestCreatePage() {
   }
 
   function addQuestionToSection(sectionKey: string, question: QuestionDto) {
-    setSections((current) =>
-      current.map((section) =>
-        section.key === sectionKey && !section.questions.some((existing) => existing.id === question.id)
-          ? { ...section, questions: [...section.questions, question] }
-          : section,
-      ),
-    )
+    setSections((current) => {
+      if (current.some((section) => section.questions.some((existing) => existing.id === question.id))) {
+        return current
+      }
+      return current.map((section) => (section.key === sectionKey ? { ...section, questions: [...section.questions, question] } : section))
+    })
   }
 
   function removeQuestionFromSection(sectionKey: string, questionId: string) {
@@ -395,12 +402,6 @@ export function TeacherClassTestCreatePage() {
         window.alert('Vui lòng chọn một blueprint và phiên bản đã xuất bản.')
         return
       }
-      if (hasSelectionSlot) {
-        window.alert(
-          'Phiên bản này có ô câu hỏi chọn ngẫu nhiên (SELECTION) — chỉ dùng được blueprint gồm toàn câu hỏi cố định (FIXED) cho bài trên lớp.',
-        )
-        return
-      }
     } else {
       if (sections.length === 0 || sections.every((section) => section.questions.length === 0)) {
         window.alert('Phải có ít nhất một phần với ít nhất một câu hỏi.')
@@ -421,7 +422,7 @@ export function TeacherClassTestCreatePage() {
       return
     }
     try {
-      await createMutation.mutateAsync({
+      const created = await createMutation.mutateAsync({
         payload: {
           closeAt: toIsoDateTime(closeAt),
           description: description || null,
@@ -441,6 +442,23 @@ export function TeacherClassTestCreatePage() {
         },
         schoolClassName,
       })
+
+      const pendingAssignments = Object.entries(selectionAssignments)
+      if (creationMode === 'blueprint' && pendingAssignments.length > 0) {
+        const createdPaper = await fetchExamPaper(created.paperId)
+        const itemsBySlotId = new Map(
+          (createdPaper?.sections.flatMap((section) => section.items) ?? [])
+            .filter((item) => item.blueprintSlotId)
+            .map((item) => [item.blueprintSlotId as string, item]),
+        )
+        for (const [slotId, question] of pendingAssignments) {
+          const item = itemsBySlotId.get(slotId)
+          if (item) {
+            await updateItemMutation.mutateAsync({ itemId: item.id, paperId: created.paperId, payload: { questionId: question.id } })
+          }
+        }
+      }
+
       await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
       navigate('/teacher/class-tests', { state: { successMessage: 'Đã tạo bài trên lớp thành công.' } })
     } catch (error) {
@@ -555,40 +573,77 @@ export function TeacherClassTestCreatePage() {
                       {selectedVersion.sectionCount ?? selectedVersion.sections.length} phần
                     </div>
                   </div>
-                  <button
-                    className="shrink-0 text-xs font-bold text-slate-500 hover:text-red-600"
-                    onClick={() => {
-                      setSelectedBlueprint(null)
-                      setSelectedVersion(null)
-                    }}
-                    type="button"
-                  >
-                    Đổi
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <a
+                      aria-label={`Xem chi tiết ${selectedVersion.code}`}
+                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                      href={`/teacher/blueprints/${selectedBlueprint.id}/versions/${selectedVersion.id}`}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      <Eye aria-hidden="true" className="size-3.5" />
+                      Xem chi tiết
+                    </a>
+                    <button
+                      className="text-xs font-bold text-slate-500 hover:text-red-600"
+                      onClick={() => {
+                        setSelectedBlueprint(null)
+                        setSelectedVersion(null)
+                        setSelectionAssignments({})
+                      }}
+                      type="button"
+                    >
+                      Đổi
+                    </button>
+                  </div>
                 </div>
                 {hasSelectionSlot ? (
                   <p className="text-xs font-semibold text-amber-700">
-                    Phiên bản này có ô câu hỏi chọn ngẫu nhiên (SELECTION) — không thể dùng cho bài trên lớp, vì mỗi học
-                    sinh cần một đề cố định giống nhau. Bấm "Đổi" để chọn blueprint/phiên bản khác chỉ gồm câu hỏi cố
-                    định (FIXED), hoặc chuyển sang "Câu hỏi trực tiếp".
+                    Phiên bản này có ô câu hỏi chọn ngẫu nhiên (SELECTION) — bạn có thể chọn câu hỏi ngay bên dưới,
+                    hoặc để trống rồi vào "Soạn đề" của bài trên lớp gán sau.
                   </p>
-                ) : (
-                  <div className="grid gap-2">
-                    {selectedVersion.sections.map((section) => (
-                      <div className="rounded-lg border border-slate-200 bg-white p-3" key={section.id}>
-                        <div className="text-xs font-extrabold text-slate-900">{section.title}</div>
-                        <div className="mt-1.5 grid gap-1">
-                          {section.slots.map((slot) => (
-                            <div className="text-xs text-slate-600" key={slot.id}>
-                              {slot.order}. {slot.fixedQuestion?.code ?? '—'} —{' '}
-                              {formatNullableText(slot.fixedQuestion?.questionText)}
+                ) : null}
+                <div className="grid gap-2">
+                  {selectedVersion.sections.map((section) => (
+                    <div className="rounded-lg border border-slate-200 bg-white p-3" key={section.id}>
+                      <div className="text-xs font-extrabold text-slate-900">{section.title}</div>
+                      <div className="mt-1.5 grid gap-1.5">
+                        {section.slots.map((slot) => {
+                          const assigned = selectionAssignments[slot.id]
+                          return (
+                            <div className="flex items-center justify-between gap-2 text-xs text-slate-600" key={slot.id}>
+                              <span className="min-w-0 flex-1">
+                                {slot.order}.{' '}
+                                {slot.slotType === 'SELECTION' ? (
+                                  assigned ? (
+                                    <>
+                                      {assigned.code} — {formatNullableText(assigned.questionText)}
+                                    </>
+                                  ) : (
+                                    <span className="italic text-amber-700">Chọn ngẫu nhiên theo tiêu chí (chưa gán)</span>
+                                  )
+                                ) : (
+                                  <>
+                                    {slot.fixedQuestion?.code ?? '—'} — {formatNullableText(slot.fixedQuestion?.questionText)}
+                                  </>
+                                )}
+                              </span>
+                              {slot.slotType === 'SELECTION' ? (
+                                <button
+                                  className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50"
+                                  onClick={() => setSelectionPickerSlotId(slot.id)}
+                                  type="button"
+                                >
+                                  {assigned ? 'Đổi' : 'Chọn câu hỏi'}
+                                </button>
+                              ) : null}
                             </div>
-                          ))}
-                        </div>
+                          )
+                        })}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : browsingBlueprint ? (
               <div>
@@ -613,21 +668,36 @@ export function TeacherClassTestCreatePage() {
                     browsingBlueprint.versions
                       .filter((version) => version.status === 'PUBLISHED')
                       .map((version) => (
-                        <button
-                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm hover:bg-slate-50"
+                        <div
+                          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5"
                           key={version.id}
-                          onClick={() => {
-                            setSelectedBlueprint(browsingBlueprint)
-                            setSelectedVersion(version)
-                            setBrowsingBlueprint(null)
-                          }}
-                          type="button"
                         >
-                          <span className="font-bold text-slate-900">{version.code}</span>
-                          <span className="text-xs text-slate-500">
-                            {version.sectionCount ?? version.sections.length} phần
-                          </span>
-                        </button>
+                          <button
+                            className="flex flex-1 items-center justify-between text-left text-sm hover:opacity-80"
+                            onClick={() => {
+                              setSelectedBlueprint(browsingBlueprint)
+                              setSelectedVersion(version)
+                              setSelectionAssignments({})
+                              setBrowsingBlueprint(null)
+                            }}
+                            type="button"
+                          >
+                            <span className="font-bold text-slate-900">{version.code}</span>
+                            <span className="text-xs text-slate-500">
+                              {version.sectionCount ?? version.sections.length} phần
+                            </span>
+                          </button>
+                          <a
+                            aria-label={`Xem chi tiết ${version.code}`}
+                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                            href={`/teacher/blueprints/${browsingBlueprint.id}/versions/${version.id}`}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                            title="Xem chi tiết"
+                          >
+                            <Eye aria-hidden="true" className="size-3.5" />
+                          </a>
+                        </div>
                       ))
                   )}
                 </div>
@@ -784,7 +854,7 @@ export function TeacherClassTestCreatePage() {
         <div className="flex justify-end">
           <button
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
-            disabled={createMutation.isPending || (creationMode === 'blueprint' && Boolean(hasSelectionSlot))}
+            disabled={createMutation.isPending}
             onClick={handleSubmit}
             type="button"
           >
@@ -795,13 +865,261 @@ export function TeacherClassTestCreatePage() {
 
       {pickerSection ? (
         <QuestionPicker
+          excludeQuestionIds={sections
+            .filter((section) => section.key !== pickerSection.key)
+            .flatMap((section) => section.questions.map((question) => question.id))}
           onClose={() => setPickerForSectionKey(null)}
           onSelect={(question) => addQuestionToSection(pickerSection.key, question)}
           scope="teacher"
           selectedQuestionIds={pickerSection.questions.map((question) => question.id)}
         />
       ) : null}
+
+      {selectionPickerSlotId ? (
+        <QuestionPicker
+          excludeQuestionIds={[
+            ...(selectedVersion?.sections.flatMap((section) =>
+              section.slots
+                .filter((slot) => slot.slotType === 'FIXED' && slot.fixedQuestion)
+                .map((slot) => slot.fixedQuestion?.id as string),
+            ) ?? []),
+            ...Object.entries(selectionAssignments)
+              .filter(([slotId]) => slotId !== selectionPickerSlotId)
+              .map(([, question]) => question.id),
+          ]}
+          onClose={() => setSelectionPickerSlotId(null)}
+          onSelect={(question) => {
+            setSelectionAssignments((current) => ({ ...current, [selectionPickerSlotId]: question }))
+            setSelectionPickerSlotId(null)
+          }}
+          publishedOnly
+          scope="teacher"
+          selectedQuestionIds={
+            selectionAssignments[selectionPickerSlotId] ? [selectionAssignments[selectionPickerSlotId].id] : []
+          }
+        />
+      ) : null}
     </section>
+  )
+}
+
+type ClassTestBlueprintTabProps = {
+  blueprintId?: string | null
+  blueprintVersionId?: string | null
+  canEdit: boolean
+  canManage: boolean
+  examId: string
+  onChanged: () => void
+}
+
+function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canManage, examId, onChanged }: ClassTestBlueprintTabProps) {
+  const navigate = useNavigate()
+  const [keyword, setKeyword] = useState('')
+  const [page, setPage] = useState(1)
+  const [browsingBlueprint, setBrowsingBlueprint] = useState<ExamBlueprintDto | null>(null)
+  const [showPicker, setShowPicker] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const currentBlueprintQuery = useExamBlueprintQuery(blueprintId ?? null)
+  const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword, page, size: 8 })
+  const changeMutation = useChangeClassTestBlueprintMutation()
+  const { confirm, dialog } = useConfirmationDialog()
+
+  const currentBlueprint = currentBlueprintQuery.data
+  const currentVersion = currentBlueprint?.versions.find((version) => version.id === blueprintVersionId)
+
+  async function handleSwitch(newBlueprintId: string, newVersionId: string) {
+    if (
+      !(await confirm({
+        message: 'Đổi blueprint sẽ xóa toàn bộ câu hỏi hiện tại của mã đề và tạo lại theo blueprint mới. Tiếp tục?',
+      }))
+    ) {
+      return
+    }
+    try {
+      await changeMutation.mutateAsync({ examId, payload: { blueprintId: newBlueprintId, blueprintVersionId: newVersionId } })
+      setShowPicker(false)
+      setBrowsingBlueprint(null)
+      onChanged()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handleDetach() {
+    if (
+      !(await confirm({
+        message: 'Gỡ blueprint sẽ xóa toàn bộ câu hỏi hiện tại của mã đề — bạn sẽ cần soạn lại từ đầu. Tiếp tục?',
+      }))
+    ) {
+      return
+    }
+    try {
+      await changeMutation.mutateAsync({ examId, payload: { blueprintId: null, blueprintVersionId: null } })
+      onChanged()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5.5">
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+      {dialog}
+      {!showPicker ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-[15px] font-extrabold text-slate-900">Blueprint (tuỳ chọn)</h3>
+            {currentBlueprint && currentVersion ? (
+              <p className="mt-1 text-[13px] text-slate-500">
+                Đang dùng <b className="text-slate-900">{currentBlueprint.name}</b> · {currentBlueprint.code} · phiên bản{' '}
+                {currentVersion.code}
+              </p>
+            ) : (
+              <p className="mt-1 text-[13px] text-slate-500">
+                Bài này đang soạn câu hỏi trực tiếp, không dùng blueprint dùng chung nào.
+              </p>
+            )}
+          </div>
+          {canManage ? (
+            <div className="flex items-center gap-2">
+              {currentBlueprint ? (
+                <button
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  onClick={() => navigate(`/teacher/blueprints/${currentBlueprint.id}`)}
+                  type="button"
+                >
+                  <Eye aria-hidden="true" className="size-3.5" />
+                  Xem chi tiết
+                </button>
+              ) : null}
+              {canEdit ? (
+                <>
+                  <button
+                    className="inline-flex h-9 items-center justify-center rounded-full bg-indigo-600 px-4 text-xs font-bold text-white hover:bg-indigo-700"
+                    onClick={() => setShowPicker(true)}
+                    type="button"
+                  >
+                    Đổi blueprint khác
+                  </button>
+                  {currentBlueprint ? (
+                    <button
+                      className="text-xs font-bold text-slate-400 hover:text-red-600"
+                      onClick={() => void handleDetach()}
+                      type="button"
+                    >
+                      Gỡ blueprint
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : browsingBlueprint ? (
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-[13px] font-extrabold text-slate-900">
+              Chọn phiên bản đã xuất bản của {browsingBlueprint.name}
+            </h3>
+            <button
+              className="shrink-0 text-xs font-bold text-slate-400 hover:text-slate-600"
+              onClick={() => setBrowsingBlueprint(null)}
+              type="button"
+            >
+              Quay lại
+            </button>
+          </div>
+          <div className="mt-2.5 grid gap-2">
+            {browsingBlueprint.versions.filter((version) => version.status === 'PUBLISHED').length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
+                Blueprint này chưa có phiên bản nào được xuất bản.
+              </div>
+            ) : (
+              browsingBlueprint.versions
+                .filter((version) => version.status === 'PUBLISHED')
+                .map((version) => (
+                  <button
+                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm hover:bg-slate-50"
+                    key={version.id}
+                    onClick={() => void handleSwitch(browsingBlueprint.id, version.id)}
+                    type="button"
+                  >
+                    <span className="font-bold text-slate-900">{version.code}</span>
+                    <span className="text-xs text-slate-500">{version.sectionCount ?? version.sections.length} phần</span>
+                  </button>
+                ))
+            )}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-[13px] font-extrabold text-slate-900">Chọn blueprint</h3>
+            <button
+              className="shrink-0 text-xs font-bold text-slate-400 hover:text-slate-600"
+              onClick={() => setShowPicker(false)}
+              type="button"
+            >
+              Hủy
+            </button>
+          </div>
+          <input
+            className="mt-2.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
+            onChange={(event) => {
+              setKeyword(event.target.value)
+              setPage(1)
+            }}
+            placeholder="Tìm blueprint theo mã hoặc tên…"
+            value={keyword}
+          />
+          <div className="mt-2.5 grid gap-2">
+            {blueprintsQuery.data?.content.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
+                Không tìm thấy blueprint phù hợp.
+              </div>
+            ) : (
+              blueprintsQuery.data?.content.map((blueprint) => (
+                <button
+                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm hover:bg-slate-50"
+                  key={blueprint.id}
+                  onClick={() => setBrowsingBlueprint(blueprint)}
+                  type="button"
+                >
+                  <span>
+                    <span className="font-bold text-slate-900">{blueprint.name}</span>{' '}
+                    <span className="text-xs text-slate-500">· {blueprint.code}</span>
+                  </span>
+                  <span className="text-xs text-slate-500">{blueprint.versionCount ?? 0} phiên bản</span>
+                </button>
+              ))
+            )}
+          </div>
+          {blueprintsQuery.data && blueprintsQuery.data.totalElements > 0 ? (
+            <div className="mt-2.5 flex items-center justify-between text-xs font-semibold text-slate-500">
+              <span>{blueprintsQuery.data.totalElements} blueprint</span>
+              <div className="flex gap-2">
+                <button
+                  className="h-8 rounded-lg border border-slate-200 px-3 disabled:opacity-40"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => current - 1)}
+                  type="button"
+                >
+                  Trước
+                </button>
+                <button
+                  className="h-8 rounded-lg border border-slate-200 px-3 disabled:opacity-40"
+                  disabled={page >= blueprintsQuery.data.totalPages}
+                  onClick={() => setPage((current) => current + 1)}
+                  type="button"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -818,12 +1136,22 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const examQuery = useExamQuery(examId ?? null)
   const exam = examQuery.data
   const updateQuestionsMutation = useUpdateClassTestQuestionsMutation()
+  const updateExamMutation = useUpdateClassTestMutation()
   const updateStatusMutation = useUpdateClassTestStatusMutation()
   const deleteMutation = useDeleteClassTestMutation()
   const setDeliveryModeMutation = useSetExamDeliveryModeMutation()
   const [tab, setTab] = useState<DetailTab>('papers')
   const [message, setMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [pickerMode, setPickerMode] = useState<{ kind: 'existing'; sectionIndex: number } | { kind: 'new'; title: string } | null>(null)
+  const [showEditInfo, setShowEditInfo] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editOpenAt, setEditOpenAt] = useState('')
+  const [editCloseAt, setEditCloseAt] = useState('')
+  const [editingSectionIndex, setEditingSectionIndex] = useState<number | null>(null)
+  const [editSectionTitle, setEditSectionTitle] = useState('')
+  const [editSectionInstruction, setEditSectionInstruction] = useState('')
   const { confirm, dialog } = useConfirmationDialog()
 
   async function invalidate() {
@@ -834,9 +1162,67 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
   function currentSectionsPayload() {
     return paperSections.map((section) => ({
+      instruction: section.instruction ?? null,
       questionIds: (section.items.map((item) => item.questionId).filter(Boolean) as string[]),
       title: section.title?.trim() || 'Phần',
     }))
+  }
+
+  function openEditInfo() {
+    if (!exam) {
+      return
+    }
+    setEditName(exam.name)
+    setEditDescription(exam.description ?? '')
+    setEditOpenAt(toDateTimeLocalValue(exam.openAt))
+    setEditCloseAt(toDateTimeLocalValue(exam.closeAt))
+    setShowEditInfo(true)
+  }
+
+  async function handleSaveInfo() {
+    if (!exam) {
+      return
+    }
+    try {
+      await updateExamMutation.mutateAsync({
+        examId: exam.id,
+        payload: {
+          closeAt: toIsoDateTime(editCloseAt),
+          description: editDescription.trim() || null,
+          name: editName.trim(),
+          openAt: toIsoDateTime(editOpenAt),
+        },
+      })
+      await invalidate()
+      setShowEditInfo(false)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  function startEditingSection(sectionIndex: number) {
+    const section = paperSections[sectionIndex]
+    setEditingSectionIndex(sectionIndex)
+    setEditSectionTitle(section?.title ?? '')
+    setEditSectionInstruction(section?.instruction ?? '')
+  }
+
+  async function handleSaveSectionMeta(sectionIndex: number) {
+    if (!exam) {
+      return
+    }
+    const next = currentSectionsPayload().map((section, index) =>
+      index === sectionIndex
+        ? { ...section, instruction: editSectionInstruction.trim() || null, title: editSectionTitle.trim() || section.title }
+        : section,
+    )
+    try {
+      await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+      await invalidate()
+      setEditingSectionIndex(null)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   function handleOpenAddSection() {
@@ -854,16 +1240,20 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     const current = currentSectionsPayload()
     const next =
       pickerMode.kind === 'new'
-        ? [...current, { questionIds: [question.id], title: pickerMode.title }]
+        ? [...current, { instruction: null, questionIds: [question.id], title: pickerMode.title }]
         : current.map((section, index) =>
             index === pickerMode.sectionIndex && !section.questionIds.includes(question.id)
               ? { ...section, questionIds: [...section.questionIds, question.id] }
               : section,
           )
-    await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
-    await invalidate()
-    setPickerMode(null)
-    setMessage('Đã cập nhật câu hỏi.')
+    try {
+      await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+      await invalidate()
+      setPickerMode(null)
+      setMessage('Đã cập nhật câu hỏi.')
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   async function handleRemoveQuestion(sectionIndex: number, questionId: string) {
@@ -874,8 +1264,12 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     const next = current.map((section, index) =>
       index === sectionIndex ? { ...section, questionIds: section.questionIds.filter((id) => id !== questionId) } : section,
     )
-    await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
-    await invalidate()
+    try {
+      await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   async function handleRemoveSection(sectionIndex: number) {
@@ -891,8 +1285,12 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       return
     }
     const next = current.filter((_, index) => index !== sectionIndex)
-    await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
-    await invalidate()
+    try {
+      await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   if (examQuery.isLoading) {
@@ -906,6 +1304,10 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const statusDisplay = getClassTestStatusDisplay(exam.status)
   const { completedCount, steps } = getClassTestWorkflowSteps(exam)
   const unlockedSchedule = completedCount >= 2
+  // Khớp rule backend: chỉ sửa được câu hỏi/section/blueprint khi bài còn ở trạng thái đã lên lịch (chưa mở cho học sinh làm bài).
+  const canEditContent = canManage && exam.status === 'SCHEDULED'
+  // Chỉ soạn câu hỏi trực tiếp được khi KHÔNG có blueprint dùng chung nào đang gắn (dùng "Đổi blueprint khác" nếu có).
+  const canEditFreeQuestions = canEditContent && !exam.blueprintId
 
   const nextAction =
     completedCount === 0
@@ -937,6 +1339,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       </button>
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
       {dialog}
 
       <DetailHeaderCard
@@ -947,10 +1350,72 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           { icon: <Calendar aria-hidden="true" className="size-3.5" />, label: `${formatDateTime(exam.openAt)} – ${formatDateTime(exam.closeAt)}` },
           { icon: <Users aria-hidden="true" className="size-3.5" />, label: `GV: ${formatNullableText(exam.teacherName)}` },
         ]}
+        onEdit={canManage ? openEditInfo : undefined}
         statusLabel={statusDisplay.label}
         statusTone={statusDisplay.tone}
         title={exam.name}
       />
+
+      {showEditInfo ? (
+        <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-5.5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[15px] font-extrabold text-slate-900">Sửa thông tin bài trên lớp</h3>
+            <button
+              className="text-xs font-bold text-slate-400 hover:text-slate-600"
+              onClick={() => setShowEditInfo(false)}
+              type="button"
+            >
+              Hủy
+            </button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Tên bài
+              <input
+                className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setEditName(event.target.value)}
+                value={editName}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Mô tả
+              <input
+                className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setEditDescription(event.target.value)}
+                value={editDescription}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Mở lúc
+              <input
+                className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setEditOpenAt(event.target.value)}
+                type="datetime-local"
+                value={editOpenAt}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Đóng lúc
+              <input
+                className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setEditCloseAt(event.target.value)}
+                type="datetime-local"
+                value={editCloseAt}
+              />
+            </label>
+          </div>
+          <div className="flex justify-end">
+            <button
+              className="inline-flex h-9.5 items-center justify-center rounded-full bg-indigo-600 px-4 text-xs font-bold text-white disabled:opacity-60"
+              disabled={updateExamMutation.isPending}
+              onClick={() => void handleSaveInfo()}
+              type="button"
+            >
+              Lưu
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <WorkflowTrackerCard
         completedCount={completedCount}
@@ -975,19 +1440,30 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       {tab === 'papers' ? (
         <div className="mt-4 grid gap-3.5">
-          {canManage && !exam.blueprintId ? (
+          {canManage ? (
             <div className="grid gap-2.5">
               <div className="flex items-center justify-between">
                 <h2 className="text-[15px] font-extrabold text-slate-900">Các phần và câu hỏi</h2>
-                <button
-                  className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-indigo-600 hover:bg-slate-50"
-                  onClick={handleOpenAddSection}
-                  type="button"
-                >
-                  <Plus aria-hidden="true" className="size-4" />
-                  Thêm phần
-                </button>
+                {canEditFreeQuestions ? (
+                  <button
+                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-indigo-600 hover:bg-slate-50"
+                    onClick={handleOpenAddSection}
+                    type="button"
+                  >
+                    <Plus aria-hidden="true" className="size-4" />
+                    Thêm phần
+                  </button>
+                ) : null}
               </div>
+              {!canEditContent ? (
+                <p className="text-xs font-semibold text-amber-700">
+                  Bài đã mở cho học sinh làm bài — không thể sửa câu hỏi/section nữa.
+                </p>
+              ) : exam.blueprintId ? (
+                <p className="text-xs font-semibold text-amber-700">
+                  Bài đang dùng blueprint dùng chung — vào tab Blueprint để đổi/gỡ blueprint thay vì sửa trực tiếp ở đây.
+                </p>
+              ) : null}
               {paperSections.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
                   Chưa có phần nào — bấm "Thêm phần" để bắt đầu soạn đề.
@@ -995,28 +1471,74 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               ) : (
                 paperSections.map((section, sectionIndex) => (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5" key={section.id}>
-                    <div className="flex items-center justify-between gap-2.5">
-                      <span className="text-sm font-bold text-slate-900">{section.title || `Phần ${sectionIndex + 1}`}</span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          className="inline-flex h-8.5 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
-                          onClick={() => setPickerMode({ kind: 'existing', sectionIndex })}
-                          type="button"
-                        >
-                          + Câu hỏi
-                        </button>
-                        {paperSections.length > 1 ? (
+                    {editingSectionIndex === sectionIndex ? (
+                      <div className="grid gap-2">
+                        <input
+                          className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
+                          onChange={(event) => setEditSectionTitle(event.target.value)}
+                          value={editSectionTitle}
+                        />
+                        <textarea
+                          className="min-h-14 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+                          onChange={(event) => setEditSectionInstruction(event.target.value)}
+                          placeholder="Hướng dẫn phần (không bắt buộc)"
+                          value={editSectionInstruction}
+                        />
+                        <div className="flex gap-2">
                           <button
-                            aria-label={`Xóa ${section.title ?? `phần ${sectionIndex + 1}`}`}
-                            className="inline-flex size-8.5 items-center justify-center rounded-full border border-red-200 text-red-600 hover:bg-red-50"
-                            onClick={() => void handleRemoveSection(sectionIndex)}
+                            className="inline-flex h-8 items-center justify-center rounded-full bg-indigo-600 px-3.5 text-xs font-bold text-white"
+                            onClick={() => void handleSaveSectionMeta(sectionIndex)}
                             type="button"
                           >
-                            <Trash2 aria-hidden="true" className="size-3.5" />
+                            Lưu
                           </button>
+                          <button
+                            className="inline-flex h-8 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                            onClick={() => setEditingSectionIndex(null)}
+                            type="button"
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2.5">
+                        <div>
+                          <span className="text-sm font-bold text-slate-900">{section.title || `Phần ${sectionIndex + 1}`}</span>
+                          {section.instruction ? <p className="mt-0.5 text-xs text-slate-500">{section.instruction}</p> : null}
+                        </div>
+                        {canEditFreeQuestions ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              aria-label={`Sửa ${section.title ?? `phần ${sectionIndex + 1}`}`}
+                              className="inline-flex size-8.5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                              onClick={() => startEditingSection(sectionIndex)}
+                              title="Sửa tên/hướng dẫn phần"
+                              type="button"
+                            >
+                              <Pencil aria-hidden="true" className="size-3.5" />
+                            </button>
+                            <button
+                              className="inline-flex h-8.5 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+                              onClick={() => setPickerMode({ kind: 'existing', sectionIndex })}
+                              type="button"
+                            >
+                              + Câu hỏi
+                            </button>
+                            {paperSections.length > 1 ? (
+                              <button
+                                aria-label={`Xóa ${section.title ?? `phần ${sectionIndex + 1}`}`}
+                                className="inline-flex size-8.5 items-center justify-center rounded-full border border-red-200 text-red-600 hover:bg-red-50"
+                                onClick={() => void handleRemoveSection(sectionIndex)}
+                                type="button"
+                              >
+                                <Trash2 aria-hidden="true" className="size-3.5" />
+                              </button>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
-                    </div>
+                    )}
                     {section.items.length === 0 ? (
                       <div className="mt-2.5 rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
                         Chưa có câu hỏi nào trong phần này.
@@ -1044,7 +1566,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                                   <Eye aria-hidden="true" className="size-3.5" />
                                 </a>
                               ) : null}
-                              {section.items.length > 1 && item.questionId ? (
+                              {canEditFreeQuestions && section.items.length > 1 && item.questionId ? (
                                 <button
                                   className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
                                   onClick={() => void handleRemoveQuestion(sectionIndex, item.questionId as string)}
@@ -1081,11 +1603,19 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       {pickerMode ? (
         <QuestionPicker
+          excludeQuestionIds={
+            paperSections
+              .filter((_, index) => !(pickerMode.kind === 'existing' && index === pickerMode.sectionIndex))
+              .flatMap((section) => section.items.map((item) => item.questionId))
+              .filter(Boolean) as string[]
+          }
           onClose={() => setPickerMode(null)}
           onSelect={(question) => void handlePickQuestion(question)}
           scope="teacher"
           selectedQuestionIds={
-            paperSections.flatMap((section) => section.items.map((item) => item.questionId)).filter(Boolean) as string[]
+            pickerMode.kind === 'existing'
+              ? ((paperSections[pickerMode.sectionIndex]?.items.map((item) => item.questionId).filter(Boolean) as string[]) ?? [])
+              : []
           }
         />
       ) : null}
@@ -1093,17 +1623,13 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       {tab === 'students' ? <CandidatesTab examId={exam.id} /> : null}
 
       {tab === 'blueprint' ? (
-        <BlueprintAttachPanel
+        <ClassTestBlueprintTab
           blueprintId={exam.blueprintId}
           blueprintVersionId={exam.blueprintVersionId}
+          canEdit={canEditContent}
+          canManage={canManage}
           examId={exam.id}
-          hasPapers={exam.papers.length > 0}
-          members={exam.members}
-          onCreateVersion={(blueprintId) => navigate(`/teacher/blueprints/${blueprintId}/versions/new`)}
-          onOpenBlueprint={(blueprintId, versionId) =>
-            navigate(versionId ? `/teacher/blueprints/${blueprintId}/versions/${versionId}` : `/teacher/blueprints/${blueprintId}`)
-          }
-          optional
+          onChanged={() => void invalidate()}
         />
       ) : null}
 

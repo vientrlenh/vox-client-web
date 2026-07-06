@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, Search, X } from 'lucide-react'
+import { useAppSelector } from '@/app/store/hooks'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
 import {
@@ -11,6 +12,7 @@ import {
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 
 type QuestionPickerProps = {
+  excludeQuestionIds?: string[]
   onClose: () => void
   onSelect: (question: QuestionDto) => void
   publishedOnly?: boolean
@@ -20,9 +22,17 @@ type QuestionPickerProps = {
 
 const PAGE_SIZE = 8
 
-export function QuestionPicker({ onClose, onSelect, publishedOnly = false, scope, selectedQuestionIds }: QuestionPickerProps) {
+export function QuestionPicker({
+  excludeQuestionIds = [],
+  onClose,
+  onSelect,
+  publishedOnly = false,
+  scope,
+  selectedQuestionIds,
+}: QuestionPickerProps) {
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
+  const currentUserId = useAppSelector((state) => state.auth.user?.userId)
   const questionsQuery = useQuestionsQuery(scope, 'all', page, PAGE_SIZE, {
     keyword,
     scope: '',
@@ -31,6 +41,9 @@ export function QuestionPicker({ onClose, onSelect, publishedOnly = false, scope
     topicName: '',
     type: '',
   })
+  const questions = (questionsQuery.data?.content ?? []).filter(
+    (question) => !question.locked || question.createdBy === currentUserId,
+  )
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
@@ -72,17 +85,23 @@ export function QuestionPicker({ onClose, onSelect, publishedOnly = false, scope
         <div className="flex-1 overflow-y-auto px-6 py-3">
           {questionsQuery.isLoading ? (
             <p className="py-8 text-center text-sm text-slate-400">Đang tải câu hỏi…</p>
-          ) : questionsQuery.data?.content.length ? (
+          ) : questions.length ? (
             <div className="grid gap-2.5 py-2">
-              {questionsQuery.data.content.map((question) => {
+              {questions.map((question) => {
                 const isSelected = selectedQuestionIds.includes(question.id)
+                const isUsedElsewhere = !isSelected && excludeQuestionIds.includes(question.id)
                 const statusDisplay = getQuestionStatusDisplay(question.status)
                 return (
                   <button
                     className={[
                       'grid gap-1 rounded-xl border p-3.5 text-left transition',
-                      isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
+                      isUsedElsewhere
+                        ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-60'
+                        : isSelected
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-slate-200 hover:bg-slate-50',
                     ].join(' ')}
+                    disabled={isUsedElsewhere}
                     key={question.id}
                     onClick={() => onSelect(question)}
                     type="button"
@@ -90,7 +109,13 @@ export function QuestionPicker({ onClose, onSelect, publishedOnly = false, scope
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-bold text-slate-900">{question.code}</span>
                       <div className="flex items-center gap-2">
-                        <StatusBadge label={statusDisplay.label} tone={statusDisplay.className.includes('emerald') ? 'success' : 'neutral'} />
+                        {isUsedElsewhere ? (
+                          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                            Đã dùng ở phần khác
+                          </span>
+                        ) : (
+                          <StatusBadge label={statusDisplay.label} tone={statusDisplay.className.includes('emerald') ? 'success' : 'neutral'} />
+                        )}
                         {isSelected ? <Check aria-hidden="true" className="size-4 text-indigo-600" /> : null}
                       </div>
                     </div>

@@ -309,6 +309,11 @@ export type AttachExamBlueprintRequest = {
   newBlueprint?: CreateBlueprintInlineRequest | null
 }
 
+export type ChangeClassTestBlueprintRequest = {
+  blueprintId?: string | null
+  blueprintVersionId?: string | null
+}
+
 export type CreateClassTestResponse = {
   candidateCount: number
   exam: ExamDto
@@ -420,7 +425,12 @@ export function getClassTestStatusDisplay(status?: string | null): { tone: Statu
   }
 }
 
-export function getExamPaperStatusDisplay(status?: string | null): { tone: StatusTone; label: string } {
+export function getExamPaperStatusDisplay(status?: string | null, examKind?: ExamKind): { tone: StatusTone; label: string } {
+  // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED làm mặc định (không dùng luồng duyệt như kỳ thi tập trung),
+  // nên với CLASS_TEST, LOCKED nghĩa là "sẵn sàng dùng", không phải "đã khóa không sửa được".
+  if (status === 'LOCKED' && examKind === 'CLASS_TEST') {
+    return { tone: 'success', label: 'Sẵn sàng' }
+  }
   switch (status) {
     case 'DRAFT':
       return { tone: 'warning', label: 'Bản nháp' }
