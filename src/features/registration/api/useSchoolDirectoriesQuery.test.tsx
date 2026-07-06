@@ -1,69 +1,67 @@
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
-import type { PageResult, SchoolDirectory } from '../types'
-import { fetchSchoolDirectories } from './useSchoolDirectoriesQuery'
+import type { SchoolDirectory } from '../types'
+import { fetchSchoolDirectoryCursorPage } from './useSchoolDirectoriesQuery'
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
 
 const mockDirectory: SchoolDirectory = {
   address: '123 Đường ABC',
-  district: 'Quận 1',
+  code: 'HCM001',
+  districtName: 'Quận 1',
   domain: 'nguyendu.edu.vn',
   id: 'directory-1',
   name: 'Trường THPT Nguyễn Du',
-  province: 'TP. Hồ Chí Minh',
-  source: 'ADMIN_VERIFIED',
+  provinceName: 'TP. Hồ Chí Minh',
+  verified: true,
 }
 
-const mockPage: PageResult<SchoolDirectory> = {
+const mockCursorPage = {
   content: [mockDirectory],
-  page: 1,
-  size: 8,
-  totalElements: 1,
-  totalPages: 1,
+  hasNext: true,
+  nextCursor: 'directory-1',
 }
 
-describe('fetchSchoolDirectories', () => {
+describe('fetchSchoolDirectoryCursorPage', () => {
   beforeEach(() => {
     mockedPost.mockReset()
   })
 
-  it('sends a trimmed search and the requested page/size', async () => {
+  it('requests the cursor page with the given cursor and limit', async () => {
     mockedPost.mockResolvedValue({
       data: {
-        data: { schoolDirectories: mockPage },
+        data: { schoolDirectoryCursorPage: mockCursorPage },
       },
     })
 
     await expect(
-      fetchSchoolDirectories({ page: 1, search: '  Nguyễn Du  ', size: 8 }),
-    ).resolves.toEqual(mockPage)
+      fetchSchoolDirectoryCursorPage({ cursor: 'directory-0', limit: 8 }),
+    ).resolves.toEqual(mockCursorPage)
 
     const requestBody = mockedPost.mock.calls[0]?.[1] as {
       query: string
       variables: Record<string, unknown>
     }
 
-    expect(requestBody.query).toContain('schoolDirectories')
+    expect(requestBody.query).toContain('schoolDirectoryCursorPage')
     expect(requestBody.variables).toEqual({
-      page: 1,
-      search: 'Nguyễn Du',
-      size: 8,
+      cursor: 'directory-0',
+      limit: 8,
     })
   })
 
-  it('passes null when the search term is empty', async () => {
+  it('passes a null cursor for the first page', async () => {
     mockedPost.mockResolvedValue({
       data: {
-        data: { schoolDirectories: mockPage },
+        data: { schoolDirectoryCursorPage: mockCursorPage },
       },
     })
 
-    await fetchSchoolDirectories({ page: 1, search: '   ', size: 8 })
+    await fetchSchoolDirectoryCursorPage({ cursor: null, limit: 8 })
 
     const requestBody = mockedPost.mock.calls[0]?.[1] as {
       variables: Record<string, unknown>
     }
 
-    expect(requestBody.variables.search).toBeNull()
+    expect(requestBody.variables.cursor).toBeNull()
   })
 })

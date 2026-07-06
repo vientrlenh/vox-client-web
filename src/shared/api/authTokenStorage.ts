@@ -1,11 +1,9 @@
 export type AuthTokens = {
   accessToken: string
-  refreshToken: string
 }
 
 export const AUTH_TOKEN_STORAGE_KEYS = {
-  accessToken: 'vox.accessToken',
-  refreshToken: 'vox.refreshToken',
+  accessToken: 'vox.accessToken'
 } as const
 
 function getStorage() {
@@ -24,7 +22,6 @@ export function saveAuthTokens(tokens: AuthTokens) {
   }
 
   storage.setItem(AUTH_TOKEN_STORAGE_KEYS.accessToken, tokens.accessToken)
-  storage.setItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken, tokens.refreshToken)
 }
 
 export function getAuthTokens(): AuthTokens | null {
@@ -35,15 +32,13 @@ export function getAuthTokens(): AuthTokens | null {
   }
 
   const accessToken = storage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)
-  const refreshToken = storage.getItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)
 
-  if (!accessToken || !refreshToken) {
+  if (!accessToken) {
     return null
   }
 
   return {
-    accessToken,
-    refreshToken,
+    accessToken
   }
 }
 
@@ -55,5 +50,4 @@ export function clearAuthTokens() {
   }
 
   storage.removeItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)
-  storage.removeItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)
 }

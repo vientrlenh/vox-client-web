@@ -5,6 +5,7 @@ import { appConfig } from '@/shared/config/env';
 import type { ApiError } from './apiError';
 import { getAuthTokens } from './authTokenStorage';
 import { toApiError } from './apiError';
+import { createRawErrorInterceptorInstaller } from './rawErrorInterceptor'
 
 type GraphQLErrorResponse = {
   extensions?: unknown;
@@ -24,6 +25,8 @@ export const graphqlApiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+  withCredentials: true
+})
 
 // 1. Interceptor Request: Tự động gắn Token vào mọi request
 graphqlApiClient.interceptors.request.use((config) => {
@@ -41,6 +44,7 @@ graphqlApiClient.interceptors.response.use(
   (response) => response,
   (error: unknown) => Promise.reject(toApiError(error)),
 );
+export const addGraphqlClientRawErrorInterceptor = createRawErrorInterceptorInstaller(graphqlApiClient)
 
 // 3. Hàm map mảng errors của GraphQL thành chuẩn ApiError chung của dự án
 function toGraphQLError(errors: GraphQLErrorResponse[]): ApiError {

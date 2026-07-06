@@ -1,27 +1,48 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Bell,
   Building2,
   ChevronDown,
   ClipboardCheck,
   ClipboardList,
+  FileQuestion,
   Home,
   Languages,
+  Library,
   LogOut,
   Menu,
   Search,
   Settings,
   ShieldCheck,
+  UserRound,
   Users,
   X,
 } from 'lucide-react'
-import { NavLink, Outlet, useNavigate } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import logoImage from '@/assets/images/logo.png'
 import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
+import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
+import { useProfileQuery } from '@/features/profile'
 
-const navigationItems = [
+type NavigationItem = {
+  icon: typeof Home
+  label: string
+  to: string
+}
+
+type NavigationGroup = {
+  icon: typeof Home
+  label: string
+  items: Array<{
+    badgeCount?: number
+    label: string
+    to: string
+  }>
+}
+
+const navigationItems: NavigationItem[] = [
   {
     icon: Home,
     label: 'Tổng quan',
@@ -36,6 +57,11 @@ const navigationItems = [
     icon: Languages,
     label: 'Quản lý ngôn ngữ',
     to: '/system-admin/languages',
+  },
+  {
+    icon: Library,
+    label: 'Danh mục trường',
+    to: '/system-admin/school-directory',
   },
   {
     icon: Users,
@@ -64,6 +90,41 @@ const navigationItems = [
   },
 ]
 
+const navigationGroups: NavigationGroup[] = [
+  {
+    icon: FileQuestion,
+    label: 'Câu hỏi',
+    items: [
+      {
+        label: 'Ngân hàng câu hỏi',
+        to: '/system-admin/question-banks',
+      },
+      {
+        label: 'Câu hỏi toàn hệ thống',
+        to: '/system-admin/questions/all',
+      },
+      {
+        label: 'Duyệt câu hỏi',
+        to: '/system-admin/questions/review',
+      },
+    ],
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Kỳ thi',
+    items: [
+      {
+        label: 'Giám sát kỳ thi',
+        to: '/system-admin/exams',
+      },
+      {
+        label: 'Giám sát blueprint',
+        to: '/system-admin/blueprints',
+      },
+    ],
+  },
+]
+
 function getEmailInitials(email?: string) {
   if (!email) {
     return 'SA'
@@ -87,13 +148,84 @@ type SystemAdminSidebarProps = {
   showCloseButton?: boolean
 }
 
+function SystemAdminNavigationGroup({
+  icon: Icon,
+  items,
+  label,
+  onNavigate,
+}: NavigationGroup & { onNavigate?: () => void }) {
+  const location = useLocation()
+  const isGroupActive = items.some(({ to }) => location.pathname.startsWith(to))
+  const [isOpen, setIsOpen] = useState(isGroupActive)
+
+  useEffect(() => {
+    if (isGroupActive) {
+      setIsOpen(true)
+    }
+  }, [isGroupActive])
+
+  return (
+    <div className="grid gap-2">
+      <button
+        aria-expanded={isOpen}
+        className={[
+          'flex min-h-12 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-bold transition',
+          isGroupActive ? 'bg-white/10 text-white' : 'text-indigo-50/90',
+        ].join(' ')}
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <Icon aria-hidden="true" className="size-5 shrink-0" />
+        <span className="flex-1">{label}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className={[
+            'size-4 shrink-0 transition-transform',
+            isOpen ? 'rotate-180' : '',
+          ].join(' ')}
+        />
+      </button>
+
+      {isOpen ? (
+        <div className="ml-4 grid gap-2 border-l border-white/10 pl-4">
+          {items.map(({ badgeCount, label: itemLabel, to }) => (
+            <NavLink
+              className={({ isActive }) =>
+                [
+                  'flex min-h-11 items-center rounded-lg px-4 py-2.5 text-sm font-bold transition',
+                  isActive
+                    ? 'bg-violet-500 text-white shadow-sm shadow-violet-950/20'
+                    : 'text-indigo-50/90 hover:bg-white/10 hover:text-white',
+                ].join(' ')
+              }
+              key={to}
+              onClick={onNavigate}
+              to={to}
+            >
+              <span className="flex flex-1 items-center justify-between gap-3">
+                <span>{itemLabel}</span>
+                {badgeCount && badgeCount > 0 ? (
+                  <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-black text-white">
+                    {badgeCount}
+                  </span>
+                ) : null}
+              </span>
+            </NavLink>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function SystemAdminSidebar({
+  groups,
   onClose,
   onNavigate,
   showCloseButton = false,
-}: SystemAdminSidebarProps) {
+}: SystemAdminSidebarProps & { groups: NavigationGroup[] }) {
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-blue-950 via-indigo-900 to-violet-900 px-6 py-7 text-white">
+    <div className="flex h-full flex-col overflow-hidden border-r border-white/10 bg-linear-to-b from-blue-950 via-indigo-900 to-violet-900 px-6 py-7 text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
       <div className="flex items-center justify-between">
         <NavLink
           aria-label="VOX system admin"
@@ -110,7 +242,7 @@ function SystemAdminSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Đóng menu system admin"
+            aria-label="Đóng menu quản trị hệ thống"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -121,46 +253,58 @@ function SystemAdminSidebar({
       </div>
 
       <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-indigo-100/80">
-        System Admin
+        Quản trị hệ thống
       </p>
 
-      <nav aria-label="System admin" className="mt-6 grid gap-2">
-        {navigationItems.map(({ icon: Icon, label, to }) => (
-          <NavLink
-            className={({ isActive }) =>
-              [
-                'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
-                isActive
-                  ? 'bg-violet-500 text-white shadow-sm shadow-violet-950/20'
-                  : 'text-indigo-50/90 hover:bg-white/10 hover:text-white',
-              ].join(' ')
-            }
-            key={to}
-            onClick={onNavigate}
-            to={to}
-          >
-            <Icon aria-hidden="true" className="size-5 shrink-0" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-      </nav>
+      <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-2 [mask-image:linear-gradient(to_bottom,black,black_calc(100%-24px),transparent)] [scrollbar-color:rgba(255,255,255,0.28)_transparent] scrollbar-thin">
+        <div className="flex min-h-full flex-col gap-6 pb-6">
+          <nav aria-label="Quản trị hệ thống" className="grid gap-3">
+            {navigationItems.map(({ icon: Icon, label, to }) => (
+              <NavLink
+                className={({ isActive }) =>
+                  [
+                    'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition',
+                    isActive
+                      ? 'bg-violet-500 text-white shadow-sm shadow-violet-950/20'
+                      : 'text-indigo-50/90 hover:bg-white/10 hover:text-white',
+                  ].join(' ')
+                }
+                key={to}
+                onClick={onNavigate}
+                to={to}
+              >
+                <Icon aria-hidden="true" className="size-5 shrink-0" />
+                <span>{label}</span>
+              </NavLink>
+            ))}
 
-      <div className="mt-auto rounded-lg border border-white/15 bg-white/10 p-5 text-white backdrop-blur">
-        <div className="inline-flex size-11 items-center justify-center rounded-lg bg-white text-indigo-700">
-          <ShieldCheck aria-hidden="true" className="size-6" />
+            {groups.map((group) => (
+              <SystemAdminNavigationGroup
+                {...group}
+                key={group.label}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </nav>
+
+          <div className="mt-auto rounded-2xl border border-white/15 bg-white/10 p-5 text-white backdrop-blur">
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-white text-indigo-700">
+              <ShieldCheck aria-hidden="true" className="size-6" />
+            </div>
+            <p className="mt-4 text-sm font-bold leading-6">
+              Hệ thống an toàn và bảo mật
+            </p>
+            <p className="mt-2 text-xs leading-5 text-indigo-50/80">
+              Dữ liệu được mã hóa và bảo vệ theo tiêu chuẩn quốc tế.
+            </p>
+            <button
+              className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/35 text-sm font-bold text-white transition hover:bg-white/10"
+              type="button"
+            >
+              Xem chi tiết
+            </button>
+          </div>
         </div>
-        <p className="mt-4 text-sm font-bold leading-6">
-          Hệ thống an toàn & bảo mật
-        </p>
-        <p className="mt-2 text-xs leading-5 text-indigo-50/80">
-          Dữ liệu được mã hóa và bảo vệ theo tiêu chuẩn quốc tế.
-        </p>
-        <button
-          className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-white/35 text-sm font-bold text-white transition hover:bg-white/10"
-          type="button"
-        >
-          Xem chi tiết
-        </button>
       </div>
     </div>
   )
@@ -173,8 +317,30 @@ export function SystemAdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const adminEmail = user?.email ?? 'unknown'
-  const adminRoles = user?.roles.length ? user.roles.join(', ') : 'No roles'
   const adminInitials = getEmailInitials(adminEmail)
+  const { data: profile } = useProfileQuery()
+  const reviewQuestionsQuery = useQuestionsQuery('admin', 'review', 1, 1, {
+    keyword: '',
+    questionBankId: '',
+    questionTopicId: '',
+    scope: '',
+    sharing: '',
+    status: 'SUBMITTED_FOR_REVIEW',
+    topicName: '',
+    type: '',
+  })
+  const systemAdminNavigationGroups = navigationGroups.map((group) =>
+    group.label === 'Câu hỏi'
+      ? {
+          ...group,
+          items: group.items.map((item) =>
+            item.to === '/system-admin/questions/review'
+              ? { ...item, badgeCount: reviewQuestionsQuery.data?.totalElements ?? 0 }
+              : item,
+          ),
+        }
+      : group,
+  )
 
   function handleLogout() {
     setIsMobileMenuOpen(false)
@@ -187,24 +353,25 @@ export function SystemAdminLayout() {
   return (
     <div className="min-h-screen bg-slate-50 text-blue-950 lg:pl-70">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-70 lg:block">
-        <SystemAdminSidebar />
+        <SystemAdminSidebar groups={systemAdminNavigationGroups} />
       </aside>
 
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Đóng menu system admin bằng lớp phủ"
+            aria-label="Đóng menu quản trị hệ thống bằng lớp phủ"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />
           <aside
-            aria-label="Menu system admin"
+            aria-label="Menu quản trị hệ thống"
             aria-modal="true"
             className="relative h-full w-70 max-w-[86vw]"
             role="dialog"
           >
             <SystemAdminSidebar
+              groups={systemAdminNavigationGroups}
               onClose={() => setIsMobileMenuOpen(false)}
               onNavigate={() => setIsMobileMenuOpen(false)}
               showCloseButton
@@ -216,7 +383,7 @@ export function SystemAdminLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mở menu system admin"
+            aria-label="Mở menu quản trị hệ thống"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-blue-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
@@ -265,10 +432,10 @@ export function SystemAdminLayout() {
                 </span>
                 <span className="hidden max-w-56 sm:block">
                   <span className="block truncate text-sm font-bold text-blue-950">
-                    {adminEmail}
+                    {profile?.fullName}
                   </span>
-                  <span className="block truncate text-xs font-medium text-slate-500">
-                    {adminRoles}
+                  <span className="block truncate uppercase text-xs font-medium text-slate-500">
+                    Quản trị hệ thống
                   </span>
                 </span>
                 <ChevronDown
@@ -282,6 +449,19 @@ export function SystemAdminLayout() {
                   className="absolute right-0 mt-2 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-950/10"
                   role="menu"
                 >
+                  <button
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-indigo-700"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      setIsUserMenuOpen(false)
+                      navigate('/profile')
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <UserRound aria-hidden="true" className="size-4" />
+                    Thông tin cá nhân
+                  </button>
                   <button
                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-red-600"
                     onClick={handleLogout}

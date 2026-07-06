@@ -1,13 +1,14 @@
 import axios from 'axios'
 import type {
   AxiosError,
+  AxiosInstance,
   AxiosRequestConfig,
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from 'axios'
 import { clearAuthState, setAuthenticatedUser } from '@/app/store/authSlice'
 import type { AppStore } from '@/app/store/store'
-import { addApiClientRawErrorInterceptor, apiClient } from '@/shared/api'
+import { addApiClientRawErrorInterceptor, addGraphqlClientRawErrorInterceptor, apiClient, graphqlApiClient } from '@/shared/api'
 import { refreshAuthTokens } from '../api/refreshAuthTokens'
 import type { RefreshResponse } from '../types'
 import {
@@ -45,6 +46,7 @@ function clearSession(store: AppStore) {
 }
 
 async function refreshAndRetry(
+  client: AxiosInstance,
   error: AxiosError,
   store: AppStore,
 ): Promise<AxiosResponse> {
@@ -70,7 +72,7 @@ async function refreshAndRetry(
 
   try {
     if (!refreshPromise) {
-      refreshPromise = refreshAuthTokens(tokens.refreshToken).finally(() => {
+      refreshPromise = refreshAuthTokens().finally(() => {
         refreshPromise = null
       })
     }
@@ -87,10 +89,19 @@ async function refreshAndRetry(
     store.dispatch(setAuthenticatedUser(user))
     updateAuthorizationHeader(config, newTokens.accessToken)
 
-    return apiClient(config)
+    return client(config)
   } catch (refreshError) {
     clearSession(store)
     return Promise.reject(refreshError)
+  }
+}
+
+function createRefreshErrorHandler(client: AxiosInstance, store: AppStore) {
+  return (error: AxiosError) => {
+    if (!axios.isAxiosError(error)) {
+      return Promise.reject(error)
+    }
+    return refreshAndRetry(client, error, store)
   }
 }
 
@@ -99,16 +110,13 @@ export function installAuthRefreshInterceptor(store: AppStore) {
     return uninstallRefreshInterceptor
   }
 
-  const uninstall = addApiClientRawErrorInterceptor((error) => {
-    if (!axios.isAxiosError(error)) {
-      return Promise.reject(error)
-    }
+  const uninstallApi = addApiClientRawErrorInterceptor(createRefreshErrorHandler(apiClient, store))
 
-    return refreshAndRetry(error, store)
-  })
+  const uninstallGraphql = addGraphqlClientRawErrorInterceptor(createRefreshErrorHandler(graphqlApiClient, store))
 
   uninstallRefreshInterceptor = () => {
-    uninstall()
+    uninstallApi()
+    uninstallGraphql()
     uninstallRefreshInterceptor = null
   }
 

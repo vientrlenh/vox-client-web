@@ -1,11 +1,10 @@
-import { apiClient } from '@/shared/api'
+import { apiClient, type ApiResponse } from '@/shared/api'
 import { getClientDevice } from '../session/authSession'
-import type { ApiResponse, RefreshRequest, RefreshResponse } from '../types'
+import type { RefreshRequest, RefreshResponse } from '../types'
 
-export async function refreshAuthTokens(refreshToken: string) {
+export async function refreshAuthTokens() {
   const payload: RefreshRequest = {
-    deviceId: getClientDevice().deviceId,
-    token: refreshToken,
+    deviceId: getClientDevice().deviceId
   }
 
   const response = await apiClient.post<ApiResponse<RefreshResponse>>(

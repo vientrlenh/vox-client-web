@@ -10,8 +10,18 @@ import type {
   ApproveRegisterFormRequest,
   RegisterForm,
   RegisterFormPage,
-  RejectRegisterFormRequest,
 } from '../types'
+
+jest.mock('../api/useVietnamProvincesQuery', () => ({
+  useVietnamProvincesQuery: () => ({
+    data: [
+      { code: 1, name: 'Hà Nội' },
+      { code: 79, name: 'TP. Hồ Chí Minh' },
+    ],
+    isError: false,
+    isLoading: false,
+  }),
+}))
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
 const mockedRestPost = jest.spyOn(apiClient, 'post')
@@ -40,7 +50,7 @@ function createRegisterForm(
     contactFullName: 'Tran Chan Quang Thien',
     contactPhone: '0355906225',
     dateOfBirth: '2004-09-05',
-    documentUrls: null,
+    documents: null,
     id: 'form-1',
     identityNumber: '079384563728',
     position: 'Pho hieu truong',
@@ -391,7 +401,8 @@ describe('SystemAdminRegistrationsPage', () => {
         '/v1/register-forms/form-1/reject',
         {
           reason: 'Thông tin chưa đủ để xác minh',
-        } satisfies RejectRegisterFormRequest,
+          registerFormId: 'form-1',
+        },
       )
     })
     expect(await screen.findByText(successMessage)).toBeInTheDocument()
@@ -421,13 +432,12 @@ describe('SystemAdminRegistrationsPage', () => {
     const dialog = screen.getByRole('dialog', {
       name: /duyệt đơn đăng ký/i,
     })
-    const schoolNameInput = within(dialog).getByLabelText(/^tên trường/i)
-
-    expect(schoolNameInput).toHaveValue('test-school-1')
 
     await user.type(within(dialog).getByLabelText(/mã trường/i), 'VOX001')
-    await user.clear(schoolNameInput)
-    await user.type(schoolNameInput, 'VOX School')
+    await user.selectOptions(
+      within(dialog).getByLabelText(/tỉnh \/ thành phố/i),
+      '79',
+    )
     await user.click(
       within(dialog).getByRole('button', { name: /tiếp tục duyệt/i }),
     )
@@ -446,17 +456,10 @@ describe('SystemAdminRegistrationsPage', () => {
       .calls[0][1] as ApproveRegisterFormRequest
 
     expect(payload).toEqual({
-      contactAddress: '27 test street',
-      contactEmail: 'gocthanh9799@gmail.com',
-      contactFullName: 'Tran Chan Quang Thien',
-      contactPhone: '0355906225',
-      dateOfBirth: '2004-09-05',
       description: null,
-      schoolAddress: '27 test street',
+      provinceCode: '79',
+      registerFormId: 'form-1',
       schoolCode: 'VOX001',
-      schoolDomain: 'testschool.edu.vn',
-      schoolName: 'VOX School',
-      studentCount: 3000,
     })
     expect(await screen.findByText(successMessage)).toBeInTheDocument()
     expect(listCalls.length).toBeGreaterThan(1)
@@ -485,6 +488,10 @@ describe('SystemAdminRegistrationsPage', () => {
     })
 
     await user.type(within(dialog).getByLabelText(/mã trường/i), '   ')
+    await user.selectOptions(
+      within(dialog).getByLabelText(/tỉnh \/ thành phố/i),
+      '79',
+    )
     await user.click(
       within(dialog).getByRole('button', { name: /tiếp tục duyệt/i }),
     )

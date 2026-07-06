@@ -1,8 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import type { AxiosResponse } from 'axios'
-import { apiClient } from '@/shared/api'
+import { apiClient, type ApiResponse } from '@/shared/api'
 import { createTestProviders } from '@/test/renderWithProviders'
-import type { ApiResponse, SetUpPasswordRequest } from '../types'
+import type { SetUpPasswordRequest } from '../types'
 import { useSetUpPasswordMutation } from './useSetUpPasswordMutation'
 
 jest.mock('@/shared/api', () => ({

@@ -14,7 +14,7 @@ const mockRegisterForm: RegisterForm = {
   contactFullName: 'Tran Chan Quang Thien',
   contactPhone: '0355906225',
   dateOfBirth: '2004-09-05',
-  documentUrls: null,
+  documents: null,
   id: 'form-1',
   identityNumber: '079384563728',
   position: 'Pho hieu truong',

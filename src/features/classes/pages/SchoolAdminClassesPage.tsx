@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
+  ChevronDown,
   Edit,
   Plus,
   RefreshCw,
   Search,
   Upload,
   Trash2,
+  X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
@@ -16,6 +18,8 @@ import {
   SchoolClassFormDialog,
   type SchoolClassFormMode,
 } from '../components/SchoolClassFormDialog'
+import { SchoolGradePickerDialog } from '../components/SchoolGradePickerDialog'
+import type { SchoolGrade } from '../components/SchoolGradePickerDialog'
 import {
   useCreateSchoolClassMutation,
   useDeleteSchoolClassMutation,
@@ -372,6 +376,9 @@ export function SchoolAdminClassesPage() {
   const [classDialogError, setClassDialogError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isGradePickerOpen, setIsGradePickerOpen] = useState(false)
+  const [selectedFilterGrade, setSelectedFilterGrade] =
+    useState<SchoolGrade | null>(null)
 
   const classesQuery = useSchoolClassesQuery(page, pageSize, filters)
   const languagesQuery = useSupportedLanguagesQuery(
@@ -392,6 +399,17 @@ export function SchoolAdminClassesPage() {
       [name]: value,
     }))
     setPage(DEFAULT_PAGE)
+  }
+
+  function handleSelectFilterGrade(grade: SchoolGrade) {
+    setSelectedFilterGrade(grade)
+    handleFilterChange('schoolGradeId', grade.id)
+    setIsGradePickerOpen(false)
+  }
+
+  function clearGradeFilter() {
+    setSelectedFilterGrade(null)
+    handleFilterChange('schoolGradeId', '')
   }
 
   function handlePageSizeChange(nextPageSize: number) {
@@ -616,17 +634,38 @@ export function SchoolAdminClassesPage() {
             </span>
           ) : null}
         </label>
-        <label className="grid gap-2 text-sm font-bold text-slate-700">
-          ID khối lớp
-          <input
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            onChange={(event) =>
-              handleFilterChange('schoolGradeId', event.target.value)
-            }
-            placeholder="ID khối lớp"
-            value={filters.schoolGradeId}
-          />
-        </label>
+        <div className="grid gap-2 text-sm font-bold text-slate-700">
+          Niên học
+          <div className="flex gap-1">
+            <button
+              className="flex h-11 flex-1 items-center justify-between overflow-hidden rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition hover:bg-slate-50 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              onClick={() => setIsGradePickerOpen(true)}
+              type="button"
+            >
+              <span
+                className={`truncate ${selectedFilterGrade ? 'text-slate-950' : 'text-slate-400'}`}
+              >
+                {selectedFilterGrade
+                  ? `${selectedFilterGrade.name} (${selectedFilterGrade.code})`
+                  : 'Tất cả niên học'}
+              </span>
+              <ChevronDown
+                aria-hidden="true"
+                className="ml-2 size-4 shrink-0 text-slate-400"
+              />
+            </button>
+            {selectedFilterGrade ? (
+              <button
+                aria-label="Xóa bộ lọc niên học"
+                className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-950"
+                onClick={clearGradeFilter}
+                type="button"
+              >
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <div className="grid h-fit gap-4">
@@ -683,6 +722,13 @@ export function SchoolAdminClassesPage() {
           void handleDeleteConfirm()
         }}
         schoolClass={deleteTarget}
+      />
+      <SchoolGradePickerDialog
+        initialGradeId={filters.schoolGradeId}
+        isOpen={isGradePickerOpen}
+        onClose={() => setIsGradePickerOpen(false)}
+        onSelect={handleSelectFilterGrade}
+        zIndex="z-50"
       />
     </section>
   )

@@ -1,12 +1,12 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import {
-  getStoredAuthUser,
   isAccessTokenExpired,
+  readStoredAuthState,
 } from '@/features/auth/session/authSession'
 import type { AuthUser } from '@/features/auth/types'
 
-export type AuthStatus = 'anonymous' | 'authenticated'
+export type AuthStatus = 'loading' | 'anonymous' | 'authenticated'
 
 type AuthState = {
   status: AuthStatus
@@ -14,11 +14,19 @@ type AuthState = {
 }
 
 function createInitialState(): AuthState {
-  const user = getStoredAuthUser()
+  const stored = readStoredAuthState()
+
+  if (stored.status === "authenticated") {
+    return { status: "authenticated", user: stored.user }
+  }
+
+  if (stored.status === "expired") {
+    return { status: 'loading', user: null }
+  }
 
   return {
-    status: user ? 'authenticated' : 'anonymous',
-    user,
+    status: 'anonymous', 
+    user: null
   }
 }
 

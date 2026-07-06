@@ -1,8 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
-import { apiClient } from '@/shared/api'
+import { apiClient, type ApiResponse } from '@/shared/api'
 import { getClientDevice } from '../session/authSession'
 import type {
-  ApiResponse,
   LoginCredentials,
   LoginRequest,
   LoginResponse,

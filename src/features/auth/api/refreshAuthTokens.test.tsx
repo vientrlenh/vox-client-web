@@ -1,6 +1,6 @@
 import type { AxiosResponse } from 'axios'
-import { apiClient } from '@/shared/api'
-import type { ApiResponse, RefreshResponse } from '../types'
+import { apiClient, type ApiResponse } from '@/shared/api'
+import type { RefreshResponse } from '../types'
 import { refreshAuthTokens } from './refreshAuthTokens'
 
 jest.mock('@/shared/api', () => ({
@@ -30,7 +30,7 @@ describe('refreshAuthTokens', () => {
       },
     } as AxiosResponse<ApiResponse<RefreshResponse>>)
 
-    await expect(refreshAuthTokens('old-refresh-token')).resolves.toEqual(
+    await expect(refreshAuthTokens()).resolves.toEqual(
       responseData,
     )
     expect(apiClient.post).toHaveBeenCalledWith('/v1/auth/refresh', {
