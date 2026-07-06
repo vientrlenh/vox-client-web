@@ -23,7 +23,6 @@ export type LoginResponse = {
 
 export type RefreshRequest = {
   deviceId: string
-  token: string
 }
 
 export type RefreshResponse = {
@@ -45,11 +44,6 @@ export type ResetPasswordRequest = {
   email: string
   otp: string
   password: string
-}
-
-export type ApiResponse<T> = {
-  data: T
-  message: string
 }
 
 export type AuthUser = {

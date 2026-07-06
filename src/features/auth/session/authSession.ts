@@ -141,3 +141,29 @@ export function getStoredAuthUser() {
 
   return user
 }
+
+export type StoredAuthState = 
+  | { status: 'authenticated'; user: AuthUser }
+  | { status: 'expired' }
+  | { status: 'absent' }
+
+export function readStoredAuthState(): StoredAuthState {
+  const token = getAuthTokens()
+
+  if (!token) {
+    return { status: 'absent' }
+  }
+
+  const user = decodeAccessToken(token.accessToken)
+
+  if (!user) {
+    clearAuthTokens()
+    return { status: 'absent' }
+  }
+
+  if (isAccessTokenExpired(user)) {
+    return { status: 'expired' }
+  }
+
+  return { status: 'authenticated', user }
+}

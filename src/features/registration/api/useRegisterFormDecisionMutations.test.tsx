@@ -18,17 +18,9 @@ type ApiResponse<T> = {
 }
 
 const approvePayload: ApproveRegisterFormRequest = {
-  contactAddress: '27 test street',
-  contactEmail: 'admin@school.edu.vn',
-  contactFullName: 'Tran Chan Quang Thien',
-  contactPhone: '0355906225',
-  dateOfBirth: '2004-09-05',
   description: null,
-  schoolAddress: '27 test street',
+  provinceCode: 'HCM',
   schoolCode: 'VOX001',
-  schoolDomain: 'testschool.edu.vn',
-  schoolName: 'VOX School',
-  studentCount: 3000,
 }
 
 const rejectPayload: RejectRegisterFormRequest = {
@@ -57,7 +49,7 @@ describe('registration decision REST API', () => {
 
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/register-forms/form-1/approve',
-      approvePayload,
+      { ...approvePayload, registerFormId: 'form-1' },
     )
   })
 
@@ -78,7 +70,7 @@ describe('registration decision REST API', () => {
 
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/register-forms/form-1/reject',
-      rejectPayload,
+      { ...rejectPayload, registerFormId: 'form-1' },
     )
   })
 })

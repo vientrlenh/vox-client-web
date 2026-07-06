@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { ChevronUp } from 'lucide-react'
-import type { RegisterForm } from '../types'
+import type { RegisterForm, RegisterFormDocument } from '../types'
 import {
   formatNullableText,
   formatRegisterFormDate,
@@ -21,29 +21,32 @@ type DetailRow = {
   value: ReactNode
 }
 
-// TODO: uncomment when BE exposes documentUrls in RegisterForm schema
-// function RegistrationDocumentList({ urls }: { urls: string[] | null }) {
-//   const documents = urls?.filter((url) => url.trim() !== '') ?? []
-//   if (documents.length === 0) {
-//     return <p className="text-sm font-bold text-slate-500">Không có tài liệu</p>
-//   }
-//   return (
-//     <ul className="grid gap-2">
-//       {documents.map((url, index) => (
-//         <li key={url}>
-//           <a
-//             className="break-all text-sm font-bold text-indigo-700 underline-offset-2 hover:underline"
-//             href={url}
-//             rel="noopener noreferrer"
-//             target="_blank"
-//           >
-//             Tài liệu {index + 1}
-//           </a>
-//         </li>
-//       ))}
-//     </ul>
-//   )
-// }
+function RegistrationDocumentList({
+  documents,
+}: {
+  documents: RegisterFormDocument[] | null
+}) {
+  const items = documents?.filter((d) => d.url.trim() !== '') ?? []
+  if (items.length === 0) {
+    return <p className="text-sm font-bold text-slate-500">Không có tài liệu</p>
+  }
+  return (
+    <ul className="grid gap-2">
+      {items.map((doc, index) => (
+        <li key={doc.id}>
+          <a
+            className="break-all text-sm font-bold text-indigo-700 underline-offset-2 hover:underline"
+            href={doc.url}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Tài liệu {index + 1}
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 function DetailRows({ rows }: { rows: DetailRow[] }) {
   return (
@@ -52,7 +55,7 @@ function DetailRows({ rows }: { rows: DetailRow[] }) {
         <div className="grid grid-cols-[120px_12px_1fr] gap-3" key={row.label}>
           <dt className="text-sm text-slate-600">{row.label}</dt>
           <dd className="text-sm text-slate-500">:</dd>
-          <dd className="min-w-0 break-words text-sm font-bold text-blue-950">
+          <dd className="min-w-0 wrap-break-word text-sm font-bold text-blue-950">
             {row.value}
           </dd>
         </div>
@@ -184,14 +187,13 @@ export function RegistrationDetailPanel({
             ]}
           />
 
-          {/* TODO: uncomment when BE exposes documentUrls in RegisterForm schema */}
-          {/* <hr className="border-slate-200" />
+          <hr className="border-slate-200" />
           <div className="grid gap-3">
             <h3 className="text-sm font-bold text-blue-950">
               Tài liệu xác thực
             </h3>
-            <RegistrationDocumentList urls={form.documentUrls} />
-          </div> */}
+            <RegistrationDocumentList documents={form.documents} />
+          </div>
         </div>
       ) : null}
     </aside>

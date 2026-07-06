@@ -1,10 +1,10 @@
 import { screen, waitFor } from '@testing-library/react'
 import type { AxiosResponse } from 'axios'
 import userEvent from '@testing-library/user-event'
-import { apiClient } from '@/shared/api'
+import { apiClient, type ApiResponse } from '@/shared/api'
 import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import type { ApiResponse, LoginResponse } from '../types'
+import type { LoginResponse } from '../types'
 import { LoginPage } from './LoginPage'
 
 jest.mock('@/shared/api', () => ({
@@ -105,9 +105,6 @@ describe('LoginPage', () => {
     expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBe(
       responseData.accessToken,
     )
-    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)).toBe(
-      responseData.refreshToken,
-    )
   })
 
   it('stores tokens and authenticates a SCHOOL_ADMIN login', async () => {
@@ -141,9 +138,6 @@ describe('LoginPage', () => {
     )
     expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBe(
       responseData.accessToken,
-    )
-    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)).toBe(
-      responseData.refreshToken,
     )
   })
 
@@ -182,7 +176,6 @@ describe('LoginPage', () => {
       /vai trò hiện chưa được hỗ trợ/i,
     )
     expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBeNull()
-    expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken)).toBeNull()
   })
 
   it('shows the API error message when credentials are rejected', async () => {

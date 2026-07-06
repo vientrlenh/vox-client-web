@@ -1,5 +1,5 @@
 export { addApiClientRawErrorInterceptor, apiClient } from './apiClient'
-export { graphQLRequest } from './graphqlClient'
+export { graphQLRequest, addGraphqlClientRawErrorInterceptor, graphqlApiClient } from './graphqlClient'
 export {
   AUTH_TOKEN_STORAGE_KEYS,
   clearAuthTokens,
