@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  Eye,
   FilePenLine,
   Hash,
   Languages,
@@ -23,6 +24,7 @@ import { useAppSelector } from '@/app/store/hooks'
 import { useMySchoolClassesQuery } from '@/features/classes/api/useMySchoolClassesQuery'
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery'
 import type { QuestionDto } from '@/features/question/types'
+import { toApiError } from '@/shared/api'
 import { Pagination } from '@/shared/components/Pagination'
 import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -42,6 +44,7 @@ import {
   examQueryKeys,
   useClassTestStatsQuery,
   useClassTestsQuery,
+  useExamBlueprintsQuery,
   useExamQuery,
 } from '../api/useExamQueries'
 import {
@@ -56,6 +59,8 @@ import {
   formatNullableText,
   getClassTestStatusDisplay,
   toIsoDateTime,
+  type ExamBlueprintDto,
+  type ExamBlueprintVersionDto,
   type ExamDeliveryMode,
   type ExamDto,
   type ExamStatus,
@@ -304,13 +309,14 @@ function nextClassTestKey(prefix: string) {
 }
 
 type ClassTestSectionDraft = {
+  instruction: string
   key: string
   questions: QuestionDto[]
   title: string
 }
 
 function newClassTestSection(order: number): ClassTestSectionDraft {
-  return { key: nextClassTestKey('cts'), questions: [], title: `Phần ${order}` }
+  return { instruction: '', key: nextClassTestKey('cts'), questions: [], title: `Phần ${order}` }
 }
 
 export function TeacherClassTestCreatePage() {
@@ -325,7 +331,18 @@ export function TeacherClassTestCreatePage() {
   const [closeAt, setCloseAt] = useState('')
   const [sections, setSections] = useState<ClassTestSectionDraft[]>([newClassTestSection(1)])
   const [pickerForSectionKey, setPickerForSectionKey] = useState<string | null>(null)
+  const [creationMode, setCreationMode] = useState<'questions' | 'blueprint'>('questions')
+  const [blueprintKeyword, setBlueprintKeyword] = useState('')
+  const [blueprintPage, setBlueprintPage] = useState(1)
+  const [browsingBlueprint, setBrowsingBlueprint] = useState<ExamBlueprintDto | null>(null)
+  const [selectedBlueprint, setSelectedBlueprint] = useState<ExamBlueprintDto | null>(null)
+  const [selectedVersion, setSelectedVersion] = useState<ExamBlueprintVersionDto | null>(null)
+  const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword: blueprintKeyword, page: blueprintPage, size: 8 })
   const { confirm, dialog } = useConfirmationDialog()
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const hasSelectionSlot = selectedVersion?.sections.some((section) =>
+    section.slots.some((slot) => slot.slotType === 'SELECTION'),
+  )
 
   function addSection() {
     setSections((current) => [...current, newClassTestSection(current.length + 1)])
@@ -337,6 +354,12 @@ export function TeacherClassTestCreatePage() {
 
   function updateSectionTitle(sectionKey: string, title: string) {
     setSections((current) => current.map((section) => (section.key === sectionKey ? { ...section, title } : section)))
+  }
+
+  function updateSectionInstruction(sectionKey: string, instruction: string) {
+    setSections((current) =>
+      current.map((section) => (section.key === sectionKey ? { ...section, instruction } : section)),
+    )
   }
 
   function addQuestionToSection(sectionKey: string, question: QuestionDto) {
@@ -367,49 +390,72 @@ export function TeacherClassTestCreatePage() {
       window.alert('Vui lòng nhập tên bài và chọn lớp học.')
       return
     }
-    if (sections.length === 0 || sections.every((section) => section.questions.length === 0)) {
-      window.alert('Phải có ít nhất một phần với ít nhất một câu hỏi.')
-      return
-    }
-    for (const section of sections) {
-      if (!section.title.trim()) {
-        window.alert('Mỗi phần phải có tên.')
+    if (creationMode === 'blueprint') {
+      if (!selectedBlueprint || !selectedVersion) {
+        window.alert('Vui lòng chọn một blueprint và phiên bản đã xuất bản.')
         return
       }
-      if (section.questions.length === 0) {
-        window.alert(`Phần "${section.title}" phải có ít nhất một câu hỏi.`)
+      if (hasSelectionSlot) {
+        window.alert(
+          'Phiên bản này có ô câu hỏi chọn ngẫu nhiên (SELECTION) — chỉ dùng được blueprint gồm toàn câu hỏi cố định (FIXED) cho bài trên lớp.',
+        )
         return
+      }
+    } else {
+      if (sections.length === 0 || sections.every((section) => section.questions.length === 0)) {
+        window.alert('Phải có ít nhất một phần với ít nhất một câu hỏi.')
+        return
+      }
+      for (const section of sections) {
+        if (!section.title.trim()) {
+          window.alert('Mỗi phần phải có tên.')
+          return
+        }
+        if (section.questions.length === 0) {
+          window.alert(`Phần "${section.title}" phải có ít nhất một câu hỏi.`)
+          return
+        }
       }
     }
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo bài trên lớp này không?' }))) {
       return
     }
-    await createMutation.mutateAsync({
-      payload: {
-        closeAt: toIsoDateTime(closeAt),
-        description: description || null,
-        name,
-        openAt: toIsoDateTime(openAt),
-        schoolClassId,
-        sections: sections.map((section) => ({
-          questionIds: section.questions.map((question) => question.id),
-          title: section.title.trim(),
-        })),
-      },
-      schoolClassName,
-    })
-    await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
-    navigate('/teacher/class-tests', { state: { successMessage: 'Đã tạo bài trên lớp thành công.' } })
+    try {
+      await createMutation.mutateAsync({
+        payload: {
+          closeAt: toIsoDateTime(closeAt),
+          description: description || null,
+          existingBlueprintId: creationMode === 'blueprint' ? selectedBlueprint?.id : null,
+          existingBlueprintVersionId: creationMode === 'blueprint' ? selectedVersion?.id : null,
+          name,
+          openAt: toIsoDateTime(openAt),
+          schoolClassId,
+          sections:
+            creationMode === 'blueprint'
+              ? null
+              : sections.map((section) => ({
+                  instruction: section.instruction.trim() || null,
+                  questionIds: section.questions.map((question) => question.id),
+                  title: section.title.trim(),
+                })),
+        },
+        schoolClassName,
+      })
+      await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
+      navigate('/teacher/class-tests', { state: { successMessage: 'Đã tạo bài trên lớp thành công.' } })
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   return (
     <section className="mx-auto max-w-220">
       <h1 className="text-[26px] font-extrabold text-slate-900">Tạo bài trên lớp</h1>
       <p className="mt-1.5 text-sm text-slate-500">
-        Nhập thông tin bài và chọn câu hỏi theo đúng thứ tự muốn sử dụng. Bạn có thể tạo thẳng đề bài bằng câu hỏi ở
-        đây mà không cần gắn blueprint — có thể gắn blueprint sau (không bắt buộc) trong trang chi tiết bài.
+        Nhập thông tin bài, sau đó chọn câu hỏi trực tiếp hoặc dùng lại một blueprint đã xuất bản có sẵn.
       </p>
       {dialog}
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
 
       <div className="mt-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-6">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -463,6 +509,190 @@ export function TeacherClassTestCreatePage() {
         </div>
 
         <div>
+          <h2 className="text-[15px] font-extrabold text-slate-900">Cách soạn đề</h2>
+          <div className="mt-2 flex gap-2">
+            <button
+              className={[
+                'inline-flex h-9.5 items-center justify-center rounded-full border px-4 text-[13px] font-semibold',
+                creationMode === 'questions'
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              ].join(' ')}
+              onClick={() => setCreationMode('questions')}
+              type="button"
+            >
+              Câu hỏi trực tiếp
+            </button>
+            <button
+              className={[
+                'inline-flex h-9.5 items-center justify-center rounded-full border px-4 text-[13px] font-semibold',
+                creationMode === 'blueprint'
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              ].join(' ')}
+              onClick={() => setCreationMode('blueprint')}
+              type="button"
+            >
+              Dùng blueprint có sẵn
+            </button>
+          </div>
+        </div>
+
+        {creationMode === 'blueprint' ? (
+          <div>
+            {selectedBlueprint && selectedVersion ? (
+              <div className="grid gap-3">
+                <div
+                  className={[
+                    'flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4',
+                    hasSelectionSlot ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50',
+                  ].join(' ')}
+                >
+                  <div>
+                    <div className="text-sm font-extrabold text-slate-900">{selectedBlueprint.name}</div>
+                    <div className="text-xs text-slate-500">
+                      {selectedBlueprint.code} · phiên bản {selectedVersion.code} ·{' '}
+                      {selectedVersion.sectionCount ?? selectedVersion.sections.length} phần
+                    </div>
+                  </div>
+                  <button
+                    className="shrink-0 text-xs font-bold text-slate-500 hover:text-red-600"
+                    onClick={() => {
+                      setSelectedBlueprint(null)
+                      setSelectedVersion(null)
+                    }}
+                    type="button"
+                  >
+                    Đổi
+                  </button>
+                </div>
+                {hasSelectionSlot ? (
+                  <p className="text-xs font-semibold text-amber-700">
+                    Phiên bản này có ô câu hỏi chọn ngẫu nhiên (SELECTION) — không thể dùng cho bài trên lớp, vì mỗi học
+                    sinh cần một đề cố định giống nhau. Bấm "Đổi" để chọn blueprint/phiên bản khác chỉ gồm câu hỏi cố
+                    định (FIXED), hoặc chuyển sang "Câu hỏi trực tiếp".
+                  </p>
+                ) : (
+                  <div className="grid gap-2">
+                    {selectedVersion.sections.map((section) => (
+                      <div className="rounded-lg border border-slate-200 bg-white p-3" key={section.id}>
+                        <div className="text-xs font-extrabold text-slate-900">{section.title}</div>
+                        <div className="mt-1.5 grid gap-1">
+                          {section.slots.map((slot) => (
+                            <div className="text-xs text-slate-600" key={slot.id}>
+                              {slot.order}. {slot.fixedQuestion?.code ?? '—'} —{' '}
+                              {formatNullableText(slot.fixedQuestion?.questionText)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : browsingBlueprint ? (
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-[13px] font-extrabold text-slate-900">
+                    Chọn phiên bản đã xuất bản của {browsingBlueprint.name}
+                  </h3>
+                  <button
+                    className="shrink-0 text-xs font-bold text-slate-400 hover:text-slate-600"
+                    onClick={() => setBrowsingBlueprint(null)}
+                    type="button"
+                  >
+                    Quay lại
+                  </button>
+                </div>
+                <div className="mt-2.5 grid gap-2">
+                  {browsingBlueprint.versions.filter((version) => version.status === 'PUBLISHED').length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
+                      Blueprint này chưa có phiên bản nào được xuất bản.
+                    </div>
+                  ) : (
+                    browsingBlueprint.versions
+                      .filter((version) => version.status === 'PUBLISHED')
+                      .map((version) => (
+                        <button
+                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm hover:bg-slate-50"
+                          key={version.id}
+                          onClick={() => {
+                            setSelectedBlueprint(browsingBlueprint)
+                            setSelectedVersion(version)
+                            setBrowsingBlueprint(null)
+                          }}
+                          type="button"
+                        >
+                          <span className="font-bold text-slate-900">{version.code}</span>
+                          <span className="text-xs text-slate-500">
+                            {version.sectionCount ?? version.sections.length} phần
+                          </span>
+                        </button>
+                      ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <input
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
+                  onChange={(event) => {
+                    setBlueprintKeyword(event.target.value)
+                    setBlueprintPage(1)
+                  }}
+                  placeholder="Tìm blueprint theo mã hoặc tên…"
+                  value={blueprintKeyword}
+                />
+                <div className="mt-2.5 grid gap-2">
+                  {blueprintsQuery.data?.content.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
+                      Không tìm thấy blueprint phù hợp.
+                    </div>
+                  ) : (
+                    blueprintsQuery.data?.content.map((blueprint) => (
+                      <button
+                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm hover:bg-slate-50"
+                        key={blueprint.id}
+                        onClick={() => setBrowsingBlueprint(blueprint)}
+                        type="button"
+                      >
+                        <span>
+                          <span className="font-bold text-slate-900">{blueprint.name}</span>{' '}
+                          <span className="text-xs text-slate-500">· {blueprint.code}</span>
+                        </span>
+                        <span className="text-xs text-slate-500">{blueprint.versionCount ?? 0} phiên bản</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                {blueprintsQuery.data && blueprintsQuery.data.totalElements > 0 ? (
+                  <div className="mt-2.5 flex items-center justify-between text-xs font-semibold text-slate-500">
+                    <span>{blueprintsQuery.data.totalElements} blueprint</span>
+                    <div className="flex gap-2">
+                      <button
+                        className="h-8 rounded-lg border border-slate-200 px-3 disabled:opacity-40"
+                        disabled={blueprintPage <= 1}
+                        onClick={() => setBlueprintPage((current) => current - 1)}
+                        type="button"
+                      >
+                        Trước
+                      </button>
+                      <button
+                        className="h-8 rounded-lg border border-slate-200 px-3 disabled:opacity-40"
+                        disabled={blueprintPage >= blueprintsQuery.data.totalPages}
+                        onClick={() => setBlueprintPage((current) => current + 1)}
+                        type="button"
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        ) : (
+        <div>
           <div className="flex items-center justify-between">
             <h2 className="text-[15px] font-extrabold text-slate-900">Các phần và câu hỏi ({totalQuestions} câu)</h2>
             <button
@@ -502,6 +732,12 @@ export function TeacherClassTestCreatePage() {
                     </button>
                   ) : null}
                 </div>
+                <textarea
+                  className="mt-2 min-h-14 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+                  onChange={(event) => updateSectionInstruction(section.key, event.target.value)}
+                  placeholder="Hướng dẫn phần (không bắt buộc)"
+                  value={section.instruction}
+                />
                 {section.questions.length === 0 ? (
                   <div className="mt-2.5 rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
                     Chưa có câu hỏi nào trong phần này.
@@ -516,13 +752,25 @@ export function TeacherClassTestCreatePage() {
                         <span className="font-semibold text-slate-800">
                           {index + 1}. {question.code} — {formatNullableText(question.questionText)}
                         </span>
-                        <button
-                          className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
-                          onClick={() => removeQuestionFromSection(section.key, question.id)}
-                          type="button"
-                        >
-                          Bỏ
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            aria-label={`Xem chi tiết ${question.code}`}
+                            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+                            href={`/teacher/questions/${question.id}`}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                            title="Xem chi tiết câu hỏi"
+                          >
+                            <Eye aria-hidden="true" className="size-3.5" />
+                          </a>
+                          <button
+                            className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                            onClick={() => removeQuestionFromSection(section.key, question.id)}
+                            type="button"
+                          >
+                            Bỏ
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -531,11 +779,12 @@ export function TeacherClassTestCreatePage() {
             ))}
           </div>
         </div>
+        )}
 
         <div className="flex justify-end">
           <button
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
-            disabled={createMutation.isPending}
+            disabled={createMutation.isPending || (creationMode === 'blueprint' && Boolean(hasSelectionSlot))}
             onClick={handleSubmit}
             type="button"
           >
@@ -782,15 +1031,29 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                             <span className="font-semibold text-slate-800">
                               {index + 1}. {item.question?.code} — {formatNullableText(item.question?.questionText)}
                             </span>
-                            {section.items.length > 1 && item.questionId ? (
-                              <button
-                                className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
-                                onClick={() => void handleRemoveQuestion(sectionIndex, item.questionId as string)}
-                                type="button"
-                              >
-                                Bỏ
-                              </button>
-                            ) : null}
+                            <div className="flex items-center gap-1.5">
+                              {item.question ? (
+                                <a
+                                  aria-label={`Xem chi tiết ${item.question.code}`}
+                                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                  href={`${canManage ? '/teacher' : '/school-admin'}/questions/${item.question.id}`}
+                                  rel="noopener noreferrer"
+                                  target="_blank"
+                                  title="Xem chi tiết câu hỏi"
+                                >
+                                  <Eye aria-hidden="true" className="size-3.5" />
+                                </a>
+                              ) : null}
+                              {section.items.length > 1 && item.questionId ? (
+                                <button
+                                  className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                                  onClick={() => void handleRemoveQuestion(sectionIndex, item.questionId as string)}
+                                  type="button"
+                                >
+                                  Bỏ
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -833,9 +1096,13 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         <BlueprintAttachPanel
           blueprintId={exam.blueprintId}
           blueprintVersionId={exam.blueprintVersionId}
-          canManage={canManage}
           examId={exam.id}
-          onOpenBlueprint={(blueprintId) => navigate(`/teacher/blueprints/${blueprintId}`)}
+          hasPapers={exam.papers.length > 0}
+          members={exam.members}
+          onCreateVersion={(blueprintId) => navigate(`/teacher/blueprints/${blueprintId}/versions/new`)}
+          onOpenBlueprint={(blueprintId, versionId) =>
+            navigate(versionId ? `/teacher/blueprints/${blueprintId}/versions/${versionId}` : `/teacher/blueprints/${blueprintId}`)
+          }
           optional
         />
       ) : null}

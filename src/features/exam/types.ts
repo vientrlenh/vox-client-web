@@ -229,6 +229,7 @@ export type CreateExamRequest = {
 }
 
 export type ClassTestSectionInput = {
+  instruction?: string | null
   questionIds: string[]
   title: string
 }
@@ -282,6 +283,11 @@ export type CreateExamPaperRequest = {
 
 export type UpdateExamPaperItemRequest = {
   questionId: string
+}
+
+export type UpdateExamPaperSectionRequest = {
+  instruction?: string | null
+  title?: string | null
 }
 
 export type UpdateExamPaperStatusRequest = {

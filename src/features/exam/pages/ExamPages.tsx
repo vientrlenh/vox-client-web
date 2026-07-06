@@ -20,6 +20,7 @@ import {
 import { useNavigate, useParams } from 'react-router'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { Pagination } from '@/shared/components/Pagination'
+import { toApiError } from '@/shared/api'
 import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
@@ -34,7 +35,7 @@ import { MembersTab } from '../components/MembersTab'
 import { PaperCard } from '../components/PaperCard'
 import { ScheduleTab } from '../components/schedule/ScheduleTab'
 import { WorkflowTrackerCard } from '../components/WorkflowTrackerCard'
-import { examQueryKeys, useExamQuery, useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
+import { examQueryKeys, useExamMyRoleQuery, useExamQuery, useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
 import {
   useCreateExamMutation,
   useCreateExamPaperMutation,
@@ -395,7 +396,6 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
 
 type ExamDetailPageProps = {
   basePath: string
-  canManageBlueprint: boolean
   canManageInfo: boolean
   canManageMembers: boolean
   canManagePapers: boolean
@@ -404,23 +404,46 @@ type ExamDetailPageProps = {
 
 type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
 
-function ExamDetailPage({ basePath, canManageBlueprint, canManageInfo, canManageMembers, canManagePapers, canManageStatus }: ExamDetailPageProps) {
+function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePapers, canManageStatus }: ExamDetailPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { examId } = useParams()
   const examQuery = useExamQuery(examId ?? null)
   const exam = examQuery.data
+  const myRoleQuery = useExamMyRoleQuery(examId ?? null)
+  const myRole = myRoleQuery.data
   const createPaperMutation = useCreateExamPaperMutation()
   const updatePaperStatusMutation = useUpdateExamPaperStatusMutation()
   const updateStatusMutation = useUpdateExamStatusMutation()
   const deleteMutation = useDeleteExamMutation()
   const [tab, setTab] = useState<ExamDetailTab>('papers')
   const [message, setMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showCopyPicker, setShowCopyPicker] = useState(false)
+  const [copyFromPaperId, setCopyFromPaperId] = useState('')
   const { confirm, dialog } = useConfirmationDialog()
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
+  }
+
+  async function handleCreatePaper(forExamId: string, source: 'blueprint' | 'copy', copyFromPaperId: string | null) {
+    try {
+      await createPaperMutation.mutateAsync({ examId: forExamId, payload: { copyFromPaperId, source } })
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handleUpdatePaperStatus(paperId: string, action: 'APPROVE' | 'LOCK' | 'SUBMIT') {
+    try {
+      await updatePaperStatusMutation.mutateAsync({ paperId, payload: { action } })
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   if (examQuery.isLoading) {
@@ -463,6 +486,7 @@ function ExamDetailPage({ basePath, canManageBlueprint, canManageInfo, canManage
       </button>
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
       {dialog}
 
       <DetailHeaderCard
@@ -497,38 +521,67 @@ function ExamDetailPage({ basePath, canManageBlueprint, canManageInfo, canManage
       {tab === 'papers' ? (
         <div className="mt-4 grid gap-3.5">
           {canManagePapers ? (
-            <div className="flex justify-end">
-              <button
-                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
-                onClick={() => {
-                  void (async () => {
-                    const sourceInput = window.prompt('Nguồn tạo mã đề (blueprint / copy):', 'blueprint')
-                    const source = sourceInput?.trim().toLowerCase()
-
-                    if (!source || !['blueprint', 'copy'].includes(source)) {
-                      return
-                    }
-
-                    const copyFromPaperId =
-                      source === 'copy'
-                        ? window.prompt('Nhập paperId cần sao chép:', exam.papers[0]?.id ?? '')
-                        : null
-
-                    await createPaperMutation.mutateAsync({
-                      examId: exam.id,
-                      payload: {
-                        copyFromPaperId: copyFromPaperId?.trim() || null,
-                        source: source as 'blueprint' | 'copy',
-                      },
-                    })
-                    await invalidate()
-                  })()
-                }}
-                type="button"
-              >
-                <Plus aria-hidden="true" className="size-4" />
-                Tạo mã đề
-              </button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {showCopyPicker ? (
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pr-1.5 pl-3.5">
+                  <span className="text-xs font-bold text-slate-500">Sao chép từ</span>
+                  <select
+                    className="h-8 rounded-full border border-slate-200 px-2.5 text-xs font-semibold text-slate-700"
+                    onChange={(event) => setCopyFromPaperId(event.target.value)}
+                    value={copyFromPaperId}
+                  >
+                    <option value="">Chọn mã đề…</option>
+                    {exam.papers.map((paper) => (
+                      <option key={paper.id} value={paper.id}>
+                        {paper.code}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="inline-flex h-8 items-center justify-center rounded-full bg-indigo-600 px-3.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!copyFromPaperId}
+                    onClick={() => {
+                      void handleCreatePaper(exam.id, 'copy', copyFromPaperId)
+                      setShowCopyPicker(false)
+                      setCopyFromPaperId('')
+                    }}
+                    type="button"
+                  >
+                    Sao chép
+                  </button>
+                  <button
+                    aria-label="Hủy sao chép mã đề"
+                    className="inline-flex size-8 items-center justify-center rounded-full text-slate-400 hover:text-slate-600"
+                    onClick={() => {
+                      setShowCopyPicker(false)
+                      setCopyFromPaperId('')
+                    }}
+                    type="button"
+                  >
+                    <X aria-hidden="true" className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {exam.papers.length > 0 ? (
+                    <button
+                      className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+                      onClick={() => setShowCopyPicker(true)}
+                      type="button"
+                    >
+                      Sao chép mã đề
+                    </button>
+                  ) : null}
+                  <button
+                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
+                    onClick={() => void handleCreatePaper(exam.id, 'blueprint', null)}
+                    type="button"
+                  >
+                    <Plus aria-hidden="true" className="size-4" />
+                    Tạo mã đề từ blueprint
+                  </button>
+                </>
+              )}
             </div>
           ) : null}
           {exam.papers.length === 0 ? (
@@ -538,15 +591,32 @@ function ExamDetailPage({ basePath, canManageBlueprint, canManageInfo, canManage
           ) : (
             exam.papers.map((paper) => {
               const paperStatusDisplay = getExamPaperStatusDisplay(paper.status)
-              const actions = canManagePapers
-                ? paper.status === 'DRAFT'
-                  ? [{ label: 'Nộp duyệt', onClick: () => void updatePaperStatusMutation.mutateAsync({ paperId: paper.id, payload: { action: 'SUBMIT' } }).then(() => invalidate()), tone: 'primary' as const }]
-                  : paper.status === 'IN_REVIEW'
-                    ? [{ label: 'Duyệt', onClick: () => void updatePaperStatusMutation.mutateAsync({ paperId: paper.id, payload: { action: 'APPROVE' } }).then(() => invalidate()), tone: 'primary' as const }]
-                    : paper.status === 'APPROVED'
-                      ? [{ label: 'Khóa mã đề', onClick: () => void updatePaperStatusMutation.mutateAsync({ paperId: paper.id, payload: { action: 'LOCK' } }).then(() => invalidate()), tone: 'primary' as const }]
+              const totalItems = paper.sections.reduce((sum, section) => sum + section.items.length, 0)
+              const filledItems = paper.sections.reduce(
+                (sum, section) => sum + section.items.filter((item) => item.questionId).length,
+                0,
+              )
+              const isIncomplete = filledItems < totalItems
+              // CHAIR có toàn quyền của REVIEWER (approve) ngoài quyền lock riêng — khớp rule backend.
+              const canSubmit = canManagePapers && myRole === 'AUTHOR'
+              const canApprove = canManagePapers && (myRole === 'CHAIR' || myRole === 'REVIEWER')
+              const canLock = canManagePapers && myRole === 'CHAIR'
+              const actions =
+                paper.status === 'DRAFT' && canSubmit
+                  ? [
+                      {
+                        disabled: isIncomplete,
+                        label: 'Nộp duyệt',
+                        onClick: () => void handleUpdatePaperStatus(paper.id, 'SUBMIT'),
+                        title: isIncomplete ? 'Còn ô câu hỏi chưa được gán — gán đủ trước khi nộp duyệt' : undefined,
+                        tone: 'primary' as const,
+                      },
+                    ]
+                  : paper.status === 'IN_REVIEW' && canApprove
+                    ? [{ label: 'Duyệt', onClick: () => void handleUpdatePaperStatus(paper.id, 'APPROVE'), tone: 'primary' as const }]
+                    : paper.status === 'APPROVED' && canLock
+                      ? [{ label: 'Khóa mã đề', onClick: () => void handleUpdatePaperStatus(paper.id, 'LOCK'), tone: 'primary' as const }]
                       : []
-                : []
               return (
                 <PaperCard
                   actions={actions}
@@ -575,9 +645,16 @@ function ExamDetailPage({ basePath, canManageBlueprint, canManageInfo, canManage
         <BlueprintAttachPanel
           blueprintId={exam.blueprintId}
           blueprintVersionId={exam.blueprintVersionId}
-          canManage={canManageBlueprint}
           examId={exam.id}
-          onOpenBlueprint={(blueprintId) => navigate(`${basePath.replace(/\/exams$/, '')}/blueprints/${blueprintId}`)}
+          hasPapers={exam.papers.length > 0}
+          members={exam.members}
+          onCreateVersion={(blueprintId) =>
+            navigate(`${basePath.replace(/\/exams$/, '')}/blueprints/${blueprintId}/versions/new`)
+          }
+          onOpenBlueprint={(blueprintId, versionId) => {
+            const blueprintsBasePath = basePath.replace(/\/exams$/, '') + '/blueprints'
+            navigate(versionId ? `${blueprintsBasePath}/${blueprintId}/versions/${versionId}` : `${blueprintsBasePath}/${blueprintId}`)
+          }}
         />
       ) : null}
 
@@ -675,7 +752,6 @@ export function TeacherExamDetailPage() {
   return (
     <ExamDetailPage
       basePath="/teacher/exams"
-      canManageBlueprint
       canManageInfo={false}
       canManageMembers={false}
       canManagePapers
@@ -688,7 +764,6 @@ export function SchoolAdminExamDetailPage() {
   return (
     <ExamDetailPage
       basePath="/school-admin/exams"
-      canManageBlueprint
       canManageInfo
       canManageMembers
       canManagePapers={false}

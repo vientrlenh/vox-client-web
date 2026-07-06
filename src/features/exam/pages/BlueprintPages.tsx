@@ -238,8 +238,18 @@ type VersionStatusSelectProps = {
 
 function VersionStatusSelect({ onArchive, onPublish, pending, version }: VersionStatusSelectProps) {
   const weightSum = version.weightSum ?? 0
-  const canPublish = version.status === 'DRAFT' && Math.abs(weightSum - 1) < 0.01
+  const sectionsWeightOk = Math.abs(weightSum - 1) < 0.01
+  const invalidSlotSection = version.sections.find((section) => {
+    const slotWeightSum = section.slots.reduce((sum, slot) => sum + (slot.weight ?? 0), 0)
+    return Math.abs(slotWeightSum - 1) >= 0.01
+  })
+  const canPublish = version.status === 'DRAFT' && sectionsWeightOk && !invalidSlotSection
   const canArchive = version.status === 'PUBLISHED'
+  const publishBlockedReason = !sectionsWeightOk
+    ? `Tổng trọng số phần phải bằng 1.00 (hiện tại ${weightSum.toFixed(2)})`
+    : invalidSlotSection
+      ? `Tổng trọng số ô câu hỏi trong phần "${invalidSlotSection.title}" phải bằng 1.00`
+      : undefined
 
   return (
     <select
@@ -256,7 +266,7 @@ function VersionStatusSelect({ onArchive, onPublish, pending, version }: Version
           onArchive(version)
         }
       }}
-      title={!canPublish && version.status === 'DRAFT' ? `Tổng trọng số phải bằng 1.00 (hiện tại ${weightSum.toFixed(2)})` : undefined}
+      title={!canPublish && version.status === 'DRAFT' ? publishBlockedReason : undefined}
       value={version.status}
     >
       {STATUS_ORDER.map((status) => {

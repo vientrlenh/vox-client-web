@@ -386,6 +386,25 @@ export function useExamQuery(id: string | null) {
   })
 }
 
+const EXAM_MY_ROLE_QUERY = `
+  query ExamMyRole($examId: ID!) {
+    examMyRole(examId: $examId)
+  }
+`
+
+async function fetchExamMyRole(examId: string) {
+  const data = await graphQLRequest<{ examMyRole: string | null }>(EXAM_MY_ROLE_QUERY, { examId })
+  return data.examMyRole
+}
+
+export function useExamMyRoleQuery(examId: string | null) {
+  return useQuery({
+    enabled: Boolean(examId),
+    queryFn: () => fetchExamMyRole(examId as string),
+    queryKey: [...examQueryKeys.all, 'my-role', examId],
+  })
+}
+
 export function useExamPaperQuery(paperId: string | null) {
   return useQuery({
     enabled: Boolean(paperId),

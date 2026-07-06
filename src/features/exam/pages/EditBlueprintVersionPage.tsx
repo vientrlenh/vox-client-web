@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2 } from 'lucide-react'
+import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
+import { toApiError } from '@/shared/api'
 import { QuestionPicker } from '../components/QuestionPicker'
 import { examQueryKeys, useExamBlueprintQuery } from '../api/useExamQueries'
 import {
@@ -173,6 +174,10 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
   const detailPath = `${basePath}/${blueprint.id}`
   const weightSum = sections.reduce((sum, section) => sum + sectionWeightOf(section), 0)
 
+  function sectionSlotWeightSum(section: SectionDraft): number {
+    return section.slots.reduce((sum, slot) => sum + (slot.weight.trim() ? Number(slot.weight) : 1), 0)
+  }
+
   function updateSection(sectionKey: string, patch: Partial<SectionDraft>) {
     setSections((current) => current.map((section) => (section.key === sectionKey ? { ...section, ...patch } : section)))
   }
@@ -229,6 +234,14 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
           return
         }
       }
+      if (Math.abs(sectionSlotWeightSum(section) - 1) >= 0.01) {
+        window.alert(`Tổng trọng số các ô câu hỏi trong phần "${section.title}" phải bằng 1.00.`)
+        return
+      }
+    }
+    if (Math.abs(weightSum - 1) >= 0.01) {
+      window.alert('Tổng trọng số các phần phải bằng 1.00.')
+      return
     }
 
     const sectionsPayload: UpdateBlueprintVersionSectionInput[] = sections.map((section, sectionIndex) => ({
@@ -259,18 +272,22 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
       title: section.title.trim(),
     }))
 
-    await updateVersionMutation.mutateAsync({
-      payload: {
-        description: description.trim() || null,
-        effectiveFrom: toIsoDateTime(effectiveFrom),
-        effectiveTo: toIsoDateTime(effectiveTo),
-        sections: sectionsPayload,
-        totalTimeLimitSeconds: totalTimeLimitMinutes.trim() ? Number(totalTimeLimitMinutes) * 60 : null,
-      },
-      versionId: version.id,
-    })
-    await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
-    navigate(detailPath, { state: { successMessage: 'Đã cập nhật phiên bản.' } })
+    try {
+      await updateVersionMutation.mutateAsync({
+        payload: {
+          description: description.trim() || null,
+          effectiveFrom: toIsoDateTime(effectiveFrom),
+          effectiveTo: toIsoDateTime(effectiveTo),
+          sections: sectionsPayload,
+          totalTimeLimitSeconds: totalTimeLimitMinutes.trim() ? Number(totalTimeLimitMinutes) * 60 : null,
+        },
+        versionId: version.id,
+      })
+      await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
+      navigate(detailPath, { state: { successMessage: 'Đã cập nhật phiên bản.' } })
+    } catch (error) {
+      window.alert(toApiError(error).message)
+    }
   }
 
   const activeSlot = pickerForSlotKey
@@ -428,6 +445,18 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                       ) : (
                         <span className="text-xs font-semibold text-amber-600">Chưa chọn câu hỏi</span>
                       )}
+                      {slot.fixedQuestion ? (
+                        <a
+                          aria-label={`Xem chi tiết ${slot.fixedQuestion.code}`}
+                          className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          href={`${basePath.replace(/\/blueprints$/, '/questions')}/${slot.fixedQuestion.id}`}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                          title="Xem chi tiết câu hỏi"
+                        >
+                          <Eye aria-hidden="true" className="size-3.5" />
+                        </a>
+                      ) : null}
                       <button
                         className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-600 hover:bg-slate-50"
                         onClick={() => setPickerForSlotKey(slot.key)}
@@ -484,6 +513,13 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                 + Thêm ô câu hỏi
               </button>
             </div>
+            <p className="mt-2.5 text-xs font-semibold text-slate-500">
+              Tổng trọng số các ô câu hỏi trong phần này:{' '}
+              <span className={sectionSlotWeightSum(section) === 1 ? 'text-emerald-600' : 'text-amber-600'}>
+                {sectionSlotWeightSum(section).toFixed(2)}
+              </span>{' '}
+              (nên bằng 1.00 trước khi xuất bản)
+            </p>
           </div>
         ))}
 

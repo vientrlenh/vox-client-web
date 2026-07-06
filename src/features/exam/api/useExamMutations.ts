@@ -21,10 +21,12 @@ import type {
   ExamMemberRole,
   ExamPaperDto,
   ExamPaperItemDto,
+  ExamPaperSectionDto,
   QuestionSelectionSpec,
   UpdateClassTestQuestionsRequest,
   UpdateExamBlueprintVersionStatusRequest,
   UpdateExamPaperItemRequest,
+  UpdateExamPaperSectionRequest,
   UpdateExamPaperStatusRequest,
   UpdateExamRequest,
   UpdateExamStatusRequest,
@@ -186,6 +188,26 @@ export function useUpdateExamPaperItemMutation() {
       payload: UpdateExamPaperItemRequest
     }) => {
       const response = await apiClient.put<ApiResponse<ExamPaperItemDto>>(`/v1/exam-papers/${paperId}/items/${itemId}`, payload)
+      return unwrap(response)
+    },
+  })
+}
+
+export function useUpdateExamPaperSectionMutation() {
+  return useMutation({
+    mutationFn: async ({
+      paperId,
+      payload,
+      sectionId,
+    }: {
+      paperId: string
+      payload: UpdateExamPaperSectionRequest
+      sectionId: string
+    }) => {
+      const response = await apiClient.patch<ApiResponse<ExamPaperSectionDto>>(
+        `/v1/exam-papers/${paperId}/sections/${sectionId}`,
+        payload,
+      )
       return unwrap(response)
     },
   })

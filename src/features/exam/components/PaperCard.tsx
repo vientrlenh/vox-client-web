@@ -4,9 +4,11 @@ import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { getExamPaperStatusDisplay, type ExamPaperDto } from '../types'
 
 type PaperCardAction = {
+  disabled?: boolean
   icon?: ComponentType<{ 'aria-hidden'?: boolean; className?: string }>
   label: string
   onClick: () => void
+  title?: string
   tone?: 'default' | 'primary'
 }
 
@@ -58,13 +60,15 @@ export function PaperCard({ actions = [], onOpen, openLabel = 'Xem đề', paper
             return (
               <button
                 className={[
-                  'inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition',
+                  'inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
                   action.tone === 'primary'
                     ? 'border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                     : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
                 ].join(' ')}
+                disabled={action.disabled}
                 key={action.label}
                 onClick={action.onClick}
+                title={action.title}
                 type="button"
               >
                 {Icon ? <Icon aria-hidden={true} className="size-4" /> : null}
