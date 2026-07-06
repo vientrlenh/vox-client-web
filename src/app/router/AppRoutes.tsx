@@ -658,43 +658,6 @@ export function AppRoutes() {
             <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
             <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
             <Route path="school-admin/class-tests/:examId" element={<SchoolAdminClassTestDetailPage />} />
-          </Route>
-        </Route>
-        <Route element={<RequireRole role="TEACHER" />}>
-          <Route element={<TeacherLayout />}>
-            <Route
-              path="teacher/dashboard"
-              element={<TeacherDashboardPage/>}
-            />
-            <Route
-              path="teacher/monitoring"
-              element={<TeacherMonitoringRoomsPage />}
-            />
-            <Route
-              path="teacher/monitoring/rooms/:roomId"
-              element={<MonitoringRoomPage />}
-            />
-            <Route path="teacher/question-banks" element={<TeacherQuestionBanksPage />} />
-            <Route path="teacher/question-banks/:bankId" element={<TeacherQuestionBankDetailPage />} />
-            <Route path="teacher/question-topics" element={<TeacherQuestionTopicsPage />} />
-            <Route path="teacher/question-topics/:topicId" element={<TeacherQuestionTopicDetailPage />} />
-            <Route path="teacher/questions/my" element={<TeacherMyQuestionsPage />} />
-            <Route path="teacher/questions/all" element={<TeacherQuestionsPage />} />
-            <Route path="teacher/questions/review" element={<TeacherReviewQuestionsPage />} />
-            <Route path="teacher/questions/import" element={<TeacherQuestionImportPage />} />
-            <Route path="teacher/questions/create" element={<TeacherCreateQuestionPage />} />
-            <Route path="teacher/questions/:questionId/edit" element={<TeacherEditQuestionPage />} />
-            <Route path="teacher/questions/:questionId" element={<TeacherQuestionDetailPage />} />
-            <Route path="teacher/blueprints" element={<TeacherBlueprintsPage />} />
-            <Route path="teacher/blueprints/:blueprintId" element={<TeacherBlueprintDetailPage />} />
-            <Route path="teacher/exams" element={<TeacherExamsPage />} />
-            <Route path="teacher/exams/:examId/papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
-            <Route path="teacher/exams/:examId/papers/:paperId" element={<TeacherExamPaperDetailPage />} />
-            <Route path="teacher/exams/:examId/papers" element={<TeacherExamPapersPage />} />
-            <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
-            <Route path="teacher/class-tests/create" element={<TeacherClassTestCreatePage />} />
-            <Route path="teacher/class-tests/:examId" element={<TeacherClassTestDetailPage />} />
-            <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
             <Route
               path="school-admin/rubrics"
               element={<SchoolAdminRubricsPage />}
@@ -739,6 +702,43 @@ export function AppRoutes() {
               path="school-admin/assessment-policies/:policyId"
               element={<SchoolAdminAssessmentPolicyDetailPage />}
             />
+          </Route>
+        </Route>
+        <Route element={<RequireRole role="TEACHER" />}>
+          <Route element={<TeacherLayout />}>
+            <Route
+              path="teacher/dashboard"
+              element={<TeacherDashboardPage/>}
+            />
+            <Route
+              path="teacher/monitoring"
+              element={<TeacherMonitoringRoomsPage />}
+            />
+            <Route
+              path="teacher/monitoring/rooms/:roomId"
+              element={<MonitoringRoomPage />}
+            />
+            <Route path="teacher/question-banks" element={<TeacherQuestionBanksPage />} />
+            <Route path="teacher/question-banks/:bankId" element={<TeacherQuestionBankDetailPage />} />
+            <Route path="teacher/question-topics" element={<TeacherQuestionTopicsPage />} />
+            <Route path="teacher/question-topics/:topicId" element={<TeacherQuestionTopicDetailPage />} />
+            <Route path="teacher/questions/my" element={<TeacherMyQuestionsPage />} />
+            <Route path="teacher/questions/all" element={<TeacherQuestionsPage />} />
+            <Route path="teacher/questions/review" element={<TeacherReviewQuestionsPage />} />
+            <Route path="teacher/questions/import" element={<TeacherQuestionImportPage />} />
+            <Route path="teacher/questions/create" element={<TeacherCreateQuestionPage />} />
+            <Route path="teacher/questions/:questionId/edit" element={<TeacherEditQuestionPage />} />
+            <Route path="teacher/questions/:questionId" element={<TeacherQuestionDetailPage />} />
+            <Route path="teacher/blueprints" element={<TeacherBlueprintsPage />} />
+            <Route path="teacher/blueprints/:blueprintId" element={<TeacherBlueprintDetailPage />} />
+            <Route path="teacher/exams" element={<TeacherExamsPage />} />
+            <Route path="teacher/exams/:examId/papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
+            <Route path="teacher/exams/:examId/papers/:paperId" element={<TeacherExamPaperDetailPage />} />
+            <Route path="teacher/exams/:examId/papers" element={<TeacherExamPapersPage />} />
+            <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
+            <Route path="teacher/class-tests/create" element={<TeacherClassTestCreatePage />} />
+            <Route path="teacher/class-tests/:examId" element={<TeacherClassTestDetailPage />} />
+            <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
