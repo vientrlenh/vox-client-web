@@ -7,7 +7,7 @@ import { useAppSelector } from '@/app/store/hooks'
 import { useSchoolUsersForRequesterQuery } from '@/features/classes/api/useSchoolUsersForRequesterQuery'
 import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
-import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { useQuestionQuery } from '../api/useQuestionQuery'
 import {
@@ -279,7 +279,6 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       return
     }
 
-    setSuccessMessage(locationSuccessMessage)
     navigate(`${location.pathname}${location.search}`, {
       replace: true,
       state: teacherView ? { fromView: teacherView } : null,
@@ -291,6 +290,9 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       return
     }
 
+    // question data arrives asynchronously after mount, so the editable draft state
+    // can only be seeded here once the query resolves
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedBankId(questionQuery.data.questionBankId)
     setSelectedTopicId(questionQuery.data.questionTopicId)
     setForm({
@@ -1187,10 +1189,13 @@ function QuestionSharingPanel({
   const { confirm, dialog } = useConfirmationDialog()
 
   useEffect(() => {
+    // resync the local draft whenever the question is refetched (e.g. after a sharing mutation)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSharing(question.sharing)
   }, [question.sharing])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollaboratorPermissions(
       Object.fromEntries(
         (question.collaborators ?? []).map((collaborator) => [

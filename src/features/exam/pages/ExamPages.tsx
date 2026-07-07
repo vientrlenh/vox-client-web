@@ -21,7 +21,7 @@ import { useNavigate, useParams } from 'react-router'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { Pagination } from '@/shared/components/Pagination'
 import { toApiError } from '@/shared/api'
-import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { TabPillGroup } from '@/shared/ui/TabPill'
@@ -453,6 +453,8 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
   const { completedCount, steps } = getExamWorkflowSteps(exam)
   const totalPapers = exam.papers.length
   const lockedPapers = exam.papers.filter((paper) => paper.status === 'LOCKED').length
+  // Backend authorizes schedule/candidate management for SCHOOL_ADMIN (same school) or the exam's CHAIR.
+  const canManageSchedule = canManageStatus || myRole === 'CHAIR'
 
   const nextAction =
     completedCount === 0
@@ -634,7 +636,7 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
 
       {tab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
 
-      {tab === 'students' ? <CandidatesTab examId={exam.id} /> : null}
+      {tab === 'students' ? <CandidatesTab canManage={canManageSchedule} examId={exam.id} /> : null}
 
       {tab === 'blueprint' ? (
         <BlueprintAttachPanel
@@ -655,6 +657,7 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
 
       {tab === 'schedule' ? (
         <ScheduleTab
+          canManage={canManageSchedule}
           examId={exam.id}
           isClassTest={false}
           onGoToPapers={() => setTab('papers')}

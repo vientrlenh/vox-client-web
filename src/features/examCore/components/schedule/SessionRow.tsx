@@ -1,18 +1,16 @@
 import { CalendarClock } from 'lucide-react'
 import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { formatDateTime, type ExamScheduleDto } from '../../types'
+import { formatDateTime, getScheduleLabel, getScheduleStatusDisplay, type ExamScheduleDto } from '../../types'
 
 type SessionRowProps = {
   actions?: ActionMenuItem[]
-  roomLabel?: string
   schedule: ExamScheduleDto
 }
 
-export function SessionRow({ actions = [], roomLabel, schedule }: SessionRowProps) {
+export function SessionRow({ actions = [], schedule }: SessionRowProps) {
   const isUnderstaffed = schedule.proctors.length < schedule.requiredProctorCount
-  const statusLabel = isUnderstaffed ? 'Thiếu giám thị' : 'Sẵn sàng'
-  const statusTone = isUnderstaffed ? 'warning' : 'success'
+  const statusDisplay = getScheduleStatusDisplay(schedule.status)
 
   return (
     <div
@@ -30,10 +28,9 @@ export function SessionRow({ actions = [], roomLabel, schedule }: SessionRowProp
         <CalendarClock aria-hidden="true" className="size-5.5" />
       </span>
       <div className="min-w-55 flex-1">
-        <div className="text-[15px] font-bold text-slate-900">{schedule.label}</div>
+        <div className="text-[15px] font-bold text-slate-900">{getScheduleLabel(schedule)}</div>
         <div className="mt-1 text-[13px] text-slate-500">
           {formatDateTime(schedule.startDate)} – {formatDateTime(schedule.endDate)}
-          {roomLabel ? ` · ${roomLabel}` : ''}
         </div>
       </div>
       <div className="min-w-22 text-right">
@@ -42,8 +39,8 @@ export function SessionRow({ actions = [], roomLabel, schedule }: SessionRowProp
           {schedule.proctors.length}/{schedule.requiredProctorCount} giám thị
         </div>
       </div>
-      <StatusBadge label={statusLabel} tone={statusTone} />
-      {actions.length ? <ActionMenuButton ariaLabel={`Thao tác cho ${schedule.label}`} items={actions} /> : null}
+      <StatusBadge label={statusDisplay.label} tone={isUnderstaffed && schedule.status === 'DRAFT' ? 'warning' : statusDisplay.tone} />
+      {actions.length ? <ActionMenuButton ariaLabel={`Thao tác cho ${getScheduleLabel(schedule)}`} items={actions} /> : null}
     </div>
   )
 }

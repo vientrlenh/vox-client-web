@@ -27,7 +27,7 @@ import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQu
 import type { QuestionDto } from '@/features/question/types'
 import { toApiError } from '@/shared/api'
 import { Pagination } from '@/shared/components/Pagination'
-import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { TabPillGroup } from '@/shared/ui/TabPill'
@@ -1607,7 +1607,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {tab === 'students' ? <CandidatesTab examId={exam.id} /> : null}
+      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} /> : null}
 
       {tab === 'blueprint' ? (
         <ClassTestBlueprintTab
@@ -1622,6 +1622,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       {tab === 'schedule' ? (
         <ScheduleTab
+          canManage={canManage}
           deliveryMode={exam.deliveryMode}
           examId={exam.id}
           isClassTest

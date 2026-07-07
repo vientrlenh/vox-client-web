@@ -268,6 +268,7 @@ export function SystemAdminLanguagesPage() {
       />
 
       <LanguageFormDialog
+        key={formMode ? (formTarget?.id ?? 'create') : 'closed'}
         errorMessage={formError ?? undefined}
         isOpen={Boolean(formMode)}
         isSubmitting={isSaving}

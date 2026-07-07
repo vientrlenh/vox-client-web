@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { graphQLRequest } from '@/shared/api'
+import { graphQLRequest, requireSchoolId } from '@/shared/api'
 import type {
   ExamCandidateDto,
   ExamBlueprintDto,
   ExamDto,
   ExamPaperDto,
-  ExamRoomDto,
   ExamScheduleDto,
   Paged,
+  SchoolRoomLite,
 } from '../types'
 
 const EXAM_MEMBER_FIELDS = `
@@ -89,11 +89,93 @@ export const EXAM_LIST_FIELDS = `
 
 const EXAM_DETAIL_FIELDS = `
   ${EXAM_LIST_FIELDS}
+  deliveryMode
+  papersLocked
   members {
     ${EXAM_MEMBER_FIELDS}
   }
   papers {
     ${EXAM_PAPER_FIELDS}
+  }
+`
+
+const SCHOOL_ROOM_FIELDS = `
+  id
+  code
+  name
+  description
+`
+
+const EXAM_SCHEDULE_PROCTOR_FIELDS = `
+  id
+  scheduleId
+  teacher {
+    id
+    fullName
+    email
+  }
+`
+
+const EXAM_SCHEDULE_FIELDS = `
+  id
+  examId
+  schoolRoomId
+  room {
+    ${SCHOOL_ROOM_FIELDS}
+  }
+  startDate
+  endDate
+  status
+  movedToScheduleId
+  candidateCount
+  requiredProctorCount
+  proctors {
+    ${EXAM_SCHEDULE_PROCTOR_FIELDS}
+  }
+`
+
+const EXAM_CANDIDATE_FIELDS = `
+  id
+  examId
+  studentId
+  scheduleId
+  assignedPaperId
+  status
+  assignedAt
+  student {
+    id
+    fullName
+    email
+  }
+`
+
+const EXAM_SCHEDULES_QUERY = `
+  query ExamSchedules($examId: ID) {
+    examSchedules(examId: $examId) {
+      ${EXAM_SCHEDULE_FIELDS}
+    }
+  }
+`
+
+const EXAM_CANDIDATES_QUERY = `
+  query ExamCandidates($examId: ID!, $scheduleId: ID, $status: ExamCandidateStatus) {
+    examCandidates(examId: $examId, scheduleId: $scheduleId, status: $status) {
+      ${EXAM_CANDIDATE_FIELDS}
+    }
+  }
+`
+
+const SCHOOL_ROOMS_QUERY = `
+  query SchoolRooms($schoolId: ID!, $page: Int, $size: Int) {
+    schoolRooms(schoolId: $schoolId, page: $page, size: $size) {
+      content {
+        ${SCHOOL_ROOM_FIELDS}
+      }
+      page
+      size
+      totalElements
+      totalPages
+    }
   }
 `
 
@@ -239,8 +321,19 @@ export const examQueryKeys = {
   examPaper: (paperId: string | null) => [...examQueryKeys.all, 'exam-paper', paperId] as const,
   examStats: () => [...examQueryKeys.all, 'exam-stats'] as const,
   exams: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'exams', filters] as const,
-  rooms: (scheduleId: string | null) => [...examQueryKeys.all, 'rooms', scheduleId] as const,
   schedules: (examId: string | null) => [...examQueryKeys.all, 'schedules', examId] as const,
+  schoolRooms: (page: number, size: number, search: string) =>
+    [...examQueryKeys.all, 'school-rooms', page, size, search] as const,
+}
+
+function normalizeDeliveryMode(exam: ExamDto | null): ExamDto | null {
+  if (!exam) {
+    return exam
+  }
+  return {
+    ...exam,
+    deliveryMode: (exam.deliveryMode as unknown as string) === 'STUDENT_DEVICE' ? 'DEVICE' : exam.deliveryMode,
+  }
 }
 
 export async function fetchExamStatusCounts(kind: 'CENTRALIZED' | 'CLASS_TEST') {
@@ -250,7 +343,7 @@ export async function fetchExamStatusCounts(kind: 'CENTRALIZED' | 'CLASS_TEST') 
 
 async function fetchExam(id: string) {
   const data = await graphQLRequest<{ exam: ExamDto | null }>(EXAM_QUERY, { id })
-  return data.exam
+  return normalizeDeliveryMode(data.exam)
 }
 
 export async function fetchExamPaper(id: string) {
@@ -324,34 +417,58 @@ export function useExamBlueprintQuery(id: string | null) {
   })
 }
 
-export function useExamCandidatesQuery(examId: string | null) {
-  return useQuery({
-    enabled: Boolean(examId),
-    queryFn: async () => [] as ExamCandidateDto[],
-    queryKey: examQueryKeys.candidates(examId),
-  })
+async function fetchExamSchedules(examId: string) {
+  const data = await graphQLRequest<{ examSchedules: ExamScheduleDto[] }>(EXAM_SCHEDULES_QUERY, { examId })
+  return data.examSchedules
 }
 
 export function useExamSchedulesQuery(examId: string | null) {
   return useQuery({
     enabled: Boolean(examId),
-    queryFn: async () => [] as ExamScheduleDto[],
+    queryFn: () => fetchExamSchedules(examId as string),
     queryKey: examQueryKeys.schedules(examId),
   })
 }
 
-export function useExamRoomsQuery(examId: string | null) {
+async function fetchExamCandidates(examId: string) {
+  const data = await graphQLRequest<{ examCandidates: ExamCandidateDto[] }>(EXAM_CANDIDATES_QUERY, {
+    examId,
+    scheduleId: null,
+    status: null,
+  })
+  return data.examCandidates
+}
+
+export function useExamCandidatesQuery(examId: string | null) {
   return useQuery({
     enabled: Boolean(examId),
-    queryFn: async () => [] as ExamRoomDto[],
-    queryKey: [...examQueryKeys.all, 'exam-rooms', examId],
+    queryFn: () => fetchExamCandidates(examId as string),
+    queryKey: examQueryKeys.candidates(examId),
   })
 }
 
-export function useScheduleRoomsQuery(scheduleId: string | null) {
+async function fetchSchoolRooms(page: number, size: number, search: string) {
+  const schoolId = requireSchoolId()
+  const data = await graphQLRequest<{ schoolRooms: Paged<SchoolRoomLite> }>(SCHOOL_ROOMS_QUERY, {
+    page,
+    schoolId,
+    size,
+  })
+  const keyword = search.trim().toLowerCase()
+  if (!keyword) {
+    return data.schoolRooms
+  }
+  return {
+    ...data.schoolRooms,
+    content: data.schoolRooms.content.filter(
+      (room) => room.code.toLowerCase().includes(keyword) || room.name.toLowerCase().includes(keyword),
+    ),
+  }
+}
+
+export function useSchoolRoomsQuery(page: number, size: number, search: string) {
   return useQuery({
-    enabled: Boolean(scheduleId),
-    queryFn: async () => [] as ExamRoomDto[],
-    queryKey: examQueryKeys.rooms(scheduleId),
+    queryFn: () => fetchSchoolRooms(page, size, search),
+    queryKey: examQueryKeys.schoolRooms(page, size, search),
   })
 }

@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { type ApiResponse, apiClient } from '@/shared/api'
+import { type ApiResponse, apiClient, graphQLRequest } from '@/shared/api'
 import type {
   CreateExamBlueprintRequest,
   CreateExamPaperRequest,
@@ -8,10 +8,13 @@ import type {
   ExamBlueprintSlotDto,
   ExamBlueprintSlotType,
   ExamBlueprintVersionDto,
+  ExamCandidateDto,
   ExamDeliveryMode,
+  ExamDto,
   ExamPaperDto,
   ExamPaperItemDto,
   ExamPaperSectionDto,
+  ExamScheduleDto,
   QuestionSelectionSpec,
   UpdateExamBlueprintVersionStatusRequest,
   UpdateExamPaperItemRequest,
@@ -25,10 +28,12 @@ export function unwrap<T>(response: { data: ApiResponse<T> }) {
 
 export function useSetExamDeliveryModeMutation() {
   return useMutation({
-    mutationFn: async ({ deliveryMode, examId }: { deliveryMode: ExamDeliveryMode; examId: string }) => ({
-      deliveryMode,
-      examId,
-    }),
+    mutationFn: async ({ deliveryMode, examId }: { deliveryMode: ExamDeliveryMode; examId: string }) => {
+      const response = await apiClient.patch<ApiResponse<ExamDto>>(`/v1/exams/${examId}/delivery-mode`, {
+        deliveryMode: deliveryMode === 'DEVICE' ? 'STUDENT_DEVICE' : 'LAB',
+      })
+      return unwrap(response)
+    },
   })
 }
 
@@ -300,76 +305,187 @@ export function useDeleteBlueprintSlotMutation() {
 
 export function useAddCandidateMutation() {
   return useMutation({
+    mutationFn: async ({ examId, payload }: { examId: string; payload: { studentId: string } }) => {
+      const response = await apiClient.post<ApiResponse<ExamCandidateDto>>(`/v1/exams/${examId}/candidates`, payload)
+      return unwrap(response)
+    },
+  })
+}
+
+export function useImportCandidatesByClassMutation() {
+  return useMutation({
+    mutationFn: async ({ examId, payload }: { examId: string; payload: { schoolClassId: string } }) => {
+      const response = await apiClient.post<ApiResponse<ExamCandidateDto[]>>(
+        `/v1/exams/${examId}/candidates/import-class`,
+        payload,
+      )
+      return unwrap(response)
+    },
+  })
+}
+
+export function useImportCandidatesByGradeMutation() {
+  return useMutation({
+    mutationFn: async ({ examId, payload }: { examId: string; payload: { schoolGradeId: string } }) => {
+      const response = await apiClient.post<ApiResponse<ExamCandidateDto[]>>(
+        `/v1/exams/${examId}/candidates/import-grade`,
+        payload,
+      )
+      return unwrap(response)
+    },
+  })
+}
+
+export function useAssignCandidateScheduleMutation() {
+  return useMutation({
     mutationFn: async ({
-      examId,
-      payload,
-    }: {
-      examId: string
-      payload: { schoolClassId: string; schoolClassName: string; studentName: string }
-    }) => ({ examId, payload }),
-  })
-}
-
-export function useAssignCandidateToRoomMutation() {
-  return useMutation({
-    mutationFn: async ({ candidateId, roomId, scheduleId }: { candidateId: string; roomId: string; scheduleId: string }) => ({
       candidateId,
-      roomId,
+      examId,
       scheduleId,
-    }),
-  })
-}
-
-export function useRemoveCandidateFromRoomMutation() {
-  return useMutation({
-    mutationFn: async ({ candidateId }: { candidateId: string }) => candidateId,
+    }: {
+      candidateId: string
+      examId: string
+      scheduleId: string | null
+    }) => {
+      const response = await apiClient.put<ApiResponse<ExamCandidateDto>>(
+        `/v1/exams/${examId}/candidates/${candidateId}/schedule`,
+        { scheduleId },
+      )
+      return unwrap(response)
+    },
   })
 }
 
 export function useApplyPaperAssignmentsMutation() {
   return useMutation({
-    mutationFn: async (assignments: { candidateId: string; paperId: string }[]) => assignments,
+    mutationFn: async ({
+      assignments,
+      examId,
+    }: {
+      assignments: { candidateId: string; paperId: string }[]
+      examId: string
+    }) => {
+      const response = await apiClient.put<ApiResponse<{ updated: number }>>(
+        `/v1/exams/${examId}/candidates/assign-papers`,
+        { assignments },
+      )
+      return unwrap(response)
+    },
   })
 }
 
-export function useAutoFillRoomsMutation() {
+export function useAutoFillCandidatesMutation() {
   return useMutation({
-    mutationFn: async ({ examId, scheduleId }: { examId: string; scheduleId: string }) => ({ examId, scheduleId }),
+    mutationFn: async ({ examId, scheduleIds }: { examId: string; scheduleIds?: string[] }) => {
+      const response = await apiClient.post<ApiResponse<ExamCandidateDto[]>>(`/v1/exams/${examId}/candidates/auto-fill`, {
+        scheduleIds: scheduleIds ?? null,
+      })
+      return unwrap(response)
+    },
   })
 }
 
 export function useCreateScheduleMutation() {
   return useMutation({
-    mutationFn: async ({ examId, payload }: { examId: string; payload: { endDate: string; label: string; startDate: string } }) => ({
+    mutationFn: async ({
       examId,
       payload,
-    }),
+    }: {
+      examId: string
+      payload: { endDate: string; schoolRoomId: string; startDate: string }
+    }) => {
+      const response = await apiClient.post<ApiResponse<ExamScheduleDto>>(`/v1/exams/${examId}/schedules`, payload)
+      return unwrap(response)
+    },
   })
 }
 
-export function useAddRoomToScheduleMutation() {
+const UPDATE_EXAM_SCHEDULE_MUTATION = `
+  mutation UpdateExamSchedule($id: ID!, $input: UpdateExamScheduleInput!) {
+    updateExamSchedule(id: $id, input: $input)
+  }
+`
+
+export function useUpdateScheduleMutation() {
   return useMutation({
-    mutationFn: async ({ payload, scheduleId }: { payload: { capacity: number; code: string }; scheduleId: string }) => ({
+    mutationFn: async ({
       payload,
       scheduleId,
-    }),
+    }: {
+      payload: { endDate?: string | null; schoolRoomId?: string | null; startDate?: string | null }
+      scheduleId: string
+    }) => {
+      const data = await graphQLRequest<{ updateExamSchedule: string }>(UPDATE_EXAM_SCHEDULE_MUTATION, {
+        id: scheduleId,
+        input: payload,
+      })
+      return data.updateExamSchedule
+    },
+  })
+}
+
+export function useUpdateScheduleStatusMutation() {
+  return useMutation({
+    mutationFn: async ({
+      examId,
+      payload,
+      scheduleId,
+    }: {
+      examId: string
+      payload: { action: 'PUBLISH' | 'MOVE' | 'COMPLETE' | 'CANCEL'; targetScheduleId?: string }
+      scheduleId: string
+    }) => {
+      const response = await apiClient.patch<ApiResponse<ExamScheduleDto>>(
+        `/v1/exams/${examId}/schedules/${scheduleId}/status`,
+        payload,
+      )
+      return unwrap(response)
+    },
+  })
+}
+
+export function useDeleteScheduleMutation() {
+  return useMutation({
+    mutationFn: async ({ examId, scheduleId }: { examId: string; scheduleId: string }) => {
+      await apiClient.delete<ApiResponse<unknown>>(`/v1/exams/${examId}/schedules/${scheduleId}`)
+      return scheduleId
+    },
   })
 }
 
 export function useAddProctorToScheduleMutation() {
   return useMutation({
-    mutationFn: async ({ payload, scheduleId }: { payload: { teacherId: string; teacherName: string }; scheduleId: string }) => ({
+    mutationFn: async ({
+      examId,
       payload,
       scheduleId,
-    }),
+    }: {
+      examId: string
+      payload: { teacherId: string }
+      scheduleId: string
+    }) => {
+      const response = await apiClient.post<ApiResponse<{ id: string; scheduleId: string; teacherId: string }>>(
+        `/v1/exams/${examId}/schedules/${scheduleId}/proctors`,
+        payload,
+      )
+      return unwrap(response)
+    },
   })
 }
 
 export function useRemoveProctorFromScheduleMutation() {
   return useMutation({
-    mutationFn: async ({ proctorId, scheduleId }: { proctorId: string; scheduleId: string }) => ({
+    mutationFn: async ({
+      examId,
       proctorId,
       scheduleId,
-    }),
+    }: {
+      examId: string
+      proctorId: string
+      scheduleId: string
+    }) => {
+      await apiClient.delete<ApiResponse<unknown>>(`/v1/exams/${examId}/schedules/${scheduleId}/proctors/${proctorId}`)
+      return proctorId
+    },
   })
 }

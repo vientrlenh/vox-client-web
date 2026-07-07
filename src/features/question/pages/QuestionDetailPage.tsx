@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { useSchoolUsersForRequesterQuery } from '@/features/classes/api/useSchoolUsersForRequesterQuery'
-import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import {
   useCreateQuestionCollaboratorMutation,
@@ -365,6 +365,8 @@ function QuestionSharingPanel({
   })
 
   useEffect(() => {
+    // resync the local draft whenever the question is refetched (e.g. after a collaborator mutation)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollaboratorPermissions(
       Object.fromEntries(
         (question.collaborators ?? []).map((collaborator) => [

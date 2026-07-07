@@ -290,6 +290,7 @@ function QuestionTopicsPage({
       />
 
       <QuestionTopicFormDialog
+        key={`${dialogMode ?? 'closed'}-${dialogTarget?.id ?? selectedTopic?.id ?? 'new'}`}
         bankId={bankId}
         errorMessage={dialogError ?? undefined}
         isSubmitting={isSubmitting}

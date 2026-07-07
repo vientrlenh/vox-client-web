@@ -1,22 +1,28 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Laptop, Lock, MonitorSmartphone, Plus, Search, UserPlus, Wand2, X } from 'lucide-react'
+import { toApiError } from '@/shared/api'
+import type { ActionMenuItem } from '@/shared/ui/ActionMenuButton'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { TabPillGroup } from '@/shared/ui/TabPill'
+import type { SchoolUser } from '@/features/school-users/types'
 import {
-  useAddRoomToScheduleMutation,
-  useAssignCandidateToRoomMutation,
-  useAutoFillRoomsMutation,
+  useAddProctorToScheduleMutation,
+  useAssignCandidateScheduleMutation,
+  useAutoFillCandidatesMutation,
   useCreateScheduleMutation,
-  useRemoveCandidateFromRoomMutation,
+  useDeleteScheduleMutation,
+  useRemoveProctorFromScheduleMutation,
+  useUpdateScheduleMutation,
+  useUpdateScheduleStatusMutation,
 } from '../../api/mutations'
-import {
-  examQueryKeys,
-  useExamCandidatesQuery,
-  useExamRoomsQuery,
-  useExamSchedulesQuery,
-} from '../../api/queries'
-import type { ExamDeliveryMode, ExamPaperDto } from '../../types'
+import { examQueryKeys, useExamCandidatesQuery, useExamSchedulesQuery } from '../../api/queries'
+import { getCandidateName, getScheduleLabel, type ExamDeliveryMode, type ExamPaperDto, type ExamScheduleDto } from '../../types'
 import { AddStudentToRoomModal } from './AddStudentToRoomModal'
+import { CreateScheduleModal } from './CreateScheduleModal'
+import { ManageProctorsModal } from './ManageProctorsModal'
+import { MoveScheduleModal } from './MoveScheduleModal'
 import { PaperAssignmentPanel } from './PaperAssignmentPanel'
 import { RoomChip } from './RoomChip'
 import { SessionRow } from './SessionRow'
@@ -24,6 +30,7 @@ import { SessionRow } from './SessionRow'
 type ScheduleSubTab = 'assign' | 'rooms' | 'sessions'
 
 type ScheduleTabProps = {
+  canManage: boolean
   deliveryMode?: ExamDeliveryMode
   examId: string
   isClassTest: boolean
@@ -34,6 +41,7 @@ type ScheduleTabProps = {
 }
 
 export function ScheduleTab({
+  canManage,
   deliveryMode,
   examId,
   isClassTest,
@@ -44,88 +52,243 @@ export function ScheduleTab({
 }: ScheduleTabProps) {
   const queryClient = useQueryClient()
   const [subTab, setSubTab] = useState<ScheduleSubTab>('sessions')
-  const [roomSearch, setRoomSearch] = useState('')
-  const [scheduleFilterId, setScheduleFilterId] = useState('all')
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [scheduleSearch, setScheduleSearch] = useState('')
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null)
   const [studentSearch, setStudentSearch] = useState('')
-  const [studentClassFilter, setStudentClassFilter] = useState('all')
   const [showAddStudentModal, setShowAddStudentModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingSchedule, setEditingSchedule] = useState<ExamScheduleDto | null>(null)
+  const [managingProctorsFor, setManagingProctorsFor] = useState<ExamScheduleDto | null>(null)
+  const [movingSchedule, setMovingSchedule] = useState<ExamScheduleDto | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const { confirm, dialog } = useConfirmationDialog()
 
   const schedulesQuery = useExamSchedulesQuery(examId)
-  const roomsQuery = useExamRoomsQuery(examId)
   const candidatesQuery = useExamCandidatesQuery(examId)
   const createScheduleMutation = useCreateScheduleMutation()
-  const addRoomMutation = useAddRoomToScheduleMutation()
-  const autoFillMutation = useAutoFillRoomsMutation()
-  const assignCandidateMutation = useAssignCandidateToRoomMutation()
-  const removeCandidateMutation = useRemoveCandidateFromRoomMutation()
+  const updateScheduleMutation = useUpdateScheduleMutation()
+  const updateStatusMutation = useUpdateScheduleStatusMutation()
+  const deleteScheduleMutation = useDeleteScheduleMutation()
+  const addProctorMutation = useAddProctorToScheduleMutation()
+  const removeProctorMutation = useRemoveProctorFromScheduleMutation()
+  const autoFillMutation = useAutoFillCandidatesMutation()
+  const assignCandidateMutation = useAssignCandidateScheduleMutation()
 
   const schedules = schedulesQuery.data ?? []
-  const rooms = roomsQuery.data ?? []
   const candidates = candidatesQuery.data ?? []
   const effectiveMode: ExamDeliveryMode = deliveryMode ?? (isClassTest ? 'DEVICE' : 'LAB')
 
   const totalProctors = schedules.reduce((sum, schedule) => sum + schedule.proctors.length, 0)
   const requiredProctors = schedules.reduce((sum, schedule) => sum + schedule.requiredProctorCount, 0)
-  const filteredRooms = rooms.filter((room) => {
-    const matchesSearch = room.code.toLowerCase().includes(roomSearch.trim().toLowerCase())
-    const matchesSchedule = scheduleFilterId === 'all' || room.scheduleId === scheduleFilterId
-    return matchesSearch && matchesSchedule
+  const hasUnassignedCandidates = candidates.some((candidate) => !candidate.scheduleId)
+  const filteredSchedules = schedules.filter((schedule) => {
+    const keyword = scheduleSearch.trim().toLowerCase()
+    return !keyword || getScheduleLabel(schedule).toLowerCase().includes(keyword)
   })
-  const selectedRoom = (selectedRoomId ? rooms.find((room) => room.id === selectedRoomId) : undefined) ?? filteredRooms[0]
-  const selectedRoomSchedule = selectedRoom ? schedules.find((schedule) => schedule.id === selectedRoom.scheduleId) : undefined
-  const roomCandidates = selectedRoom ? candidates.filter((candidate) => candidate.roomId === selectedRoom.id) : []
-  const roomClassOptions = Array.from(new Set(roomCandidates.map((candidate) => candidate.schoolClassName)))
-  const visibleRoomCandidates = roomCandidates.filter((candidate) => {
+  const selectedSchedule =
+    (selectedScheduleId ? schedules.find((schedule) => schedule.id === selectedScheduleId) : undefined) ??
+    filteredSchedules[0]
+  const scheduleCandidates = selectedSchedule
+    ? candidates.filter((candidate) => candidate.scheduleId === selectedSchedule.id)
+    : []
+  const visibleScheduleCandidates = scheduleCandidates.filter((candidate) => {
     const keyword = studentSearch.trim().toLowerCase()
-    const matchesKeyword =
-      !keyword || candidate.studentName.toLowerCase().includes(keyword) || candidate.sbd.toLowerCase().includes(keyword)
-    const matchesClass = studentClassFilter === 'all' || candidate.schoolClassName === studentClassFilter
-    return matchesKeyword && matchesClass
+    if (!keyword) {
+      return true
+    }
+    return (
+      getCandidateName(candidate).toLowerCase().includes(keyword) ||
+      (candidate.student?.email ?? '').toLowerCase().includes(keyword)
+    )
   })
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
   }
 
-  async function handleAddSchedule() {
-    const label = window.prompt('Tên ca thi mới (ví dụ: Ca 5 · Bù):')
-    if (!label?.trim()) {
-      return
-    }
-    const now = new Date()
-    await createScheduleMutation.mutateAsync({
-      examId,
-      payload: { endDate: now.toISOString(), label: label.trim(), startDate: now.toISOString() },
-    })
-    await invalidate()
+  function handleError(error: unknown) {
+    setErrorMessage(toApiError(error).message)
   }
 
-  async function handleAddRoom(scheduleId: string) {
-    const code = window.prompt('Mã phòng mới (ví dụ: P.305):')
-    if (!code?.trim()) {
-      return
+  async function handleCreateSchedule(input: { endDate: string; schoolRoomId: string; startDate: string }) {
+    try {
+      await createScheduleMutation.mutateAsync({ examId, payload: input })
+      await invalidate()
+      setShowCreateModal(false)
+      setMessage('Đã tạo ca thi.')
+    } catch (error) {
+      handleError(error)
     }
-    await addRoomMutation.mutateAsync({ payload: { capacity: 25, code: code.trim() }, scheduleId })
-    await invalidate()
   }
 
-  async function handleAutoFill(scheduleId: string) {
-    await autoFillMutation.mutateAsync({ examId, scheduleId })
-    await invalidate()
+  async function handleUpdateSchedule(input: { endDate: string; schoolRoomId: string; startDate: string }) {
+    if (!editingSchedule) {
+      return
+    }
+    try {
+      await updateScheduleMutation.mutateAsync({ payload: input, scheduleId: editingSchedule.id })
+      await invalidate()
+      setEditingSchedule(null)
+      setMessage('Đã cập nhật ca thi.')
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleStatusAction(schedule: ExamScheduleDto, action: 'PUBLISH' | 'COMPLETE' | 'CANCEL') {
+    const confirmMessages: Record<'PUBLISH' | 'COMPLETE' | 'CANCEL', string> = {
+      CANCEL: `Hủy ${getScheduleLabel(schedule)}? Hành động này không thể hoàn tác.`,
+      COMPLETE: `Đánh dấu ${getScheduleLabel(schedule)} đã hoàn thành?`,
+      PUBLISH: `Công bố ${getScheduleLabel(schedule)}? Học sinh và giám thị sẽ thấy ca thi này.`,
+    }
+    if (!(await confirm({ message: confirmMessages[action], title: 'Xác nhận thao tác' }))) {
+      return
+    }
+    try {
+      await updateStatusMutation.mutateAsync({ examId, payload: { action }, scheduleId: schedule.id })
+      await invalidate()
+      setMessage('Đã cập nhật trạng thái ca thi.')
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleMoveSchedule(targetScheduleId: string) {
+    if (!movingSchedule) {
+      return
+    }
+    try {
+      await updateStatusMutation.mutateAsync({
+        examId,
+        payload: { action: 'MOVE', targetScheduleId },
+        scheduleId: movingSchedule.id,
+      })
+      await invalidate()
+      setMovingSchedule(null)
+      setMessage('Đã dời ca thi.')
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleDeleteSchedule(schedule: ExamScheduleDto) {
+    if (
+      !(await confirm({
+        message: `Xóa ${getScheduleLabel(schedule)}? Chỉ xóa được khi ca chưa có thí sinh.`,
+        title: 'Xóa ca thi',
+      }))
+    ) {
+      return
+    }
+    try {
+      await deleteScheduleMutation.mutateAsync({ examId, scheduleId: schedule.id })
+      await invalidate()
+      if (selectedScheduleId === schedule.id) {
+        setSelectedScheduleId(null)
+      }
+      setMessage('Đã xóa ca thi.')
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleAddProctor(schedule: ExamScheduleDto, teacher: SchoolUser) {
+    if (!teacher.userId) {
+      return
+    }
+    try {
+      await addProctorMutation.mutateAsync({ examId, payload: { teacherId: teacher.userId }, scheduleId: schedule.id })
+      await invalidate()
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleRemoveProctor(schedule: ExamScheduleDto, proctorId: string) {
+    try {
+      await removeProctorMutation.mutateAsync({ examId, proctorId, scheduleId: schedule.id })
+      await invalidate()
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleAutoFill() {
+    try {
+      await autoFillMutation.mutateAsync({ examId, scheduleIds: selectedSchedule ? [selectedSchedule.id] : undefined })
+      await invalidate()
+      setMessage('Đã tự động xếp học sinh.')
+    } catch (error) {
+      handleError(error)
+    }
   }
 
   async function handleAssignCandidate(candidateId: string) {
-    if (!selectedRoom) {
+    if (!selectedSchedule) {
       return
     }
-    await assignCandidateMutation.mutateAsync({ candidateId, roomId: selectedRoom.id, scheduleId: selectedRoom.scheduleId })
-    await invalidate()
+    try {
+      await assignCandidateMutation.mutateAsync({ candidateId, examId, scheduleId: selectedSchedule.id })
+      await invalidate()
+    } catch (error) {
+      handleError(error)
+    }
   }
 
-  async function handleRemoveFromRoom(candidateId: string) {
-    await removeCandidateMutation.mutateAsync({ candidateId })
-    await invalidate()
+  async function handleRemoveFromSchedule(candidateId: string) {
+    try {
+      await assignCandidateMutation.mutateAsync({ candidateId, examId, scheduleId: null })
+      await invalidate()
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  function getScheduleActions(schedule: ExamScheduleDto): ActionMenuItem[] {
+    if (!canManage) {
+      return []
+    }
+    const items: ActionMenuItem[] = []
+    if (schedule.status === 'DRAFT') {
+      items.push({ id: 'edit', label: 'Sửa ca thi', onSelect: () => setEditingSchedule(schedule) })
+    }
+    items.push({ id: 'proctors', label: 'Quản lý giám thị', onSelect: () => setManagingProctorsFor(schedule) })
+    if (schedule.status === 'DRAFT') {
+      items.push({
+        id: 'publish',
+        label: 'Công bố',
+        onSelect: () => void handleStatusAction(schedule, 'PUBLISH'),
+        tone: 'primary',
+      })
+    }
+    if (schedule.status === 'DRAFT' || schedule.status === 'PUBLISHED') {
+      items.push({ id: 'move', label: 'Dời ca', onSelect: () => setMovingSchedule(schedule) })
+    }
+    if (schedule.status === 'PUBLISHED') {
+      items.push({
+        id: 'complete',
+        label: 'Đánh dấu hoàn thành',
+        onSelect: () => void handleStatusAction(schedule, 'COMPLETE'),
+      })
+    }
+    if (schedule.status === 'DRAFT' || schedule.status === 'PUBLISHED') {
+      items.push({
+        id: 'cancel',
+        label: 'Hủy ca',
+        onSelect: () => void handleStatusAction(schedule, 'CANCEL'),
+        tone: 'danger',
+      })
+    }
+    items.push({
+      disabled: schedule.candidateCount > 0,
+      disabledReason: schedule.candidateCount > 0 ? 'Ca đang có thí sinh' : undefined,
+      id: 'delete',
+      label: 'Xóa ca thi',
+      onSelect: () => void handleDeleteSchedule(schedule),
+      tone: 'danger',
+    })
+    return items
   }
 
   const deviceModeSection =
@@ -182,16 +345,25 @@ export function ScheduleTab({
               ) : null}
             </div>
             <div className="mt-1.5 text-xs leading-5 text-slate-600">
-              Thi tập trung tại phòng máy. Xếp chỗ và phân đề theo phòng như bên dưới.
+              Thi tập trung tại phòng máy. Xếp ca thi và phân đề theo ca như bên dưới.
             </div>
           </button>
         </div>
       </div>
     ) : null
 
+  const toasts = (
+    <>
+      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+      {dialog}
+    </>
+  )
+
   if (!unlocked) {
     return (
       <div className="mt-4 grid gap-4">
+        {toasts}
         {deviceModeSection}
         <div className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-8 py-12 text-center">
           <span className="flex size-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
@@ -216,6 +388,7 @@ export function ScheduleTab({
   if (effectiveMode === 'DEVICE') {
     return (
       <div className="mt-4 grid gap-4">
+        {toasts}
         {deviceModeSection}
         <div className="rounded-2xl border border-slate-200 bg-white p-5.5 text-[13px] text-slate-600">
           Học sinh làm bài trực tiếp trên thiết bị cá nhân trong khung giờ mở – đóng bài đã cấu hình ở phần thông tin
@@ -225,26 +398,27 @@ export function ScheduleTab({
           <StatBlock label="Thí sinh" value={candidates.length} />
           <StatBlock label="Mã đề đã khóa" value={papers.filter((paper) => paper.status === 'LOCKED').length} />
         </div>
-        <PaperAssignmentPanel candidates={candidates} onApplied={() => void invalidate()} papers={papers} rooms={[]} />
+        <PaperAssignmentPanel candidates={candidates} examId={examId} onApplied={() => void invalidate()} papers={papers} schedules={[]} />
       </div>
     )
   }
 
   return (
     <div className="mt-4 grid gap-4">
+      {toasts}
       {deviceModeSection}
 
       <div className="grid gap-3.5 sm:grid-cols-4">
         <StatBlock label="Ca thi" value={schedules.length} />
-        <StatBlock label="Phòng thi" value={rooms.length} />
         <StatBlock label="Thí sinh" value={candidates.length} />
+        <StatBlock label="Đã phân đề" value={candidates.filter((candidate) => candidate.assignedPaperId).length} />
         <StatBlock label="Giám thị" value={`${totalProctors} / ${requiredProctors}`} />
       </div>
 
       <TabPillGroup
         items={[
           { label: '1 · Ca thi', value: 'sessions' },
-          { label: '2 · Phòng & học sinh', value: 'rooms' },
+          { label: '2 · Xếp học sinh', value: 'rooms' },
           { label: '3 · Phân đề', value: 'assign' },
         ]}
         onChange={setSubTab}
@@ -252,37 +426,32 @@ export function ScheduleTab({
       />
 
       <p className="text-[13px] text-slate-500">
-        Quy trình: Tạo ca thi → thêm phòng thi vào ca → thêm học sinh vào phòng → phân đề cho học sinh.
+        Quy trình: Tạo ca thi (gắn phòng &amp; khung giờ) → công bố ca → xếp học sinh vào ca → phân đề cho học sinh.
       </p>
 
       {subTab === 'sessions' ? (
         <div className="grid gap-3">
           <div className="flex items-center justify-between">
-            <p className="text-[13px] text-slate-500">Mỗi ca gồm khung giờ, phòng thi và giám thị phụ trách.</p>
-            <button
-              className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
-              onClick={handleAddSchedule}
-              type="button"
-            >
-              <Plus aria-hidden="true" className="size-4" />
-              Thêm ca thi
-            </button>
+            <p className="text-[13px] text-slate-500">Mỗi ca gắn với đúng một phòng thi, khung giờ và giám thị phụ trách.</p>
+            {canManage ? (
+              <button
+                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
+                onClick={() => setShowCreateModal(true)}
+                type="button"
+              >
+                <Plus aria-hidden="true" className="size-4" />
+                Thêm ca thi
+              </button>
+            ) : null}
           </div>
           {schedules.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-[13px] text-slate-400">
               Chưa có ca thi nào.
             </div>
           ) : (
-            schedules.map((schedule) => {
-              const scheduleRooms = rooms.filter((room) => schedule.roomIds.includes(room.id))
-              return (
-                <SessionRow
-                  key={schedule.id}
-                  roomLabel={scheduleRooms.length ? scheduleRooms.map((room) => room.code).join(', ') : undefined}
-                  schedule={schedule}
-                />
-              )
-            })
+            schedules.map((schedule) => (
+              <SessionRow actions={getScheduleActions(schedule)} key={schedule.id} schedule={schedule} />
+            ))
           )}
         </div>
       ) : null}
@@ -290,148 +459,104 @@ export function ScheduleTab({
       {subTab === 'rooms' ? (
         <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
           <div className="grid gap-2.5 self-start">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Chọn phòng thi</p>
-              {schedules.length ? (
-                <button
-                  className="text-xs font-bold text-indigo-600 hover:underline"
-                  onClick={() => void handleAddRoom(scheduleFilterId !== 'all' ? scheduleFilterId : schedules[0].id)}
-                  type="button"
-                >
-                  + Thêm phòng
-                </button>
-              ) : null}
-            </div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Chọn ca thi</p>
             <div className="relative">
               <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
                 className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
-                onChange={(event) => setRoomSearch(event.target.value)}
-                placeholder="Tìm phòng…"
-                value={roomSearch}
+                onChange={(event) => setScheduleSearch(event.target.value)}
+                placeholder="Tìm ca theo phòng…"
+                value={scheduleSearch}
               />
             </div>
-            <select
-              className="h-9.5 rounded-lg border border-slate-200 px-2.5 text-[13px] text-slate-900"
-              onChange={(event) => setScheduleFilterId(event.target.value)}
-              value={scheduleFilterId}
-            >
-              <option value="all">Tất cả ca</option>
-              {schedules.map((schedule) => (
-                <option key={schedule.id} value={schedule.id}>
-                  {schedule.label}
-                </option>
-              ))}
-            </select>
             <div className="grid gap-2">
-              {filteredRooms.length === 0 ? (
-                <p className="px-1 text-xs text-slate-400">Không tìm thấy phòng phù hợp.</p>
+              {filteredSchedules.length === 0 ? (
+                <p className="px-1 text-xs text-slate-400">Không tìm thấy ca thi phù hợp.</p>
               ) : (
-                filteredRooms.map((room) => {
-                  const roomSchedule = schedules.find((schedule) => schedule.id === room.scheduleId)
-                  return (
-                    <RoomChip
-                      active={selectedRoom?.id === room.id}
-                      key={room.id}
-                      onClick={() => setSelectedRoomId(room.id)}
-                      room={room}
-                      sessionLabel={roomSchedule?.label}
-                    />
-                  )
-                })
+                filteredSchedules.map((schedule) => (
+                  <RoomChip
+                    active={selectedSchedule?.id === schedule.id}
+                    key={schedule.id}
+                    onClick={() => setSelectedScheduleId(schedule.id)}
+                    schedule={schedule}
+                  />
+                ))
               )}
             </div>
           </div>
 
-          {selectedRoom ? (
+          {selectedSchedule ? (
             <div className="grid gap-3.5 self-start rounded-2xl border border-slate-200 bg-white p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-lg font-extrabold text-slate-900">{selectedRoom.code}</div>
-                  <div className="mt-1 text-[13px] text-slate-500">
-                    {selectedRoomSchedule?.label ?? '—'} · Sức chứa {selectedRoom.capacity} · Đã thêm {selectedRoom.occupied}
-                  </div>
+                  <div className="text-lg font-extrabold text-slate-900">{getScheduleLabel(selectedSchedule)}</div>
+                  <div className="mt-1 text-[13px] text-slate-500">{selectedSchedule.candidateCount} học sinh</div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedRoomSchedule &&
-                  candidates.some((candidate) => candidate.scheduleId === selectedRoomSchedule.id && !candidate.roomId) ? (
+                {canManage ? (
+                  <div className="flex flex-wrap gap-2">
+                    {hasUnassignedCandidates ? (
+                      <button
+                        className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                        onClick={() => void handleAutoFill()}
+                        type="button"
+                      >
+                        <Wand2 aria-hidden="true" className="size-3.5" />
+                        Tự động xếp
+                      </button>
+                    ) : null}
                     <button
-                      className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                      onClick={() => void handleAutoFill(selectedRoomSchedule.id)}
+                      className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
+                      onClick={() => setShowAddStudentModal(true)}
                       type="button"
                     >
-                      <Wand2 aria-hidden="true" className="size-3.5" />
-                      Tự động xếp
+                      <UserPlus aria-hidden="true" className="size-4" />
+                      Thêm học sinh vào ca
                     </button>
-                  ) : null}
-                  <button
-                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
-                    onClick={() => setShowAddStudentModal(true)}
-                    type="button"
-                  >
-                    <UserPlus aria-hidden="true" className="size-4" />
-                    Thêm học sinh vào phòng
-                  </button>
-                </div>
+                  </div>
+                ) : null}
               </div>
 
-              <div className="flex flex-wrap gap-2.5">
-                <div className="relative min-w-50 flex-1">
-                  <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
-                    onChange={(event) => setStudentSearch(event.target.value)}
-                    placeholder="Tìm theo tên hoặc SBD…"
-                    value={studentSearch}
-                  />
-                </div>
-                <select
-                  className="h-9.5 rounded-lg border border-slate-200 px-2.5 text-[13px] text-slate-900"
-                  onChange={(event) => setStudentClassFilter(event.target.value)}
-                  value={studentClassFilter}
-                >
-                  <option value="all">Tất cả lớp</option>
-                  {roomClassOptions.map((className) => (
-                    <option key={className} value={className}>
-                      {className}
-                    </option>
-                  ))}
-                </select>
+              <div className="relative">
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
+                  onChange={(event) => setStudentSearch(event.target.value)}
+                  placeholder="Tìm theo tên hoặc email…"
+                  value={studentSearch}
+                />
               </div>
 
               <div className="overflow-hidden rounded-xl border border-slate-200">
-                <div className="grid grid-cols-[110px_1fr_80px_90px_36px] gap-2.5 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                  <span>SBD</span>
+                <div className="grid grid-cols-[1fr_100px_36px] gap-2.5 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
                   <span>Họ tên</span>
-                  <span>Lớp</span>
                   <span>Mã đề</span>
                   <span />
                 </div>
                 <div className="max-h-100 overflow-y-auto">
-                  {visibleRoomCandidates.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-xs text-slate-400">Chưa có học sinh nào trong phòng này.</div>
+                  {visibleScheduleCandidates.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-xs text-slate-400">Chưa có học sinh nào trong ca này.</div>
                   ) : (
-                    visibleRoomCandidates.map((candidate) => {
-                      const candidatePaper = papers.find((paper) => paper.id === candidate.paperId)
+                    visibleScheduleCandidates.map((candidate) => {
+                      const candidatePaper = papers.find((paper) => paper.id === candidate.assignedPaperId)
                       return (
                         <div
-                          className="grid grid-cols-[110px_1fr_80px_90px_36px] items-center gap-2.5 border-t border-slate-100 px-4 py-2.5"
+                          className="grid grid-cols-[1fr_100px_36px] items-center gap-2.5 border-t border-slate-100 px-4 py-2.5"
                           key={candidate.id}
                         >
-                          <span className="font-mono text-xs font-bold text-slate-900">{candidate.sbd}</span>
-                          <span className="text-[13px] text-slate-900">{candidate.studentName}</span>
-                          <span className="text-[13px] text-slate-500">{candidate.schoolClassName}</span>
+                          <span className="text-[13px] text-slate-900">{getCandidateName(candidate)}</span>
                           <span className="text-[13px] font-semibold text-indigo-700">
                             {candidatePaper ? candidatePaper.code : '-'}
                           </span>
-                          <button
-                            aria-label={`Bỏ ${candidate.studentName} khỏi phòng`}
-                            className="inline-flex size-6 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-red-600"
-                            onClick={() => void handleRemoveFromRoom(candidate.id)}
-                            type="button"
-                          >
-                            <X aria-hidden="true" className="size-4" />
-                          </button>
+                          {canManage ? (
+                            <button
+                              aria-label={`Bỏ ${getCandidateName(candidate)} khỏi ca`}
+                              className="inline-flex size-6 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-red-600"
+                              onClick={() => void handleRemoveFromSchedule(candidate.id)}
+                              type="button"
+                            >
+                              <X aria-hidden="true" className="size-4" />
+                            </button>
+                          ) : null}
                         </div>
                       )
                     })
@@ -441,22 +566,69 @@ export function ScheduleTab({
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-[13px] text-slate-400">
-              Chưa có phòng thi nào. Thêm phòng ở bước Ca thi để bắt đầu xếp học sinh.
+              Chưa có ca thi nào. Thêm ca thi để bắt đầu xếp học sinh.
             </div>
           )}
         </div>
       ) : null}
 
       {subTab === 'assign' ? (
-        <PaperAssignmentPanel candidates={candidates} onApplied={() => void invalidate()} papers={papers} rooms={rooms} />
+        <PaperAssignmentPanel
+          candidates={candidates}
+          examId={examId}
+          onApplied={() => void invalidate()}
+          papers={papers}
+          schedules={schedules}
+        />
       ) : null}
 
-      {showAddStudentModal && selectedRoom ? (
+      {showAddStudentModal && selectedSchedule ? (
         <AddStudentToRoomModal
           candidates={candidates}
           onAssign={(candidateId) => void handleAssignCandidate(candidateId)}
           onClose={() => setShowAddStudentModal(false)}
-          room={selectedRoom}
+          schedule={selectedSchedule}
+        />
+      ) : null}
+
+      {showCreateModal ? (
+        <CreateScheduleModal
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={(input) => void handleCreateSchedule(input)}
+          submitting={createScheduleMutation.isPending}
+        />
+      ) : null}
+
+      {editingSchedule ? (
+        <CreateScheduleModal
+          initial={{
+            endDate: editingSchedule.endDate,
+            room: editingSchedule.room,
+            startDate: editingSchedule.startDate,
+          }}
+          onClose={() => setEditingSchedule(null)}
+          onSubmit={(input) => void handleUpdateSchedule(input)}
+          submitLabel="Lưu thay đổi"
+          submitting={updateScheduleMutation.isPending}
+          title="Sửa ca thi"
+        />
+      ) : null}
+
+      {managingProctorsFor ? (
+        <ManageProctorsModal
+          onAdd={(teacher) => void handleAddProctor(managingProctorsFor, teacher)}
+          onClose={() => setManagingProctorsFor(null)}
+          onRemove={(proctorId) => void handleRemoveProctor(managingProctorsFor, proctorId)}
+          schedule={schedules.find((schedule) => schedule.id === managingProctorsFor.id) ?? managingProctorsFor}
+        />
+      ) : null}
+
+      {movingSchedule ? (
+        <MoveScheduleModal
+          currentScheduleId={movingSchedule.id}
+          onClose={() => setMovingSchedule(null)}
+          onSelect={(targetScheduleId) => void handleMoveSchedule(targetScheduleId)}
+          schedules={schedules}
         />
       ) : null}
     </div>

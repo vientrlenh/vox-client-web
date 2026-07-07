@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import type {
   CreateSupportedLanguageRequest,
@@ -95,13 +95,6 @@ export function LanguageFormDialog({
   const [form, setForm] = useState<FormState>(() => createFormState(language))
   const [validationMessage, setValidationMessage] = useState<string | null>(null)
   const isEditMode = mode === 'edit'
-
-  useEffect(() => {
-    if (isOpen) {
-      setForm(createFormState(language))
-      setValidationMessage(null)
-    }
-  }, [isOpen, language])
 
   if (!isOpen) {
     return null

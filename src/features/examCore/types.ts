@@ -152,46 +152,58 @@ export type ExamBlueprintDto = {
   versions: ExamBlueprintVersionDto[]
 }
 
-export type ExamRoomDto = {
-  capacity: number
+export type SchoolRoomLite = {
   code: string
+  description?: string | null
   id: string
-  occupied: number
-  scheduleId: string
+  name: string
 }
 
-export type ExamProctorDto = {
+export type ExamScheduleProctorDto = {
   id: string
   scheduleId: string
-  teacherId: string
-  teacherName: string
+  teacher?: {
+    email?: string | null
+    fullName?: string | null
+    id: string
+  } | null
 }
 
 export type ExamScheduleDto = {
   candidateCount: number
-  endDate: string
+  endDate?: string | null
   examId: string
   id: string
-  label: string
-  proctors: ExamProctorDto[]
+  movedToScheduleId?: string | null
+  proctors: ExamScheduleProctorDto[]
   requiredProctorCount: number
-  roomIds: string[]
-  startDate: string
+  room?: SchoolRoomLite | null
+  schoolRoomId?: string | null
+  startDate?: string | null
   status: ExamScheduleStatus
 }
 
 export type ExamCandidateDto = {
+  assignedAt?: string | null
+  assignedPaperId?: string | null
   examId: string
   id: string
-  paperId?: string | null
-  roomId?: string | null
   scheduleId?: string | null
-  sbd: string
-  schoolClassId: string
-  schoolClassName: string
   status: ExamCandidateStatus
+  student?: {
+    email?: string | null
+    fullName?: string | null
+    id: string
+  } | null
   studentId: string
-  studentName: string
+}
+
+export function getScheduleLabel(schedule: Pick<ExamScheduleDto, 'room'>) {
+  return schedule.room?.code ?? schedule.room?.name ?? 'Ca thi'
+}
+
+export function getCandidateName(candidate: Pick<ExamCandidateDto, 'student' | 'studentId'>) {
+  return candidate.student?.fullName ?? candidate.student?.email ?? candidate.studentId
 }
 
 export type ExamDto = {
@@ -209,6 +221,7 @@ export type ExamDto = {
   name: string
   openAt?: string | null
   papers: ExamPaperDto[]
+  papersLocked?: boolean | null
   schoolClassId?: string | null
   schoolClassName?: string | null
   schoolId: string
@@ -367,7 +380,7 @@ export function getCandidateStatusDisplay(status?: string | null): { tone: Statu
     case 'EXEMPTED':
       return { tone: 'neutral', label: 'Miễn thi' }
     default:
-      return { tone: 'warning', label: 'Chưa xếp phòng' }
+      return { tone: 'warning', label: 'Chưa xếp ca' }
   }
 }
 

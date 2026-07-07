@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Check, RefreshCw, Search, Sparkles } from 'lucide-react'
 import { Pagination } from '@/shared/components/Pagination'
 import { useApplyPaperAssignmentsMutation } from '../../api/mutations'
-import type { ExamCandidateDto, ExamPaperDto, ExamRoomDto } from '../../types'
+import { getCandidateName, getScheduleLabel, type ExamCandidateDto, type ExamPaperDto, type ExamScheduleDto } from '../../types'
 
 const PAGE_SIZE = 8
 
@@ -26,7 +26,7 @@ function shuffle<T>(items: T[]): T[] {
 function computeAssignments(
   candidates: ExamCandidateDto[],
   paperIds: string[],
-  byRoom: boolean,
+  bySchedule: boolean,
   randomize: boolean,
 ): Map<string, string> {
   const result = new Map<string, string>()
@@ -42,10 +42,10 @@ function computeAssignments(
     })
   }
 
-  if (byRoom) {
+  if (bySchedule) {
     const groups = new Map<string, ExamCandidateDto[]>()
     for (const candidate of candidates) {
-      const key = candidate.roomId ?? ''
+      const key = candidate.scheduleId ?? ''
       const list = groups.get(key) ?? []
       list.push(candidate)
       groups.set(key, list)
@@ -59,34 +59,30 @@ function computeAssignments(
 
 type PaperAssignmentPanelProps = {
   candidates: ExamCandidateDto[]
+  examId: string
   onApplied?: () => void
   papers: ExamPaperDto[]
-  rooms: ExamRoomDto[]
+  schedules: ExamScheduleDto[]
 }
 
-export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: PaperAssignmentPanelProps) {
+export function PaperAssignmentPanel({ candidates, examId, onApplied, papers, schedules }: PaperAssignmentPanelProps) {
   const lockedPapers = useMemo(() => papers.filter((paper) => paper.status === 'LOCKED'), [papers])
-  const byRoom = rooms.length > 0
+  const bySchedule = schedules.length > 0
   const eligibleCandidates = useMemo(
-    () => (byRoom ? candidates.filter((candidate) => candidate.roomId) : candidates),
-    [byRoom, candidates],
+    () => (bySchedule ? candidates.filter((candidate) => candidate.scheduleId) : candidates),
+    [bySchedule, candidates],
   )
   const sortedCandidates = useMemo(
-    () => [...eligibleCandidates].sort((a, b) => a.sbd.localeCompare(b.sbd)),
+    () => [...eligibleCandidates].sort((a, b) => getCandidateName(a).localeCompare(getCandidateName(b))),
     [eligibleCandidates],
   )
   const paperIds = useMemo(() => lockedPapers.map((paper) => paper.id), [lockedPapers])
-  const classOptions = useMemo(
-    () => Array.from(new Set(sortedCandidates.map((candidate) => candidate.schoolClassName))),
-    [sortedCandidates],
-  )
 
   const [assignments, setAssignments] = useState<Map<string, string>>(() =>
-    computeAssignments(sortedCandidates, paperIds, byRoom, false),
+    computeAssignments(sortedCandidates, paperIds, bySchedule, false),
   )
   const [applied, setApplied] = useState(false)
   const [search, setSearch] = useState('')
-  const [classFilter, setClassFilter] = useState('all')
   const [page, setPage] = useState(1)
   const applyMutation = useApplyPaperAssignmentsMutation()
 
@@ -94,14 +90,9 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
     () =>
       sortedCandidates.filter((candidate) => {
         const keyword = search.trim().toLowerCase()
-        const matchesKeyword =
-          !keyword ||
-          candidate.studentName.toLowerCase().includes(keyword) ||
-          candidate.sbd.toLowerCase().includes(keyword)
-        const matchesClass = classFilter === 'all' || candidate.schoolClassName === classFilter
-        return matchesKeyword && matchesClass
+        return !keyword || getCandidateName(candidate).toLowerCase().includes(keyword)
       }),
-    [classFilter, search, sortedCandidates],
+    [search, sortedCandidates],
   )
   const totalPages = Math.max(1, Math.ceil(filteredCandidates.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -112,13 +103,8 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
     setPage(1)
   }
 
-  function handleClassFilterChange(value: string) {
-    setClassFilter(value)
-    setPage(1)
-  }
-
   function handleShuffle() {
-    setAssignments(computeAssignments(sortedCandidates, paperIds, byRoom, true))
+    setAssignments(computeAssignments(sortedCandidates, paperIds, bySchedule, true))
     setApplied(false)
   }
 
@@ -134,8 +120,8 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
   }
 
   async function handleApply() {
-    const payload = Array.from(assignments.entries()).map(([candidateId, paperId]) => ({ candidateId, paperId }))
-    await applyMutation.mutateAsync(payload)
+    const assignmentPayload = Array.from(assignments.entries()).map(([candidateId, paperId]) => ({ candidateId, paperId }))
+    await applyMutation.mutateAsync({ assignments: assignmentPayload, examId })
     setApplied(true)
     onApplied?.()
   }
@@ -143,7 +129,7 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
   if (lockedPapers.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-[13px] text-slate-400">
-        Cần khóa ít nhất một mã đề ở tab Đề thi trước khi phân đề.
+        Cần khóa tất cả mã đề của kỳ thi ở tab Đề thi trước khi phân đề.
       </div>
     )
   }
@@ -151,7 +137,7 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
   if (sortedCandidates.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-[13px] text-slate-400">
-        {byRoom ? 'Chưa có học sinh nào được xếp vào phòng thi.' : 'Chưa có học sinh nào tham gia.'}
+        {bySchedule ? 'Chưa có học sinh nào được xếp vào ca thi.' : 'Chưa có học sinh nào tham gia.'}
       </div>
     )
   }
@@ -161,15 +147,15 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
 
   const summaryColsClass =
     lockedPapers.length >= 4 ? 'sm:grid-cols-4' : lockedPapers.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
-  const rowGridClass = byRoom ? 'grid-cols-[110px_1fr_100px_110px]' : 'grid-cols-[110px_1fr_110px]'
+  const rowGridClass = bySchedule ? 'grid-cols-[1fr_120px_100px]' : 'grid-cols-[1fr_100px]'
 
   return (
     <div className="grid gap-4">
       <div className="flex items-center gap-2">
         <Sparkles aria-hidden="true" className="size-4.5 text-indigo-600" />
         <p className="text-[13px] font-bold text-slate-900">
-          {byRoom
-            ? 'Phân đều số lượng theo mã đề trong từng phòng'
+          {bySchedule
+            ? 'Phân đều số lượng theo mã đề trong từng ca thi'
             : 'Phân đều số lượng theo mã đề theo số học sinh'}
         </p>
       </div>
@@ -229,22 +215,10 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
             <input
               className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
               onChange={(event) => handleSearchChange(event.target.value)}
-              placeholder="Tìm theo tên hoặc SBD…"
+              placeholder="Tìm theo tên hoặc email…"
               value={search}
             />
           </div>
-          <select
-            className="h-9.5 rounded-lg border border-slate-200 px-2.5 text-[13px] text-slate-900"
-            onChange={(event) => handleClassFilterChange(event.target.value)}
-            value={classFilter}
-          >
-            <option value="all">Tất cả lớp</option>
-            {classOptions.map((className) => (
-              <option key={className} value={className}>
-                {className}
-              </option>
-            ))}
-          </select>
         </div>
 
         <div
@@ -253,9 +227,8 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
             rowGridClass,
           ].join(' ')}
         >
-          <span>SBD</span>
           <span>Họ tên</span>
-          {byRoom ? <span>Phòng</span> : null}
+          {bySchedule ? <span>Ca thi</span> : null}
           <span>Mã đề</span>
         </div>
         {pagedCandidates.length === 0 ? (
@@ -266,7 +239,7 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
             const paperIndex = paperId ? paperIds.indexOf(paperId) : -1
             const candidatePaper = paperIndex >= 0 ? lockedPapers[paperIndex] : undefined
             const color = paperIndex >= 0 ? PAPER_COLORS[paperIndex % PAPER_COLORS.length] : undefined
-            const room = rooms.find((item) => item.id === candidate.roomId)
+            const schedule = schedules.find((item) => item.id === candidate.scheduleId)
             return (
               <div
                 className={['items-center gap-2.5 border-t border-slate-100 px-4.5 py-2.5', 'grid', rowGridClass].join(
@@ -274,9 +247,10 @@ export function PaperAssignmentPanel({ candidates, onApplied, papers, rooms }: P
                 )}
                 key={candidate.id}
               >
-                <span className="font-mono text-xs font-bold text-slate-900">{candidate.sbd}</span>
-                <span className="text-[13px] text-slate-900">{candidate.studentName}</span>
-                {byRoom ? <span className="text-[13px] text-slate-500">{room?.code ?? '-'}</span> : null}
+                <span className="text-[13px] text-slate-900">{getCandidateName(candidate)}</span>
+                {bySchedule ? (
+                  <span className="text-[13px] text-slate-500">{schedule ? getScheduleLabel(schedule) : '-'}</span>
+                ) : null}
                 <button
                   className={[
                     'inline-flex h-7 w-fit items-center justify-self-start gap-1 rounded-full px-2.5 text-xs font-bold transition hover:opacity-80',
