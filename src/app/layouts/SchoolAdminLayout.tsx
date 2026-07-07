@@ -4,6 +4,7 @@ import {
   BookOpen,
   ChevronDown,
   ClipboardCheck,
+  DoorOpen,
   FileQuestion,
   FileSpreadsheet,
   GraduationCap,
@@ -56,6 +57,11 @@ const navigationItems = [
     icon: Layers,
     label: 'Quản lý khối',
     to: '/school-admin/grades',
+  },
+  {
+    icon: DoorOpen,
+    label: 'Quản lý phòng học',
+    to: '/school-admin/rooms',
   },
   {
     icon: FileSpreadsheet,

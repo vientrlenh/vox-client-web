@@ -131,6 +131,18 @@ const SchoolAdminGradeImportPage = lazy(() =>
   })),
 )
 
+const SchoolAdminRoomsPage = lazy(() =>
+  import('@/features/school-room').then((module) => ({
+    default: module.SchoolAdminRoomsPage,
+  })),
+)
+
+const SchoolAdminRoomImportPage = lazy(() =>
+  import('@/features/school-room').then((module) => ({
+    default: module.SchoolAdminRoomImportPage,
+  })),
+)
+
 const SchoolAdminStudentsPage = lazy(() =>
   import("@/features/school-users").then((module) => ({
     default: module.SchoolAdminStudentsPage,
@@ -460,6 +472,14 @@ export function AppRoutes() {
             <Route
               path="school-admin/grades/:gradeLevelId"
               element={<SchoolAdminGradeLevelDetailPage />}
+            />
+            <Route
+              path="school-admin/rooms"
+              element={<SchoolAdminRoomsPage />}
+            />
+            <Route
+              path="school-admin/rooms/import"
+              element={<SchoolAdminRoomImportPage />}
             />
             <Route
               path="school-admin/students"
