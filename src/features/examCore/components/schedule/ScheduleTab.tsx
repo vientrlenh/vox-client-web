@@ -291,66 +291,65 @@ export function ScheduleTab({
     return items
   }
 
-  const deviceModeSection =
-    isClassTest && onSetDeliveryMode ? (
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-[10px] bg-indigo-50 text-indigo-600">
-            <MonitorSmartphone aria-hidden="true" className="size-4.5" />
-          </span>
-          <div>
-            <div className="text-sm font-extrabold text-slate-900">Hình thức làm bài</div>
-            <div className="text-xs text-slate-500">
-              Chọn nơi học sinh làm bài trên lớp — có thể thi ngay trên thiết bị của học sinh.
-            </div>
+  const deviceModeSection = onSetDeliveryMode ? (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex items-center gap-2.5">
+        <span className="flex size-9 items-center justify-center rounded-[10px] bg-indigo-50 text-indigo-600">
+          <MonitorSmartphone aria-hidden="true" className="size-4.5" />
+        </span>
+        <div>
+          <div className="text-sm font-extrabold text-slate-900">Hình thức làm bài</div>
+          <div className="text-xs text-slate-500">
+            Chọn nơi thí sinh làm bài — có thể thi ngay trên thiết bị cá nhân.
           </div>
         </div>
-        <div className="mt-3.5 flex flex-wrap gap-2.5">
-          <button
-            className={[
-              'min-w-55 flex-1 rounded-xl border p-3.5 text-left transition',
-              effectiveMode === 'DEVICE' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
-            ].join(' ')}
-            onClick={() => onSetDeliveryMode('DEVICE')}
-            type="button"
-          >
-            <div className="flex items-center gap-2">
-              <MonitorSmartphone aria-hidden="true" className="size-4.5 text-indigo-600" />
-              <span className="text-[13px] font-bold text-slate-900">Thiết bị học sinh</span>
-              {effectiveMode === 'DEVICE' ? (
-                <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
-                  Đang chọn
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-1.5 text-xs leading-5 text-slate-600">
-              Học sinh dùng điện thoại/laptop cá nhân. Không cần xếp phòng máy, chỉ cần khung giờ mở – đóng bài.
-            </div>
-          </button>
-          <button
-            className={[
-              'min-w-55 flex-1 rounded-xl border p-3.5 text-left transition',
-              effectiveMode === 'LAB' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
-            ].join(' ')}
-            onClick={() => onSetDeliveryMode('LAB')}
-            type="button"
-          >
-            <div className="flex items-center gap-2">
-              <Laptop aria-hidden="true" className="size-4.5 text-slate-500" />
-              <span className="text-[13px] font-bold text-slate-900">Phòng máy của trường</span>
-              {effectiveMode === 'LAB' ? (
-                <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
-                  Đang chọn
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-1.5 text-xs leading-5 text-slate-600">
-              Thi tập trung tại phòng máy. Xếp ca thi và phân đề theo ca như bên dưới.
-            </div>
-          </button>
-        </div>
       </div>
-    ) : null
+      <div className="mt-3.5 flex flex-wrap gap-2.5">
+        <button
+          className={[
+            'min-w-55 flex-1 rounded-xl border p-3.5 text-left transition',
+            effectiveMode === 'DEVICE' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
+          ].join(' ')}
+          onClick={() => onSetDeliveryMode('DEVICE')}
+          type="button"
+        >
+          <div className="flex items-center gap-2">
+            <MonitorSmartphone aria-hidden="true" className="size-4.5 text-indigo-600" />
+            <span className="text-[13px] font-bold text-slate-900">Thiết bị thí sinh</span>
+            {effectiveMode === 'DEVICE' ? (
+              <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
+                Đang chọn
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1.5 text-xs leading-5 text-slate-600">
+            Thí sinh dùng điện thoại/laptop cá nhân. Không cần xếp phòng máy, chỉ cần khung giờ mở – đóng bài.
+          </div>
+        </button>
+        <button
+          className={[
+            'min-w-55 flex-1 rounded-xl border p-3.5 text-left transition',
+            effectiveMode === 'LAB' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
+          ].join(' ')}
+          onClick={() => onSetDeliveryMode('LAB')}
+          type="button"
+        >
+          <div className="flex items-center gap-2">
+            <Laptop aria-hidden="true" className="size-4.5 text-slate-500" />
+            <span className="text-[13px] font-bold text-slate-900">Phòng máy của trường</span>
+            {effectiveMode === 'LAB' ? (
+              <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
+                Đang chọn
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1.5 text-xs leading-5 text-slate-600">
+            Thi tập trung tại phòng máy. Xếp ca thi và phân đề theo ca như bên dưới.
+          </div>
+        </button>
+      </div>
+    </div>
+  ) : null
 
   const toasts = (
     <>

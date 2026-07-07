@@ -39,6 +39,7 @@ import { examQueryKeys, useExamMyRoleQuery, useExamQuery } from '@/features/exam
 import {
   useCreateExamPaperMutation,
   useReleaseSecurePoolMutation,
+  useSetExamDeliveryModeMutation,
   useUpdateExamPaperStatusMutation,
 } from '@/features/examCore/api/mutations'
 import {
@@ -49,6 +50,7 @@ import {
   RESULT_DECISION_METHODS,
   toDateTimeLocalValue,
   toIsoDateTime,
+  type ExamDeliveryMode,
   type ExamDto,
   type ExamStatus,
   type ResultDecisionMethod,
@@ -496,6 +498,7 @@ function ExamDetailPage({
   const updateStatusMutation = useUpdateExamStatusMutation()
   const deleteMutation = useDeleteExamMutation()
   const releaseSecurePoolMutation = useReleaseSecurePoolMutation()
+  const setDeliveryModeMutation = useSetExamDeliveryModeMutation()
   const [tab, setTab] = useState<ExamDetailTab>('papers')
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -532,6 +535,15 @@ function ExamDetailPage({
     }
     try {
       await releaseSecurePoolMutation.mutateAsync(forExamId)
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handleSetDeliveryMode(forExamId: string, mode: ExamDeliveryMode) {
+    try {
+      await setDeliveryModeMutation.mutateAsync({ deliveryMode: mode, examId: forExamId })
       await invalidate()
     } catch (error) {
       setErrorMessage(toApiError(error).message)
@@ -816,9 +828,11 @@ function ExamDetailPage({
       {tab === 'schedule' ? (
         <ScheduleTab
           canManage={canManageSchedule}
+          deliveryMode={exam.deliveryMode}
           examId={exam.id}
           isClassTest={false}
           onGoToPapers={() => setTab('papers')}
+          onSetDeliveryMode={canManageSchedule ? (mode) => void handleSetDeliveryMode(exam.id, mode) : undefined}
           papers={exam.papers}
           unlocked={completedCount >= 3}
         />
