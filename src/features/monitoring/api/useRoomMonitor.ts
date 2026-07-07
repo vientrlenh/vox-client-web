@@ -83,8 +83,16 @@ function streamsReducer(
     }
 }
 
-export function useRoomMonitor(roomId: string | undefined) {
-    const { data: token, refetch: refetchToken } = useMonitorToken()
+type UseRoomMonitorParams = {
+    examId?: string 
+    roomId?: string
+}
+
+export function useRoomMonitor({ examId, roomId }: UseRoomMonitorParams) {
+    const { data: token, refetch: refetchToken } = useMonitorToken({
+        examId: examId ?? '', 
+        roomIds: roomId ? [roomId] : []
+    })
     const [streamMap, dispatch] = useReducer(
         streamsReducer, 
         undefined, 
@@ -99,8 +107,8 @@ export function useRoomMonitor(roomId: string | undefined) {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     // keep newest token for the reconnect attempt
-    tokenRef.current = token?.token ?? null
-    const hasToken = Boolean(token?.token)
+    tokenRef.current = token ?? null
+    const hasToken = Boolean(token)
 
     useEffect(() => {
         if (!roomId || !hasToken) {
