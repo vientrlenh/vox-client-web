@@ -8,13 +8,13 @@ import {
   useAutoFillRoomsMutation,
   useCreateScheduleMutation,
   useRemoveCandidateFromRoomMutation,
-} from '../../api/useExamMutations'
+} from '../../api/mutations'
 import {
   examQueryKeys,
   useExamCandidatesQuery,
   useExamRoomsQuery,
   useExamSchedulesQuery,
-} from '../../api/useExamQueries'
+} from '../../api/queries'
 import type { ExamDeliveryMode, ExamPaperDto } from '../../types'
 import { AddStudentToRoomModal } from './AddStudentToRoomModal'
 import { PaperAssignmentPanel } from './PaperAssignmentPanel'

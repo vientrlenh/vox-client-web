@@ -4,8 +4,8 @@ import { FileUp, Search, UserPlus } from 'lucide-react'
 import { Pagination } from '@/shared/components/Pagination'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { examQueryKeys, useExamCandidatesQuery, useExamRoomsQuery } from '../api/useExamQueries'
-import { useAddCandidateMutation } from '../api/useExamMutations'
+import { examQueryKeys, useExamCandidatesQuery, useExamRoomsQuery } from '../api/queries'
+import { useAddCandidateMutation } from '../api/mutations'
 import { getCandidateStatusDisplay } from '../types'
 
 const PAGE_SIZE = 10

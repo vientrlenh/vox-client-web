@@ -7,8 +7,8 @@ import { Pagination } from '@/shared/components/Pagination'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
-import { examQueryKeys, useExamBlueprintQuery, useExamBlueprintsQuery } from '../api/useExamQueries'
-import { useCreateBlueprintMutation, useDeleteBlueprintVersionMutation, useUpdateBlueprintVersionStatusMutation } from '../api/useExamMutations'
+import { examQueryKeys, useExamBlueprintQuery, useExamBlueprintsQuery } from '../api/queries'
+import { useCreateBlueprintMutation, useDeleteBlueprintVersionMutation, useUpdateBlueprintVersionStatusMutation } from '../api/mutations'
 import {
   formatNullableText,
   getBlueprintVersionStatusDisplay,

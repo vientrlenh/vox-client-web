@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, UserPlus } from 'lucide-react'
-import { examQueryKeys } from '../api/useExamQueries'
+import { examQueryKeys } from '@/features/examCore/api/queries'
+import type { ExamMemberDto } from '@/features/examCore/types'
 import { useCreateExamMemberMutation, useDeleteExamMemberMutation, useUpdateExamMemberMutation } from '../api/useExamMutations'
 import { TeacherPickerModal } from './TeacherPickerModal'
-import { getMemberRoleDisplay, type ExamMemberDto, type ExamMemberRole } from '../types'
+import { getMemberRoleDisplay, type ExamMemberRole } from '../types'
 
 const ROLE_ORDER: ExamMemberRole[] = ['CHAIR', 'AUTHOR', 'REVIEWER']
 const REQUIRED_ROLES: ExamMemberRole[] = ['CHAIR', 'AUTHOR']

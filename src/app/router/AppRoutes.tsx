@@ -287,21 +287,21 @@ const SystemAdminQuestionImportPage = lazy(() =>
   import("@/features/question").then((m) => ({ default: m.SystemAdminQuestionImportPage })),
 );
 
-// exam: class tests
+// classTest: class tests
 const TeacherClassTestsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherClassTestsPage })),
+  import("@/features/classTest").then((m) => ({ default: m.TeacherClassTestsPage })),
 );
 const TeacherClassTestCreatePage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherClassTestCreatePage })),
+  import("@/features/classTest").then((m) => ({ default: m.TeacherClassTestCreatePage })),
 );
 const TeacherClassTestDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherClassTestDetailPage })),
+  import("@/features/classTest").then((m) => ({ default: m.TeacherClassTestDetailPage })),
 );
 const SchoolAdminClassTestsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminClassTestsPage })),
+  import("@/features/classTest").then((m) => ({ default: m.SchoolAdminClassTestsPage })),
 );
 const SchoolAdminClassTestDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminClassTestDetailPage })),
+  import("@/features/classTest").then((m) => ({ default: m.SchoolAdminClassTestDetailPage })),
 );
 
 // exam: centralized exams
@@ -310,9 +310,6 @@ const TeacherExamsPage = lazy(() =>
 );
 const TeacherExamDetailPage = lazy(() =>
   import("@/features/exam").then((m) => ({ default: m.TeacherExamDetailPage })),
-);
-const TeacherExamPaperEditPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherExamPaperEditPage })),
 );
 const SchoolAdminExamsPage = lazy(() =>
   import("@/features/exam").then((m) => ({ default: m.SchoolAdminExamsPage })),
@@ -323,40 +320,43 @@ const SchoolAdminExamCreatePage = lazy(() =>
 const SchoolAdminExamDetailPage = lazy(() =>
   import("@/features/exam").then((m) => ({ default: m.SchoolAdminExamDetailPage })),
 );
-const SchoolAdminExamPaperViewPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminExamPaperViewPage })),
-);
 
-// exam: blueprints
+// examCore: exam papers + blueprints (shared by exam & classTest)
+const TeacherExamPaperEditPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.TeacherExamPaperEditPage })),
+);
+const SchoolAdminExamPaperViewPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminExamPaperViewPage })),
+);
 const TeacherBlueprintsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherBlueprintsPage })),
+  import("@/features/examCore").then((m) => ({ default: m.TeacherBlueprintsPage })),
 );
 const TeacherBlueprintDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherBlueprintDetailPage })),
+  import("@/features/examCore").then((m) => ({ default: m.TeacherBlueprintDetailPage })),
 );
 const SchoolAdminBlueprintsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminBlueprintsPage })),
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminBlueprintsPage })),
 );
 const SchoolAdminBlueprintDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminBlueprintDetailPage })),
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminBlueprintDetailPage })),
 );
 const TeacherCreateBlueprintVersionPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherCreateBlueprintVersionPage })),
+  import("@/features/examCore").then((m) => ({ default: m.TeacherCreateBlueprintVersionPage })),
 );
 const SchoolAdminCreateBlueprintVersionPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminCreateBlueprintVersionPage })),
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminCreateBlueprintVersionPage })),
 );
 const TeacherBlueprintVersionDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherBlueprintVersionDetailPage })),
+  import("@/features/examCore").then((m) => ({ default: m.TeacherBlueprintVersionDetailPage })),
 );
 const TeacherEditBlueprintVersionPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherEditBlueprintVersionPage })),
+  import("@/features/examCore").then((m) => ({ default: m.TeacherEditBlueprintVersionPage })),
 );
 const SchoolAdminBlueprintVersionDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminBlueprintVersionDetailPage })),
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminBlueprintVersionDetailPage })),
 );
 const SchoolAdminEditBlueprintVersionPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminEditBlueprintVersionPage })),
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminEditBlueprintVersionPage })),
 );
 
 export function AppRoutes() {

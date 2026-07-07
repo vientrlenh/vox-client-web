@@ -7,13 +7,13 @@ import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { QuestionPicker } from '../components/QuestionPicker'
-import { examQueryKeys, useExamMyRoleQuery, useExamPaperQuery, useExamQuery } from '../api/useExamQueries'
+import { examQueryKeys, useExamMyRoleQuery, useExamPaperQuery, useExamQuery } from '../api/queries'
 import {
   useDeleteExamPaperMutation,
   useUpdateExamPaperItemMutation,
   useUpdateExamPaperSectionMutation,
   useUpdateExamPaperStatusMutation,
-} from '../api/useExamMutations'
+} from '../api/mutations'
 import { formatNullableText, getExamPaperStatusDisplay, type ExamMemberRole, type UpdateExamPaperStatusRequest } from '../types'
 
 const STATUS_ACTION_LABEL: Record<UpdateExamPaperStatusRequest['action'], string> = {

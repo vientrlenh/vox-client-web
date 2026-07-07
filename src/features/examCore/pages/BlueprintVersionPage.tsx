@@ -1,8 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { examQueryKeys, useExamBlueprintQuery } from '../api/useExamQueries'
-import { useDuplicateBlueprintVersionMutation } from '../api/useExamMutations'
+import { examQueryKeys, useExamBlueprintQuery } from '../api/queries'
+import { useDuplicateBlueprintVersionMutation } from '../api/mutations'
 import { getBlueprintVersionStatusDisplay } from '../types'
 
 type BlueprintVersionPageProps = {

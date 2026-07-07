@@ -9,10 +9,7 @@ import {
   mockSchedules,
 } from './examData'
 import type {
-  CreateClassTestRequest,
   CreateExamBlueprintRequest,
-  CreateExamMemberRequest,
-  CreateExamRequest,
   ExamBlueprintDto,
   ExamBlueprintSectionDto,
   ExamBlueprintSlotDto,
@@ -34,6 +31,8 @@ import type {
   UpdateExamRequest,
   UpdateExamStatusRequest,
 } from '../types'
+import type { CreateExamMemberRequest, CreateExamRequest } from '@/features/exam/types'
+import type { CreateClassTestRequest } from '@/features/classTest/types'
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T

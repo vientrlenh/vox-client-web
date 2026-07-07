@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Check, RefreshCw, Search, Sparkles } from 'lucide-react'
 import { Pagination } from '@/shared/components/Pagination'
-import { useApplyPaperAssignmentsMutation } from '../../api/useExamMutations'
+import { useApplyPaperAssignmentsMutation } from '../../api/mutations'
 import type { ExamCandidateDto, ExamPaperDto, ExamRoomDto } from '../../types'
 
 const PAGE_SIZE = 8

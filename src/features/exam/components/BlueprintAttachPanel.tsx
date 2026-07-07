@@ -6,9 +6,9 @@ import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupporte
 import { toApiError } from '@/shared/api'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
-import { examQueryKeys, useExamBlueprintQuery, useExamBlueprintsQuery } from '../api/useExamQueries'
+import { examQueryKeys, useExamBlueprintQuery, useExamBlueprintsQuery } from '@/features/examCore/api/queries'
+import { getBlueprintVersionStatusDisplay, type ExamMemberDto } from '@/features/examCore/types'
 import { useAttachExamBlueprintMutation } from '../api/useExamMutations'
-import { getBlueprintVersionStatusDisplay, type ExamMemberDto } from '../types'
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 

@@ -32,37 +32,19 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
-import { CandidatesTab } from '../components/CandidatesTab'
-import { DetailHeaderCard } from '../components/DetailHeaderCard'
-import { ExamListRow } from '../components/ExamListRow'
-import { FilterChips } from '../components/FilterChips'
-import { PaperCard } from '../components/PaperCard'
-import { QuestionPicker } from '../components/QuestionPicker'
-import { ScheduleTab } from '../components/schedule/ScheduleTab'
-import { WorkflowTrackerCard } from '../components/WorkflowTrackerCard'
-import {
-  examQueryKeys,
-  fetchExamPaper,
-  useClassTestStatsQuery,
-  useClassTestsQuery,
-  useExamBlueprintQuery,
-  useExamBlueprintsQuery,
-  useExamQuery,
-} from '../api/useExamQueries'
-import {
-  useChangeClassTestBlueprintMutation,
-  useCreateClassTestMutation,
-  useDeleteClassTestMutation,
-  useSetExamDeliveryModeMutation,
-  useUpdateClassTestMutation,
-  useUpdateClassTestQuestionsMutation,
-  useUpdateClassTestStatusMutation,
-  useUpdateExamPaperItemMutation,
-} from '../api/useExamMutations'
+import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
+import { FilterChips } from '@/shared/ui/FilterChips'
+import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
+import { ExamListRow } from '@/features/examCore/components/ExamListRow'
+import { PaperCard } from '@/features/examCore/components/PaperCard'
+import { QuestionPicker } from '@/features/examCore/components/QuestionPicker'
+import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
+import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
+import { examQueryKeys, fetchExamPaper, useExamBlueprintQuery, useExamBlueprintsQuery, useExamQuery } from '@/features/examCore/api/queries'
+import { useSetExamDeliveryModeMutation, useUpdateExamPaperItemMutation } from '@/features/examCore/api/mutations'
 import {
   formatDateTime,
   formatNullableText,
-  getClassTestStatusDisplay,
   toDateTimeLocalValue,
   toIsoDateTime,
   type ExamBlueprintDto,
@@ -70,7 +52,17 @@ import {
   type ExamDeliveryMode,
   type ExamDto,
   type ExamStatus,
-} from '../types'
+} from '@/features/examCore/types'
+import { useClassTestStatsQuery, useClassTestsQuery } from '../api/useClassTestQueries'
+import {
+  useChangeClassTestBlueprintMutation,
+  useCreateClassTestMutation,
+  useDeleteClassTestMutation,
+  useUpdateClassTestMutation,
+  useUpdateClassTestQuestionsMutation,
+  useUpdateClassTestStatusMutation,
+} from '../api/useClassTestMutations'
+import { getClassTestStatusDisplay } from '../types'
 
 const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
   { label: 'Tất cả', value: '' },

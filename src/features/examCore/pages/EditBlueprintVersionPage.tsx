@@ -2,16 +2,22 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { QuestionDto } from '@/features/question/types'
 import { toApiError } from '@/shared/api'
 import { QuestionPicker } from '../components/QuestionPicker'
-import { examQueryKeys, useExamBlueprintQuery } from '../api/useExamQueries'
+import { examQueryKeys, useExamBlueprintQuery } from '../api/queries'
 import {
-  useCreateBlueprintVersionMutation,
-  type CreateBlueprintVersionSectionInput,
-  type CreateBlueprintVersionSlotInput,
-} from '../api/useExamMutations'
-import type { ExamBlueprintSlotType } from '../types'
+  useUpdateBlueprintVersionMutation,
+  type UpdateBlueprintVersionSectionInput,
+  type UpdateBlueprintVersionSlotInput,
+} from '../api/mutations'
+import {
+  toDateTimeLocalValue,
+  toIsoDateTime,
+  type ExamBlueprintDto,
+  type ExamBlueprintSectionDto,
+  type ExamBlueprintSlotType,
+  type ExamBlueprintVersionDto,
+} from '../types'
 
 const QUESTION_TYPE_OPTIONS = ['READ_ALOUD', 'SHORT_ANSWER', 'LONG_ANSWER', 'OPINION', 'DESCRIPTION'] as const
 const DIFFICULTY_OPTIONS = ['EASY', 'MEDIUM', 'HARD'] as const
@@ -22,9 +28,12 @@ function nextKey(prefix: string) {
   return `${prefix}-${keySeed}`
 }
 
+type FixedQuestionRef = { code?: string | null; id: string; questionText?: string | null }
+
 type SlotDraft = {
   difficulty: string
-  fixedQuestion: QuestionDto | null
+  fixedQuestion: FixedQuestionRef | null
+  id?: string
   key: string
   prepTimeSecondsOverride: string
   questionType: string
@@ -37,6 +46,7 @@ type SlotDraft = {
 }
 
 type SectionDraft = {
+  id?: string
   instruction: string
   key: string
   sectionTimeLimitMinutes: string
@@ -76,23 +86,92 @@ function sectionWeightOf(section: SectionDraft): number {
   return section.sectionWeight.trim() ? Number(section.sectionWeight) : 1
 }
 
-type CreateBlueprintVersionPageProps = {
-  basePath: string
+function slotFromDto(slot: ExamBlueprintSectionDto['slots'][number]): SlotDraft {
+  return {
+    difficulty: slot.selectionSpec?.difficulty ?? 'MEDIUM',
+    fixedQuestion: slot.fixedQuestion ?? null,
+    id: slot.id,
+    key: nextKey('slot'),
+    prepTimeSecondsOverride: slot.prepTimeSecondsOverride != null ? String(slot.prepTimeSecondsOverride) : '',
+    questionType: slot.selectionSpec?.questionType ?? 'SHORT_ANSWER',
+    responseTimeSecondsOverride: slot.responseTimeSecondsOverride != null ? String(slot.responseTimeSecondsOverride) : '',
+    skillCode: slot.selectionSpec?.skillCode ?? '',
+    slotType: slot.slotType,
+    targetBandLevel: slot.selectionSpec?.targetBandLevel ?? '',
+    topicId: slot.selectionSpec?.topicId ?? '',
+    weight: slot.weight != null ? String(slot.weight) : '1',
+  }
 }
 
-function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProps) {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const { blueprintId } = useParams()
-  const blueprintQuery = useExamBlueprintQuery(blueprintId ?? null)
-  const createVersionMutation = useCreateBlueprintVersionMutation()
-  const [totalTimeLimitMinutes, setTotalTimeLimitMinutes] = useState('')
-  const [sections, setSections] = useState<SectionDraft[]>([newSection(1)])
-  const [pickerForSlotKey, setPickerForSlotKey] = useState<string | null>(null)
+function sectionFromDto(section: ExamBlueprintSectionDto): SectionDraft {
+  return {
+    id: section.id,
+    instruction: section.instruction ?? '',
+    key: nextKey('section'),
+    sectionTimeLimitMinutes: section.sectionTimeLimitSeconds ? String(Math.round(section.sectionTimeLimitSeconds / 60)) : '',
+    sectionWeight: section.sectionWeight != null ? String(section.sectionWeight) : '',
+    slots: section.slots.map(slotFromDto),
+    title: section.title,
+  }
+}
 
+function EditBlueprintVersionPage({ basePath }: { basePath: string }) {
+  const navigate = useNavigate()
+  const { blueprintId, versionId } = useParams()
+  const blueprintQuery = useExamBlueprintQuery(blueprintId ?? null)
   const blueprint = blueprintQuery.data
+  const version = blueprint?.versions.find((candidate) => candidate.id === versionId) ?? null
   const detailPath = blueprintId ? `${basePath}/${blueprintId}` : basePath
 
+  if (blueprintQuery.isLoading) {
+    return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
+  }
+
+  if (!blueprint || !version) {
+    return (
+      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy phiên bản blueprint.</section>
+    )
+  }
+
+  if (version.status !== 'DRAFT') {
+    return (
+      <section className="mx-auto max-w-240">
+        <button className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600" onClick={() => navigate(detailPath)} type="button">
+          ← {blueprint.name}
+        </button>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-700">
+          Phiên bản {version.code} không còn ở trạng thái bản nháp nên không thể chỉnh sửa.
+        </div>
+      </section>
+    )
+  }
+
+  return <EditVersionForm basePath={basePath} blueprint={blueprint} key={version.id} version={version} />
+}
+
+type EditVersionFormProps = {
+  basePath: string
+  blueprint: ExamBlueprintDto
+  version: ExamBlueprintVersionDto
+}
+
+function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const updateVersionMutation = useUpdateBlueprintVersionMutation()
+
+  const [description, setDescription] = useState(version.description ?? '')
+  const [totalTimeLimitMinutes, setTotalTimeLimitMinutes] = useState(
+    version.totalTimeLimitSeconds ? String(Math.round(version.totalTimeLimitSeconds / 60)) : '',
+  )
+  const [effectiveFrom, setEffectiveFrom] = useState(toDateTimeLocalValue(version.effectiveFrom))
+  const [effectiveTo, setEffectiveTo] = useState(toDateTimeLocalValue(version.effectiveTo))
+  const [sections, setSections] = useState<SectionDraft[]>(
+    version.sections.length ? version.sections.map(sectionFromDto) : [newSection(1)],
+  )
+  const [pickerForSlotKey, setPickerForSlotKey] = useState<string | null>(null)
+
+  const detailPath = `${basePath}/${blueprint.id}`
   const weightSum = sections.reduce((sum, section) => sum + sectionWeightOf(section), 0)
 
   function sectionSlotWeightSum(section: SectionDraft): number {
@@ -165,12 +244,14 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
       return
     }
 
-    const sectionsPayload: CreateBlueprintVersionSectionInput[] = sections.map((section, sectionIndex) => ({
+    const sectionsPayload: UpdateBlueprintVersionSectionInput[] = sections.map((section, sectionIndex) => ({
+      id: section.id ?? null,
       instruction: section.instruction.trim() || null,
       order: sectionIndex + 1,
       sectionTimeLimitSeconds: section.sectionTimeLimitMinutes.trim() ? Number(section.sectionTimeLimitMinutes) * 60 : null,
       sectionWeight: sectionWeightOf(section),
-      slots: section.slots.map((slot, slotIndex): CreateBlueprintVersionSlotInput => ({
+      slots: section.slots.map((slot, slotIndex): UpdateBlueprintVersionSlotInput => ({
+        id: slot.id ?? null,
         fixedQuestionId: slot.slotType === 'FIXED' ? slot.fixedQuestion?.id ?? null : null,
         order: slotIndex + 1,
         prepTimeSecondsOverride: slot.prepTimeSecondsOverride.trim() ? Number(slot.prepTimeSecondsOverride) : null,
@@ -192,26 +273,21 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
     }))
 
     try {
-      await createVersionMutation.mutateAsync({
-        blueprintId: blueprintId as string,
+      await updateVersionMutation.mutateAsync({
         payload: {
+          description: description.trim() || null,
+          effectiveFrom: toIsoDateTime(effectiveFrom),
+          effectiveTo: toIsoDateTime(effectiveTo),
           sections: sectionsPayload,
           totalTimeLimitSeconds: totalTimeLimitMinutes.trim() ? Number(totalTimeLimitMinutes) * 60 : null,
         },
+        versionId: version.id,
       })
       await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
-      navigate(detailPath, { state: { successMessage: 'Đã tạo phiên bản mới (bản nháp).' } })
+      navigate(detailPath, { state: { successMessage: 'Đã cập nhật phiên bản.' } })
     } catch (error) {
       window.alert(toApiError(error).message)
     }
-  }
-
-  if (blueprintQuery.isLoading) {
-    return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
-  }
-
-  if (!blueprint) {
-    return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy blueprint.</section>
   }
 
   const activeSlot = pickerForSlotKey
@@ -220,19 +296,23 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
 
   return (
     <section className="mx-auto max-w-240">
-      <button
-        className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600"
-        onClick={() => navigate(detailPath)}
-        type="button"
-      >
+      <button className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600" onClick={() => navigate(detailPath)} type="button">
         ← {blueprint.name}
       </button>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h1 className="text-xl font-extrabold text-slate-900">Tạo phiên bản mới</h1>
-        <p className="mt-1 text-sm text-slate-500">Xây cấu trúc đề: các phần và ô câu hỏi. Phiên bản mới luôn ở trạng thái bản nháp.</p>
+        <h1 className="text-xl font-extrabold text-slate-900">Cập nhật phiên bản {version.code}</h1>
+        <p className="mt-1 text-sm text-slate-500">Chỉnh sửa cấu trúc đề và thông tin phiên bản (chỉ áp dụng khi đang là bản nháp).</p>
 
         <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Mô tả (không bắt buộc)
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setDescription(event.target.value)}
+              value={description}
+            />
+          </label>
           <label className="grid gap-1.5 text-sm font-bold text-slate-700">
             Tổng thời lượng (phút)
             <input
@@ -243,7 +323,25 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
               value={totalTimeLimitMinutes}
             />
           </label>
-          <div className="grid content-end text-sm font-semibold text-slate-500">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Hiệu lực từ (không bắt buộc)
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setEffectiveFrom(event.target.value)}
+              type="datetime-local"
+              value={effectiveFrom}
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Hiệu lực đến (không bắt buộc)
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setEffectiveTo(event.target.value)}
+              type="datetime-local"
+              value={effectiveTo}
+            />
+          </label>
+          <div className="grid content-end text-sm font-semibold text-slate-500 sm:col-span-2">
             Tổng trọng số các phần hiện tại: <span className={weightSum === 1 ? 'text-emerald-600' : 'text-amber-600'}>{weightSum.toFixed(2)}</span>{' '}
             (nên bằng 1.00 trước khi xuất bản)
           </div>
@@ -251,7 +349,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
       </div>
 
       <div className="mt-4 grid gap-3.5">
-        {sections.map((section, sectionIndex) => (
+        {sections.map((section) => (
           <div className="rounded-2xl border border-slate-200 bg-white p-5.5" key={section.key}>
             <div className="flex items-start justify-between gap-3">
               <div className="grid flex-1 gap-3 sm:grid-cols-2">
@@ -295,8 +393,8 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
               </div>
               {sections.length > 1 ? (
                 <button
-                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
                   aria-label={`Xóa ${section.title}`}
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
                   onClick={() => removeSection(section.key)}
                   type="button"
                 >
@@ -329,8 +427,8 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
                       />
                     </label>
                     <button
-                      className="ml-auto inline-flex size-8 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
                       aria-label={`Xóa ô ${slotIndex + 1}`}
+                      className="ml-auto inline-flex size-8 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
                       onClick={() => removeSlot(section.key, slot.key)}
                       type="button"
                     >
@@ -445,11 +543,11 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
         </button>
         <button
           className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
-          disabled={createVersionMutation.isPending}
+          disabled={updateVersionMutation.isPending}
           onClick={() => void handleSubmit()}
           type="button"
         >
-          Tạo phiên bản
+          Lưu thay đổi
         </button>
       </div>
 
@@ -469,10 +567,10 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
   )
 }
 
-export function TeacherCreateBlueprintVersionPage() {
-  return <CreateBlueprintVersionPage basePath="/teacher/blueprints" />
+export function TeacherEditBlueprintVersionPage() {
+  return <EditBlueprintVersionPage basePath="/teacher/blueprints" />
 }
 
-export function SchoolAdminCreateBlueprintVersionPage() {
-  return <CreateBlueprintVersionPage basePath="/school-admin/blueprints" />
+export function SchoolAdminEditBlueprintVersionPage() {
+  return <EditBlueprintVersionPage basePath="/school-admin/blueprints" />
 }

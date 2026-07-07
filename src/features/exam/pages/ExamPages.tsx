@@ -26,34 +26,29 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
-import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
-import { CandidatesTab } from '../components/CandidatesTab'
-import { DetailHeaderCard } from '../components/DetailHeaderCard'
-import { ExamListRow } from '../components/ExamListRow'
-import { FilterChips } from '../components/FilterChips'
-import { MembersTab } from '../components/MembersTab'
-import { PaperCard } from '../components/PaperCard'
-import { ScheduleTab } from '../components/schedule/ScheduleTab'
-import { WorkflowTrackerCard } from '../components/WorkflowTrackerCard'
-import { examQueryKeys, useExamMyRoleQuery, useExamQuery, useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
-import {
-  useCreateExamMutation,
-  useCreateExamPaperMutation,
-  useDeleteExamMutation,
-  useUpdateExamMutation,
-  useUpdateExamPaperStatusMutation,
-  useUpdateExamStatusMutation,
-} from '../api/useExamMutations'
+import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
+import { FilterChips } from '@/shared/ui/FilterChips'
+import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
+import { ExamListRow } from '@/features/examCore/components/ExamListRow'
+import { PaperCard } from '@/features/examCore/components/PaperCard'
+import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
+import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
+import { examQueryKeys, useExamMyRoleQuery, useExamQuery } from '@/features/examCore/api/queries'
+import { useCreateExamPaperMutation, useUpdateExamPaperStatusMutation } from '@/features/examCore/api/mutations'
 import {
   formatDateTime,
   formatNullableText,
-  getExamStatusDisplay,
   getExamPaperStatusDisplay,
   toDateTimeLocalValue,
   toIsoDateTime,
   type ExamDto,
   type ExamStatus,
-} from '../types'
+} from '@/features/examCore/types'
+import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
+import { MembersTab } from '../components/MembersTab'
+import { useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
+import { useCreateExamMutation, useDeleteExamMutation, useUpdateExamMutation, useUpdateExamStatusMutation } from '../api/useExamMutations'
+import { getExamStatusDisplay } from '../types'
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
