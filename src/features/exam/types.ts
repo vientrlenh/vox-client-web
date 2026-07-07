@@ -1,5 +1,5 @@
 import type { StatusTone } from '@/shared/ui/StatusBadge'
-import type { ExamMemberRole, ExamStatus } from '@/features/examCore/types'
+import type { ExamMemberRole, ExamStatus, ResultDecisionMethod } from '@/features/examCore/types'
 
 export type { ExamMemberRole } from '@/features/examCore/types'
 
@@ -10,8 +10,10 @@ export type CreateExamRequest = {
   code: string
   description?: string | null
   languageId: string
+  maxAttempt?: number | null
   name: string
   openAt?: string | null
+  resultDecisionMethod?: ResultDecisionMethod | null
 }
 
 export type CreateExamMemberRequest = {

@@ -15,6 +15,7 @@ import type {
   ExamPaperItemDto,
   ExamPaperSectionDto,
   ExamScheduleDto,
+  ExamSecurePoolDto,
   QuestionSelectionSpec,
   UpdateExamBlueprintVersionStatusRequest,
   UpdateExamPaperItemRequest,
@@ -31,6 +32,17 @@ export function useSetExamDeliveryModeMutation() {
     mutationFn: async ({ deliveryMode, examId }: { deliveryMode: ExamDeliveryMode; examId: string }) => {
       const response = await apiClient.patch<ApiResponse<ExamDto>>(`/v1/exams/${examId}/delivery-mode`, {
         deliveryMode: deliveryMode === 'DEVICE' ? 'STUDENT_DEVICE' : 'LAB',
+      })
+      return unwrap(response)
+    },
+  })
+}
+
+export function useReleaseSecurePoolMutation() {
+  return useMutation({
+    mutationFn: async (examId: string) => {
+      const response = await apiClient.patch<ApiResponse<ExamSecurePoolDto>>(`/v1/exams/${examId}/secure-pool/status`, {
+        action: 'RELEASE',
       })
       return unwrap(response)
     },

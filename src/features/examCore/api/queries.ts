@@ -91,6 +91,12 @@ const EXAM_DETAIL_FIELDS = `
   ${EXAM_LIST_FIELDS}
   deliveryMode
   papersLocked
+  maxAttempt
+  resultDecisionMethod
+  securePool {
+    id
+    status
+  }
   members {
     ${EXAM_MEMBER_FIELDS}
   }

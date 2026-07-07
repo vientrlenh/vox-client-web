@@ -26,6 +26,12 @@ export type ExamScheduleStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'MOVED' |
 
 export type ExamDeliveryMode = 'DEVICE' | 'LAB'
 
+export type ResultDecisionMethod = 'HIGHEST' | 'LATEST' | 'AVERAGE' | 'FIRST'
+
+export const RESULT_DECISION_METHODS: ResultDecisionMethod[] = ['HIGHEST', 'LATEST', 'AVERAGE', 'FIRST']
+
+export type ExamSecurePoolStatus = 'SEALED' | 'RELEASED'
+
 export type Paged<T> = {
   content: T[]
   page: number
@@ -183,6 +189,11 @@ export type ExamScheduleDto = {
   status: ExamScheduleStatus
 }
 
+export type ExamSecurePoolDto = {
+  id: string
+  status: ExamSecurePoolStatus
+}
+
 export type ExamCandidateDto = {
   assignedAt?: string | null
   assignedPaperId?: string | null
@@ -217,29 +228,36 @@ export type ExamDto = {
   id: string
   kind: ExamKind
   languageId: string
+  maxAttempt?: number | null
   members: ExamMemberDto[]
   name: string
   openAt?: string | null
   papers: ExamPaperDto[]
   papersLocked?: boolean | null
+  resultDecisionMethod?: ResultDecisionMethod | null
   schoolClassId?: string | null
-  schoolClassName?: string | null
   schoolId: string
+  securePool?: ExamSecurePoolDto | null
   status: ExamStatus
-  teacherName?: string | null
   updatedAt?: string | null
 }
 
 export type UpdateExamRequest = {
   closeAt?: string | null
   description?: string | null
+  maxAttempt?: number | null
   name?: string
   openAt?: string | null
+  resultDecisionMethod?: ResultDecisionMethod | null
 }
 
 export type UpdateExamStatusRequest = {
   action: 'CANCEL' | 'CLOSE' | 'PUBLISH_RESULTS' | 'SCHEDULE' | 'START'
   note?: string | null
+}
+
+export type UpdateExamSecurePoolStatusRequest = {
+  action: 'RELEASE'
 }
 
 export type CreateExamBlueprintRequest = {
@@ -382,6 +400,29 @@ export function getCandidateStatusDisplay(status?: string | null): { tone: Statu
     default:
       return { tone: 'warning', label: 'Chưa xếp ca' }
   }
+}
+
+export function getResultDecisionMethodDisplay(method?: ResultDecisionMethod | string | null): string {
+  switch (method) {
+    case 'HIGHEST':
+      return 'Điểm cao nhất'
+    case 'LATEST':
+      return 'Lượt mới nhất'
+    case 'AVERAGE':
+      return 'Điểm trung bình'
+    case 'FIRST':
+      return 'Lượt đầu tiên'
+    default:
+      return '-'
+  }
+}
+
+export function getExamChairName(members: Pick<ExamMemberDto, 'role' | 'user' | 'userId'>[]): string {
+  const chair = members.find((member) => member.role === 'CHAIR')
+  if (!chair) {
+    return '-'
+  }
+  return chair.user?.fullName ?? chair.user?.email ?? chair.userId
 }
 
 export function getScheduleStatusDisplay(status?: string | null): { tone: StatusTone; label: string } {

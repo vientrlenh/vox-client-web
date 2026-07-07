@@ -1,5 +1,5 @@
 import type { StatusTone } from '@/shared/ui/StatusBadge'
-import type { ExamDto, ExamStatus } from '@/features/examCore/types'
+import type { ExamDto, ExamStatus, ResultDecisionMethod } from '@/features/examCore/types'
 
 export type ClassTestSectionInput = {
   instruction?: string | null
@@ -12,9 +12,11 @@ export type CreateClassTestRequest = {
   description?: string | null
   existingBlueprintId?: string | null
   existingBlueprintVersionId?: string | null
+  maxAttempt?: number | null
   name: string
   openAt?: string | null
   questionIds?: string[] | null
+  resultDecisionMethod?: ResultDecisionMethod | null
   sections?: ClassTestSectionInput[] | null
   schoolClassId: string
 }

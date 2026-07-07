@@ -10,6 +10,8 @@ import {
   Hash,
   Languages,
   LayoutList,
+  Lock,
+  Megaphone,
   PlayCircle,
   Plus,
   Rocket,
@@ -34,15 +36,22 @@ import { PaperCard } from '@/features/examCore/components/PaperCard'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
 import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
 import { examQueryKeys, useExamMyRoleQuery, useExamQuery } from '@/features/examCore/api/queries'
-import { useCreateExamPaperMutation, useUpdateExamPaperStatusMutation } from '@/features/examCore/api/mutations'
+import {
+  useCreateExamPaperMutation,
+  useReleaseSecurePoolMutation,
+  useUpdateExamPaperStatusMutation,
+} from '@/features/examCore/api/mutations'
 import {
   formatDateTime,
   formatNullableText,
   getExamPaperStatusDisplay,
+  getResultDecisionMethodDisplay,
+  RESULT_DECISION_METHODS,
   toDateTimeLocalValue,
   toIsoDateTime,
   type ExamDto,
   type ExamStatus,
+  type ResultDecisionMethod,
 } from '@/features/examCore/types'
 import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
 import { MembersTab } from '../components/MembersTab'
@@ -208,6 +217,8 @@ export function SchoolAdminExamCreatePage() {
   const [code, setCode] = useState('')
   const [description, setDescription] = useState('')
   const [languageId, setLanguageId] = useState('')
+  const [maxAttempt, setMaxAttempt] = useState('1')
+  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>('HIGHEST')
   const { confirm, dialog } = useConfirmationDialog()
 
   async function handleSubmit() {
@@ -218,7 +229,14 @@ export function SchoolAdminExamCreatePage() {
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo kỳ thi này không?' }))) {
       return
     }
-    await createMutation.mutateAsync({ code: code.trim(), description: description || null, languageId, name })
+    await createMutation.mutateAsync({
+      code: code.trim(),
+      description: description || null,
+      languageId,
+      maxAttempt: Number(maxAttempt) || 1,
+      name,
+      resultDecisionMethod,
+    })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
     navigate('/school-admin/exams')
   }
@@ -270,6 +288,32 @@ export function SchoolAdminExamCreatePage() {
             ))}
           </select>
         </label>
+        <div className="grid gap-3.5 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Số lượt thi tối đa
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              min={1}
+              onChange={(event) => setMaxAttempt(event.target.value)}
+              type="number"
+              value={maxAttempt}
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Cách chốt điểm
+            <select
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+              value={resultDecisionMethod}
+            >
+              {RESULT_DECISION_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {getResultDecisionMethodDisplay(method)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="flex justify-end">
           <button
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
@@ -297,6 +341,10 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
   const [description, setDescription] = useState(exam.description ?? '')
   const [openAt, setOpenAt] = useState(toDateTimeLocalValue(exam.openAt))
   const [closeAt, setCloseAt] = useState(toDateTimeLocalValue(exam.closeAt))
+  const [maxAttempt, setMaxAttempt] = useState(String(exam.maxAttempt ?? 1))
+  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
+    exam.resultDecisionMethod ?? 'HIGHEST',
+  )
 
   async function handleSubmit() {
     if (!name.trim()) {
@@ -308,8 +356,10 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
       payload: {
         closeAt: toIsoDateTime(closeAt),
         description: description || null,
+        maxAttempt: Number(maxAttempt) || 1,
         name: name.trim(),
         openAt: toIsoDateTime(openAt),
+        resultDecisionMethod,
       },
     })
     onSaved()
@@ -366,6 +416,32 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
               />
             </label>
           </div>
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Số lượt thi tối đa
+              <input
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                min={1}
+                onChange={(event) => setMaxAttempt(event.target.value)}
+                type="number"
+                value={maxAttempt}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Cách chốt điểm
+              <select
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+                value={resultDecisionMethod}
+              >
+                {RESULT_DECISION_METHODS.map((method) => (
+                  <option key={method} value={method}>
+                    {getResultDecisionMethodDisplay(method)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
         <div className="flex justify-end gap-2.5 border-t border-slate-200 px-6 py-4">
           <button
@@ -395,11 +471,19 @@ type ExamDetailPageProps = {
   canManageMembers: boolean
   canManagePapers: boolean
   canManageStatus: boolean
+  canReleaseSecurePool: boolean
 }
 
 type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
 
-function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePapers, canManageStatus }: ExamDetailPageProps) {
+function ExamDetailPage({
+  basePath,
+  canManageInfo,
+  canManageMembers,
+  canManagePapers,
+  canManageStatus,
+  canReleaseSecurePool,
+}: ExamDetailPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { examId } = useParams()
@@ -411,6 +495,7 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
   const updatePaperStatusMutation = useUpdateExamPaperStatusMutation()
   const updateStatusMutation = useUpdateExamStatusMutation()
   const deleteMutation = useDeleteExamMutation()
+  const releaseSecurePoolMutation = useReleaseSecurePoolMutation()
   const [tab, setTab] = useState<ExamDetailTab>('papers')
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -441,6 +526,18 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
     }
   }
 
+  async function handleReleaseSecurePool(forExamId: string) {
+    if (!(await confirm({ message: 'Bạn có chắc muốn mở khóa câu hỏi đề thi không?' }))) {
+      return
+    }
+    try {
+      await releaseSecurePoolMutation.mutateAsync(forExamId)
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
   if (examQuery.isLoading) {
     return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
   }
@@ -455,6 +552,17 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
   const lockedPapers = exam.papers.filter((paper) => paper.status === 'LOCKED').length
   // Backend authorizes schedule/candidate management for SCHOOL_ADMIN (same school) or the exam's CHAIR.
   const canManageSchedule = canManageStatus || myRole === 'CHAIR'
+
+  const primaryStatusAction =
+    exam.status === 'DRAFT' && completedCount >= 3
+      ? { action: 'SCHEDULE' as const, icon: <Calendar aria-hidden="true" className="size-4.5" />, label: 'Lên lịch kỳ thi' }
+      : exam.status === 'SCHEDULED'
+        ? { action: 'START' as const, icon: <PlayCircle aria-hidden="true" className="size-4.5" />, label: 'Bắt đầu thi' }
+        : exam.status === 'IN_PROGRESS'
+          ? { action: 'CLOSE' as const, icon: <Lock aria-hidden="true" className="size-4.5" />, label: 'Đóng kỳ thi' }
+          : exam.status === 'CLOSED'
+            ? { action: 'PUBLISH_RESULTS' as const, icon: <Megaphone aria-hidden="true" className="size-4.5" />, label: 'Công bố kết quả' }
+            : null
 
   const nextAction =
     completedCount === 0
@@ -487,11 +595,50 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
       {dialog}
 
       <DetailHeaderCard
+        actions={
+          canManageStatus ? (
+            <>
+              <button
+                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                onClick={() => {
+                  void (async () => {
+                    if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
+                      return
+                    }
+                    await deleteMutation.mutateAsync(exam.id)
+                    await invalidate()
+                    navigate(basePath)
+                  })()
+                }}
+                type="button"
+              >
+                <Trash2 aria-hidden="true" className="size-4" />
+                Xóa
+              </button>
+              {primaryStatusAction ? (
+                <button
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                  onClick={() =>
+                    void updateStatusMutation
+                      .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
+                      .then(() => invalidate())
+                  }
+                  type="button"
+                >
+                  {primaryStatusAction.icon}
+                  {primaryStatusAction.label}
+                </button>
+              ) : null}
+            </>
+          ) : null
+        }
         metaItems={[
           { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
           { icon: <ClipboardList aria-hidden="true" className="size-3.5" />, label: 'Thi tập trung' },
           { icon: <Languages aria-hidden="true" className="size-3.5" />, label: 'Tiếng Anh' },
           { icon: <Calendar aria-hidden="true" className="size-3.5" />, label: `${formatDateTime(exam.openAt)} – ${formatDateTime(exam.closeAt)}` },
+          { icon: <Clock4 aria-hidden="true" className="size-3.5" />, label: `Số lượt thi tối đa: ${exam.maxAttempt ?? 1}` },
+          { icon: <CircleCheck aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
         ]}
         onEdit={canManageInfo ? () => setShowEditModal(true) : undefined}
         statusLabel={statusDisplay.label}
@@ -517,6 +664,17 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
 
       {tab === 'papers' ? (
         <div className="mt-4 grid gap-3.5">
+          {canReleaseSecurePool && exam.securePool?.status === 'SEALED' ? (
+            <div className="flex justify-end">
+              <button
+                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-4 text-[13px] font-semibold text-amber-700 hover:bg-amber-100"
+                onClick={() => void handleReleaseSecurePool(exam.id)}
+                type="button"
+              >
+                Mở khóa câu hỏi đề thi
+              </button>
+            </div>
+          ) : null}
           {canManagePapers ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {showCopyPicker ? (
@@ -666,72 +824,6 @@ function ExamDetailPage({ basePath, canManageInfo, canManageMembers, canManagePa
         />
       ) : null}
 
-      {canManageStatus ? (
-        <div className="mt-6 flex flex-wrap gap-2.5">
-          {exam.status === 'DRAFT' && completedCount >= 3 ? (
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-              onClick={() =>
-                void updateStatusMutation.mutateAsync({ examId: exam.id, payload: { action: 'SCHEDULE' } }).then(() => invalidate())
-              }
-              type="button"
-            >
-              Lên lịch kỳ thi
-            </button>
-          ) : null}
-          {exam.status === 'SCHEDULED' ? (
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-              onClick={() =>
-                void updateStatusMutation.mutateAsync({ examId: exam.id, payload: { action: 'START' } }).then(() => invalidate())
-              }
-              type="button"
-            >
-              Bắt đầu thi
-            </button>
-          ) : null}
-          {exam.status === 'IN_PROGRESS' ? (
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-              onClick={() =>
-                void updateStatusMutation.mutateAsync({ examId: exam.id, payload: { action: 'CLOSE' } }).then(() => invalidate())
-              }
-              type="button"
-            >
-              Đóng kỳ thi
-            </button>
-          ) : null}
-          {exam.status === 'CLOSED' ? (
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-              onClick={() =>
-                void updateStatusMutation.mutateAsync({ examId: exam.id, payload: { action: 'PUBLISH_RESULTS' } }).then(() => invalidate())
-              }
-              type="button"
-            >
-              Công bố kết quả
-            </button>
-          ) : null}
-          <button
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-red-200 px-4 text-sm font-bold text-red-600 hover:bg-red-50"
-            onClick={() => {
-              void (async () => {
-                if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
-                  return
-                }
-                await deleteMutation.mutateAsync(exam.id)
-                await invalidate()
-                navigate(basePath)
-              })()
-            }}
-            type="button"
-          >
-            <Trash2 aria-hidden="true" className="size-4" />
-            Xóa kỳ thi
-          </button>
-        </div>
-      ) : null}
-
       {showEditModal ? (
         <EditExamModal
           exam={exam}
@@ -754,6 +846,7 @@ export function TeacherExamDetailPage() {
       canManageMembers={false}
       canManagePapers
       canManageStatus={false}
+      canReleaseSecurePool
     />
   )
 }
@@ -766,6 +859,7 @@ export function SchoolAdminExamDetailPage() {
       canManageMembers
       canManagePapers={false}
       canManageStatus
+      canReleaseSecurePool={false}
     />
   )
 }

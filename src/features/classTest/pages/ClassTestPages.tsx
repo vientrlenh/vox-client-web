@@ -11,6 +11,7 @@ import {
   Hash,
   Languages,
   LayoutList,
+  Megaphone,
   Pencil,
   PlayCircle,
   Plus,
@@ -45,6 +46,9 @@ import { useSetExamDeliveryModeMutation, useUpdateExamPaperItemMutation } from '
 import {
   formatDateTime,
   formatNullableText,
+  getExamChairName,
+  getResultDecisionMethodDisplay,
+  RESULT_DECISION_METHODS,
   toDateTimeLocalValue,
   toIsoDateTime,
   type ExamBlueprintDto,
@@ -52,6 +56,7 @@ import {
   type ExamDeliveryMode,
   type ExamDto,
   type ExamStatus,
+  type ResultDecisionMethod,
 } from '@/features/examCore/types'
 import { useClassTestStatsQuery, useClassTestsQuery } from '../api/useClassTestQueries'
 import {
@@ -326,6 +331,8 @@ export function TeacherClassTestCreatePage() {
   const [schoolClassName, setSchoolClassName] = useState('')
   const [openAt, setOpenAt] = useState('')
   const [closeAt, setCloseAt] = useState('')
+  const [maxAttempt, setMaxAttempt] = useState('1')
+  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>('HIGHEST')
   const [sections, setSections] = useState<ClassTestSectionDraft[]>([newClassTestSection(1)])
   const [pickerForSectionKey, setPickerForSectionKey] = useState<string | null>(null)
   const [creationMode, setCreationMode] = useState<'questions' | 'blueprint'>('questions')
@@ -420,8 +427,10 @@ export function TeacherClassTestCreatePage() {
           description: description || null,
           existingBlueprintId: creationMode === 'blueprint' ? selectedBlueprint?.id : null,
           existingBlueprintVersionId: creationMode === 'blueprint' ? selectedVersion?.id : null,
+          maxAttempt: Number(maxAttempt) || 1,
           name,
           openAt: toIsoDateTime(openAt),
+          resultDecisionMethod,
           schoolClassId,
           sections:
             creationMode === 'blueprint'
@@ -502,6 +511,30 @@ export function TeacherClassTestCreatePage() {
               type="datetime-local"
               value={closeAt}
             />
+          </label>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Số lượt thi tối đa
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              min={1}
+              onChange={(event) => setMaxAttempt(event.target.value)}
+              type="number"
+              value={maxAttempt}
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Cách chốt điểm
+            <select
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+              value={resultDecisionMethod}
+            >
+              {RESULT_DECISION_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {getResultDecisionMethodDisplay(method)}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 
@@ -1140,6 +1173,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const [editDescription, setEditDescription] = useState('')
   const [editOpenAt, setEditOpenAt] = useState('')
   const [editCloseAt, setEditCloseAt] = useState('')
+  const [editMaxAttempt, setEditMaxAttempt] = useState('1')
+  const [editResultDecisionMethod, setEditResultDecisionMethod] = useState<ResultDecisionMethod>('HIGHEST')
   const [editingSectionIndex, setEditingSectionIndex] = useState<number | null>(null)
   const [editSectionTitle, setEditSectionTitle] = useState('')
   const [editSectionInstruction, setEditSectionInstruction] = useState('')
@@ -1167,6 +1202,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     setEditDescription(exam.description ?? '')
     setEditOpenAt(toDateTimeLocalValue(exam.openAt))
     setEditCloseAt(toDateTimeLocalValue(exam.closeAt))
+    setEditMaxAttempt(String(exam.maxAttempt ?? 1))
+    setEditResultDecisionMethod(exam.resultDecisionMethod ?? 'HIGHEST')
     setShowEditInfo(true)
   }
 
@@ -1180,8 +1217,10 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         payload: {
           closeAt: toIsoDateTime(editCloseAt),
           description: editDescription.trim() || null,
+          maxAttempt: Number(editMaxAttempt) || 1,
           name: editName.trim(),
           openAt: toIsoDateTime(editOpenAt),
+          resultDecisionMethod: editResultDecisionMethod,
         },
       })
       await invalidate()
@@ -1330,12 +1369,61 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       {dialog}
 
       <DetailHeaderCard
+        actions={
+          canManage ? (
+            <>
+              <button
+                aria-label="Làm mới"
+                className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+                onClick={() => void examQuery.refetch()}
+                title="Làm mới"
+                type="button"
+              >
+                <RefreshCw aria-hidden="true" className="size-4.5" />
+              </button>
+              <button
+                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                onClick={() => {
+                  void (async () => {
+                    if (!(await confirm({ message: 'Bạn có chắc muốn xóa bài trên lớp này không?' }))) {
+                      return
+                    }
+                    await deleteMutation.mutateAsync(exam.id)
+                    await invalidate()
+                    navigate('/teacher/class-tests')
+                  })()
+                }}
+                type="button"
+              >
+                <Trash2 aria-hidden="true" className="size-4" />
+                Xóa
+              </button>
+              {exam.status !== 'RESULTS_PUBLISHED' ? (
+                <button
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                  onClick={() =>
+                    void updateStatusMutation
+                      .mutateAsync({ examId: exam.id, payload: { action: 'PUBLISH_RESULTS' } })
+                      .then(() => invalidate())
+                      .then(() => setMessage('Đã trả điểm cho bài trên lớp.'))
+                  }
+                  type="button"
+                >
+                  <Megaphone aria-hidden="true" className="size-4.5" />
+                  Trả điểm
+                </button>
+              ) : null}
+            </>
+          ) : null
+        }
         metaItems={[
           { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
           { icon: <NotebookPen aria-hidden="true" className="size-3.5" />, label: 'Bài trên lớp' },
           { icon: <Languages aria-hidden="true" className="size-3.5" />, label: 'Tiếng Anh' },
           { icon: <Calendar aria-hidden="true" className="size-3.5" />, label: `${formatDateTime(exam.openAt)} – ${formatDateTime(exam.closeAt)}` },
-          { icon: <Users aria-hidden="true" className="size-3.5" />, label: `GV: ${formatNullableText(exam.teacherName)}` },
+          { icon: <Users aria-hidden="true" className="size-3.5" />, label: `GV: ${getExamChairName(exam.members)}` },
+          { icon: <Clock aria-hidden="true" className="size-3.5" />, label: `Số lượt thi tối đa: ${exam.maxAttempt ?? 1}` },
+          { icon: <CheckCircle2 aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
         ]}
         onEdit={canManage ? openEditInfo : undefined}
         statusLabel={statusDisplay.label}
@@ -1389,6 +1477,30 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                 type="datetime-local"
                 value={editCloseAt}
               />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Số lượt thi tối đa
+              <input
+                className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                min={1}
+                onChange={(event) => setEditMaxAttempt(event.target.value)}
+                type="number"
+                value={editMaxAttempt}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Cách chốt điểm
+              <select
+                className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setEditResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+                value={editResultDecisionMethod}
+              >
+                {RESULT_DECISION_METHODS.map((method) => (
+                  <option key={method} value={method}>
+                    {getResultDecisionMethodDisplay(method)}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
           <div className="flex justify-end">
@@ -1638,49 +1750,6 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {canManage ? (
-        <div className="mt-6 flex flex-wrap gap-2.5">
-          <button
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            onClick={() => void examQuery.refetch()}
-            type="button"
-          >
-            <RefreshCw aria-hidden="true" className="size-4" />
-            Làm mới
-          </button>
-          {exam.status !== 'RESULTS_PUBLISHED' ? (
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-              onClick={() =>
-                void updateStatusMutation
-                  .mutateAsync({ examId: exam.id, payload: { action: 'PUBLISH_RESULTS' } })
-                  .then(() => invalidate())
-                  .then(() => setMessage('Đã trả điểm cho bài trên lớp.'))
-              }
-              type="button"
-            >
-              Trả điểm
-            </button>
-          ) : null}
-          <button
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-red-200 px-4 text-sm font-bold text-red-600 hover:bg-red-50"
-            onClick={() => {
-              void (async () => {
-                if (!(await confirm({ message: 'Bạn có chắc muốn xóa bài trên lớp này không?' }))) {
-                  return
-                }
-                await deleteMutation.mutateAsync(exam.id)
-                await invalidate()
-                navigate('/teacher/class-tests')
-              })()
-            }}
-            type="button"
-          >
-            <Trash2 aria-hidden="true" className="size-4" />
-            Xóa bài trên lớp
-          </button>
-        </div>
-      ) : null}
     </section>
   )
 }
