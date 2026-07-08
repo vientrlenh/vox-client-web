@@ -1,4 +1,4 @@
-import { ActiveRoomsList } from '../components/ActiveRoomsList'
+import { ActiveExamsList } from '../components/ActiveExamsList'
 
 export function TeacherMonitoringRoomsPage() {
 
@@ -12,15 +12,14 @@ export function TeacherMonitoringRoomsPage() {
           className="mt-2 text-3xl font-black tracking-0 text-slate-950"
           id="teacher-monitoring-title"
         >
-          Phòng thi được phân công
+          Kỳ thi được phân công
         </h1>
         <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-          Theo dõi các phòng thi bạn gác — đang diễn ra và sắp tới. Nhấn vào
-          phòng đang diễn ra để xem màn hình và camera của học sinh.
+          Các kỳ thi bạn chủ trì đang diễn ra. Nhấn vào một kỳ thi để chọn phòng giám sát
         </p>
       </div>
 
-      <ActiveRoomsList/>
+      <ActiveExamsList/>
     </section>
   )
 }
