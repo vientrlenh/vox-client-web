@@ -108,12 +108,10 @@ export function PaperAssignmentPanel({ candidates, examId, onApplied, papers, sc
     setApplied(false)
   }
 
-  function handleCycle(candidateId: string) {
+  function handleSelectPaper(candidateId: string, paperId: string) {
     setAssignments((current) => {
       const next = new Map(current)
-      const currentPaperId = next.get(candidateId)
-      const currentIndex = currentPaperId ? paperIds.indexOf(currentPaperId) : -1
-      next.set(candidateId, paperIds[(currentIndex + 1) % paperIds.length])
+      next.set(candidateId, paperId)
       return next
     })
     setApplied(false)
@@ -147,7 +145,7 @@ export function PaperAssignmentPanel({ candidates, examId, onApplied, papers, sc
 
   const summaryColsClass =
     lockedPapers.length >= 4 ? 'sm:grid-cols-4' : lockedPapers.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
-  const rowGridClass = bySchedule ? 'grid-cols-[1fr_120px_100px]' : 'grid-cols-[1fr_100px]'
+  const rowGridClass = bySchedule ? 'grid-cols-[1fr_120px_140px]' : 'grid-cols-[1fr_140px]'
 
   return (
     <div className="grid gap-4">
@@ -180,7 +178,7 @@ export function PaperAssignmentPanel({ candidates, examId, onApplied, papers, sc
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4.5 py-3.5">
           <p className="text-[13px] text-slate-500">
-            {filteredCandidates.length}/{sortedCandidates.length} học sinh · bấm vào chip mã đề để chỉnh tay
+            {filteredCandidates.length}/{sortedCandidates.length} học sinh · chọn mã đề để chỉnh tay
           </p>
           <div className="flex gap-2">
             <button
@@ -237,7 +235,6 @@ export function PaperAssignmentPanel({ candidates, examId, onApplied, papers, sc
           pagedCandidates.map((candidate) => {
             const paperId = assignments.get(candidate.id)
             const paperIndex = paperId ? paperIds.indexOf(paperId) : -1
-            const candidatePaper = paperIndex >= 0 ? lockedPapers[paperIndex] : undefined
             const color = paperIndex >= 0 ? PAPER_COLORS[paperIndex % PAPER_COLORS.length] : undefined
             const schedule = schedules.find((item) => item.id === candidate.scheduleId)
             return (
@@ -251,16 +248,20 @@ export function PaperAssignmentPanel({ candidates, examId, onApplied, papers, sc
                 {bySchedule ? (
                   <span className="text-[13px] text-slate-500">{schedule ? getScheduleLabel(schedule) : '-'}</span>
                 ) : null}
-                <button
-                  className={[
-                    'inline-flex h-7 w-fit items-center justify-self-start gap-1 rounded-full px-2.5 text-xs font-bold transition hover:opacity-80',
-                    color ? color.chip : 'bg-slate-100 text-slate-500',
-                  ].join(' ')}
-                  onClick={() => handleCycle(candidate.id)}
-                  type="button"
-                >
-                  {candidatePaper ? candidatePaper.code : '-'}
-                </button>
+                <div className="flex items-center gap-2 justify-self-start">
+                  <span className={['size-2.5 rounded-full', color ? color.dot : 'bg-slate-300'].join(' ')} />
+                  <select
+                    className="h-8 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400"
+                    onChange={(event) => handleSelectPaper(candidate.id, event.target.value)}
+                    value={paperId ?? ''}
+                  >
+                    {lockedPapers.map((examPaper) => (
+                      <option key={examPaper.id} value={examPaper.id}>
+                        {examPaper.code}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )
           })

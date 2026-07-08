@@ -16,7 +16,6 @@ import {
   Plus,
   Rocket,
   Trash2,
-  Users,
   X,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
@@ -30,6 +29,7 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
@@ -82,7 +82,7 @@ function getExamWorkflowSteps(exam: ExamDto): { completedCount: number; steps: W
   const steps: WorkflowStep[] = [
     {
       icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
-      label: 'Gắn blueprint',
+      label: 'Khung đề',
       state: step1Done ? 'done' : 'current',
       sublabel: step1Done ? 'Hoàn tất' : 'Chưa gắn blueprint',
     },
@@ -94,13 +94,13 @@ function getExamWorkflowSteps(exam: ExamDto): { completedCount: number; steps: W
     },
     {
       icon: step3Done ? <Check size={26} /> : <FilePenLine size={24} />,
-      label: 'Soạn & duyệt đề',
+      label: 'Đề bài',
       state: !step2Done ? 'upcoming' : step3Done ? 'done' : 'current',
       sublabel: totalPapers ? `${lockedPapers} / ${totalPapers} mã đề đã khóa` : undefined,
     },
     {
       icon: step4Done ? <Check size={26} /> : <Rocket size={24} />,
-      label: 'Vận hành thi',
+      label: 'Xếp lịch',
       state: !step3Done ? 'upcoming' : step4Done ? 'done' : 'current',
       sublabel: step4Done ? 'Đã công bố kết quả' : 'Lên lịch → công bố',
     },
@@ -476,7 +476,7 @@ type ExamDetailPageProps = {
   canReleaseSecurePool: boolean
 }
 
-type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
+type ExamDetailTab = 'assessment' | 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
 
 function ExamDetailPage({
   basePath,
@@ -663,11 +663,12 @@ function ExamDetailPage({
       <div className="mt-5.5">
         <TabPillGroup
           items={[
-            { label: 'Đề bài', value: 'papers' },
             { label: 'Phân công', value: 'people' },
-            { label: 'Học sinh', value: 'students' },
+            { label: 'Phương thức đánh giá', value: 'assessment' },
             { label: 'Blueprint', value: 'blueprint' },
-            { icon: <Users aria-hidden="true" className="size-4" />, label: 'Phân lịch', value: 'schedule' },
+            { label: 'Đề bài', value: 'papers' },
+            { label: 'Học sinh', value: 'students' },
+            { icon: <Calendar aria-hidden="true" className="size-4" />, label: 'Xếp lịch', value: 'schedule' },
           ]}
           onChange={setTab}
           value={tab}
@@ -806,7 +807,9 @@ function ExamDetailPage({
 
       {tab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
 
-      {tab === 'students' ? <CandidatesTab canManage={canManageSchedule} examId={exam.id} /> : null}
+      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
+
+      {tab === 'students' ? <CandidatesTab canManage={canManageSchedule} examId={exam.id} papers={exam.papers} /> : null}
 
       {tab === 'blueprint' ? (
         <BlueprintAttachPanel

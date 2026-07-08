@@ -16,7 +16,6 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
-  Smartphone,
   Trash2,
   Users,
   NotebookPen,
@@ -35,6 +34,7 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
@@ -93,7 +93,7 @@ function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; ste
   const steps: WorkflowStep[] = [
     {
       icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
-      label: 'Soạn đề bài',
+      label: 'Đề bài',
       state: step1Done ? 'done' : 'current',
       sublabel: step1Done ? 'Đã có câu hỏi trong đề' : 'Chưa gắn blueprint hoặc thêm câu hỏi',
     },
@@ -105,7 +105,7 @@ function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; ste
     },
     {
       icon: step3Done ? <Check size={26} /> : <PlayCircle size={24} />,
-      label: 'Mở bài & chấm',
+      label: 'Xếp lịch & chấm',
       state: !step2Done ? 'upcoming' : step3Done ? 'done' : 'current',
       sublabel: step3Done ? 'Đã trả điểm' : 'Chọn thời gian làm bài',
     },
@@ -1151,7 +1151,7 @@ type ClassTestDetailPageProps = {
   canManage: boolean
 }
 
-type DetailTab = 'blueprint' | 'papers' | 'schedule' | 'students'
+type DetailTab = 'assessment' | 'blueprint' | 'papers' | 'schedule' | 'students'
 
 function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const navigate = useNavigate()
@@ -1527,10 +1527,11 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       <div className="mt-5.5">
         <TabPillGroup
           items={[
+            { label: 'Phương thức đánh giá', value: 'assessment' },
+            { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
             { label: 'Đề bài', value: 'papers' },
             { label: 'Học sinh', value: 'students' },
-            { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
-            { icon: <Smartphone aria-hidden="true" className="size-4" />, label: 'Phân lịch', value: 'schedule' },
+            { icon: <Calendar aria-hidden="true" className="size-4" />, label: 'Xếp lịch', value: 'schedule' },
           ]}
           onChange={setTab}
           value={tab}
@@ -1719,7 +1720,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} /> : null}
+      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
+
+      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} papers={exam.papers} /> : null}
 
       {tab === 'blueprint' ? (
         <ClassTestBlueprintTab

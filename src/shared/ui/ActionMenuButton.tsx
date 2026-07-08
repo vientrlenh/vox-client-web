@@ -39,9 +39,13 @@ const menuItemToneClassNames: Record<ActionMenuItemTone, string> = {
 function getMenuPosition(
   trigger: HTMLButtonElement,
   align: 'left' | 'right',
+  itemCount: number,
 ): MenuPosition {
   const rect = trigger.getBoundingClientRect()
-  const top = rect.bottom + 8
+  const estHeight = itemCount * 44 + 8
+  const spaceBelow = window.innerHeight - rect.bottom
+  const openUp = spaceBelow < estHeight + 8 && rect.top > spaceBelow
+  const top = openUp ? Math.max(8, rect.top - estHeight - 8) : rect.bottom + 8
 
   if (align === 'left') {
     return {
@@ -87,7 +91,7 @@ export function ActionMenuButton({
       return
     }
 
-    setMenuPosition(getMenuPosition(trigger, align))
+    setMenuPosition(getMenuPosition(trigger, align, items.length))
     setIsOpen(true)
   }
 
@@ -131,7 +135,7 @@ export function ActionMenuButton({
   const menu = isOpen && menuPosition
     ? createPortal(
         <div
-          className="z-50 w-60 rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-950/10"
+          className="z-50 max-h-[calc(100vh-24px)] w-60 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-950/10"
           id={menuId}
           ref={menuRef}
           role="menu"
