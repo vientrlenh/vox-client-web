@@ -81,6 +81,25 @@ export type RubricCriterionPage = {
 };
 
 // ==========================================
+// 3b. FRAMEWORK OPTIONS (dùng cho dropdown chọn Framework Criterion)
+// ==========================================
+export type FrameworkVersionOption = {
+  id: string;
+  code: string;
+  name: string;
+  version: number;
+  status: string;
+};
+
+export type FrameworkCriterionOption = {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  order: number;
+};
+
+// ==========================================
 // 4. RUBRIC CRITERION BAND (Mức điểm chi tiết của Tiêu chí)
 // ==========================================
 export type RubricCriterionBand = {

@@ -75,12 +75,12 @@ const navigationItems: NavigationItem[] = [
   },
   {
     icon: ClipboardList,
-    label: 'Quản lý Rubrics',
+    label: 'Quản lý tiêu chí đánh giá',
     to: '/system-admin/rubrics',
   },
   {
     icon: ClipboardCheck,
-    label: 'Quản lý Assessment Policy',
+    label: 'Quản lý chính sách đánh giá',
     to: '/system-admin/assessment-policies',
   },
   {

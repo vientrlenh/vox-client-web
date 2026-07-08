@@ -90,7 +90,7 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
         explanation: item.explanation.trim(),
         expectedScore: Number(item.expectedScore) || 0,
       }));
-    const examplesJson = cleanedExamples.length > 0 ? JSON.stringify({ values: cleanedExamples }) : undefined;
+    const examplesJson = cleanedExamples.length > 0 ? JSON.stringify(cleanedExamples) : undefined;
 
     const payload: UpdateRubricCriterionPayload = {
       name: formData.name,

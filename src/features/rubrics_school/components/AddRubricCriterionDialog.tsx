@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import type { AddRubricCriteriaPayload } from '../api/useAddSchoolRubricCriteriaMutation';
+import { useFrameworkVersionCriteriaQuery, useFrameworkVersionsQuery } from '../api/useFrameworkVersionOptionsQuery';
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: AddRubricCriteriaPayload) => Promise<void>;
   isPending: boolean;
+  frameworkId?: string;
 };
 
 // Cấu trúc thật của examplesJson trả về từ Backend: { "values": [{ transcript, explanation, expectedScore }] }
@@ -20,7 +22,7 @@ type ExampleItem = {
 
 const EMPTY_EXAMPLE: ExampleItem = { transcript: '', explanation: '', expectedScore: 0 };
 
-export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending }: Props) {
+export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, frameworkId }: Props) {
   const [formData, setFormData] = useState({
     frameworkCriterionId: '',
     code: '',
@@ -33,8 +35,17 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending 
     isRequired: false,
   });
   const [examples, setExamples] = useState<ExampleItem[]>([EMPTY_EXAMPLE]);
+  const [frameworkVersionId, setFrameworkVersionId] = useState('');
+
+  const { data: frameworkVersions, isLoading: isLoadingVersions } = useFrameworkVersionsQuery(frameworkId);
+  const { data: frameworkCriteria, isLoading: isLoadingCriteria } = useFrameworkVersionCriteriaQuery(frameworkVersionId || undefined);
 
   if (!isOpen) return null;
+
+  const handleFrameworkVersionChange = (value: string) => {
+    setFrameworkVersionId(value);
+    setFormData((prev) => ({ ...prev, frameworkCriterionId: '' }));
+  };
 
   const updateExample = (index: number, patch: Partial<ExampleItem>) => {
     setExamples((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -48,7 +59,7 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending 
     e.preventDefault();
 
     if (!formData.frameworkCriterionId.trim()) {
-      alert('Lỗi: Vui lòng nhập UUID Framework Criterion!');
+      alert('Lỗi: Vui lòng chọn Framework Version và Framework Criterion!');
       return;
     }
 
@@ -101,19 +112,36 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending 
         <form onSubmit={handleSubmit} className="max-h-[80vh] overflow-y-auto p-6">
           <div className="grid gap-5 sm:grid-cols-2">
 
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-bold text-slate-700">
-                Framework Criterion ID <span className="font-normal text-slate-400">(nhập UUID, tạm thời chưa có API danh sách)</span>
-              </label>
-              <input
-                type="text"
+            <div>
+              <label className="mb-1 block text-sm font-bold text-slate-700">Framework Version</label>
+              <select
+                value={frameworkVersionId}
+                onChange={(e) => handleFrameworkVersionChange(e.target.value)}
+                disabled={isPending || !frameworkId || isLoadingVersions}
+                required
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+              >
+                <option value="">{isLoadingVersions ? 'Đang tải...' : '-- Chọn framework version --'}</option>
+                {frameworkVersions?.map((fv) => (
+                  <option key={fv.id} value={fv.id}>{fv.code} - {fv.name} (v{fv.version})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-bold text-slate-700">Framework Criterion</label>
+              <select
                 value={formData.frameworkCriterionId}
                 onChange={(e) => setFormData({ ...formData, frameworkCriterionId: e.target.value })}
-                disabled={isPending}
+                disabled={isPending || !frameworkVersionId || isLoadingCriteria}
                 required
-                placeholder="vd: 019f12ac-d26f-798f-bb2e-0b09ae9dde1b"
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 font-mono text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-              />
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+              >
+                <option value="">{isLoadingCriteria ? 'Đang tải...' : '-- Chọn framework criterion --'}</option>
+                {frameworkCriteria?.map((fc) => (
+                  <option key={fc.id} value={fc.id}>{fc.code} - {fc.name}</option>
+                ))}
+              </select>
             </div>
 
             <div>

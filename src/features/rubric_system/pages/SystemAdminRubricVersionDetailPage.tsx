@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
 import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, Edit, Plus, ListChecks, Layers, Calculator, Trash2, Search, Filter, FileSpreadsheet } from 'lucide-react';
 
+import { useSystemRubricQuery } from '../api/useSystemRubricQuery';
 import { useSystemRubricVersionQuery } from '../api/useSystemRubricVersionQuery';
 import {
   useSearchSystemRubricCriteriaQuery,
@@ -78,6 +79,8 @@ export function SystemAdminRubricVersionDetailPage() {
   }, [bandsKeyword]);
 
   // --- 1. GỌI CÁC API QUERY (LẤY DỮ LIỆU) ---
+  const { data: rubric } = useSystemRubricQuery(rubricId);
+
   const {
     data: version,
     isLoading: isVersionLoading,
@@ -502,6 +505,7 @@ export function SystemAdminRubricVersionDetailPage() {
           onClose={() => setIsAddCriterionModalOpen(false)}
           onSubmit={handleAddCriterion}
           isPending={isAddingCriterion}
+          frameworkId={rubric?.frameworkId}
         />
       )}
 

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, Edit, Plus, ListChecks, Layers, Calculator, Trash2, Search, Filter, FileSpreadsheet } from 'lucide-react';
 import { useAppSelector } from '@/app/store/hooks';
 
+import { useSchoolRubricQuery } from '../api/useSchoolRubricQuery';
 import { useSchoolRubricVersionQuery } from '../api/useSchoolRubricVersionQuery';
 import {
   useSearchSchoolRubricCriteriaQuery,
@@ -82,6 +83,8 @@ export function SchoolAdminRubricVersionDetailPage() {
   }, [bandsKeyword]);
 
   // --- 1. GỌI CÁC API QUERY (LẤY DỮ LIỆU) ---
+  const { data: rubric } = useSchoolRubricQuery(schoolId, rubricId);
+
   const {
     data: version,
     isLoading: isVersionLoading,
@@ -515,6 +518,7 @@ export function SchoolAdminRubricVersionDetailPage() {
           onClose={() => setIsAddCriterionModalOpen(false)}
           onSubmit={handleAddCriterion}
           isPending={isAddingCriterion}
+          frameworkId={rubric?.frameworkId}
         />
       )}
 
