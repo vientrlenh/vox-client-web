@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import type { AxiosResponse } from 'axios'
 import userEvent from '@testing-library/user-event'
-import { apiClient, type ApiResponse } from '@/shared/api'
+import { type ApiResponse, apiClient } from '@/shared/api'
 import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { LoginResponse } from '../types'
@@ -10,7 +10,6 @@ import { LoginPage } from './LoginPage'
 jest.mock('@/shared/api', () => ({
   AUTH_TOKEN_STORAGE_KEYS: {
     accessToken: 'vox.accessToken',
-    refreshToken: 'vox.refreshToken',
   },
   apiClient: {
     post: jest.fn(),

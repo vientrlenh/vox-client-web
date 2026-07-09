@@ -109,14 +109,13 @@ describe('authRefreshInterceptor', () => {
     })
 
     expect(refreshAuthTokens).toHaveBeenCalledTimes(1)
-    expect(refreshAuthTokens).toHaveBeenCalledWith('old-refresh-token')
+    expect(refreshAuthTokens).toHaveBeenCalledWith()
     expect(adapter).toHaveBeenCalledTimes(2)
     expect(adapter.mock.calls[1][0].headers.Authorization).toBe(
       `Bearer ${newAccessToken}`,
     )
     expect(getAuthTokens()).toEqual({
       accessToken: newAccessToken,
-      refreshToken: 'new-refresh-token',
     })
     expect(store.getState().auth.status).toBe('authenticated')
   })

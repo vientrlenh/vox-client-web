@@ -267,6 +267,7 @@ function QuestionBanksPage({
       />
 
       <QuestionBankFormDialog
+        key={`${dialogMode ?? 'closed'}-${dialogTarget?.id ?? selectedBank?.id ?? 'new'}`}
         errorMessage={dialogError ?? undefined}
         isSubmitting={isSubmitting}
         mode={dialogMode}

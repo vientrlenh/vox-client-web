@@ -118,6 +118,7 @@ export type QuestionDto = {
   updatedAt: string | null
   createdBy: string | null
   updatedBy: string | null
+  usableInExam?: boolean
   topic?: QuestionTopicRefDto | null
   bank?: QuestionBankRefDto | null
   assets?: QuestionAssetDto[] | null

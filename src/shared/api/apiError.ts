@@ -23,6 +23,10 @@ export function toApiError(error: unknown): ApiError {
     }
   }
 
+  if (isApiError(error)) {
+    return error
+  }
+
   if (error instanceof Error) {
     return {
       message: error.message,
@@ -33,4 +37,13 @@ export function toApiError(error: unknown): ApiError {
     details: error,
     message: 'Unexpected API error',
   }
+}
+
+function isApiError(error: unknown): error is ApiError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    !(error instanceof Error) &&
+    typeof (error as ApiError).message === 'string'
+  )
 }

@@ -37,12 +37,10 @@ describe('authSession', () => {
   it('saves, reads, and clears auth tokens from localStorage', () => {
     saveAuthTokens({
       accessToken: 'access-token',
-      refreshToken: 'refresh-token',
     })
 
     expect(getAuthTokens()).toEqual({
       accessToken: 'access-token',
-      refreshToken: 'refresh-token',
     })
     expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEYS.accessToken)).toBe(
       'access-token',
@@ -80,7 +78,6 @@ describe('authSession', () => {
 
     saveAuthTokens({
       accessToken,
-      refreshToken: 'refresh-token',
     })
 
     expect(getStoredAuthUser()).toBeNull()

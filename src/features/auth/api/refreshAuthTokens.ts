@@ -1,4 +1,4 @@
-import { apiClient, type ApiResponse } from '@/shared/api'
+import { type ApiResponse, apiClient } from '@/shared/api'
 import { getClientDevice } from '../session/authSession'
 import type { RefreshRequest, RefreshResponse } from '../types'
 

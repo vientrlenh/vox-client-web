@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import type { AxiosResponse } from 'axios'
-import { apiClient, type ApiResponse } from '@/shared/api'
+import { type ApiResponse, apiClient } from '@/shared/api'
 import { createTestProviders } from '@/test/renderWithProviders'
 import type { LoginResponse } from '../types'
 import { useLoginMutation } from './useLoginMutation'

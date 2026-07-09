@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { apiClient, type ApiResponse } from '@/shared/api'
+import { type ApiResponse, apiClient } from '@/shared/api'
 import type { SetUpPasswordRequest } from '../types'
 
 export async function setUpPassword(payload: SetUpPasswordRequest) {

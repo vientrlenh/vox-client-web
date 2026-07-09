@@ -24,7 +24,7 @@ import type {
   QuestionType,
 } from '../types'
 import { questionQueryKeys } from '../api/useQuestionsQuery'
-import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
@@ -207,15 +207,12 @@ function QuestionsPage({
       return
     }
 
-    setToastMessage(flashMessage)
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
   }, [flashMessage, location.pathname, location.search, navigate])
 
-  useEffect(() => {
-    setBulkSelection((current) =>
-      current.filter((id) => questionsQuery.data?.content.some((question) => question.id === id)),
-    )
-  }, [questionsQuery.data?.content])
+  const validBulkSelection = bulkSelection.filter((id) =>
+    questionsQuery.data?.content.some((question) => question.id === id),
+  )
 
   async function handleExport() {
     setIsExporting(true)
@@ -250,7 +247,7 @@ function QuestionsPage({
 
   async function handleBulkApprove() {
     const selectedQuestions = (questionsQuery.data?.content ?? []).filter((question) =>
-      bulkSelection.includes(question.id),
+      validBulkSelection.includes(question.id),
     )
 
     if (!selectedQuestions.length) {
@@ -489,12 +486,12 @@ function QuestionsPage({
       {view === 'review' ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
           <div className="text-sm font-semibold text-indigo-900">
-            Đang chọn {bulkSelection.length} câu hỏi trên trang hiện tại để duyệt hàng loạt.
+            Đang chọn {validBulkSelection.length} câu hỏi trên trang hiện tại để duyệt hàng loạt.
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               className="inline-flex h-10 items-center justify-center rounded-lg border border-indigo-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
-              disabled={!bulkSelection.length}
+              disabled={!validBulkSelection.length}
               onClick={() => setBulkSelection([])}
               type="button"
             >
@@ -502,7 +499,7 @@ function QuestionsPage({
             </button>
             <button
               className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:bg-slate-300"
-              disabled={!bulkSelection.length || isBulkApproving}
+              disabled={!validBulkSelection.length || isBulkApproving}
               onClick={() => {
                 void handleBulkApprove()
               }}
@@ -567,7 +564,7 @@ function QuestionsPage({
           )
         }}
         questions={questionsQuery.data?.content ?? []}
-        selectedIds={bulkSelection}
+        selectedIds={validBulkSelection}
         selectedId={null}
       />
     </section>

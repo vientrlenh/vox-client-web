@@ -106,12 +106,16 @@ export function useRoomMonitor({ examId, roomId }: UseRoomMonitorParams) {
     const closedRef = useRef(false)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    // keep newest token for the reconnect attempt
-    tokenRef.current = token ?? null
     const hasToken = Boolean(token)
+
+    // keep newest token for the reconnect attempt, without retriggering the connect effect below
+    useEffect(() => {
+        tokenRef.current = token ?? null
+    }, [token])
 
     useEffect(() => {
         if (!roomId || !hasToken) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing connection state with the external WebSocket lifecycle
             setConnectionState('idle')
             return
         }

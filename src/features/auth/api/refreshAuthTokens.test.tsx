@@ -1,5 +1,5 @@
 import type { AxiosResponse } from 'axios'
-import { apiClient, type ApiResponse } from '@/shared/api'
+import { type ApiResponse, apiClient } from '@/shared/api'
 import type { RefreshResponse } from '../types'
 import { refreshAuthTokens } from './refreshAuthTokens'
 
@@ -15,7 +15,7 @@ describe('refreshAuthTokens', () => {
     jest.mocked(apiClient.post).mockReset()
   })
 
-  it('posts the refresh token with the persisted device id and unwraps data', async () => {
+  it('posts the persisted device id and unwraps data', async () => {
     localStorage.setItem('vox.deviceId', 'device-1')
 
     const responseData: RefreshResponse = {
@@ -30,12 +30,9 @@ describe('refreshAuthTokens', () => {
       },
     } as AxiosResponse<ApiResponse<RefreshResponse>>)
 
-    await expect(refreshAuthTokens()).resolves.toEqual(
-      responseData,
-    )
+    await expect(refreshAuthTokens()).resolves.toEqual(responseData)
     expect(apiClient.post).toHaveBeenCalledWith('/v1/auth/refresh', {
       deviceId: 'device-1',
-      token: 'old-refresh-token',
     })
   })
 })

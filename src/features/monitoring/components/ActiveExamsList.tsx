@@ -1,7 +1,9 @@
-import { useAppSelector } from "@/app/store/hooks";
 import { useExamsQuery } from "@/features/exam/api/useExamQueries";
-import { formatDateTime, getExamStatusDisplay, type ExamDto } from "@/features/exam/types";
-import { CalendarClock, Link, MonitorPlay } from "lucide-react";
+import { getExamStatusDisplay } from "@/features/exam/types";
+import { formatDateTime, type ExamDto } from "@/features/examCore/types";
+import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { CalendarClock, MonitorPlay } from "lucide-react";
+import { Link } from "react-router";
 
 const PLACEHOLDER = 'rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm font-medium text-slate-500'
 
@@ -14,13 +16,9 @@ function isExamActiveNow(exam: ExamDto): boolean {
 }
 
 export function ActiveExamsList() {
-    const schoolId = useAppSelector((state) => state.auth.user?.schoolId)
-
     const { data, isLoading, isError } = useExamsQuery({
-        kind: 'CENTRALIZED', 
-        status: 'IN_PROGRESS', 
-        schoolId, 
-        page: 1, 
+        status: 'IN_PROGRESS',
+        page: 1,
         size: 20
     })
 
@@ -53,9 +51,7 @@ export function ActiveExamsList() {
                 <span className="inline-flex size-10 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700">
                     <MonitorPlay aria-hidden="true" className="size-5" />
                 </span>
-                <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${status.className}`}>
-                    {status.label}
-                </span>
+                <StatusBadge label={status.label} tone={status.tone} />
                 </div>
                 <p className="mt-4 truncate text-base font-black text-slate-950">{exam.name}</p>
                 <p className="mt-1 text-sm font-medium text-slate-500">{exam.code}</p>

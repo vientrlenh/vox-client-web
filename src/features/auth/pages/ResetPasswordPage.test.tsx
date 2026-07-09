@@ -2,7 +2,7 @@ import { act, screen, waitFor } from '@testing-library/react'
 import type { AxiosResponse } from 'axios'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
-import { apiClient, type ApiResponse } from '@/shared/api'
+import { type ApiResponse, apiClient } from '@/shared/api'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { ResetPasswordPage } from './ResetPasswordPage'
 

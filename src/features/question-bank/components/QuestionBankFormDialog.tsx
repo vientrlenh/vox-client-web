@@ -44,14 +44,15 @@ export function QuestionBankFormDialog({
   onClose,
   onSubmit,
 }: QuestionBankFormDialogProps) {
+  const [form, setForm] = useState(() => createFormState(questionBank))
+  const [step, setStep] = useState<'confirm' | 'form'>('form')
+  const [validationMessage, setValidationMessage] = useState<string | null>(null)
+
   if (!mode) {
     return null
   }
 
   const isCreateMode = mode === 'create'
-  const [form, setForm] = useState(() => createFormState(questionBank))
-  const [step, setStep] = useState<'confirm' | 'form'>('form')
-  const [validationMessage, setValidationMessage] = useState<string | null>(null)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

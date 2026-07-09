@@ -46,7 +46,6 @@ function saveSession(nextSchoolId: string | null = schoolId) {
       userId: 'school-admin-1',
     }),
   )
-  localStorage.setItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken, 'refresh-token')
 }
 
 function createQueryClient() {

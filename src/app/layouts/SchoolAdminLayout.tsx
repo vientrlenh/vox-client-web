@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Bell,
   BookOpen,
   ChevronDown,
   ClipboardCheck,
+  DoorOpen,
   ClipboardList,
   FileQuestion,
   FileSpreadsheet,
+  GraduationCap,
   Gavel,
   Home,
   Layers,
@@ -16,7 +18,7 @@ import {
   Search,
   ShieldCheck,
   UserRound,
-  Users,
+  Presentation,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -59,14 +61,24 @@ const navigationItems = [
     to: '/school-admin/grades',
   },
   {
+    icon: DoorOpen,
+    label: 'Quản lý phòng học',
+    to: '/school-admin/rooms',
+  },
+  {
     icon: FileSpreadsheet,
     label: 'Quản lý import',
     to: '/school-admin/imports',
   },
   {
-    icon: Users,
-    label: 'Quản lý Người dùng',
+    icon: GraduationCap,
+    label: 'Quản lý Học sinh',
     to: '/school-admin/students',
+  },
+  {
+    icon: Presentation,
+    label: 'Quản lý Giáo viên',
+    to: '/school-admin/teachers',
   },
   {
     icon: ClipboardList,
@@ -156,12 +168,12 @@ function SchoolAdminNavigationGroup({
   const location = useLocation()
   const isGroupActive = items.some(({ to }) => location.pathname.startsWith(to))
   const [isOpen, setIsOpen] = useState(isGroupActive)
+  const [prevIsGroupActive, setPrevIsGroupActive] = useState(isGroupActive)
 
-  useEffect(() => {
-    if (isGroupActive) {
-      setIsOpen(true)
-    }
-  }, [isGroupActive])
+  if (isGroupActive !== prevIsGroupActive) {
+    setPrevIsGroupActive(isGroupActive)
+    setIsOpen(isGroupActive)
+  }
 
   return (
     <div className="grid gap-2">

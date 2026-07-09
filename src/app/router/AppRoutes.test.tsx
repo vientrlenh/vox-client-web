@@ -28,7 +28,6 @@ function saveSystemAdminSession() {
 
   saveAuthTokens({
     accessToken,
-    refreshToken: 'refresh-token',
   })
 }
 
@@ -42,7 +41,6 @@ function saveSchoolAdminSession() {
 
   saveAuthTokens({
     accessToken,
-    refreshToken: 'refresh-token',
   })
 }
 

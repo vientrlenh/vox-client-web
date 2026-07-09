@@ -53,7 +53,6 @@ function saveSession(nextSchoolId: string | null = schoolId) {
       userId: 'user-1',
     }),
   )
-  localStorage.setItem(AUTH_TOKEN_STORAGE_KEYS.refreshToken, 'refresh-token')
 }
 
 describe('grade management mutations', () => {
