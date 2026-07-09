@@ -14,6 +14,7 @@ type AssessmentPolicyTableProps = {
   onViewDetails: (policy: AssessmentPolicy) => void;
   onEdit: (policy: AssessmentPolicy) => void;
   onDelete: (policy: AssessmentPolicy) => void;
+  onViewRubricVersion: (policy: AssessmentPolicy) => void;
 };
 
 const strictnessLabels: Record<string, string> = {
@@ -45,6 +46,7 @@ export function AssessmentPolicyTable({
   onViewDetails,
   onEdit,
   onDelete,
+  onViewRubricVersion,
 }: AssessmentPolicyTableProps) {
   if (isLoading) {
     return (
@@ -151,20 +153,14 @@ export function AssessmentPolicyTable({
               </td>
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                 {policy.rubricVersion ? (
-                  <DetailPopoverButton
-                    ariaLabel={`Chi tiết rubric version của policy ${policy.id}`}
-                    badgeClassName="bg-purple-50 text-purple-700 ring-purple-700/10 hover:bg-purple-100"
-                    label={`${policy.rubricVersion.code} (v${policy.rubricVersion.version})`}
+                  <button
+                    type="button"
+                    onClick={() => onViewRubricVersion(policy)}
+                    aria-label={`Xem Rubric Version và các Assessment Policy liên kết của policy ${policy.id}`}
+                    className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10 transition hover:bg-purple-100"
                   >
-                    <PopoverInfoRow label="Mã" value={policy.rubricVersion.code} />
-                    <PopoverInfoRow label="Tên" value={policy.rubricVersion.name} />
-                    <PopoverInfoRow label="Version" value={`v${policy.rubricVersion.version}`} />
-                    <PopoverInfoRow label="Trạng thái" value={policy.rubricVersion.status || '—'} />
-                    <PopoverInfoRow
-                      label="Hiệu lực"
-                      value={`${formatAssessmentPolicyDate(policy.rubricVersion.effectiveFrom)} – ${formatAssessmentPolicyDate(policy.rubricVersion.effectiveTo)}`}
-                    />
-                  </DetailPopoverButton>
+                    {policy.rubricVersion.code} (v{policy.rubricVersion.version})
+                  </button>
                 ) : (
                   '—'
                 )}
@@ -200,7 +196,15 @@ export function AssessmentPolicyTable({
                     items={[
                       { id: 'view', label: 'Xem chi tiết', icon: Eye, onSelect: () => onViewDetails(policy) },
                       { id: 'edit', label: 'Chỉnh sửa', icon: Pencil, onSelect: () => onEdit(policy) },
-                      { id: 'delete', label: 'Xóa', icon: Trash2, tone: 'danger', onSelect: () => onDelete(policy) },
+                      {
+                        id: 'delete',
+                        label: 'Xóa',
+                        icon: Trash2,
+                        tone: 'danger',
+                        onSelect: () => onDelete(policy),
+                        disabled: policy.status !== 'DRAFT',
+                        disabledReason: 'Chỉ có thể xóa Policy đang ở trạng thái DRAFT',
+                      },
                     ]}
                   />
                 </div>

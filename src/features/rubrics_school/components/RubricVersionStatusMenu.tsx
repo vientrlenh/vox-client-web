@@ -6,6 +6,7 @@ import { ChevronDown, RefreshCw } from 'lucide-react';
 type Props = {
   status: string;
   onPublish: () => void;
+  onArchive: () => void;
   isPending?: boolean;
 };
 
@@ -15,12 +16,11 @@ const STATUS_BADGE_CLASSNAMES: Record<string, string> = {
   ARCHIVED: 'bg-slate-100 text-slate-600 ring-slate-500/20',
 };
 
-// Hiện tại chỉ hỗ trợ chuyển DRAFT -> PUBLISHED thủ công từ FE.
-// PUBLISHED -> ARCHIVED do Worker nền tự xử lý khi phiên bản hết hạn (effectiveTo).
-export function RubricVersionStatusMenu({ status, onPublish, isPending = false }: Props) {
+// DRAFT -> PUBLISHED và PUBLISHED -> ARCHIVED đều là thao tác thủ công của Admin qua 2 API riêng biệt.
+export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPending = false }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const canChangeStatus = status === 'DRAFT';
+  const canChangeStatus = status === 'DRAFT' || status === 'PUBLISHED';
 
   useEffect(() => {
     if (!isOpen) return;
@@ -46,6 +46,15 @@ export function RubricVersionStatusMenu({ status, onPublish, isPending = false }
     onPublish();
   }
 
+  function handleArchiveClick() {
+    setIsOpen(false);
+    const isConfirm = window.confirm(
+      'Bạn có chắc chắn muốn Lưu trữ (ARCHIVE) phiên bản này? Sau khi lưu trữ sẽ không thể chỉnh sửa hoặc sử dụng nữa.'
+    );
+    if (!isConfirm) return;
+    onArchive();
+  }
+
   if (!canChangeStatus) {
     return (
       <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${badgeClassName}`}>
@@ -69,13 +78,23 @@ export function RubricVersionStatusMenu({ status, onPublish, isPending = false }
 
       {isOpen ? (
         <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-950/10">
-          <button
-            className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
-            onClick={handlePublishClick}
-            type="button"
-          >
-            Chuyển sang PUBLISHED
-          </button>
+          {status === 'DRAFT' ? (
+            <button
+              className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
+              onClick={handlePublishClick}
+              type="button"
+            >
+              Chuyển sang PUBLISHED
+            </button>
+          ) : (
+            <button
+              className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-slate-600 transition hover:bg-slate-100"
+              onClick={handleArchiveClick}
+              type="button"
+            >
+              Lưu trữ (ARCHIVE)
+            </button>
+          )}
         </div>
       ) : null}
     </div>

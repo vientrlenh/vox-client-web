@@ -169,7 +169,15 @@ export function AssessmentPolicyTable({
                     items={[
                       { id: 'view', label: 'Xem chi tiết', icon: Eye, onSelect: () => onViewDetails(policy) },
                       { id: 'edit', label: 'Chỉnh sửa', icon: Pencil, onSelect: () => onEdit(policy) },
-                      { id: 'delete', label: 'Xóa', icon: Trash2, tone: 'danger', onSelect: () => onDelete(policy) },
+                      {
+                        id: 'delete',
+                        label: 'Xóa',
+                        icon: Trash2,
+                        tone: 'danger',
+                        onSelect: () => onDelete(policy),
+                        disabled: policy.status !== 'DRAFT',
+                        disabledReason: 'Chỉ có thể xóa Policy đang ở trạng thái DRAFT',
+                      },
                     ]}
                   />
                 </div>

@@ -7,6 +7,7 @@ import type { AssessmentPolicyPage } from '../types';
 export type SchoolAssessmentPolicyFilter = {
   status?: string | null;
   languageId?: string | null;
+  rubricVersionId?: string | null;
 };
 
 export const assessmentPolicyQueryKeys = {
@@ -17,8 +18,8 @@ export const assessmentPolicyQueryKeys = {
 };
 
 const GET_SCHOOL_ASSESSMENT_POLICIES = `
-  query GetSchoolAssessmentPolicies($schoolId: ID!, $status: String, $languageId: ID, $page: Int, $size: Int) {
-    viewSchoolAssessmentPolicies(schoolId: $schoolId, status: $status, languageId: $languageId, page: $page, size: $size) {
+  query GetSchoolAssessmentPolicies($schoolId: ID!, $status: String, $languageId: ID, $rubricVersionId: ID, $page: Int, $size: Int) {
+    viewSchoolAssessmentPolicies(schoolId: $schoolId, status: $status, languageId: $languageId, rubricVersionId: $rubricVersionId, page: $page, size: $size) {
       content {
         id
         languageId
@@ -98,7 +99,14 @@ async function fetchSchoolAssessmentPolicies(
 ): Promise<AssessmentPolicyPage> {
   const data = await graphQLRequest<{ viewSchoolAssessmentPolicies: AssessmentPolicyPage }>(
     GET_SCHOOL_ASSESSMENT_POLICIES,
-    { schoolId, status: filter.status || null, languageId: filter.languageId || null, page, size }
+    {
+      schoolId,
+      status: filter.status || null,
+      languageId: filter.languageId || null,
+      rubricVersionId: filter.rubricVersionId || null,
+      page,
+      size,
+    }
   );
 
   const response = data.viewSchoolAssessmentPolicies;

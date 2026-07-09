@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import {
   AlertTriangle,
+  Archive,
   BookMarked,
   ChevronLeft,
   ClipboardCheck,
@@ -22,6 +23,7 @@ import { useSchoolAssessmentPolicyQuery } from '../api/useSchoolAssessmentPolicy
 import { useUpdateSchoolAssessmentPolicyMutation } from '../api/useUpdateSchoolAssessmentPolicyMutation';
 import { useDeleteSchoolAssessmentPolicyMutation } from '../api/useDeleteSchoolAssessmentPolicyMutation';
 import { usePublishSchoolAssessmentPolicyMutation } from '../api/usePublishSchoolAssessmentPolicyMutation';
+import { useArchiveSchoolAssessmentPolicyMutation } from '../api/useArchiveSchoolAssessmentPolicyMutation';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
 import { useAppSelector } from '@/app/store/hooks';
 import { formatAssessmentPolicyDate } from '../types';
@@ -68,6 +70,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   const { mutateAsync: updatePolicy, isPending: isUpdating } = useUpdateSchoolAssessmentPolicyMutation(schoolId);
   const { mutateAsync: deletePolicy, isPending: isDeleting } = useDeleteSchoolAssessmentPolicyMutation(schoolId);
   const { mutateAsync: publishPolicy, isPending: isPublishing } = usePublishSchoolAssessmentPolicyMutation(schoolId);
+  const { mutateAsync: archivePolicy, isPending: isArchiving } = useArchiveSchoolAssessmentPolicyMutation(schoolId);
 
   const handlePublishPolicy = async () => {
     if (!policyId) return;
@@ -80,6 +83,20 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
     } catch (error) {
       const err = error as Error;
       alert(err.message || 'Có lỗi xảy ra khi xuất bản Assessment Policy.');
+    }
+  };
+
+  const handleArchivePolicy = async () => {
+    if (!policyId) return;
+
+    const isConfirm = window.confirm('Bạn có chắc chắn muốn Lưu trữ (ARCHIVE) Assessment Policy này? Sau khi lưu trữ sẽ không thể chỉnh sửa hoặc sử dụng nữa.');
+    if (!isConfirm) return;
+
+    try {
+      await archivePolicy(policyId);
+    } catch (error) {
+      const err = error as Error;
+      alert(err.message || 'Có lỗi xảy ra khi lưu trữ Assessment Policy.');
     }
   };
 
@@ -97,7 +114,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
 
   const handleDeletePolicy = async () => {
     const isConfirm = window.confirm(
-      'Bạn có chắc chắn muốn xóa Assessment Policy này? DRAFT sẽ bị xóa cứng, PUBLISHED sẽ chuyển sang ARCHIVED.'
+      'Bạn có chắc chắn muốn xóa vĩnh viễn Assessment Policy DRAFT này? Hành động này không thể hoàn tác!'
     );
     if (!isConfirm || !policyId) return;
 
@@ -245,15 +262,17 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
         </div>
 
         <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
-          <button
-            type="button"
-            onClick={handleDeletePolicy}
-            disabled={isDeleting}
-            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-5 text-sm font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
-          >
-            {isDeleting ? <RefreshCw className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-            Xóa Policy
-          </button>
+          {policy.status === 'DRAFT' ? (
+            <button
+              type="button"
+              onClick={handleDeletePolicy}
+              disabled={isDeleting}
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-5 text-sm font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+            >
+              {isDeleting ? <RefreshCw className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              Xóa Policy
+            </button>
+          ) : null}
           {policy.status === 'DRAFT' ? (
             <button
               type="button"
@@ -263,6 +282,17 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
             >
               {isPublishing ? <RefreshCw className="size-4 animate-spin" /> : <Rocket className="size-4" />}
               Xuất bản
+            </button>
+          ) : null}
+          {policy.status === 'PUBLISHED' ? (
+            <button
+              type="button"
+              onClick={handleArchivePolicy}
+              disabled={isArchiving}
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+            >
+              {isArchiving ? <RefreshCw className="size-4 animate-spin" /> : <Archive className="size-4" />}
+              Lưu trữ
             </button>
           ) : null}
           <button

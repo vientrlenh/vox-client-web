@@ -75,7 +75,7 @@ export function SystemAdminAssessmentPoliciesPage() {
 
   const handleDeletePolicy = async (policy: AssessmentPolicy) => {
     const isConfirm = window.confirm(
-      'Bạn có chắc chắn muốn xóa Assessment Policy này? DRAFT sẽ bị xóa cứng, PUBLISHED sẽ chuyển sang ARCHIVED.'
+      'Bạn có chắc chắn muốn xóa vĩnh viễn Assessment Policy DRAFT này? Hành động này không thể hoàn tác!'
     );
     if (!isConfirm) return;
 

@@ -13,6 +13,7 @@ import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { AssessmentPolicyTable } from '../components/AssessmentPolicyTable';
 import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPolicyDialog';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
+import { RubricVersionPoliciesDialog } from '../components/RubricVersionPoliciesDialog';
 import { Pagination } from '@/shared/components/Pagination';
 import { useAppSelector } from '@/app/store/hooks';
 import type { AssessmentPolicy, CreateAssessmentPolicyPayload, UpdateAssessmentPolicyPayload } from '../types';
@@ -35,6 +36,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<AssessmentPolicy | null>(null);
+  const [viewingRubricVersionPolicy, setViewingRubricVersionPolicy] = useState<AssessmentPolicy | null>(null);
 
   const { data: languages } = useLanguageOptionsQuery();
 
@@ -78,7 +80,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
 
   const handleDeletePolicy = async (policy: AssessmentPolicy) => {
     const isConfirm = window.confirm(
-      'Bạn có chắc chắn muốn xóa Assessment Policy này? DRAFT sẽ bị xóa cứng, PUBLISHED sẽ chuyển sang ARCHIVED.'
+      'Bạn có chắc chắn muốn xóa vĩnh viễn Assessment Policy DRAFT này? Hành động này không thể hoàn tác!'
     );
     if (!isConfirm) return;
 
@@ -185,6 +187,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
           onViewDetails={(policy) => navigate(`/school-admin/assessment-policies/${policy.id}`)}
           onEdit={(policy) => setEditingPolicy(policy)}
           onDelete={handleDeletePolicy}
+          onViewRubricVersion={(policy) => setViewingRubricVersionPolicy(policy)}
         />
         {!isLoading && !isError && policies.length > 0 && (
           <Pagination currentPage={page} totalPages={totalPages} totalElements={totalElements} itemName="assessment policy" onPageChange={setPage} />
@@ -204,6 +207,14 @@ export function SchoolAdminAssessmentPoliciesPage() {
         onClose={() => setEditingPolicy(null)}
         onSubmit={handleUpdatePolicy}
         isPending={isUpdating}
+      />
+
+      <RubricVersionPoliciesDialog
+        isOpen={Boolean(viewingRubricVersionPolicy)}
+        onClose={() => setViewingRubricVersionPolicy(null)}
+        schoolId={schoolId}
+        rubricVersionId={viewingRubricVersionPolicy?.rubricVersionId}
+        rubricVersion={viewingRubricVersionPolicy?.rubricVersion}
       />
     </section>
   );

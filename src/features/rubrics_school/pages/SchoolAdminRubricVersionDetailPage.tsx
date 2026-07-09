@@ -2,7 +2,7 @@
 
 import { useParams, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, Edit, Plus, ListChecks, Layers, Calculator, Trash2, Search, Filter, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, Edit, Plus, ListChecks, Layers, Calculator, Trash2, Archive, Search, Filter, FileSpreadsheet } from 'lucide-react';
 import { useAppSelector } from '@/app/store/hooks';
 
 import { useSchoolRubricQuery } from '../api/useSchoolRubricQuery';
@@ -19,6 +19,7 @@ import {
 import { useUpdateSchoolRubricVersionMutation, type UpdateRubricVersionPayload } from '../api/useUpdateSchoolRubricVersionMutation';
 import { useDeleteSchoolRubricVersionMutation } from '../api/useDeleteSchoolRubricVersionMutation';
 import { useChangeSchoolRubricVersionStatusMutation } from '../api/useChangeSchoolRubricVersionStatusMutation';
+import { useArchiveSchoolRubricVersionMutation } from '../api/useArchiveSchoolRubricVersionMutation';
 import { useAddSchoolRubricCriteriaMutation, type AddRubricCriteriaPayload } from '../api/useAddSchoolRubricCriteriaMutation';
 import { useUpdateSchoolRubricCriterionMutation, type UpdateRubricCriterionPayload } from '../api/useUpdateSchoolRubricCriterionMutation';
 import { useDeleteSchoolRubricCriterionMutation } from '../api/useDeleteSchoolRubricCriterionMutation';
@@ -120,6 +121,7 @@ export function SchoolAdminRubricVersionDetailPage() {
   const { mutateAsync: updateVersion, isPending: isUpdating } = useUpdateSchoolRubricVersionMutation(schoolId, versionId);
   const { mutateAsync: deleteVersion, isPending: isDeleting } = useDeleteSchoolRubricVersionMutation(schoolId);
   const { mutateAsync: changeVersionStatus, isPending: isChangingStatus } = useChangeSchoolRubricVersionStatusMutation(schoolId, versionId);
+  const { mutateAsync: archiveVersion, isPending: isArchiving } = useArchiveSchoolRubricVersionMutation(schoolId, versionId);
 
   const { mutateAsync: addCriteria, isPending: isAddingCriterion } = useAddSchoolRubricCriteriaMutation(schoolId, versionId);
   const { mutateAsync: updateCriterion, isPending: isUpdatingCriterion } = useUpdateSchoolRubricCriterionMutation(schoolId, editingCriterion?.id);
@@ -154,9 +156,9 @@ export function SchoolAdminRubricVersionDetailPage() {
     }
   };
 
-  // Hàm xử lý Delete Version
+  // Hàm xử lý Delete Version (chỉ áp dụng khi DRAFT)
   const handleDeleteVersion = async () => {
-    const isConfirm = window.confirm("Bạn có chắc chắn muốn xóa/lưu trữ phiên bản này? Hành động này không thể hoàn tác!");
+    const isConfirm = window.confirm("Bạn có chắc chắn muốn xóa vĩnh viễn phiên bản DRAFT này? Hành động này không thể hoàn tác!");
     if (!isConfirm || !versionId) return;
 
     try {
@@ -166,7 +168,17 @@ export function SchoolAdminRubricVersionDetailPage() {
     } catch (error) {
       const err = error as Error;
       console.error("Lỗi xóa Version:", err);
-      alert(err.message || 'Có lỗi xảy ra khi xử lý phiên bản.');
+      alert(err.message || 'Có lỗi xảy ra khi xóa phiên bản.');
+    }
+  };
+
+  // Hàm xử lý Lưu trữ (ARCHIVE) Version (chỉ áp dụng khi PUBLISHED)
+  const handleArchiveVersion = async () => {
+    try {
+      await archiveVersion();
+    } catch (error) {
+      const err = error as Error;
+      alert(err.message || 'Có lỗi xảy ra khi lưu trữ phiên bản.');
     }
   };
 
@@ -305,7 +317,12 @@ export function SchoolAdminRubricVersionDetailPage() {
               <span className="inline-flex items-center font-mono rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-500/20">
                 Mã Phiên bản: {version.code}
               </span>
-              <RubricVersionStatusMenu isPending={isChangingStatus} onPublish={handlePublishVersion} status={version.status} />
+              <RubricVersionStatusMenu
+                isPending={isChangingStatus || isArchiving}
+                onPublish={handlePublishVersion}
+                onArchive={handleArchiveVersion}
+                status={version.status}
+              />
             </div>
           </div>
 
@@ -332,15 +349,29 @@ export function SchoolAdminRubricVersionDetailPage() {
 
         {/* KHU VỰC CÁC NÚT HÀNH ĐỘNG */}
         <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
-          <button
-            type="button"
-            onClick={handleDeleteVersion}
-            disabled={isDeleting}
-            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-5 text-sm font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
-          >
-            {isDeleting ? <RefreshCw className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-            Xóa Version
-          </button>
+          {version.status === 'DRAFT' && (
+            <button
+              type="button"
+              onClick={handleDeleteVersion}
+              disabled={isDeleting}
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-5 text-sm font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+            >
+              {isDeleting ? <RefreshCw className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              Xóa Version
+            </button>
+          )}
+
+          {version.status === 'PUBLISHED' && (
+            <button
+              type="button"
+              onClick={handleArchiveVersion}
+              disabled={isArchiving}
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+            >
+              {isArchiving ? <RefreshCw className="size-4 animate-spin" /> : <Archive className="size-4" />}
+              Lưu trữ Version
+            </button>
+          )}
 
           <button
             type="button"
