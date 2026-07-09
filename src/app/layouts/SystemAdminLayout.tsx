@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   FileQuestion,
+  Gavel,
   Home,
   Languages,
   Library,
@@ -82,6 +83,11 @@ const navigationItems: NavigationItem[] = [
     icon: ClipboardCheck,
     label: 'Quản lý chính sách đánh giá',
     to: '/system-admin/assessment-policies',
+  },
+  {
+    icon: Gavel,
+    label: 'Quản lý Scoring Rules',
+    to: '/system-admin/scoring-rules',
   },
   {
     icon: Settings,

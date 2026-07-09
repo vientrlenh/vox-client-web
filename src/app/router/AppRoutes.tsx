@@ -509,6 +509,18 @@ const SchoolAdminScoringRulePoliciesPage = lazy(() =>
   })),
 );
 
+const SystemAdminScoringRulesPage = lazy(() =>
+  import("@/features/scoring_rules_system").then((module) => ({
+    default: module.SystemAdminScoringRulesPage,
+  })),
+);
+
+const SystemAdminScoringRulePoliciesPage = lazy(() =>
+  import("@/features/scoring_rules_system").then((module) => ({
+    default: module.SystemAdminScoringRulePoliciesPage,
+  })),
+);
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -602,6 +614,14 @@ export function AppRoutes() {
             <Route
               path="system-admin/assessment-policies/:policyId"
               element={<SystemAdminAssessmentPolicyDetailPage />}
+            />
+            <Route
+              path="system-admin/assessment-policies/:policyId/scoring-rules"
+              element={<SystemAdminScoringRulesPage />}
+            />
+            <Route
+              path="system-admin/scoring-rules"
+              element={<SystemAdminScoringRulePoliciesPage />}
             />
           </Route>
         </Route>
