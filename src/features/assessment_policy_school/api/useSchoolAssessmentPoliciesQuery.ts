@@ -8,6 +8,8 @@ export type SchoolAssessmentPolicyFilter = {
   status?: string | null;
   languageId?: string | null;
   rubricVersionId?: string | null;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
 };
 
 export const assessmentPolicyQueryKeys = {
@@ -18,8 +20,8 @@ export const assessmentPolicyQueryKeys = {
 };
 
 const GET_SCHOOL_ASSESSMENT_POLICIES = `
-  query GetSchoolAssessmentPolicies($schoolId: ID!, $status: String, $languageId: ID, $rubricVersionId: ID, $page: Int, $size: Int) {
-    viewSchoolAssessmentPolicies(schoolId: $schoolId, status: $status, languageId: $languageId, rubricVersionId: $rubricVersionId, page: $page, size: $size) {
+  query GetSchoolAssessmentPolicies($schoolId: ID!, $status: String, $languageId: ID, $rubricVersionId: ID, $effectiveFrom: String, $effectiveTo: String, $page: Int, $size: Int) {
+    viewSchoolAssessmentPolicies(schoolId: $schoolId, status: $status, languageId: $languageId, rubricVersionId: $rubricVersionId, effectiveFrom: $effectiveFrom, effectiveTo: $effectiveTo, page: $page, size: $size) {
       content {
         id
         languageId
@@ -104,6 +106,8 @@ async function fetchSchoolAssessmentPolicies(
       status: filter.status || null,
       languageId: filter.languageId || null,
       rubricVersionId: filter.rubricVersionId || null,
+      effectiveFrom: filter.effectiveFrom || null,
+      effectiveTo: filter.effectiveTo || null,
       page,
       size,
     }

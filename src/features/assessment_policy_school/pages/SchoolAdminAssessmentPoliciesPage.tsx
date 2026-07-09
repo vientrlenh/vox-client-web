@@ -23,6 +23,11 @@ const DEFAULT_PAGE_SIZE = 10;
 
 const STATUS_OPTIONS = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
 
+function toOffsetDateTime(dateInputValue: string, endOfDay: boolean) {
+  if (!dateInputValue) return null;
+  return `${dateInputValue}T${endOfDay ? '23:59:59' : '00:00:00'}Z`;
+}
+
 export function SchoolAdminAssessmentPoliciesPage() {
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
@@ -33,6 +38,8 @@ export function SchoolAdminAssessmentPoliciesPage() {
 
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedLanguageId, setSelectedLanguageId] = useState('');
+  const [effectiveFrom, setEffectiveFrom] = useState('');
+  const [effectiveTo, setEffectiveTo] = useState('');
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<AssessmentPolicy | null>(null);
@@ -43,6 +50,18 @@ export function SchoolAdminAssessmentPoliciesPage() {
   const filter: SchoolAssessmentPolicyFilter = {
     status: selectedStatus || null,
     languageId: selectedLanguageId || null,
+    effectiveFrom: toOffsetDateTime(effectiveFrom, false),
+    effectiveTo: toOffsetDateTime(effectiveTo, true),
+  };
+
+  const hasActiveFilters = Boolean(selectedStatus || selectedLanguageId || effectiveFrom || effectiveTo);
+
+  const handleResetFilters = () => {
+    setSelectedStatus('');
+    setSelectedLanguageId('');
+    setEffectiveFrom('');
+    setEffectiveTo('');
+    setPage(1);
   };
 
   const { data, isLoading, isError, refetch, isFetching } = useSchoolAssessmentPoliciesQuery(schoolId, filter, page, pageSize);
@@ -139,7 +158,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
 
       {/* FILTER BAR */}
       <div className="relative rounded-[14px] border border-slate-200 bg-white p-4">
-        <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="relative min-w-52">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
               <Filter className="size-4 text-slate-400" />
@@ -174,6 +193,43 @@ export function SchoolAdminAssessmentPoliciesPage() {
               {languages?.map((lang) => <option key={lang.id} value={lang.id}>{lang.name}</option>)}
             </select>
           </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-slate-500" htmlFor="effectiveFromFilter">Hiệu lực từ</label>
+            <input
+              id="effectiveFromFilter"
+              type="date"
+              value={effectiveFrom}
+              max={effectiveTo || undefined}
+              onChange={(e) => {
+                setEffectiveFrom(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-slate-500" htmlFor="effectiveToFilter">đến</label>
+            <input
+              id="effectiveToFilter"
+              type="date"
+              value={effectiveTo}
+              min={effectiveFrom || undefined}
+              onChange={(e) => {
+                setEffectiveTo(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+            />
+          </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="text-sm font-medium text-indigo-600 transition hover:text-indigo-700"
+            >
+              Xóa bộ lọc
+            </button>
+          )}
         </div>
       </div>
 
