@@ -1,1422 +1,879 @@
-import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router'
-import { useAppSelector } from '@/app/store/hooks'
-import { useSchoolUsersForRequesterQuery } from '@/features/classes/api/useSchoolUsersForRequesterQuery'
-import { formatNullableText as formatQuestionNullableText } from '@/features/question/types'
-import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
-import { FeedbackToast } from '@/shared/ui/FeedbackToast'
-import { QuestionPicker } from '../components/QuestionPicker'
 import {
-  useAttachExamBlueprintMutation,
-  useCreateExamMemberMutation,
-  useCreateExamMutation,
+  Calendar,
+  Check,
+  CircleCheck,
+  ClipboardList,
+  Clock4,
+  FilePenLine,
+  Hash,
+  Languages,
+  LayoutList,
+  Lock,
+  Megaphone,
+  PlayCircle,
+  Plus,
+  Rocket,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react'
+import { useNavigate, useParams } from 'react-router'
+import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
+import { Pagination } from '@/shared/components/Pagination'
+import { toApiError } from '@/shared/api'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { StatCard } from '@/shared/ui/StatCard'
+import { TabPillGroup } from '@/shared/ui/TabPill'
+import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
+import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
+import { FilterChips } from '@/shared/ui/FilterChips'
+import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
+import { ExamListRow } from '@/features/examCore/components/ExamListRow'
+import { PaperCard } from '@/features/examCore/components/PaperCard'
+import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
+import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
+import { examQueryKeys, useExamMyRoleQuery, useExamQuery } from '@/features/examCore/api/queries'
+import {
   useCreateExamPaperMutation,
-  useDeleteExamMemberMutation,
-  useDeleteExamMutation,
-  useDeleteExamPaperMutation,
-  useUpdateExamMemberMutation,
-  useUpdateExamMutation,
-  useUpdateExamPaperItemMutation,
+  useReleaseSecurePoolMutation,
+  useSetExamDeliveryModeMutation,
   useUpdateExamPaperStatusMutation,
-  useUpdateExamStatusMutation,
-} from '../api/useExamMutations'
-import { examQueryKeys, useExamBlueprintQuery, useExamBlueprintsQuery, useExamQuery, useExamsQuery } from '../api/useExamQueries'
-import type {
-  CreateExamRequest,
-  ExamBlueprintDto,
-  ExamBlueprintVersionDto,
-  CreateExamMemberRequest,
-  ExamKind,
-  ExamMemberRole,
-  ExamStatus,
-  UpdateExamPaperStatusRequest,
-  UpdateExamStatusRequest,
-} from '../types'
+} from '@/features/examCore/api/mutations'
 import {
   formatDateTime,
   formatNullableText,
   getExamPaperStatusDisplay,
-  getExamStatusDisplay,
-} from '../types'
+  getResultDecisionMethodDisplay,
+  RESULT_DECISION_METHODS,
+  toDateTimeLocalValue,
+  toIsoDateTime,
+  type ExamDeliveryMode,
+  type ExamDto,
+  type ExamStatus,
+  type ResultDecisionMethod,
+} from '@/features/examCore/types'
+import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
+import { MembersTab } from '../components/MembersTab'
+import { useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
+import { useCreateExamMutation, useDeleteExamMutation, useUpdateExamMutation, useUpdateExamStatusMutation } from '../api/useExamMutations'
+import { getExamStatusDisplay } from '../types'
 
-const DEFAULT_PAGE = 1
-const DEFAULT_PAGE_SIZE = 10
-const DEFAULT_LANGUAGE_ID = '00000000-0000-0000-0000-000000000001'
-type ExamDetailTab = 'blueprint' | 'workflow' | 'papers' | 'people'
+const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
-function getErrorMessage(error: unknown) {
-  if (
-    error &&
-    typeof error === 'object' &&
-    'message' in error &&
-    typeof error.message === 'string'
-  ) {
-    return error.message
-  }
+const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
+  { label: 'Tất cả', value: '' },
+  { label: 'Bản nháp', value: 'DRAFT' },
+  { label: 'Đã lên lịch', value: 'SCHEDULED' },
+  { label: 'Đang diễn ra', value: 'IN_PROGRESS' },
+  { label: 'Đã công bố kết quả', value: 'RESULTS_PUBLISHED' },
+]
 
-  return 'Không thể xử lý yêu cầu hiện tại.'
-}
+function getExamWorkflowSteps(exam: ExamDto): { completedCount: number; steps: WorkflowStep[] } {
+  const step1Done = Boolean(exam.blueprintId)
+  const step2Done = Boolean(exam.blueprintVersionId)
+  const totalPapers = exam.papers.length
+  const lockedPapers = exam.papers.filter((paper) => paper.status === 'LOCKED').length
+  const step3Done = step2Done && totalPapers > 0 && lockedPapers === totalPapers
+  const step4Done = exam.status === 'RESULTS_PUBLISHED' || exam.status === 'CLOSED'
 
-function StatusBadge({ status }: { status?: string | null }) {
-  const display = getExamStatusDisplay(status)
-  return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${display.className}`}>{display.label}</span>
-}
+  const steps: WorkflowStep[] = [
+    {
+      icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
+      label: 'Gắn blueprint',
+      state: step1Done ? 'done' : 'current',
+      sublabel: step1Done ? 'Hoàn tất' : 'Chưa gắn blueprint',
+    },
+    {
+      icon: step2Done ? <Check size={26} /> : <LayoutList size={24} />,
+      label: 'Chốt phiên bản',
+      state: !step1Done ? 'upcoming' : step2Done ? 'done' : 'current',
+      sublabel: step2Done ? 'Đã chốt' : 'Chờ CHAIR chốt phiên bản',
+    },
+    {
+      icon: step3Done ? <Check size={26} /> : <FilePenLine size={24} />,
+      label: 'Soạn & duyệt đề',
+      state: !step2Done ? 'upcoming' : step3Done ? 'done' : 'current',
+      sublabel: totalPapers ? `${lockedPapers} / ${totalPapers} mã đề đã khóa` : undefined,
+    },
+    {
+      icon: step4Done ? <Check size={26} /> : <Rocket size={24} />,
+      label: 'Vận hành thi',
+      state: !step3Done ? 'upcoming' : step4Done ? 'done' : 'current',
+      sublabel: step4Done ? 'Đã công bố kết quả' : 'Lên lịch → công bố',
+    },
+  ]
 
-function PaperStatusBadge({ status }: { status?: string | null }) {
-  const display = getExamPaperStatusDisplay(status)
-  return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${display.className}`}>{display.label}</span>
-}
-
-function getPublishedBlueprintVersion(blueprint: ExamBlueprintDto | null | undefined) {
-  return [...(blueprint?.versions ?? [])]
-    .reverse()
-    .find((version) => version.status === 'PUBLISHED') ?? null
-}
-
-function getBlueprintVersionById(blueprint: ExamBlueprintDto | null | undefined, blueprintVersionId?: string | null) {
-  if (!blueprintVersionId) {
-    return null
-  }
-
-  return blueprint?.versions?.find((version) => version.id === blueprintVersionId) ?? null
-}
-
-function getBlockingFixedSlots(version: ExamBlueprintVersionDto | null) {
-  return version?.sections.flatMap((section) =>
-    section.slots.filter(
-      (slot) =>
-        slot.slotType === 'FIXED' &&
-        slot.fixedQuestion &&
-        slot.fixedQuestion.status !== 'PUBLISHED',
-    ),
-  ) ?? []
-}
-
-function getExamActionLabel(action: UpdateExamStatusRequest['action']) {
-  switch (action) {
-    case 'SCHEDULE':
-      return 'Lên lịch thi'
-    case 'START':
-      return 'Bắt đầu thi'
-    case 'CLOSE':
-      return 'Đóng kỳ thi'
-    case 'PUBLISH_RESULTS':
-      return 'Công bố kết quả'
-    case 'CANCEL':
-      return 'Hủy kỳ thi'
-    default:
-      return action
-  }
+  return { completedCount: [step1Done, step2Done, step3Done, step4Done].filter(Boolean).length, steps }
 }
 
 type ExamListPageProps = {
   allowCreate: boolean
   basePath: string
-  kind?: ExamKind
-  readOnly?: boolean
   title: string
 }
 
-function ExamListPage({ allowCreate, basePath, kind, readOnly = false, title }: ExamListPageProps) {
-  const queryClient = useQueryClient()
+function ExamListPage({ allowCreate, basePath, title }: ExamListPageProps) {
   const navigate = useNavigate()
-  const user = useAppSelector((state) => state.auth.user)
-  const [page, setPage] = useState(DEFAULT_PAGE)
-  const [keyword, setKeyword] = useState('')
+  const [page, setPage] = useState(1)
   const [status, setStatus] = useState<'' | ExamStatus>('')
-  const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [showCreate, setShowCreate] = useState(false)
-  const { confirm, dialog } = useConfirmationDialog()
-  const examsQuery = useExamsQuery({
-    kind,
-    keyword,
-    page,
-    schoolId: user?.schoolId,
-    size: DEFAULT_PAGE_SIZE,
-    status: status || undefined,
-  })
-  const createExamMutation = useCreateExamMutation()
-  const deleteExamMutation = useDeleteExamMutation()
+  const statsQuery = useExamStatsQuery()
+  const examsQuery = useExamsQuery({ page, size: 10, status })
 
-  async function refresh() {
+  return (
+    <section className="mx-auto max-w-290">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">{title}</h1>
+          <p className="mt-2 text-[15px] text-slate-500">
+            Theo dõi tiến độ từng kỳ thi và biết ngay bước cần làm tiếp theo.
+          </p>
+        </div>
+        {allowCreate ? (
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+            onClick={() => navigate('/school-admin/exams/create')}
+            type="button"
+          >
+            <Plus aria-hidden="true" className="size-4.5" />
+            Tạo kỳ thi
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-4">
+        <StatCard icon={<ClipboardList size={19} />} iconTone="indigo" label="Tổng kỳ thi" value={statsQuery.data?.total ?? '-'} />
+        <StatCard icon={<PlayCircle size={19} />} iconTone="violet" label="Đang diễn ra" value={statsQuery.data?.inProgress ?? '-'} />
+        <StatCard icon={<Clock4 size={19} />} iconTone="amber" label="Chờ xử lý" value={statsQuery.data?.pending ?? '-'} />
+        <StatCard icon={<CircleCheck size={19} />} iconTone="emerald" label="Đã công bố" value={statsQuery.data?.published ?? '-'} />
+      </div>
+
+      <FilterChips
+        items={STATUS_FILTERS}
+        onChange={(value) => {
+          setStatus(value)
+          setPage(1)
+        }}
+        value={status}
+      />
+
+      <div className="mt-5 grid gap-3.5">
+        {examsQuery.data?.content.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-400">
+            Không có kỳ thi phù hợp.
+          </div>
+        ) : (
+          examsQuery.data?.content.map((exam) => {
+            const statusDisplay = getExamStatusDisplay(exam.status)
+            const { steps } = getExamWorkflowSteps(exam)
+            const metaItems = [
+              { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
+              exam.blueprintId
+                ? { icon: <LayoutList aria-hidden="true" className="size-3.5" />, label: formatNullableText(exam.description) }
+                : { icon: <Clock4 aria-hidden="true" className="size-3.5" />, label: 'Chưa gắn blueprint', tone: 'warning' as const },
+            ]
+            return (
+              <ExamListRow
+                key={exam.id}
+                metaItems={metaItems}
+                onClick={() => navigate(`${basePath}/${exam.id}`)}
+                statusLabel={statusDisplay.label}
+                statusTone={statusDisplay.tone}
+                steps={steps}
+                title={exam.name}
+              />
+            )
+          })
+        )}
+      </div>
+
+      {examsQuery.data ? (
+        <Pagination
+          currentPage={page}
+          itemName="kỳ thi"
+          onPageChange={setPage}
+          totalElements={examsQuery.data.totalElements}
+          totalPages={examsQuery.data.totalPages}
+        />
+      ) : null}
+    </section>
+  )
+}
+
+export function TeacherExamsPage() {
+  return <ExamListPage allowCreate={false} basePath="/teacher/exams" title="Kiểm tra tập trung" />
+}
+
+export function SchoolAdminExamsPage() {
+  return <ExamListPage allowCreate basePath="/school-admin/exams" title="Kiểm tra tập trung" />
+}
+
+export function SchoolAdminExamCreatePage() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const createMutation = useCreateExamMutation()
+  const languagesQuery = useSupportedLanguagesQuery(1, 100, ACTIVE_LANGUAGE_FILTERS)
+  const [name, setName] = useState('')
+  const [code, setCode] = useState('')
+  const [description, setDescription] = useState('')
+  const [languageId, setLanguageId] = useState('')
+  const [maxAttempt, setMaxAttempt] = useState('1')
+  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>('HIGHEST')
+  const { confirm, dialog } = useConfirmationDialog()
+
+  async function handleSubmit() {
+    if (!name.trim() || !code.trim() || !languageId) {
+      window.alert('Vui lòng nhập tên và mã kỳ thi.')
+      return
+    }
+    if (!(await confirm({ message: 'Bạn có chắc muốn tạo kỳ thi này không?' }))) {
+      return
+    }
+    await createMutation.mutateAsync({
+      code: code.trim(),
+      description: description || null,
+      languageId,
+      maxAttempt: Number(maxAttempt) || 1,
+      name,
+      resultDecisionMethod,
+    })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
+    navigate('/school-admin/exams')
   }
 
   return (
-    <section className="grid gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-blue-950">{title}</h1>
-          <p className="mt-2 text-sm font-medium text-slate-600">
-            Theo dõi danh sách kỳ thi và mở chi tiết để thao tác.
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-            onClick={() => void examsQuery.refetch()}
-            type="button"
-          >
-            Làm mới
-          </button>
-          {allowCreate ? (
-            <button
-              className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
-              onClick={() => setShowCreate((current) => !current)}
-              type="button"
-            >
-              {showCreate ? 'Đóng form' : 'Tạo kỳ thi'}
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
-      <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+    <section className="mx-auto max-w-160">
+      <h1 className="text-[26px] font-extrabold text-slate-900">Tạo kỳ thi</h1>
+      <p className="mt-1.5 text-sm text-slate-500">Nhập thông tin cơ bản, sau đó gắn blueprint và thêm hội đồng đề.</p>
       {dialog}
 
-      {showCreate ? (
-        <CreateExamCard
-          isSubmitting={createExamMutation.isPending}
-          onCancel={() => setShowCreate(false)}
-          onSubmit={async (payload) => {
-            if (!(await confirm({ message: 'Bạn có chắc muốn tạo kỳ thi này không?' }))) {
-              return
-            }
-            try {
-              const result = await createExamMutation.mutateAsync(payload)
-              await refresh()
-              setShowCreate(false)
-              setMessage(result)
-              setError(null)
-            } catch (submitError) {
-              setError(getErrorMessage(submitError))
-            }
-          }}
-        />
-      ) : null}
-
-      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 md:grid-cols-3">
-        <Field label="Từ khóa" value={keyword} onChange={setKeyword} />
-        <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Trạng thái
+      <div className="mt-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-6">
+        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          Tên kỳ thi
+          <input
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+            onChange={(event) => setName(event.target.value)}
+            value={name}
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          Mã kỳ thi
+          <input
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+            onChange={(event) => setCode(event.target.value)}
+            placeholder="VD: EXAM-2025-K11"
+            value={code}
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          Mô tả
+          <textarea
+            className="min-h-24 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900"
+            onChange={(event) => setDescription(event.target.value)}
+            value={description}
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          Ngôn ngữ
           <select
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
-            onChange={(event) => setStatus(event.target.value as '' | ExamStatus)}
-            value={status}
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+            onChange={(event) => setLanguageId(event.target.value)}
+            value={languageId}
           >
-            <option value="">Tất cả</option>
-            <option value="DRAFT">Bản nháp</option>
-            <option value="SCHEDULED">Đã lên lịch</option>
-            <option value="IN_PROGRESS">Đang diễn ra</option>
-            <option value="CLOSED">Đã đóng</option>
-            <option value="RESULTS_PUBLISHED">Đã công bố kết quả</option>
-            <option value="CANCELLED">Đã hủy</option>
+            <option value="">Chọn ngôn ngữ</option>
+            {languagesQuery.data?.content.map((language) => (
+              <option key={language.id} value={language.id}>
+                {language.name ?? language.code ?? language.id}
+              </option>
+            ))}
           </select>
         </label>
-      </div>
-
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <table className="min-w-full text-left">
-          <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Kỳ thi</th>
-              <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Mở lúc</th>
-              <th className="px-4 py-3">Đóng lúc</th>
-              <th className="px-4 py-3 text-right">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {examsQuery.data?.content.map((exam) => (
-              <tr key={exam.id}>
-                <td className="px-4 py-4">
-                  <div className="grid gap-1">
-                    <span className="text-sm font-black text-slate-950">{exam.name}</span>
-                    <span className="text-xs font-medium text-slate-500">{formatNullableText(exam.description)}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-4 font-mono text-xs font-semibold text-slate-600">{exam.code}</td>
-                <td className="px-4 py-4"><StatusBadge status={exam.status} /></td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-600">{formatDateTime(exam.openAt)}</td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-600">{formatDateTime(exam.closeAt)}</td>
-                <td className="px-4 py-4">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                      onClick={() => navigate(`${basePath}/${exam.id}`)}
-                      type="button"
-                    >
-                      Chi tiết
-                    </button>
-                    {!readOnly ? (
-                      <button
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-bold text-red-600 transition hover:bg-red-50"
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              const result = await deleteExamMutation.mutateAsync(exam.id)
-                              await refresh()
-                              setMessage(result)
-                              setError(null)
-                            } catch (deleteError) {
-                              setError(getErrorMessage(deleteError))
-                            }
-                          })()
-                        }}
-                        type="button"
-                      >
-                        Xóa
-                      </button>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600">
-          <span>
-            {examsQuery.data?.totalElements ?? 0} kỳ thi, trang {examsQuery.data?.page ?? 1}/{examsQuery.data?.totalPages ?? 1}
-          </span>
-          <div className="flex gap-2">
-            <button
-              className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-              type="button"
+        <div className="grid gap-3.5 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Số lượt thi tối đa
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              min={1}
+              onChange={(event) => setMaxAttempt(event.target.value)}
+              type="number"
+              value={maxAttempt}
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Cách chốt điểm
+            <select
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+              value={resultDecisionMethod}
             >
-              Trước
-            </button>
-            <button
-              className="h-9 rounded-lg border border-slate-200 px-3 disabled:opacity-50"
-              disabled={page >= (examsQuery.data?.totalPages ?? 1)}
-              onClick={() => setPage((current) => current + 1)}
-              type="button"
-            >
-              Sau
-            </button>
-          </div>
+              {RESULT_DECISION_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {getResultDecisionMethodDisplay(method)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="flex justify-end">
+          <button
+            className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
+            disabled={createMutation.isPending}
+            onClick={() => void handleSubmit()}
+            type="button"
+          >
+            Tạo kỳ thi
+          </button>
         </div>
       </div>
     </section>
+  )
+}
+
+type EditExamModalProps = {
+  exam: ExamDto
+  onClose: () => void
+  onSaved: () => void
+}
+
+function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
+  const updateMutation = useUpdateExamMutation()
+  const [name, setName] = useState(exam.name)
+  const [description, setDescription] = useState(exam.description ?? '')
+  const [openAt, setOpenAt] = useState(toDateTimeLocalValue(exam.openAt))
+  const [closeAt, setCloseAt] = useState(toDateTimeLocalValue(exam.closeAt))
+  const [maxAttempt, setMaxAttempt] = useState(String(exam.maxAttempt ?? 1))
+  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
+    exam.resultDecisionMethod ?? 'HIGHEST',
+  )
+
+  async function handleSubmit() {
+    if (!name.trim()) {
+      window.alert('Vui lòng nhập tên kỳ thi.')
+      return
+    }
+    await updateMutation.mutateAsync({
+      examId: exam.id,
+      payload: {
+        closeAt: toIsoDateTime(closeAt),
+        description: description || null,
+        maxAttempt: Number(maxAttempt) || 1,
+        name: name.trim(),
+        openAt: toIsoDateTime(openAt),
+        resultDecisionMethod,
+      },
+    })
+    onSaved()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
+      <section className="w-full max-w-md rounded-2xl bg-white shadow-2xl" role="dialog">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+          <h2 className="text-lg font-black text-slate-900">Sửa thông tin kỳ thi</h2>
+          <button
+            aria-label="Đóng"
+            className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+            onClick={onClose}
+            type="button"
+          >
+            <X aria-hidden="true" className="size-4" />
+          </button>
+        </div>
+        <div className="grid gap-3.5 px-6 py-5">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Tên kỳ thi
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setName(event.target.value)}
+              value={name}
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Mô tả
+            <textarea
+              className="min-h-20 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900"
+              onChange={(event) => setDescription(event.target.value)}
+              value={description}
+            />
+          </label>
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Mở lúc
+              <input
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setOpenAt(event.target.value)}
+                type="datetime-local"
+                value={openAt}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Đóng lúc
+              <input
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setCloseAt(event.target.value)}
+                type="datetime-local"
+                value={closeAt}
+              />
+            </label>
+          </div>
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Số lượt thi tối đa
+              <input
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                min={1}
+                onChange={(event) => setMaxAttempt(event.target.value)}
+                type="number"
+                value={maxAttempt}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Cách chốt điểm
+              <select
+                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+                value={resultDecisionMethod}
+              >
+                {RESULT_DECISION_METHODS.map((method) => (
+                  <option key={method} value={method}>
+                    {getResultDecisionMethodDisplay(method)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2.5 border-t border-slate-200 px-6 py-4">
+          <button
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            onClick={onClose}
+            type="button"
+          >
+            Hủy
+          </button>
+          <button
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white disabled:opacity-60"
+            disabled={updateMutation.isPending}
+            onClick={() => void handleSubmit()}
+            type="button"
+          >
+            Lưu
+          </button>
+        </div>
+      </section>
+    </div>
   )
 }
 
 type ExamDetailPageProps = {
   basePath: string
-  blueprintBasePath: string
+  canManageInfo: boolean
   canManageMembers: boolean
   canManagePapers: boolean
   canManageStatus: boolean
-  canUpdateInfo: boolean
-  title: string
+  canReleaseSecurePool: boolean
 }
+
+type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
 
 function ExamDetailPage({
   basePath,
-  blueprintBasePath,
+  canManageInfo,
   canManageMembers,
   canManagePapers,
   canManageStatus,
-  canUpdateInfo,
-  title,
+  canReleaseSecurePool,
 }: ExamDetailPageProps) {
-  const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const user = useAppSelector((state) => state.auth.user)
+  const queryClient = useQueryClient()
   const { examId } = useParams()
   const examQuery = useExamQuery(examId ?? null)
   const exam = examQuery.data
-  const blueprintQuery = useExamBlueprintQuery(exam?.blueprintId ?? null)
-  const blueprint = blueprintQuery.data
-  const availableBlueprintsQuery = useExamBlueprintsQuery({
-    examKind: exam?.kind,
-    isActive: true,
-    keyword: '',
-    page: 1,
-    schoolId: exam?.schoolId ?? user?.schoolId,
-    size: 50,
-  })
-  const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<ExamDetailTab>('blueprint')
-  const updateExamMutation = useUpdateExamMutation()
-  const attachBlueprintMutation = useAttachExamBlueprintMutation()
-  const updateStatusMutation = useUpdateExamStatusMutation()
-  const createMemberMutation = useCreateExamMemberMutation()
-  const updateMemberMutation = useUpdateExamMemberMutation()
-  const deleteMemberMutation = useDeleteExamMemberMutation()
+  const myRoleQuery = useExamMyRoleQuery(examId ?? null)
+  const myRole = myRoleQuery.data
   const createPaperMutation = useCreateExamPaperMutation()
-  const updatePaperItemMutation = useUpdateExamPaperItemMutation()
   const updatePaperStatusMutation = useUpdateExamPaperStatusMutation()
-  const deletePaperMutation = useDeleteExamPaperMutation()
-  const [draftName, setDraftName] = useState('')
-  const [draftDescription, setDraftDescription] = useState('')
-  const [memberUserId, setMemberUserId] = useState('')
-  const [memberRole, setMemberRole] = useState<ExamMemberRole>('AUTHOR')
-  const [memberSearch, setMemberSearch] = useState('')
-  const [memberPage, setMemberPage] = useState(1)
-  const [memberListPage, setMemberListPage] = useState(1)
-  const [selectedBlueprintId, setSelectedBlueprintId] = useState('')
-  const [selectedBlueprintVersionId, setSelectedBlueprintVersionId] = useState('')
+  const updateStatusMutation = useUpdateExamStatusMutation()
+  const deleteMutation = useDeleteExamMutation()
+  const releaseSecurePoolMutation = useReleaseSecurePoolMutation()
+  const setDeliveryModeMutation = useSetExamDeliveryModeMutation()
+  const [tab, setTab] = useState<ExamDetailTab>('papers')
+  const [message, setMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showCopyPicker, setShowCopyPicker] = useState(false)
+  const [copyFromPaperId, setCopyFromPaperId] = useState('')
   const { confirm, dialog } = useConfirmationDialog()
-  const schoolUsersQuery = useSchoolUsersForRequesterQuery(memberPage, 8, {
-    schoolId: user?.schoolId ?? '',
-    search: memberSearch,
-  })
-  const selectedBlueprintQuery = useExamBlueprintQuery(selectedBlueprintId || null)
 
-  async function refresh() {
+  async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
   }
 
+  async function handleCreatePaper(forExamId: string, source: 'blueprint' | 'copy', copyFromPaperId: string | null) {
+    try {
+      await createPaperMutation.mutateAsync({ examId: forExamId, payload: { copyFromPaperId, source } })
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handleUpdatePaperStatus(paperId: string, action: 'APPROVE' | 'LOCK' | 'SUBMIT') {
+    try {
+      await updatePaperStatusMutation.mutateAsync({ paperId, payload: { action } })
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handleReleaseSecurePool(forExamId: string) {
+    if (!(await confirm({ message: 'Bạn có chắc muốn mở khóa câu hỏi đề thi không?' }))) {
+      return
+    }
+    try {
+      await releaseSecurePoolMutation.mutateAsync(forExamId)
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handleSetDeliveryMode(forExamId: string, mode: ExamDeliveryMode) {
+    try {
+      await setDeliveryModeMutation.mutateAsync({ deliveryMode: mode, examId: forExamId })
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
   if (examQuery.isLoading) {
-    return <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">Đang tải chi tiết kỳ thi...</section>
+    return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
   }
 
   if (!exam) {
-    return <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">Không tìm thấy kỳ thi.</section>
+    return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy kỳ thi.</section>
   }
 
-  const finalizedBlueprintVersion = getBlueprintVersionById(blueprint, exam.blueprintVersionId)
-  const finalizedBlockingFixedSlots = getBlockingFixedSlots(finalizedBlueprintVersion)
-  const canUsePaperActions = Boolean(exam.blueprintVersionId && finalizedBlueprintVersion) && finalizedBlockingFixedSlots.length === 0
-  const hasBlueprint = Boolean(exam.blueprintId && blueprint)
-  const isSchoolAdmin = user?.roles?.includes('SCHOOL_ADMIN') ?? false
-  const viewerRoles = exam.members
-    ?.filter((member) => member.userId === user?.userId)
-    .map((member) => member.role) ?? []
-  const isAuthor = viewerRoles.includes('AUTHOR')
-  const isChair = viewerRoles.includes('CHAIR')
-  const hasAuthor = exam.members?.some((member) => member.role === 'AUTHOR') ?? false
-  const hasReviewerOrChair = exam.members?.some((member) => member.role === 'REVIEWER' || member.role === 'CHAIR') ?? false
-  const hasChair = exam.members?.some((member) => member.role === 'CHAIR') ?? false
-  const canAttachBlueprint = exam.kind === 'CENTRALIZED' && isAuthor
-  const canFinalizeBlueprintVersion = exam.kind === 'CENTRALIZED' && isChair
-  const canShowExamWorkflow = canManageStatus && exam.kind === 'CENTRALIZED' && isSchoolAdmin
-  const selectedBlueprint = selectedBlueprintQuery.data
-  const selectedBlueprintPublishedVersion = getPublishedBlueprintVersion(selectedBlueprint)
-  const publishedVersions = [...(blueprint?.versions ?? [])].filter((version) => version.status === 'PUBLISHED')
-  const examStatusActions: UpdateExamStatusRequest['action'][] = ['SCHEDULE', 'START', 'CLOSE', 'PUBLISH_RESULTS', 'CANCEL']
-  const paperStatusActions: UpdateExamPaperStatusRequest['action'][] = ['SUBMIT', 'APPROVE', 'REQUEST_REVISION', 'LOCK']
-  const pagedMembers = (exam.members ?? []).slice((memberListPage - 1) * 6, memberListPage * 6)
-  const totalMemberPages = Math.max(1, Math.ceil((exam.members?.length ?? 0) / 6))
+  const statusDisplay = getExamStatusDisplay(exam.status)
+  const { completedCount, steps } = getExamWorkflowSteps(exam)
+  const totalPapers = exam.papers.length
+  const lockedPapers = exam.papers.filter((paper) => paper.status === 'LOCKED').length
+  // Backend authorizes schedule/candidate management for SCHOOL_ADMIN (same school) or the exam's CHAIR.
+  const canManageSchedule = canManageStatus || myRole === 'CHAIR'
+
+  const primaryStatusAction =
+    exam.status === 'DRAFT' && completedCount >= 3
+      ? { action: 'SCHEDULE' as const, icon: <Calendar aria-hidden="true" className="size-4.5" />, label: 'Lên lịch kỳ thi' }
+      : exam.status === 'SCHEDULED'
+        ? { action: 'START' as const, icon: <PlayCircle aria-hidden="true" className="size-4.5" />, label: 'Bắt đầu thi' }
+        : exam.status === 'IN_PROGRESS'
+          ? { action: 'CLOSE' as const, icon: <Lock aria-hidden="true" className="size-4.5" />, label: 'Đóng kỳ thi' }
+          : exam.status === 'CLOSED'
+            ? { action: 'PUBLISH_RESULTS' as const, icon: <Megaphone aria-hidden="true" className="size-4.5" />, label: 'Công bố kết quả' }
+            : null
+
+  const nextAction =
+    completedCount === 0
+      ? { ctaLabel: 'Gắn blueprint', description: 'Chọn blueprint ở tab Blueprint để bắt đầu.', onClick: () => setTab('blueprint'), title: 'Chưa gắn blueprint' }
+      : completedCount === 1
+        ? { ctaLabel: 'Chốt phiên bản', description: 'Chọn phiên bản đã xuất bản để CHAIR chốt dùng cho kỳ thi.', onClick: () => setTab('blueprint'), title: 'Chờ CHAIR chốt phiên bản' }
+        : completedCount === 2
+          ? {
+              ctaLabel: 'Mở đề thi',
+              description: totalPapers ? `${lockedPapers}/${totalPapers} mã đề đã khóa. Duyệt và khóa các mã đề còn lại.` : 'Tạo mã đề để bắt đầu soạn.',
+              onClick: () => setTab('papers'),
+              title: 'Duyệt và khóa các mã đề còn lại',
+            }
+          : completedCount === 3
+            ? { ctaLabel: 'Mở phân lịch', description: 'Xếp ca thi, phòng thi và giám thị để vận hành kỳ thi.', onClick: () => setTab('schedule'), title: 'Chuyển sang vận hành thi' }
+            : null
 
   return (
-    <section className="grid gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <button
-            className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600 transition hover:text-indigo-800"
-            onClick={() => navigate(-1)}
-            type="button"
-          >
-            Quay lại
-          </button>
-          <h1 className="text-3xl font-black text-blue-950">{title}</h1>
-          <p className="mt-2 text-sm font-medium text-slate-600">
-            Theo dõi thông tin kỳ thi, thành viên và đề thi trong cùng một màn.
-          </p>
-        </div>
-      </div>
+    <section className="mx-auto max-w-260">
+      <button
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600"
+        onClick={() => navigate(-1)}
+        type="button"
+      >
+        ← Kiểm tra tập trung
+      </button>
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
-      <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
       {dialog}
 
-      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
-        <InfoItem label="Tên kỳ thi" value={exam.name} />
-        <InfoItem label="Code" value={exam.code} />
-        <InfoItem label="Loại" value={exam.kind} />
-        <InfoItem label="Trạng thái" value={<StatusBadge status={exam.status} />} />
-        <InfoItem label="Mở lúc" value={formatDateTime(exam.openAt)} />
-        <InfoItem label="Đóng lúc" value={formatDateTime(exam.closeAt)} />
-        <InfoItem label="Blueprint ID" value={formatNullableText(exam.blueprintId)} />
-        <InfoItem label="School class ID" value={formatNullableText(exam.schoolClassId)} />
-      </div>
-
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-1">
-        <div className="flex flex-wrap gap-2">
-          <ExamTabButton isActive={activeTab === 'blueprint'} label="Blueprint" onClick={() => setActiveTab('blueprint')} />
-          <ExamTabButton isActive={activeTab === 'workflow'} label="Workflow" onClick={() => setActiveTab('workflow')} />
-          <ExamTabButton isActive={activeTab === 'papers'} label="Đề thi" onClick={() => setActiveTab('papers')} />
-          <ExamTabButton isActive={activeTab === 'people'} label="Phân công" onClick={() => setActiveTab('people')} />
-        </div>
-      </div>
-
-      {activeTab === 'blueprint' ? (
-        <div className="grid gap-4">
-          <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
-            <div>
-              <h2 className="text-lg font-black text-slate-950">Sẵn sàng quy trình</h2>
-              <p className="mt-1 text-sm font-medium text-slate-600">
-                AUTHOR gan blueprint, REVIEWER/CHAIR doi trang thai version, CHAIR chot version su dung.
-              </p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-4">
-              <WorkflowReadinessItem isReady={hasAuthor} readyLabel="AUTHOR ready" missingLabel="Missing AUTHOR" />
-              <WorkflowReadinessItem isReady={hasReviewerOrChair} readyLabel="Version reviewer ready" missingLabel="Missing REVIEWER or CHAIR" />
-              <WorkflowReadinessItem isReady={hasChair} readyLabel="CHAIR ready" missingLabel="Missing CHAIR" />
-              <WorkflowReadinessItem
-                isReady={Boolean(exam.blueprintVersionId)}
-                readyLabel="Paper flow ready"
-                missingLabel="Paper flow locked until blueprintVersionId is chosen"
-              />
-            </div>
-          </div>
-
-          {!hasBlueprint ? (
-            <form
-              className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void (async () => {
-                  if (!selectedBlueprintId) {
-                    setError('Hay chon blueprint truoc khi gan vao exam.')
-                    return
-                  }
-
-                  if (!(await confirm({ message: 'Ban co chac muon gan blueprint nay vao exam khong?' }))) {
-                    return
-                  }
-
-                  try {
-                    const result = await attachBlueprintMutation.mutateAsync({
-                      blueprintId: selectedBlueprintId,
-                      blueprintVersionId: null,
-                      examId: exam.id,
-                    })
-                    await refresh()
-                    setMessage(result)
-                    setError(null)
-                  } catch (submitError) {
-                    setError(getErrorMessage(submitError))
-                  }
-                })()
-              }}
-            >
-              <div className="md:col-span-2">
-                <h2 className="text-lg font-black text-slate-950">Gan blueprint cho exam</h2>
-                <p className="mt-1 text-sm font-medium text-slate-600">
-                  Buoc 1: AUTHOR gan blueprint vao exam. Chua can co version PUBLISHED o buoc nay.
-                </p>
-              </div>
-              {canAttachBlueprint ? (
-                <>
-                  <SelectField
-                    label="Blueprint"
-                    onChange={setSelectedBlueprintId}
-                    options={[
-                      { label: 'Chon blueprint', value: '' },
-                      ...((availableBlueprintsQuery.data?.content ?? []).map((candidate) => ({
-                        label: `${candidate.code} - ${candidate.name}`,
-                        value: candidate.id,
-                      }))),
-                    ]}
-                    value={selectedBlueprintId}
-                  />
-                  <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Trang thai blueprint da chon</p>
-                    <p className="text-sm font-black text-slate-950">
-                      {selectedBlueprint
-                        ? `${selectedBlueprint.code} - ${selectedBlueprint.name}`
-                        : 'Chua chon blueprint'}
-                    </p>
-                    <p className="text-sm font-medium text-slate-600">
-                      {selectedBlueprintId
-                        ? selectedBlueprintPublishedVersion
-                          ? 'Blueprint nay da co version PUBLISHED, CHAIR co the chot version sau khi gan.'
-                          : 'Blueprint nay chua co version PUBLISHED. REVIEWER/CHAIR se doi trang thai version o buoc tiep theo.'
-                        : 'Chi hien blueprint dang hoat dong trong truong hien tai.'}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                  Chi AUTHOR cua exam duoc gan blueprint.
-                </div>
-              )}
-              <div className="md:col-span-2 flex justify-end">
-                <button
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
-                  disabled={!canAttachBlueprint || !selectedBlueprintId}
-                  type="submit"
-                >
-                  AUTHOR gan blueprint
-                </button>
-              </div>
-            </form>
-          ) : null}
-
-          {hasBlueprint && !exam.blueprintVersionId ? (
-            <div className="grid gap-4">
-              <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
-                <InfoItem label="Ten blueprint" value={blueprint?.name ?? '-'} />
-                <InfoItem label="Code" value={blueprint?.code ?? '-'} />
-                <InfoItem label="Blueprint ID" value={formatNullableText(exam.blueprintId)} />
-                <InfoItem label="Version dang duoc chot" value="Chua chot" />
-              </div>
-
-              {!hasReviewerOrChair ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                  Exam nay chua co actor doi trang thai version.
-                </div>
-              ) : null}
-
-              {!hasChair ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                  Exam nay chua co CHAIR de chot version su dung.
-                </div>
-              ) : null}
-
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800">
-                Buoc 2: REVIEWER/CHAIR doi trang thai version trong blueprint detail. Buoc 3: CHAIR quay lai exam nay de chot version su dung.
-              </div>
-
-              <div className="flex flex-wrap justify-between gap-3">
-                <button
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700"
-                  onClick={() => navigate(`${blueprintBasePath}/${blueprint?.id}`)}
-                  type="button"
-                >
-                  Mo blueprint de doi trang thai version
-                </button>
-              </div>
-
-              {canFinalizeBlueprintVersion ? (
-                <form
-                  className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    void (async () => {
-                      if (!selectedBlueprintVersionId) {
-                        setError('Hay chon version PUBLISHED truoc khi chot.')
-                        return
-                      }
-
-                      if (!(await confirm({ message: 'Ban co chac muon chot version nay cho exam khong?' }))) {
-                        return
-                      }
-
-                      try {
-                        const result = await attachBlueprintMutation.mutateAsync({
-                          blueprintId: null,
-                          blueprintVersionId: selectedBlueprintVersionId,
-                          examId: exam.id,
-                        })
-                        await refresh()
-                        setMessage(result)
-                        setError(null)
-                      } catch (submitError) {
-                        setError(getErrorMessage(submitError))
-                      }
-                    })()
-                  }}
-                >
-                  <div className="md:col-span-2">
-                    <h2 className="text-lg font-black text-slate-950">Chot version su dung</h2>
-                    <p className="mt-1 text-sm font-medium text-slate-600">
-                      Buoc 3: CHAIR chot blueprintVersionId. Exam paper chi mo sau khi CHAIR chot version.
-                    </p>
-                  </div>
-                  <SelectField
-                    label="Version PUBLISHED"
-                    onChange={setSelectedBlueprintVersionId}
-                    options={[
-                      { label: 'Chon version PUBLISHED', value: '' },
-                      ...publishedVersions.map((version) => ({
-                        label: `Version ${version.version} - ${version.code}`,
-                        value: version.id,
-                      })),
-                    ]}
-                    value={selectedBlueprintVersionId}
-                  />
-                  <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Readiness chot version</p>
-                    <p className="text-sm font-black text-slate-950">
-                      {selectedBlueprintVersionId
-                        ? `Version duoc chon: ${publishedVersions.find((version) => version.id === selectedBlueprintVersionId)?.code ?? selectedBlueprintVersionId}`
-                        : 'Chua chon version'}
-                    </p>
-                    <p className="text-sm font-medium text-slate-600">
-                      {publishedVersions.length
-                        ? 'Chi liet ke cac version dang PUBLISHED.'
-                        : 'Chua co version PUBLISHED de CHAIR chot.'}
-                    </p>
-                  </div>
-                  <div className="md:col-span-2 flex justify-end">
-                    <button
-                      className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
-                      disabled={!selectedBlueprintVersionId || !publishedVersions.length}
-                      type="submit"
-                    >
-                      CHAIR chot version su dung
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                  Chi CHAIR cua exam duoc chot version su dung.
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          {hasBlueprint && exam.blueprintVersionId ? (
-            <div className="grid gap-4">
-              <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2">
-                <InfoItem label="Ten blueprint" value={blueprint?.name ?? '-'} />
-                <InfoItem label="Code" value={blueprint?.code ?? '-'} />
-                <InfoItem
-                  label="Version dang duoc chot"
-                  value={finalizedBlueprintVersion ? `Version ${finalizedBlueprintVersion.version} - ${finalizedBlueprintVersion.code}` : 'Khong tim thay version'}
-                />
-                <InfoItem label="Blueprint version ID" value={formatNullableText(exam.blueprintVersionId)} />
-              </div>
-
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                Version nay dang duoc su dung de tao exam paper.
-              </div>
-
-              {!finalizedBlueprintVersion ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                  Khong tai duoc version da chot tu blueprint hien tai. Hay mo blueprint de kiem tra lai version.
-                </div>
-              ) : null}
-
-              {finalizedBlockingFixedSlots.length ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                  Version da chot van co slot FIXED tro toi question chua PUBLISHED, nen paper flow dang bi khoa.
-                </div>
-              ) : null}
-
-              <div className="flex justify-end">
-                <button
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white"
-                  onClick={() => navigate(`${blueprintBasePath}/${blueprint?.id}`)}
-                  type="button"
-                >
-                  Mo chi tiet blueprint
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {activeTab === 'blueprint' && hasBlueprint && canUpdateInfo ? (
-        <form
-          className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void (async () => {
-              if (!(await confirm({ message: 'Ban co chac muon luu thong tin exam nay khong?' }))) {
-                return
-              }
-              try {
-                const result = await updateExamMutation.mutateAsync({
-                  examId: exam.id,
-                  payload: {
-                    description: draftDescription || exam.description || null,
-                    name: draftName || exam.name,
-                  },
-                })
-                await refresh()
-                setMessage(result)
-                setError(null)
-              } catch (submitError) {
-                setError(getErrorMessage(submitError))
-              }
-            })()
-          }}
-        >
-          <Field label="Ten exam" value={draftName} onChange={setDraftName} placeholder={exam.name} />
-          <Field label="Mo ta" value={draftDescription} onChange={setDraftDescription} placeholder={exam.description ?? ''} />
-          <div className="md:col-span-2 flex justify-end">
-            <button className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white" type="submit">
-              Luu thong tin
-            </button>
-          </div>
-        </form>
-      ) : null}
-
-      {activeTab === 'workflow' ? (
-        <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-6">
-          <h2 className="text-lg font-black text-slate-950">Workflow exam</h2>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <WorkflowReadinessItem isReady readyLabel="DRAFT" missingLabel="DRAFT" />
-            <WorkflowReadinessItem isReady={exam.status === 'SCHEDULED' || exam.status === 'IN_PROGRESS' || exam.status === 'CLOSED' || exam.status === 'RESULTS_PUBLISHED'} readyLabel="SCHEDULED" missingLabel="SCHEDULED" />
-            <WorkflowReadinessItem isReady={exam.status === 'IN_PROGRESS' || exam.status === 'CLOSED' || exam.status === 'RESULTS_PUBLISHED'} readyLabel="IN_PROGRESS" missingLabel="IN_PROGRESS" />
-            <WorkflowReadinessItem isReady={exam.status === 'CLOSED' || exam.status === 'RESULTS_PUBLISHED'} readyLabel="CLOSED" missingLabel="CLOSED" />
-            <WorkflowReadinessItem isReady={exam.status === 'RESULTS_PUBLISHED'} readyLabel="RESULTS_PUBLISHED" missingLabel={exam.status === 'CANCELLED' ? 'CANCELLED' : 'RESULTS_PUBLISHED'} />
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">
-            {'Flow chuan: DRAFT -> SCHEDULED -> IN_PROGRESS -> CLOSED -> RESULTS_PUBLISHED. Can popup xac nhan truoc khi chuyen trang thai.'}
-          </div>
-          {canShowExamWorkflow ? (
-          <div className="flex flex-wrap gap-3">
-            {examStatusActions.map((action) => (
+      <DetailHeaderCard
+        actions={
+          canManageStatus ? (
+            <>
               <button
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                key={action}
+                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
                 onClick={() => {
                   void (async () => {
-                    try {
-                      if (!(await confirm({ message: `Báº¡n cÃ³ cháº¯c muá»‘n ${getExamActionLabel(action).toLowerCase()}?` }))) {
-                        return
-                      }
-                      const result = await updateStatusMutation.mutateAsync({
-                        examId: exam.id,
-                        payload: { action },
-                      })
-                      await refresh()
-                      setMessage(result)
-                      setError(null)
-                    } catch (submitError) {
-                      setError(getErrorMessage(submitError))
+                    if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
+                      return
                     }
+                    await deleteMutation.mutateAsync(exam.id)
+                    await invalidate()
+                    navigate(basePath)
                   })()
                 }}
                 type="button"
               >
-                {getExamActionLabel(action)}
+                <Trash2 aria-hidden="true" className="size-4" />
+                Xóa
               </button>
-            ))}
-          </div>
-          ) : (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-              Chá»‰ SCHOOL_ADMIN Ä‘Æ°á»£c Ä‘iá»u khiá»ƒn workflow exam táº­p trung.
+              {primaryStatusAction ? (
+                <button
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                  onClick={() =>
+                    void updateStatusMutation
+                      .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
+                      .then(() => invalidate())
+                  }
+                  type="button"
+                >
+                  {primaryStatusAction.icon}
+                  {primaryStatusAction.label}
+                </button>
+              ) : null}
+            </>
+          ) : null
+        }
+        metaItems={[
+          { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
+          { icon: <ClipboardList aria-hidden="true" className="size-3.5" />, label: 'Thi tập trung' },
+          { icon: <Languages aria-hidden="true" className="size-3.5" />, label: 'Tiếng Anh' },
+          { icon: <Calendar aria-hidden="true" className="size-3.5" />, label: `${formatDateTime(exam.openAt)} – ${formatDateTime(exam.closeAt)}` },
+          { icon: <Clock4 aria-hidden="true" className="size-3.5" />, label: `Số lượt thi tối đa: ${exam.maxAttempt ?? 1}` },
+          { icon: <CircleCheck aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
+        ]}
+        onEdit={canManageInfo ? () => setShowEditModal(true) : undefined}
+        statusLabel={statusDisplay.label}
+        statusTone={statusDisplay.tone}
+        title={exam.name}
+      />
+
+      <WorkflowTrackerCard completedCount={completedCount} nextAction={nextAction} steps={steps} totalCount={4} />
+
+      <div className="mt-5.5">
+        <TabPillGroup
+          items={[
+            { label: 'Đề bài', value: 'papers' },
+            { label: 'Phân công', value: 'people' },
+            { label: 'Học sinh', value: 'students' },
+            { label: 'Blueprint', value: 'blueprint' },
+            { icon: <Users aria-hidden="true" className="size-4" />, label: 'Phân lịch', value: 'schedule' },
+          ]}
+          onChange={setTab}
+          value={tab}
+        />
+      </div>
+
+      {tab === 'papers' ? (
+        <div className="mt-4 grid gap-3.5">
+          {canReleaseSecurePool && exam.securePool?.status === 'SEALED' ? (
+            <div className="flex justify-end">
+              <button
+                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-4 text-[13px] font-semibold text-amber-700 hover:bg-amber-100"
+                onClick={() => void handleReleaseSecurePool(exam.id)}
+                type="button"
+              >
+                Mở khóa câu hỏi đề thi
+              </button>
             </div>
+          ) : null}
+          {canManagePapers ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {showCopyPicker ? (
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pr-1.5 pl-3.5">
+                  <span className="text-xs font-bold text-slate-500">Sao chép từ</span>
+                  <select
+                    className="h-8 rounded-full border border-slate-200 px-2.5 text-xs font-semibold text-slate-700"
+                    onChange={(event) => setCopyFromPaperId(event.target.value)}
+                    value={copyFromPaperId}
+                  >
+                    <option value="">Chọn mã đề…</option>
+                    {exam.papers.map((paper) => (
+                      <option key={paper.id} value={paper.id}>
+                        {paper.code}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="inline-flex h-8 items-center justify-center rounded-full bg-indigo-600 px-3.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!copyFromPaperId}
+                    onClick={() => {
+                      void handleCreatePaper(exam.id, 'copy', copyFromPaperId)
+                      setShowCopyPicker(false)
+                      setCopyFromPaperId('')
+                    }}
+                    type="button"
+                  >
+                    Sao chép
+                  </button>
+                  <button
+                    aria-label="Hủy sao chép mã đề"
+                    className="inline-flex size-8 items-center justify-center rounded-full text-slate-400 hover:text-slate-600"
+                    onClick={() => {
+                      setShowCopyPicker(false)
+                      setCopyFromPaperId('')
+                    }}
+                    type="button"
+                  >
+                    <X aria-hidden="true" className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {exam.papers.length > 0 ? (
+                    <button
+                      className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+                      onClick={() => setShowCopyPicker(true)}
+                      type="button"
+                    >
+                      Sao chép mã đề
+                    </button>
+                  ) : null}
+                  <button
+                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
+                    onClick={() => void handleCreatePaper(exam.id, 'blueprint', null)}
+                    type="button"
+                  >
+                    <Plus aria-hidden="true" className="size-4" />
+                    Tạo mã đề từ blueprint
+                  </button>
+                </>
+              )}
+            </div>
+          ) : null}
+          {exam.papers.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-400">
+              Chưa có mã đề nào.
+            </div>
+          ) : (
+            exam.papers.map((paper) => {
+              const paperStatusDisplay = getExamPaperStatusDisplay(paper.status)
+              const totalItems = paper.sections.reduce((sum, section) => sum + section.items.length, 0)
+              const filledItems = paper.sections.reduce(
+                (sum, section) => sum + section.items.filter((item) => item.questionId).length,
+                0,
+              )
+              const isIncomplete = filledItems < totalItems
+              // CHAIR có toàn quyền của REVIEWER (approve) ngoài quyền lock riêng — khớp rule backend.
+              const canSubmit = canManagePapers && myRole === 'AUTHOR'
+              const canApprove = canManagePapers && (myRole === 'CHAIR' || myRole === 'REVIEWER')
+              const canLock = canManagePapers && myRole === 'CHAIR'
+              const actions =
+                paper.status === 'DRAFT' && canSubmit
+                  ? [
+                      {
+                        disabled: isIncomplete,
+                        label: 'Nộp duyệt',
+                        onClick: () => void handleUpdatePaperStatus(paper.id, 'SUBMIT'),
+                        title: isIncomplete ? 'Còn ô câu hỏi chưa được gán — gán đủ trước khi nộp duyệt' : undefined,
+                        tone: 'primary' as const,
+                      },
+                    ]
+                  : paper.status === 'IN_REVIEW' && canApprove
+                    ? [{ label: 'Duyệt', onClick: () => void handleUpdatePaperStatus(paper.id, 'APPROVE'), tone: 'primary' as const }]
+                    : paper.status === 'APPROVED' && canLock
+                      ? [{ label: 'Khóa mã đề', onClick: () => void handleUpdatePaperStatus(paper.id, 'LOCK'), tone: 'primary' as const }]
+                      : []
+              return (
+                <PaperCard
+                  actions={actions}
+                  key={paper.id}
+                  onOpen={() =>
+                    navigate(
+                      canManagePapers ? `/teacher/exam-papers/${paper.id}/edit` : `${basePath.replace(/\/exams$/, '')}/exam-papers/${paper.id}`,
+                      { state: { examId: exam.id, paperId: paper.id } },
+                    )
+                  }
+                  openLabel={canManagePapers ? 'Soạn đề' : 'Xem đề'}
+                  paper={paper}
+                  subtitle={paperStatusDisplay.label}
+                />
+              )
+            })
           )}
         </div>
       ) : null}
 
-      <div className="grid gap-6">
-        {activeTab === 'people' ? (
-        <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-slate-950">Thanh vien exam</h2>
-          </div>
-          {canManageMembers ? (
-            <form
-              className="grid gap-4"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void (async () => {
-                  if (!(await confirm({ message: 'Ban co chac muon them thanh vien vao exam nay khong?' }))) {
-                    return
-                  }
-                  try {
-                    const payload: CreateExamMemberRequest = {
-                      role: memberRole,
-                      userId: memberUserId,
-                    }
-                    const result = await createMemberMutation.mutateAsync({ examId: exam.id, payload })
-                    await refresh()
-                    setMemberUserId('')
-                    setMessage(result)
-                    setError(null)
-                  } catch (submitError) {
-                    setError(getErrorMessage(submitError))
-                  }
-                })()
-              }}
-            >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
-                <Field
-                  label="Tim giao vien"
-                  value={memberSearch}
-                  onChange={(value) => {
-                    setMemberSearch(value)
-                    setMemberPage(1)
-                  }}
-                  placeholder="Nhap ten hoac email"
-                />
-                <SelectField
-                  label="Role"
-                  value={memberRole}
-                  onChange={(value) => setMemberRole(value as ExamMemberRole)}
-                  options={[
-                    { label: 'Chair', value: 'CHAIR' },
-                    { label: 'Author', value: 'AUTHOR' },
-                    { label: 'Reviewer', value: 'REVIEWER' },
-                  ]}
-                />
-                <div className="self-end">
-                  <button className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:bg-slate-300" disabled={!memberUserId} type="submit">
-                    Them
-                  </button>
-                </div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                Chon giao vien o danh sach ben duoi, sau do chon role va bam Them. Exam can du AUTHOR, REVIEWER va CHAIR de workflow chay dung.
-              </div>
-              {memberUserId ? (
-                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700">
-                  Da chon user: {memberUserId}
-                </div>
-              ) : null}
-              <div className="grid gap-3">
-                {schoolUsersQuery.data?.content.map((schoolUser) => {
-                  const displayName = schoolUser.user?.fullName?.trim() || schoolUser.user?.email || schoolUser.userId || 'Unknown'
-                  const displayUserId = schoolUser.userId ?? schoolUser.user?.id ?? ''
-                  return (
-                    <button
-                      className={`grid gap-1 rounded-lg border px-4 py-3 text-left transition ${memberUserId === displayUserId ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}
-                      key={schoolUser.id}
-                      onClick={() => setMemberUserId(displayUserId)}
-                      type="button"
-                    >
-                      <span className="text-sm font-black text-slate-950">{displayName}</span>
-                      <span className="text-xs font-semibold text-slate-500">{schoolUser.user?.email ?? displayUserId}</span>
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="flex items-center justify-between text-sm font-semibold text-slate-600">
-                <span>
-                  {schoolUsersQuery.data?.totalElements ?? 0} giao vien, trang {schoolUsersQuery.data?.page ?? 1}/{schoolUsersQuery.data?.totalPages ?? 1}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
-                    disabled={memberPage <= 1}
-                    onClick={() => setMemberPage((current) => current - 1)}
-                    type="button"
-                  >
-                    Truoc
-                  </button>
-                  <button
-                    className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
-                    disabled={memberPage >= (schoolUsersQuery.data?.totalPages ?? 1)}
-                    onClick={() => setMemberPage((current) => current + 1)}
-                    type="button"
-                  >
-                    Sau
-                  </button>
-                </div>
-              </div>
-            </form>
-          ) : null}
+      {tab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
 
-          <div className="grid gap-3">
-            {pagedMembers.map((member) => (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4" key={member.id}>
-                <div>
-                  <p className="text-sm font-black text-slate-950">
-                    {member.user?.fullName?.trim() || member.user?.email || member.userId}
-                  </p>
-                  <p className="text-xs font-medium text-slate-500">
-                    {member.user?.email ?? member.userId} - {member.role}
-                  </p>
-                </div>
-                {canManageMembers ? (
-                  <div className="flex gap-2">
-                    <select
-                      className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700 transition focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
-                      onChange={(event) => {
-                        const nextRole = event.target.value as ExamMemberRole
+      {tab === 'students' ? <CandidatesTab canManage={canManageSchedule} examId={exam.id} /> : null}
 
-                        if (nextRole === member.role) {
-                          return
-                        }
-
-                        void (async () => {
-                          try {
-                            if (!(await confirm({ message: `Ban co chac muon doi role thanh ${nextRole}?` }))) {
-                              return
-                            }
-                            const result = await updateMemberMutation.mutateAsync({
-                              examId: exam.id,
-                              memberId: member.id,
-                              payload: { role: nextRole },
-                            })
-                            await refresh()
-                            setMessage(result)
-                            setError(null)
-                          } catch (submitError) {
-                            setError(getErrorMessage(submitError))
-                          }
-                        })()
-                      }}
-                      value={member.role}
-                    >
-                      <option value="AUTHOR">Author</option>
-                      <option value="REVIEWER">Reviewer</option>
-                      <option value="CHAIR">Chair</option>
-                    </select>
-                    <button
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-bold text-red-600 transition hover:bg-red-50"
-                      onClick={() => {
-                        void (async () => {
-                          try {
-                            if (!(await confirm({ message: 'Ban co chac muon go thanh vien nay khoi exam khong?' }))) {
-                              return
-                            }
-                            const result = await deleteMemberMutation.mutateAsync({
-                              examId: exam.id,
-                              memberId: member.id,
-                            })
-                            await refresh()
-                            setMessage(result)
-                            setError(null)
-                          } catch (submitError) {
-                            setError(getErrorMessage(submitError))
-                          }
-                        })()
-                      }}
-                      type="button"
-                    >
-                      Xoa
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center justify-between text-sm font-semibold text-slate-600">
-            <span>
-              {exam.members?.length ?? 0} thÃ nh viÃªn, trang {memberListPage}/{totalMemberPages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
-                disabled={memberListPage <= 1}
-                onClick={() => setMemberListPage((current) => current - 1)}
-                type="button"
-              >
-                Truoc
-              </button>
-              <button
-                className="h-9 rounded-lg border border-slate-200 px-3 transition hover:bg-slate-50 disabled:opacity-50"
-                disabled={memberListPage >= totalMemberPages}
-                onClick={() => setMemberListPage((current) => current + 1)}
-                type="button"
-              >
-                Sau
-              </button>
-            </div>
-          </div>
-        </div>
-        ) : null}
-
-        {activeTab === 'papers' ? (
-        <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-black text-slate-950">De thi / Papers</h2>
-              <p className="mt-1 text-sm font-medium text-slate-600">
-                Exam paper chi mo sau khi CHAIR chot version su dung.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                className={`inline-flex h-10 items-center justify-center rounded-lg border px-4 text-sm font-bold ${canUsePaperActions ? 'border-slate-200 text-slate-700' : 'border-slate-200 text-slate-400'}`}
-                disabled={!canUsePaperActions}
-                onClick={() => navigate(`${basePath}/${exam.id}/papers`)}
-                type="button"
-              >
-                Mo danh sach papers
-              </button>
-              {canManagePapers ? (
-                <button
-                  className={`inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-bold text-white ${canUsePaperActions ? 'bg-indigo-600' : 'bg-slate-300'}`}
-                  disabled={!canUsePaperActions}
-                  onClick={() => {
-                    void (async () => {
-                      if (!canUsePaperActions) {
-                        return
-                      }
-                      try {
-                        const result = await createPaperMutation.mutateAsync(exam.id)
-                        await refresh()
-                        setMessage(result)
-                        setError(null)
-                      } catch (submitError) {
-                        setError(getErrorMessage(submitError))
-                      }
-                    })()
-                  }}
-                  type="button"
-                >
-                  Tao paper
-                </button>
-              ) : null}
-            </div>
-          </div>
-          {!exam.blueprintVersionId ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-              CHAIR can chot blueprint version truoc khi tao paper.
-            </div>
-          ) : null}
-          {exam.blueprintVersionId && !finalizedBlueprintVersion ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-              Khong tim thay version da chot tu blueprint hien tai, nen paper flow dang bi khoa.
-            </div>
-          ) : null}
-          {finalizedBlockingFixedSlots.length ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-              Version da chot van co slot FIXED tro toi question chua PUBLISHED, nen cac thao tac voi paper dang bi khoa.
-            </div>
-          ) : null}
-          <div className="grid gap-4">
-            {exam.papers?.map((paper) => (
-              <div className="grid gap-4 rounded-lg border border-slate-200 p-4" key={paper.id}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-black text-slate-950">{paper.code} - Variant {paper.variant}</p>
-                    <div className="mt-1"><PaperStatusBadge status={paper.status} /></div>
-                  </div>
-                  {canManagePapers ? (
-                    <div className="flex flex-wrap gap-2">
-                      {paperStatusActions.map((action) => (
-                        <button
-                          className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold ${canUsePaperActions ? 'border-slate-200 text-slate-700' : 'border-slate-200 text-slate-400'}`}
-                          disabled={!canUsePaperActions}
-                          key={action}
-                          onClick={() => {
-                            void (async () => {
-                              if (!canUsePaperActions) {
-                                return
-                              }
-                              try {
-                                const result = await updatePaperStatusMutation.mutateAsync({
-                                  paperId: paper.id,
-                                  payload: { action },
-                                })
-                                await refresh()
-                                setMessage(result)
-                                setError(null)
-                              } catch (submitError) {
-                                setError(getErrorMessage(submitError))
-                              }
-                            })()
-                          }}
-                          type="button"
-                        >
-                          {action}
-                        </button>
-                      ))}
-                      <button
-                        className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold ${canUsePaperActions ? 'border-slate-200 text-slate-700' : 'border-slate-200 text-slate-400'}`}
-                        disabled={!canUsePaperActions}
-                        onClick={() => navigate(`${basePath}/${exam.id}/papers/${paper.id}`)}
-                        type="button"
-                      >
-                        Chi tiet paper
-                      </button>
-                      <button
-                        className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold ${canUsePaperActions ? 'border-red-200 text-red-600' : 'border-slate-200 text-slate-400'}`}
-                        disabled={!canUsePaperActions}
-                        onClick={() => {
-                          void (async () => {
-                            if (!canUsePaperActions) {
-                              return
-                            }
-                            try {
-                              const result = await deletePaperMutation.mutateAsync(paper.id)
-                              await refresh()
-                              setMessage(result)
-                              setError(null)
-                            } catch (submitError) {
-                              setError(getErrorMessage(submitError))
-                            }
-                          })()
-                        }}
-                        type="button"
-                      >
-                        Xoa paper
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
-                      onClick={() => navigate(`${basePath}/${exam.id}/papers/${paper.id}`)}
-                      type="button"
-                    >
-                      Chi tiet paper
-                    </button>
-                  )}
-                </div>
-
-                {paper.sections.map((section) => (
-                  <div className="grid gap-3 rounded-lg border border-slate-100 bg-slate-50 p-4" key={section.id}>
-                    <p className="text-sm font-black text-slate-950">
-                      Section {section.order}: {formatNullableText(section.title)}
-                    </p>
-                    {section.items.map((item) => (
-                      <PaperItemEditor
-                        canEdit={canManagePapers && canUsePaperActions}
-                        item={item}
-                        key={item.id}
-                        onSave={async (questionId) => {
-                          try {
-                            const result = await updatePaperItemMutation.mutateAsync({
-                              itemId: item.id,
-                              paperId: paper.id,
-                              payload: { questionId },
-                            })
-                            await refresh()
-                            setMessage(result)
-                            setError(null)
-                          } catch (submitError) {
-                            setError(getErrorMessage(submitError))
-                          }
-                        }}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-        ) : null}
-      </div>
-    </section>
-  )
-}
-
-function CreateExamCard({
-  isSubmitting,
-  onCancel,
-  onSubmit,
-}: {
-  isSubmitting: boolean
-  onCancel: () => void
-  onSubmit: (payload: CreateExamRequest) => void
-}) {
-  const [code, setCode] = useState('')
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-
-  return (
-    <form
-      className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 md:grid-cols-3"
-      onSubmit={(event) => {
-        event.preventDefault()
-        onSubmit({
-          code,
-          description: description || null,
-          languageId: DEFAULT_LANGUAGE_ID,
-          name,
-        })
-      }}
-    >
-      <Field label="Code" value={code} onChange={setCode} />
-      <Field label="Ten exam" value={name} onChange={setName} />
-      <Field label="Mo ta" value={description} onChange={setDescription} />
-      <div className="md:col-span-3 flex justify-end gap-3">
-        <button className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700" onClick={onCancel} type="button">
-          Huy
-        </button>
-        <button className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white" disabled={isSubmitting} type="submit">
-          Tao exam
-        </button>
-      </div>
-    </form>
-  )
-}
-
-function PaperItemEditor({
-  canEdit,
-  item,
-  onSave,
-}: {
-  canEdit: boolean
-  item: { id: string; order: number; question?: { code?: string | null; id: string; questionText?: string | null } | null; questionId?: string | null }
-  onSave: (questionId: string) => void
-}) {
-  const [questionId, setQuestionId] = useState(item.questionId ?? item.question?.id ?? '')
-  const questionCode = (item.question?.code ?? questionId) || 'Chua gan cau hoi'
-
-  useEffect(() => {
-    setQuestionId(item.questionId ?? item.question?.id ?? '')
-  }, [item.id, item.question?.id, item.questionId])
-
-  return (
-    <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3">
-      <div className="text-sm font-black text-slate-950">Item {item.order}</div>
-      <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-        <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Question hien tai</p>
-        <p className="mt-2 text-sm font-black text-slate-950">{questionCode}</p>
-        <p className="mt-1 text-sm font-medium text-slate-600">{formatQuestionNullableText(item.question?.questionText)}</p>
-      </div>
-      {canEdit ? (
-        <QuestionPicker
-          allowStatusChange={false}
-          basePath="/teacher"
-          canEditQuestion={() => true}
-          fixedStatus="PUBLISHED"
-          mode="single"
-          onSelect={(question) => {
-            setQuestionId(question.id)
-            onSave(question.id)
+      {tab === 'blueprint' ? (
+        <BlueprintAttachPanel
+          blueprintId={exam.blueprintId}
+          blueprintVersionId={exam.blueprintVersionId}
+          examId={exam.id}
+          hasPapers={exam.papers.length > 0}
+          members={exam.members}
+          onCreateVersion={(blueprintId) =>
+            navigate(`${basePath.replace(/\/exams$/, '')}/blueprints/${blueprintId}/versions/new`)
+          }
+          onOpenBlueprint={(blueprintId, versionId) => {
+            const blueprintsBasePath = basePath.replace(/\/exams$/, '') + '/blueprints'
+            navigate(versionId ? `${blueprintsBasePath}/${blueprintId}/versions/${versionId}` : `${blueprintsBasePath}/${blueprintId}`)
           }}
-          selectedQuestionIds={questionId ? [questionId] : []}
-          title="Chon cau hoi published"
         />
       ) : null}
-    </div>
+
+      {tab === 'schedule' ? (
+        <ScheduleTab
+          canManage={canManageSchedule}
+          deliveryMode={exam.deliveryMode}
+          examId={exam.id}
+          isClassTest={false}
+          onGoToPapers={() => setTab('papers')}
+          onSetDeliveryMode={canManageSchedule ? (mode) => void handleSetDeliveryMode(exam.id, mode) : undefined}
+          papers={exam.papers}
+          unlocked={completedCount >= 3}
+        />
+      ) : null}
+
+      {showEditModal ? (
+        <EditExamModal
+          exam={exam}
+          onClose={() => setShowEditModal(false)}
+          onSaved={() => {
+            void invalidate()
+            setShowEditModal(false)
+          }}
+        />
+      ) : null}
+    </section>
   )
-}
-
-function Field({
-  label,
-  onChange,
-  placeholder,
-  value,
-}: {
-  label: string
-  onChange: (value: string) => void
-  placeholder?: string
-  value: string
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-bold text-slate-700">
-      {label}
-      <input
-        className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        value={value}
-      />
-    </label>
-  )
-}
-
-function SelectField({
-  label,
-  onChange,
-  options,
-  value,
-}: {
-  label: string
-  onChange: (value: string) => void
-  options: Array<{ label: string; value: string }>
-  value: string
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-bold text-slate-700">
-      {label}
-      <select
-        className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
-function InfoItem({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-      <div className="mt-2 text-sm font-bold text-slate-950">{value}</div>
-    </div>
-  )
-}
-
-function WorkflowReadinessItem({
-  isReady,
-  missingLabel,
-  readyLabel,
-}: {
-  isReady: boolean
-  missingLabel: string
-  readyLabel: string
-}) {
-  return (
-    <div className={`rounded-lg border px-4 py-3 text-sm font-black ${isReady ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
-      {isReady ? readyLabel : missingLabel}
-    </div>
-  )
-}
-
-function ExamTabButton({
-  isActive,
-  label,
-  onClick,
-}: {
-  isActive: boolean
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      className={[
-        'rounded-lg px-4 py-2 text-sm font-bold transition',
-        isActive ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-white',
-      ].join(' ')}
-      onClick={onClick}
-      type="button"
-    >
-      {label}
-    </button>
-  )
-}
-
-export function SchoolAdminExamsPage() {
-  return <ExamListPage allowCreate basePath="/school-admin/exams" kind="CENTRALIZED" title="Kiem tra tap trung" />
-}
-
-export function SchoolAdminExamDetailPage() {
-  return (
-    <ExamDetailPage
-      basePath="/school-admin/exams"
-      blueprintBasePath="/school-admin/blueprints"
-      canManageMembers
-      canManagePapers={false}
-      canManageStatus
-      canUpdateInfo
-      title="Chi tiet kiem tra tap trung"
-    />
-  )
-}
-
-export function TeacherExamsPage() {
-  return <ExamListPage allowCreate={false} basePath="/teacher/exams" kind="CENTRALIZED" title="Kiem tra tap trung cua toi" />
 }
 
 export function TeacherExamDetailPage() {
   return (
     <ExamDetailPage
       basePath="/teacher/exams"
-      blueprintBasePath="/teacher/blueprints"
+      canManageInfo={false}
       canManageMembers={false}
       canManagePapers
       canManageStatus={false}
-      canUpdateInfo={false}
-      title="Chi tiet exam duoc giao"
+      canReleaseSecurePool
     />
   )
 }
 
-export function SystemAdminExamsPage() {
-  return <ExamListPage allowCreate={false} basePath="/system-admin/exams" kind="CENTRALIZED" readOnly title="Giam sat exam" />
-}
-
-export function SystemAdminExamDetailPage() {
+export function SchoolAdminExamDetailPage() {
   return (
     <ExamDetailPage
-      basePath="/system-admin/exams"
-      blueprintBasePath="/system-admin/blueprints"
-      canManageMembers={false}
+      basePath="/school-admin/exams"
+      canManageInfo
+      canManageMembers
       canManagePapers={false}
-      canManageStatus={false}
-      canUpdateInfo={false}
-      title="Chi tiet exam"
+      canManageStatus
+      canReleaseSecurePool={false}
     />
   )
 }

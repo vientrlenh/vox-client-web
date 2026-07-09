@@ -45,6 +45,7 @@ const QUESTION_FIELDS = `
   updatedAt
   createdBy
   updatedBy
+  usableInExam
   topic {
     id
     questionBankId

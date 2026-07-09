@@ -131,6 +131,18 @@ const SchoolAdminGradeImportPage = lazy(() =>
   })),
 )
 
+const SchoolAdminRoomsPage = lazy(() =>
+  import('@/features/school-room').then((module) => ({
+    default: module.SchoolAdminRoomsPage,
+  })),
+)
+
+const SchoolAdminRoomImportPage = lazy(() =>
+  import('@/features/school-room').then((module) => ({
+    default: module.SchoolAdminRoomImportPage,
+  })),
+)
+
 const SchoolAdminStudentsPage = lazy(() =>
   import("@/features/school-users").then((module) => ({
     default: module.SchoolAdminStudentsPage,
@@ -287,70 +299,76 @@ const SystemAdminQuestionImportPage = lazy(() =>
   import("@/features/question").then((m) => ({ default: m.SystemAdminQuestionImportPage })),
 );
 
-// exam: blueprints
-const TeacherBlueprintsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherBlueprintsPage })),
+// classTest: class tests
+const TeacherClassTestsPage = lazy(() =>
+  import("@/features/classTest").then((m) => ({ default: m.TeacherClassTestsPage })),
 );
-const TeacherBlueprintDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherBlueprintDetailPage })),
+const TeacherClassTestCreatePage = lazy(() =>
+  import("@/features/classTest").then((m) => ({ default: m.TeacherClassTestCreatePage })),
 );
-const SchoolAdminBlueprintsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminBlueprintsPage })),
+const TeacherClassTestDetailPage = lazy(() =>
+  import("@/features/classTest").then((m) => ({ default: m.TeacherClassTestDetailPage })),
 );
-const SchoolAdminBlueprintDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminBlueprintDetailPage })),
+const SchoolAdminClassTestsPage = lazy(() =>
+  import("@/features/classTest").then((m) => ({ default: m.SchoolAdminClassTestsPage })),
 );
-const SystemAdminBlueprintsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SystemAdminBlueprintsPage })),
-);
-const SystemAdminBlueprintDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SystemAdminBlueprintDetailPage })),
+const SchoolAdminClassTestDetailPage = lazy(() =>
+  import("@/features/classTest").then((m) => ({ default: m.SchoolAdminClassTestDetailPage })),
 );
 
-// exam: exams
+// exam: centralized exams
 const TeacherExamsPage = lazy(() =>
   import("@/features/exam").then((m) => ({ default: m.TeacherExamsPage })),
 );
 const TeacherExamDetailPage = lazy(() =>
   import("@/features/exam").then((m) => ({ default: m.TeacherExamDetailPage })),
 );
-const TeacherExamPapersPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherExamPapersPage })),
-);
-const TeacherExamPaperDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherExamPaperDetailPage })),
-);
-const TeacherExamPaperEditPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherExamPaperEditPage })),
-);
 const SchoolAdminExamsPage = lazy(() =>
   import("@/features/exam").then((m) => ({ default: m.SchoolAdminExamsPage })),
+);
+const SchoolAdminExamCreatePage = lazy(() =>
+  import("@/features/exam").then((m) => ({ default: m.SchoolAdminExamCreatePage })),
 );
 const SchoolAdminExamDetailPage = lazy(() =>
   import("@/features/exam").then((m) => ({ default: m.SchoolAdminExamDetailPage })),
 );
-const SystemAdminExamsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SystemAdminExamsPage })),
-);
-const SystemAdminExamDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SystemAdminExamDetailPage })),
-);
 
-// exam: class tests
-const TeacherClassTestsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherClassTestsPage })),
+// examCore: exam papers + blueprints (shared by exam & classTest)
+const TeacherExamPaperEditPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.TeacherExamPaperEditPage })),
 );
-const TeacherClassTestCreatePage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherClassTestCreatePage })),
+const SchoolAdminExamPaperViewPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminExamPaperViewPage })),
 );
-const TeacherClassTestDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.TeacherClassTestDetailPage })),
+const TeacherBlueprintsPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.TeacherBlueprintsPage })),
 );
-const SchoolAdminClassTestsPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminClassTestsPage })),
+const TeacherBlueprintDetailPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.TeacherBlueprintDetailPage })),
 );
-const SchoolAdminClassTestDetailPage = lazy(() =>
-  import("@/features/exam").then((m) => ({ default: m.SchoolAdminClassTestDetailPage })),
+const SchoolAdminBlueprintsPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminBlueprintsPage })),
+);
+const SchoolAdminBlueprintDetailPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminBlueprintDetailPage })),
+);
+const TeacherCreateBlueprintVersionPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.TeacherCreateBlueprintVersionPage })),
+);
+const SchoolAdminCreateBlueprintVersionPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminCreateBlueprintVersionPage })),
+);
+const TeacherBlueprintVersionDetailPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.TeacherBlueprintVersionDetailPage })),
+);
+const TeacherEditBlueprintVersionPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.TeacherEditBlueprintVersionPage })),
+);
+const SchoolAdminBlueprintVersionDetailPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminBlueprintVersionDetailPage })),
+);
+const SchoolAdminEditBlueprintVersionPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminEditBlueprintVersionPage })),
 );
 
 export function AppRoutes() {
@@ -407,10 +425,6 @@ export function AppRoutes() {
             <Route path="system-admin/questions/create" element={<SystemAdminCreateQuestionPage />} />
             <Route path="system-admin/questions/:questionId/edit" element={<SystemAdminEditQuestionPage />} />
             <Route path="system-admin/questions/:questionId" element={<SystemAdminQuestionDetailPage />} />
-            <Route path="system-admin/blueprints" element={<SystemAdminBlueprintsPage />} />
-            <Route path="system-admin/blueprints/:blueprintId" element={<SystemAdminBlueprintDetailPage />} />
-            <Route path="system-admin/exams" element={<SystemAdminExamsPage />} />
-            <Route path="system-admin/exams/:examId" element={<SystemAdminExamDetailPage />} />
           </Route>
         </Route>
         <Route element={<RequireRole role="SCHOOL_ADMIN" />}>
@@ -424,7 +438,7 @@ export function AppRoutes() {
               element={<SchoolAdminMonitoringRoomsPage />}
             />
             <Route
-              path="school-admin/monitoring/rooms/:roomId"
+              path="school-admin/monitoring/exams/:examId/rooms/:roomId"
               element={<MonitoringRoomPage />}
             />
             <Route
@@ -458,6 +472,14 @@ export function AppRoutes() {
             <Route
               path="school-admin/grades/:gradeLevelId"
               element={<SchoolAdminGradeLevelDetailPage />}
+            />
+            <Route
+              path="school-admin/rooms"
+              element={<SchoolAdminRoomsPage />}
+            />
+            <Route
+              path="school-admin/rooms/import"
+              element={<SchoolAdminRoomImportPage />}
             />
             <Route
               path="school-admin/students"
@@ -500,12 +522,23 @@ export function AppRoutes() {
             <Route path="school-admin/questions/create" element={<SchoolAdminCreateQuestionPage />} />
             <Route path="school-admin/questions/:questionId/edit" element={<SchoolAdminEditQuestionPage />} />
             <Route path="school-admin/questions/:questionId" element={<SchoolAdminQuestionDetailPage />} />
-            <Route path="school-admin/blueprints" element={<SchoolAdminBlueprintsPage />} />
-            <Route path="school-admin/blueprints/:blueprintId" element={<SchoolAdminBlueprintDetailPage />} />
-            <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
-            <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
-            <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
             <Route path="school-admin/class-tests/:examId" element={<SchoolAdminClassTestDetailPage />} />
+            <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
+            <Route path="school-admin/exam-papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
+            <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
+            <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
+            <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
+            <Route path="school-admin/blueprints/:blueprintId/versions/new" element={<SchoolAdminCreateBlueprintVersionPage />} />
+            <Route
+              path="school-admin/blueprints/:blueprintId/versions/:versionId/edit"
+              element={<SchoolAdminEditBlueprintVersionPage />}
+            />
+            <Route
+              path="school-admin/blueprints/:blueprintId/versions/:versionId"
+              element={<SchoolAdminBlueprintVersionDetailPage />}
+            />
+            <Route path="school-admin/blueprints/:blueprintId" element={<SchoolAdminBlueprintDetailPage />} />
+            <Route path="school-admin/blueprints" element={<SchoolAdminBlueprintsPage />} />
           </Route>
         </Route>
         <Route element={<RequireRole role="TEACHER" />}>
@@ -519,7 +552,7 @@ export function AppRoutes() {
               element={<TeacherMonitoringRoomsPage />}
             />
             <Route
-              path="teacher/monitoring/rooms/:roomId"
+              path="teacher/monitoring/exams/:examId/rooms/:roomId"
               element={<MonitoringRoomPage />}
             />
             <Route path="teacher/question-banks" element={<TeacherQuestionBanksPage />} />
@@ -533,16 +566,17 @@ export function AppRoutes() {
             <Route path="teacher/questions/create" element={<TeacherCreateQuestionPage />} />
             <Route path="teacher/questions/:questionId/edit" element={<TeacherEditQuestionPage />} />
             <Route path="teacher/questions/:questionId" element={<TeacherQuestionDetailPage />} />
-            <Route path="teacher/blueprints" element={<TeacherBlueprintsPage />} />
-            <Route path="teacher/blueprints/:blueprintId" element={<TeacherBlueprintDetailPage />} />
-            <Route path="teacher/exams" element={<TeacherExamsPage />} />
-            <Route path="teacher/exams/:examId/papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
-            <Route path="teacher/exams/:examId/papers/:paperId" element={<TeacherExamPaperDetailPage />} />
-            <Route path="teacher/exams/:examId/papers" element={<TeacherExamPapersPage />} />
-            <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
             <Route path="teacher/class-tests/create" element={<TeacherClassTestCreatePage />} />
             <Route path="teacher/class-tests/:examId" element={<TeacherClassTestDetailPage />} />
             <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
+            <Route path="teacher/exam-papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
+            <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
+            <Route path="teacher/exams" element={<TeacherExamsPage />} />
+            <Route path="teacher/blueprints/:blueprintId/versions/new" element={<TeacherCreateBlueprintVersionPage />} />
+            <Route path="teacher/blueprints/:blueprintId/versions/:versionId/edit" element={<TeacherEditBlueprintVersionPage />} />
+            <Route path="teacher/blueprints/:blueprintId/versions/:versionId" element={<TeacherBlueprintVersionDetailPage />} />
+            <Route path="teacher/blueprints/:blueprintId" element={<TeacherBlueprintDetailPage />} />
+            <Route path="teacher/blueprints" element={<TeacherBlueprintsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

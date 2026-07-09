@@ -44,8 +44,8 @@ function StreamTile({ stream, now }: { stream: StreamView, now: number }) {
   )
 } 
 export function MonitoringRoomPage() {
-  const { roomId } = useParams()
-  const { connectionState, streams } = useRoomMonitor(roomId)
+  const { examId, roomId } = useParams()
+  const { connectionState, streams } = useRoomMonitor({ examId, roomId })
 
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {

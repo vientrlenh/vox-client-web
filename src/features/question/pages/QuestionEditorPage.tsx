@@ -7,7 +7,7 @@ import { useAppSelector } from '@/app/store/hooks'
 import { useSchoolUsersForRequesterQuery } from '@/features/classes/api/useSchoolUsersForRequesterQuery'
 import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
-import { useConfirmationDialog } from '@/shared/ui/ConfirmationDialog'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { useQuestionQuery } from '../api/useQuestionQuery'
 import {
@@ -53,6 +53,9 @@ import {
 } from '../types'
 
 type TabKey = 'assets' | 'content' | 'guide' | 'sharing' | 'workflow'
+
+// Tạm ẩn tab "Tài nguyên" khỏi UI (chưa cho người dùng tương tác) — logic/mutations giữ nguyên, chỉ bật lại bằng cách đổi hằng số này.
+const ASSETS_TAB_ENABLED = false
 
 type EditorFormState = {
   instructionText: string
@@ -276,7 +279,6 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       return
     }
 
-    setSuccessMessage(locationSuccessMessage)
     navigate(`${location.pathname}${location.search}`, {
       replace: true,
       state: teacherView ? { fromView: teacherView } : null,
@@ -288,6 +290,9 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       return
     }
 
+    // question data arrives asynchronously after mount, so the editable draft state
+    // can only be seeded here once the query resolves
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedBankId(questionQuery.data.questionBankId)
     setSelectedTopicId(questionQuery.data.questionTopicId)
     setForm({
@@ -654,7 +659,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
         <div className="flex flex-wrap gap-2">
           {[
             { id: 'content', label: 'Nội dung' },
-            { id: 'assets', label: 'Tài nguyên' },
+            ...(ASSETS_TAB_ENABLED ? [{ id: 'assets', label: 'Tài nguyên' }] : []),
             { id: 'guide', label: 'Hướng dẫn chấm' },
             ...(mode === 'edit'
               ? [
@@ -1184,10 +1189,13 @@ function QuestionSharingPanel({
   const { confirm, dialog } = useConfirmationDialog()
 
   useEffect(() => {
+    // resync the local draft whenever the question is refetched (e.g. after a sharing mutation)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSharing(question.sharing)
   }, [question.sharing])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollaboratorPermissions(
       Object.fromEntries(
         (question.collaborators ?? []).map((collaborator) => [

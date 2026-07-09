@@ -12,7 +12,8 @@
     "axe/aria": [
       "default",
       {
-        "aria-roles": "off"
+        "aria-roles": "off",
+        "aria-valid-attr-value": "off"
       }
     ]
   }

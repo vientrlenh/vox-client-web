@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { AxiosError } from 'axios'
 import { appConfig } from '@/shared/config/env'
 import type { ApiError } from './apiError'
 import { getAuthTokens } from './authTokenStorage'
@@ -32,6 +32,28 @@ graphqlApiClient.interceptors.request.use((config) => {
   }
 
   return config
+})
+
+const AUTH_CLASSIFICATIONS = new Set(['UNAUTHORIZED', 'UNAUTHENTICATED', 'FORBIDDEN'])
+
+function hasAuthError(errors: GraphQLErrorResponse[] | undefined) {
+  return !!errors?.some((e) => {
+    const c = (e.extensions as { classification?: string } | undefined)?.classification
+    return c !== undefined && AUTH_CLASSIFICATIONS.has(c)
+  })
+}
+
+graphqlApiClient.interceptors.response.use((response) => {
+  if (hasAuthError((response.data as GraphQLResponse<unknown>).errors)) {
+    throw new AxiosError(
+      'GraphQL authorization error', 
+      AxiosError.ERR_BAD_REQUEST, 
+      response.config, 
+      response.request, 
+      { ...response, status: 401, statusText: 'Unauthorized' },
+    )
+  }
+  return response
 })
 
 export const addGraphqlClientRawErrorInterceptor = createRawErrorInterceptorInstaller(graphqlApiClient)

@@ -1,6 +1,12 @@
 
 export type StreamType = 'camera' | 'screen'
 
+export type StreamTokenRequest = {
+  examId: string
+  roomIds: string[]
+  streamTypes: StreamType[]
+}
+
 export type AlertType =
   | 'FACE_NOT_VISIBLE'
   | 'MULTIPLE_PERSONS'

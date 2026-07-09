@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Bell,
   Building2,
   ChevronDown,
-  ClipboardCheck,
   ClipboardList,
   FileQuestion,
   Home,
@@ -99,20 +98,6 @@ const navigationGroups: NavigationGroup[] = [
       },
     ],
   },
-  {
-    icon: ClipboardCheck,
-    label: 'Kỳ thi',
-    items: [
-      {
-        label: 'Giám sát kỳ thi',
-        to: '/system-admin/exams',
-      },
-      {
-        label: 'Giám sát blueprint',
-        to: '/system-admin/blueprints',
-      },
-    ],
-  },
 ]
 
 function getEmailInitials(email?: string) {
@@ -146,13 +131,8 @@ function SystemAdminNavigationGroup({
 }: NavigationGroup & { onNavigate?: () => void }) {
   const location = useLocation()
   const isGroupActive = items.some(({ to }) => location.pathname.startsWith(to))
-  const [isOpen, setIsOpen] = useState(isGroupActive)
-
-  useEffect(() => {
-    if (isGroupActive) {
-      setIsOpen(true)
-    }
-  }, [isGroupActive])
+  const [manualOpen, setManualOpen] = useState<boolean | null>(null)
+  const isOpen = manualOpen ?? isGroupActive
 
   return (
     <div className="grid gap-2">
@@ -162,7 +142,7 @@ function SystemAdminNavigationGroup({
           'flex min-h-12 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-bold transition',
           isGroupActive ? 'bg-white/10 text-white' : 'text-indigo-50/90',
         ].join(' ')}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() => setManualOpen(!isOpen)}
         type="button"
       >
         <Icon aria-hidden="true" className="size-5 shrink-0" />
