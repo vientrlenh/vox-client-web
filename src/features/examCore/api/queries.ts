@@ -61,6 +61,7 @@ export const EXAM_LIST_FIELDS = `
   id
   blueprintId
   blueprintVersionId
+  assessmentPolicyId
   code
   name
   description

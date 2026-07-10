@@ -370,6 +370,9 @@ const SchoolAdminBlueprintVersionDetailPage = lazy(() =>
 const SchoolAdminEditBlueprintVersionPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.SchoolAdminEditBlueprintVersionPage })),
 );
+const SchoolAdminSelectRubricVersionPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminSelectRubricVersionPage })),
+);
 
 export function AppRoutes() {
   return (
@@ -526,6 +529,7 @@ export function AppRoutes() {
             <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
             <Route path="school-admin/exam-papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
+            <Route path="school-admin/rubric-versions/select" element={<SchoolAdminSelectRubricVersionPage />} />
             <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
             <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
             <Route path="school-admin/blueprints/:blueprintId/versions/new" element={<SchoolAdminCreateBlueprintVersionPage />} />

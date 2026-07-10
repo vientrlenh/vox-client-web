@@ -28,6 +28,8 @@ export type ExamDeliveryMode = 'DEVICE' | 'LAB'
 
 export type ResultDecisionMethod = 'HIGHEST' | 'LATEST' | 'AVERAGE' | 'FIRST'
 
+export type AssessmentPolicyStrictness = 'LENIENT' | 'STANDARD' | 'STRICT'
+
 export const RESULT_DECISION_METHODS: ResultDecisionMethod[] = ['HIGHEST', 'LATEST', 'AVERAGE', 'FIRST']
 
 export type ExamSecurePoolStatus = 'SEALED' | 'RELEASED'
@@ -158,6 +160,37 @@ export type ExamBlueprintDto = {
   versions: ExamBlueprintVersionDto[]
 }
 
+export type RubricVersionDto = {
+  code: string
+  id: string
+  name: string
+  rubricId: string
+  status: ExamBlueprintVersionStatus
+  version: number
+}
+
+export type RubricDto = {
+  code: string
+  frameworkId: string
+  id: string
+  languageId: string
+  name: string
+  versions: RubricVersionDto[]
+}
+
+export type AssessmentPolicyDto = {
+  effectiveFrom?: string | null
+  effectiveTo?: string | null
+  id: string
+  languageId: string
+  passingScore?: number | null
+  rubricVersion?: RubricVersionDto | null
+  rubricVersionId: string
+  status: string
+  strictness: AssessmentPolicyStrictness
+  version: number
+}
+
 export type SchoolRoomLite = {
   code: string
   description?: string | null
@@ -218,6 +251,7 @@ export function getCandidateName(candidate: Pick<ExamCandidateDto, 'student' | '
 }
 
 export type ExamDto = {
+  assessmentPolicyId?: string | null
   blueprintId?: string | null
   blueprintVersionId?: string | null
   closeAt?: string | null
@@ -384,6 +418,19 @@ export function getBlueprintVersionStatusDisplay(status?: string | null): { tone
       return { tone: 'neutral', label: 'Lưu trữ' }
     default:
       return { tone: 'neutral', label: String(status ?? '-') }
+  }
+}
+
+export function getAssessmentPolicyStrictnessLabel(strictness?: AssessmentPolicyStrictness | string | null): string {
+  switch (strictness) {
+    case 'LENIENT':
+      return 'Nới lỏng'
+    case 'STANDARD':
+      return 'Tiêu chuẩn'
+    case 'STRICT':
+      return 'Nghiêm ngặt'
+    default:
+      return '-'
   }
 }
 
