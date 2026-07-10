@@ -226,48 +226,54 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
               </div>
             )}
             <div className="mt-3.5 grid gap-2.5">
-              {section.items.map((item) => (
-                <div
-                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5"
-                  key={item.id}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                      {item.order}.{' '}
-                      {item.question ? (
-                        <>
-                          {item.question.code}
-                          <CircleCheck aria-hidden="true" className="size-4 text-emerald-600" />
-                        </>
-                      ) : (
-                        <span className="text-amber-700">Chưa gán câu hỏi</span>
-                      )}
+              {section.items.map((item) => {
+                const isAssignedButHidden = !item.question && Boolean(item.questionId)
+                return (
+                  <div
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5"
+                    key={item.id}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                        {item.order}.{' '}
+                        {item.question ? (
+                          <>
+                            {item.question.code}
+                            <CircleCheck aria-hidden="true" className="size-4 text-emerald-600" />
+                          </>
+                        ) : isAssignedButHidden ? (
+                          <span className="text-slate-500">Đã gán câu hỏi — bạn không có quyền xem nội dung</span>
+                        ) : (
+                          <span className="text-amber-700">Chưa gán câu hỏi</span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs text-slate-500">{formatNullableText(item.question?.questionText)}</p>
                     </div>
-                    <p className="truncate text-xs text-slate-500">{formatNullableText(item.question?.questionText)}</p>
+                    {item.question ? (
+                      <a
+                        aria-label={`Xem chi tiết ${item.question.code}`}
+                        className="inline-flex size-8.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        href={`${canManage ? '/teacher' : '/school-admin'}/questions/${item.question.id}`}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                        title="Xem chi tiết câu hỏi"
+                      >
+                        <Eye aria-hidden="true" className="size-4" />
+                      </a>
+                    ) : null}
+                    {canEditPaperContent ? (
+                      <button
+                        className="inline-flex h-8.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-slate-50"
+                        onClick={() => setPickerItemId(item.id)}
+                        title={isAssignedButHidden ? 'Đã có câu hỏi được gán — đổi sẽ thay thế câu hỏi hiện tại' : undefined}
+                        type="button"
+                      >
+                        {item.question || isAssignedButHidden ? 'Đổi câu hỏi' : 'Gán câu hỏi'}
+                      </button>
+                    ) : null}
                   </div>
-                  {item.question ? (
-                    <a
-                      aria-label={`Xem chi tiết ${item.question.code}`}
-                      className="inline-flex size-8.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                      href={`${canManage ? '/teacher' : '/school-admin'}/questions/${item.question.id}`}
-                      rel="noopener noreferrer"
-                      target="_blank"
-                      title="Xem chi tiết câu hỏi"
-                    >
-                      <Eye aria-hidden="true" className="size-4" />
-                    </a>
-                  ) : null}
-                  {canEditPaperContent ? (
-                    <button
-                      className="inline-flex h-8.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-slate-50"
-                      onClick={() => setPickerItemId(item.id)}
-                      type="button"
-                    >
-                      {item.question ? 'Đổi câu hỏi' : 'Gán câu hỏi'}
-                    </button>
-                  ) : null}
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ))}

@@ -33,6 +33,7 @@ type FixedQuestionRef = { code?: string | null; id: string; questionText?: strin
 type SlotDraft = {
   difficulty: string
   fixedQuestion: FixedQuestionRef | null
+  fixedQuestionId: string | null
   id?: string
   key: string
   prepTimeSecondsOverride: string
@@ -59,6 +60,7 @@ function newSlot(): SlotDraft {
   return {
     difficulty: 'MEDIUM',
     fixedQuestion: null,
+    fixedQuestionId: null,
     key: nextKey('slot'),
     prepTimeSecondsOverride: '',
     questionType: 'SHORT_ANSWER',
@@ -90,6 +92,7 @@ function slotFromDto(slot: ExamBlueprintSectionDto['slots'][number]): SlotDraft 
   return {
     difficulty: slot.selectionSpec?.difficulty ?? 'MEDIUM',
     fixedQuestion: slot.fixedQuestion ?? null,
+    fixedQuestionId: slot.fixedQuestionId ?? null,
     id: slot.id,
     key: nextKey('slot'),
     prepTimeSecondsOverride: slot.prepTimeSecondsOverride != null ? String(slot.prepTimeSecondsOverride) : '',
@@ -229,7 +232,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
         return
       }
       for (const slot of section.slots) {
-        if (slot.slotType === 'FIXED' && !slot.fixedQuestion) {
+        if (slot.slotType === 'FIXED' && !slot.fixedQuestion && !slot.fixedQuestionId) {
           window.alert(`Phần "${section.title}" có ô câu hỏi chưa chọn câu hỏi cố định.`)
           return
         }
@@ -252,7 +255,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
       sectionWeight: sectionWeightOf(section),
       slots: section.slots.map((slot, slotIndex): UpdateBlueprintVersionSlotInput => ({
         id: slot.id ?? null,
-        fixedQuestionId: slot.slotType === 'FIXED' ? slot.fixedQuestion?.id ?? null : null,
+        fixedQuestionId: slot.slotType === 'FIXED' ? slot.fixedQuestionId ?? slot.fixedQuestion?.id ?? null : null,
         order: slotIndex + 1,
         prepTimeSecondsOverride: slot.prepTimeSecondsOverride.trim() ? Number(slot.prepTimeSecondsOverride) : null,
         responseTimeSecondsOverride: slot.responseTimeSecondsOverride.trim() ? Number(slot.responseTimeSecondsOverride) : null,
@@ -442,6 +445,10 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                         <span className="text-xs font-semibold text-slate-700">
                           {slot.fixedQuestion.code} · {slot.fixedQuestion.questionText}
                         </span>
+                      ) : slot.fixedQuestionId ? (
+                        <span className="text-xs font-semibold text-slate-500">
+                          Đã chọn câu hỏi — bạn không có quyền xem nội dung
+                        </span>
                       ) : (
                         <span className="text-xs font-semibold text-amber-600">Chưa chọn câu hỏi</span>
                       )}
@@ -460,9 +467,10 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                       <button
                         className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-600 hover:bg-slate-50"
                         onClick={() => setPickerForSlotKey(slot.key)}
+                        title={slot.fixedQuestionId && !slot.fixedQuestion ? 'Đã có câu hỏi được gán — đổi sẽ thay thế câu hỏi hiện tại' : undefined}
                         type="button"
                       >
-                        {slot.fixedQuestion ? 'Đổi câu hỏi' : 'Chọn câu hỏi'}
+                        {slot.fixedQuestion || slot.fixedQuestionId ? 'Đổi câu hỏi' : 'Chọn câu hỏi'}
                       </button>
                     </div>
                   ) : (
@@ -555,7 +563,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
         <QuestionPicker
           onClose={() => setPickerForSlotKey(null)}
           onSelect={(question) => {
-            updateSlot(activeSlot.section.key, activeSlot.slot.key, { fixedQuestion: question })
+            updateSlot(activeSlot.section.key, activeSlot.slot.key, { fixedQuestion: question, fixedQuestionId: question.id })
             setPickerForSlotKey(null)
           }}
           publishedOnly

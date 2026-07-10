@@ -647,10 +647,14 @@ export function TeacherClassTestCreatePage() {
                                   ) : (
                                     <span className="italic text-amber-700">Chọn ngẫu nhiên theo tiêu chí (chưa gán)</span>
                                   )
-                                ) : (
+                                ) : slot.fixedQuestion ? (
                                   <>
-                                    {slot.fixedQuestion?.code ?? '—'} — {formatNullableText(slot.fixedQuestion?.questionText)}
+                                    {slot.fixedQuestion.code} — {formatNullableText(slot.fixedQuestion.questionText)}
                                   </>
+                                ) : slot.fixedQuestionId ? (
+                                  <span className="italic text-slate-500">Đã chọn — bạn không có quyền xem nội dung</span>
+                                ) : (
+                                  '—'
                                 )}
                               </span>
                               {slot.slotType === 'SELECTION' ? (
@@ -661,6 +665,17 @@ export function TeacherClassTestCreatePage() {
                                 >
                                   {assigned ? 'Đổi' : 'Chọn câu hỏi'}
                                 </button>
+                              ) : slot.fixedQuestion ? (
+                                <a
+                                  aria-label={`Xem chi tiết ${slot.fixedQuestion.code}`}
+                                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                  href={`/teacher/questions/${slot.fixedQuestion.id}`}
+                                  rel="noopener noreferrer"
+                                  target="_blank"
+                                  title="Xem chi tiết câu hỏi"
+                                >
+                                  <Eye aria-hidden="true" className="size-3.5" />
+                                </a>
                               ) : null}
                             </div>
                           )
