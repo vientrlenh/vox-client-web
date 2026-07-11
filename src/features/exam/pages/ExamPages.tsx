@@ -608,41 +608,51 @@ function ExamDetailPage({
 
       <DetailHeaderCard
         actions={
-          canManageStatus ? (
-            <>
-              <button
-                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
-                onClick={() => {
-                  void (async () => {
-                    if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
-                      return
-                    }
-                    await deleteMutation.mutateAsync(exam.id)
-                    await invalidate()
-                    navigate(basePath)
-                  })()
-                }}
-                type="button"
-              >
-                <Trash2 aria-hidden="true" className="size-4" />
-                Xóa
-              </button>
-              {primaryStatusAction ? (
+          <>
+            <button
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              onClick={() => navigate(`${basePath.replace('/exams', '/exam-results')}?examId=${exam.id}`)}
+              type="button"
+            >
+              <ClipboardList aria-hidden="true" className="size-4" />
+              Xem kết quả
+            </button>
+            {canManageStatus ? (
+              <>
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
-                  onClick={() =>
-                    void updateStatusMutation
-                      .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
-                      .then(() => invalidate())
-                  }
+                  className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                  onClick={() => {
+                    void (async () => {
+                      if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
+                        return
+                      }
+                      await deleteMutation.mutateAsync(exam.id)
+                      await invalidate()
+                      navigate(basePath)
+                    })()
+                  }}
                   type="button"
                 >
-                  {primaryStatusAction.icon}
-                  {primaryStatusAction.label}
+                  <Trash2 aria-hidden="true" className="size-4" />
+                  Xóa
                 </button>
-              ) : null}
-            </>
-          ) : null
+                {primaryStatusAction ? (
+                  <button
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                    onClick={() =>
+                      void updateStatusMutation
+                        .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
+                        .then(() => invalidate())
+                    }
+                    type="button"
+                  >
+                    {primaryStatusAction.icon}
+                    {primaryStatusAction.label}
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+          </>
         }
         metaItems={[
           { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },

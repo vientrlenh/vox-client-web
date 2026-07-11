@@ -3,6 +3,7 @@ import { useAppSelector } from "../store/hooks";
 import { SystemAdminLayout } from "./SystemAdminLayout";
 import { SchoolAdminLayout } from "./SchoolAdminLayout";
 import { TeacherLayout } from "./TeacherLayout";
+import { StudentLayout } from "./StudentLayout";
 
 export function RoleLayout() {
     const user = useAppSelector((state) => state.auth.user)
@@ -21,6 +22,9 @@ export function RoleLayout() {
 
     if (user.roles.includes('TEACHER')) {
         return <TeacherLayout/>
+    }
+    if (user.roles.includes('STUDENT')) {
+        return <StudentLayout/>
     }
     return <Navigate replace to="/login"/>
 }

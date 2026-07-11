@@ -26,9 +26,9 @@ export type ExamScheduleStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'MOVED' |
 
 export type ExamDeliveryMode = 'DEVICE' | 'LAB'
 
-export type ResultDecisionMethod = 'HIGHEST' | 'LATEST' | 'AVERAGE' | 'FIRST'
+export type ResultDecisionMethod = 'HIGHEST' | 'LATEST' | 'AVERAGE' | 'FIRST' | 'LOWEST'
 
-export const RESULT_DECISION_METHODS: ResultDecisionMethod[] = ['HIGHEST', 'LATEST', 'AVERAGE', 'FIRST']
+export const RESULT_DECISION_METHODS: ResultDecisionMethod[] = ['HIGHEST', 'LATEST', 'AVERAGE', 'FIRST', 'LOWEST']
 
 export type ExamSecurePoolStatus = 'SEALED' | 'RELEASED'
 
@@ -194,11 +194,25 @@ export type ExamSecurePoolDto = {
   status: ExamSecurePoolStatus
 }
 
+export type ExamAttemptSummaryDto = {
+  rubricResultBandCode?: string | null
+  rubricResultBandName?: string | null
+  sessionId: string
+  startedAt?: string | null
+  status: string
+  submittedAt?: string | null
+  totalScore?: number | null
+}
+
 export type ExamCandidateDto = {
   assignedAt?: string | null
   assignedPaperId?: string | null
+  attempts: ExamAttemptSummaryDto[]
   examId: string
   id: string
+  latestSessionId?: string | null
+  officialAttempt?: ExamAttemptSummaryDto | null
+  officialScore?: number | null
   scheduleId?: string | null
   status: ExamCandidateStatus
   student?: {
@@ -412,6 +426,8 @@ export function getResultDecisionMethodDisplay(method?: ResultDecisionMethod | s
       return 'Điểm trung bình'
     case 'FIRST':
       return 'Lượt đầu tiên'
+    case 'LOWEST':
+      return 'Điểm thấp nhất'
     default:
       return '-'
   }

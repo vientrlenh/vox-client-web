@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { SchoolAdminLayout } from "@/app/layouts/SchoolAdminLayout";
+import { StudentLayout } from "@/app/layouts/StudentLayout";
 import { SystemAdminLayout } from "@/app/layouts/SystemAdminLayout";
 import { TeacherLayout } from "@/app/layouts/TeacherLayout";
 import { RequireRole } from "./RequireRole";
@@ -333,6 +334,42 @@ const SchoolAdminExamDetailPage = lazy(() =>
   import("@/features/exam").then((m) => ({ default: m.SchoolAdminExamDetailPage })),
 );
 
+const SchoolAdminExamResultsListPage = lazy(() =>
+  import("@/features/exam-results").then((module) => ({
+    default: module.SchoolAdminExamResultsListPage,
+  })),
+);
+
+const SchoolAdminExamResultDetailPage = lazy(() =>
+  import("@/features/exam-results").then((module) => ({
+    default: module.SchoolAdminExamResultDetailPage,
+  })),
+);
+
+const TeacherExamResultsListPage = lazy(() =>
+  import("@/features/exam-results").then((module) => ({
+    default: module.TeacherExamResultsListPage,
+  })),
+);
+
+const TeacherExamResultDetailPage = lazy(() =>
+  import("@/features/exam-results").then((module) => ({
+    default: module.TeacherExamResultDetailPage,
+  })),
+);
+
+const StudentExamsPage = lazy(() =>
+  import("@/features/student-exams").then((module) => ({
+    default: module.StudentExamsPage,
+  })),
+);
+
+const StudentExamResultPage = lazy(() =>
+  import("@/features/student-exams").then((module) => ({
+    default: module.StudentExamResultPage,
+  })),
+);
+
 // examCore: exam papers + blueprints (shared by exam & classTest)
 const TeacherExamPaperEditPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.TeacherExamPaperEditPage })),
@@ -528,6 +565,8 @@ export function AppRoutes() {
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
             <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
             <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
+            <Route path="school-admin/exam-results" element={<SchoolAdminExamResultsListPage />} />
+            <Route path="school-admin/exam-results/:sessionId" element={<SchoolAdminExamResultDetailPage />} />
             <Route path="school-admin/blueprints/:blueprintId/versions/new" element={<SchoolAdminCreateBlueprintVersionPage />} />
             <Route
               path="school-admin/blueprints/:blueprintId/versions/:versionId/edit"
@@ -572,11 +611,19 @@ export function AppRoutes() {
             <Route path="teacher/exam-papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
             <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
             <Route path="teacher/exams" element={<TeacherExamsPage />} />
+            <Route path="teacher/exam-results" element={<TeacherExamResultsListPage />} />
+            <Route path="teacher/exam-results/:sessionId" element={<TeacherExamResultDetailPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/new" element={<TeacherCreateBlueprintVersionPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/:versionId/edit" element={<TeacherEditBlueprintVersionPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/:versionId" element={<TeacherBlueprintVersionDetailPage />} />
             <Route path="teacher/blueprints/:blueprintId" element={<TeacherBlueprintDetailPage />} />
             <Route path="teacher/blueprints" element={<TeacherBlueprintsPage />} />
+          </Route>
+        </Route>
+        <Route element={<RequireRole role="STUDENT" />}>
+          <Route element={<StudentLayout />}>
+            <Route path="student/exams" element={<StudentExamsPage />} />
+            <Route path="student/exams/:sessionId/result" element={<StudentExamResultPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

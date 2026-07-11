@@ -144,6 +144,26 @@ const EXAM_CANDIDATE_FIELDS = `
   id
   examId
   studentId
+  latestSessionId
+  attempts {
+    sessionId
+    startedAt
+    submittedAt
+    status
+    totalScore
+    rubricResultBandCode
+    rubricResultBandName
+  }
+  officialAttempt {
+    sessionId
+    startedAt
+    submittedAt
+    status
+    totalScore
+    rubricResultBandCode
+    rubricResultBandName
+  }
+  officialScore
   scheduleId
   assignedPaperId
   status

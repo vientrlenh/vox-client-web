@@ -1,0 +1,628 @@
+import { useMemo, useState } from 'react'
+import { useQueries } from '@tanstack/react-query'
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  ClipboardList,
+  FileText,
+  Gauge,
+  Hash,
+  MessageSquareQuote,
+  Mic2,
+  Search,
+  Target,
+  UserRound,
+} from 'lucide-react'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
+import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
+import { Pagination } from '@/shared/components/Pagination'
+import { AudioReplayButton } from '@/shared/ui/AudioReplayButton'
+import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
+import { StatCard } from '@/shared/ui/StatCard'
+import { StatusBadge } from '@/shared/ui/StatusBadge'
+import { TabPillGroup } from '@/shared/ui/TabPill'
+import { WordFeedbackText } from '@/shared/ui/WordFeedbackText'
+import { examResultQueryKeys, fetchExamItemEvaluation, useExamSessionResultQuery } from '../api/useExamResultQueries'
+import { formatScore, getExamResultStatusDisplay, type ExamCandidateResultDto, type ExamItemEvaluationDto } from '../types'
+
+const PAGE_SIZE = 10
+
+function getPendingRowStatus(candidateStatus?: string | null) {
+  switch (candidateStatus) {
+    case 'ABSENT':
+      return { label: 'Vắng thi', tone: 'danger' as const }
+    case 'EXEMPTED':
+      return { label: 'Miễn thi', tone: 'neutral' as const }
+    case 'COMPLETED':
+      return { label: 'Đã nộp, chưa chấm', tone: 'info' as const }
+    default:
+      return { label: 'Chưa có kết quả', tone: 'warning' as const }
+  }
+}
+
+function getAttemptStatusDisplay(status?: string | null) {
+  switch (status) {
+    case 'GRADED':
+      return { label: 'Đã chấm', tone: 'success' as const }
+    case 'GRADING':
+      return { label: 'Đang chấm', tone: 'info' as const }
+    case 'GRADING_FAILED':
+      return { label: 'Chấm lỗi', tone: 'danger' as const }
+    case 'SUBMITTED':
+      return { label: 'Đã nộp', tone: 'info' as const }
+    case 'IN_PROGRESS':
+      return { label: 'Đang làm', tone: 'warning' as const }
+    case 'EXPIRED':
+      return { label: 'Hết giờ', tone: 'neutral' as const }
+    default:
+      return { label: status ?? 'Chưa có kết quả', tone: 'neutral' as const }
+  }
+}
+
+function ResultBand({
+  attempt,
+  officialScore,
+}: {
+  attempt?: ExamAttemptSummaryDto | null
+  officialScore?: number | null
+}) {
+  if (typeof officialScore !== 'number' || Number.isNaN(officialScore)) {
+    return <span className="text-[13px] text-slate-400">-</span>
+  }
+
+  return (
+    <div>
+      <p className="text-[13px] font-bold text-slate-900">{formatScore(officialScore)}</p>
+      <p className="text-xs text-slate-500">{attempt?.rubricResultBandName ?? attempt?.rubricResultBandCode ?? 'Chưa gán band'}</p>
+    </div>
+  )
+}
+
+function AttemptRows({
+  attempts,
+  detailBasePath,
+  navigate,
+  officialAttempt,
+  officialScore,
+}: {
+  attempts: ExamAttemptSummaryDto[]
+  detailBasePath: string
+  navigate: ReturnType<typeof useNavigate>
+  officialAttempt?: ExamAttemptSummaryDto | null
+  officialScore?: number | null
+}) {
+  if (attempts.length === 0) {
+    return <div className="px-4 py-5 text-center text-xs text-slate-400">Thí sinh này chưa có lượt thi nào.</div>
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="grid grid-cols-[72px_1.2fr_140px_1fr_110px] gap-3 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        <span>Lượt</span>
+        <span>Thời gian</span>
+        <span>Trạng thái</span>
+        <span>Điểm / band</span>
+        <span>Chi tiết</span>
+      </div>
+
+      {attempts.map((attempt, index) => {
+        const attemptStatus = getAttemptStatusDisplay(attempt.status)
+        const isOfficialAttempt = officialAttempt?.sessionId === attempt.sessionId
+        return (
+          <div
+            className="grid grid-cols-[72px_1.2fr_140px_1fr_110px] items-center gap-3 border-t border-slate-100 px-3 py-3"
+            key={attempt.sessionId}
+          >
+            <div className="text-sm font-bold text-slate-700">#{attempts.length - index}</div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{formatDateTime(attempt.startedAt)}</p>
+              <p className="text-xs text-slate-500">Nộp bài: {formatDateTime(attempt.submittedAt)}</p>
+            </div>
+            <span>
+              <StatusBadge label={attemptStatus.label} tone={attemptStatus.tone} />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-slate-900">{formatScore(attempt.totalScore)}</p>
+              <p className="text-xs text-slate-500">
+                {attempt.rubricResultBandName ?? attempt.rubricResultBandCode ?? 'Chưa gán band'}
+              </p>
+              {isOfficialAttempt ? (
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <StatusBadge label="Chính thức" tone="violet" />
+                  {officialScore != null && officialScore !== attempt.totalScore ? (
+                    <span className="text-xs text-slate-500">Điểm chính thức: {formatScore(officialScore)}</span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <span>
+              {attempt.totalScore != null ? (
+                <button
+                  className="inline-flex h-8.5 items-center justify-center gap-1 rounded-full border border-slate-200 px-3 text-xs font-bold text-indigo-600 transition hover:bg-slate-50"
+                  onClick={() => navigate(`${detailBasePath}/${attempt.sessionId}`)}
+                  type="button"
+                >
+                  Xem
+                  <ArrowRight aria-hidden="true" className="size-3.5" />
+                </button>
+              ) : (
+                <span className="text-xs text-slate-400">-</span>
+              )}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function ExamResultsListPage({ detailBasePath }: { detailBasePath: string }) {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const examId = searchParams.get('examId')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [expandedCandidates, setExpandedCandidates] = useState<Record<string, boolean>>({})
+  const examQuery = useExamQuery(examId)
+  const candidatesQuery = useExamCandidatesQuery(examId)
+  const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
+  const rows = useMemo(() => candidates.map((candidate) => ({ candidate })), [candidates])
+
+  const filteredRows = useMemo(() => {
+    const keyword = search.trim().toLowerCase()
+    if (!keyword) {
+      return rows
+    }
+
+    return rows.filter(({ candidate }) => {
+      const name = getCandidateName(candidate).toLowerCase()
+      const email = (candidate.student?.email ?? '').toLowerCase()
+      return name.includes(keyword) || email.includes(keyword)
+    })
+  }, [rows, search])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const visibleRows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const gradedRows = rows.filter((row) => typeof row.candidate.officialScore === 'number')
+  const pendingReviewCount = rows.filter((row) =>
+    (row.candidate.attempts ?? []).some((attempt) => attempt.status === 'SUBMITTED' || attempt.status === 'GRADING'),
+  ).length
+  const averageScore =
+    gradedRows.length === 0
+      ? '-'
+      : formatScore(gradedRows.reduce((sum, row) => sum + (row.candidate.officialScore ?? 0), 0) / gradedRows.length)
+
+  if (!examId) {
+    return (
+      <section className="mx-auto max-w-240">
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
+          <h1 className="text-2xl font-extrabold text-slate-900">Kết quả kỳ thi</h1>
+          <p className="mt-3 text-sm text-slate-500">Trang này cần `examId` để nạp danh sách thí sinh và kết quả.</p>
+        </div>
+      </section>
+    )
+  }
+
+  if (examQuery.isLoading || candidatesQuery.isLoading) {
+    return (
+      <section className="mx-auto max-w-240">
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
+          Đang tải danh sách kết quả...
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="mx-auto max-w-290">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">Kết quả kỳ thi</h1>
+          <p className="mt-2 text-[15px] text-slate-500">
+            {examQuery.data ? `${examQuery.data.name} • ${examQuery.data.code}` : 'Đang tải thông tin kỳ thi...'}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-4">
+        <StatCard icon={<UserRound size={19} />} iconTone="indigo" label="Tổng thí sinh" value={rows.length} />
+        <StatCard icon={<CheckCircle2 size={19} />} iconTone="emerald" label="Đã có kết quả" value={gradedRows.length} />
+        <StatCard icon={<ClipboardList size={19} />} iconTone="amber" label="Chờ chấm" value={pendingReviewCount} />
+        <StatCard icon={<Gauge size={19} />} iconTone="violet" label="Điểm trung bình" value={averageScore} />
+      </div>
+
+      <div className="mt-3.5 rounded-2xl border border-slate-200 bg-white p-5.5">
+        <div className="relative min-w-50 max-w-120">
+          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <input
+            className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPage(1)
+            }}
+            placeholder="Tìm theo tên hoặc email..."
+            value={search}
+          />
+        </div>
+
+        <div className="mt-3.5 overflow-hidden rounded-xl border border-slate-200">
+          <div className="grid grid-cols-[1.2fr_0.8fr_160px_120px] gap-3 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <span>Thí sinh</span>
+            <span>Điểm / band</span>
+            <span>Trạng thái</span>
+            <span>Chi tiết</span>
+          </div>
+
+          {visibleRows.length === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-slate-400">Không tìm thấy kết quả phù hợp.</div>
+          ) : (
+            visibleRows.map(({ candidate }) => {
+              const attempts = candidate.attempts ?? []
+              const statusDisplay = candidate.officialAttempt
+                ? getAttemptStatusDisplay(candidate.officialAttempt.status)
+                : getPendingRowStatus(candidate.status)
+              const isExpanded = expandedCandidates[candidate.id] ?? false
+
+              return (
+                <div className="border-t border-slate-100" key={candidate.id}>
+                  <div className="grid grid-cols-[1.2fr_0.8fr_160px_120px] items-center gap-3 px-4 py-3">
+                    <div>
+                      <p className="text-[13px] font-semibold text-slate-900">{getCandidateName(candidate)}</p>
+                      <p className="text-xs text-slate-500">{candidate.student?.email ?? candidate.studentId}</p>
+                    </div>
+                    <ResultBand attempt={candidate.officialAttempt} officialScore={candidate.officialScore} />
+                    <span>
+                      <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
+                    </span>
+                    <span>
+                      {attempts.length > 0 ? (
+                        <button
+                          className="inline-flex h-8.5 items-center justify-center gap-1 rounded-full border border-slate-200 px-3 text-xs font-bold text-indigo-600 transition hover:bg-slate-50"
+                          onClick={() =>
+                            setExpandedCandidates((current) => ({
+                              ...current,
+                              [candidate.id]: !isExpanded,
+                            }))
+                          }
+                          type="button"
+                        >
+                          {isExpanded ? 'Ẩn lượt thi' : `Xem ${attempts.length} lượt`}
+                          <ChevronDown
+                            aria-hidden="true"
+                            className={`size-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-400">-</span>
+                      )}
+                    </span>
+                  </div>
+
+                  {isExpanded ? (
+                    <div className="border-t border-slate-100 bg-slate-50/60 px-4 pb-4 pt-3">
+                      <AttemptRows
+                        attempts={attempts}
+                        detailBasePath={detailBasePath}
+                        navigate={navigate}
+                        officialAttempt={candidate.officialAttempt}
+                        officialScore={candidate.officialScore}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        <Pagination
+          currentPage={currentPage}
+          itemName="kết quả"
+          onPageChange={setPage}
+          totalElements={filteredRows.length}
+          totalPages={totalPages}
+        />
+      </div>
+    </section>
+  )
+}
+
+function SectionOverview({ result }: { result: ExamCandidateResultDto }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {result.sections.map((section) => (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4" key={section.sectionId}>
+          <p className="text-sm font-bold text-slate-900">{section.title ?? 'Section'}</p>
+          <p className="mt-2 text-2xl font-extrabold text-indigo-600">{formatScore(section.score)}</p>
+          <p className="mt-1 text-xs text-slate-500">Điểm quy đổi của phần này</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function QuestionEvaluationCard({
+  evaluation,
+  itemResult,
+  open,
+  onToggle,
+  questionCode,
+  questionText,
+}: {
+  evaluation: ExamItemEvaluationDto | null | undefined
+  itemResult: ExamCandidateResultDto['items'][number] | undefined
+  onToggle: () => void
+  open: boolean
+  questionCode?: string | null
+  questionText?: string | null
+}) {
+  const validityRules = Array.isArray(evaluation?.validity?.ruleResults)
+    ? evaluation?.validity?.ruleResults?.filter((rule) => rule?.ruleId || rule?.message)
+    : []
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white">
+      <button
+        className="flex w-full items-start justify-between gap-3 px-4 py-4 text-left"
+        onClick={onToggle}
+        type="button"
+      >
+        <div>
+          <p className="text-sm font-extrabold text-slate-900">{questionCode ?? 'Question'}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">{questionText ?? 'Không có nội dung câu hỏi.'}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {itemResult ? <StatusBadge label={`Điểm câu ${formatScore(itemResult.itemScore)}`} tone="info" /> : null}
+          {itemResult ? <StatusBadge label={`Quy đổi ${formatScore(itemResult.weightedScore)}`} tone="violet" /> : null}
+          <ChevronDown
+            aria-hidden="true"
+            className={`size-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          />
+        </div>
+      </button>
+
+      {open ? (
+        <div className="border-t border-slate-100 px-4 py-4">
+          {!evaluation ? (
+            <p className="text-sm text-slate-400">Chưa có evaluation cho câu trả lời này.</p>
+          ) : (
+            <div className="grid gap-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge label={getExamResultStatusDisplay(evaluation.status).label} tone={getExamResultStatusDisplay(evaluation.status).tone} />
+                  <span className="text-xs text-slate-500">Chấm lúc {formatDateTime(evaluation.evaluatedAt)}</span>
+                </div>
+                {evaluation.feedbackSummary ? (
+                  <p className="mt-3 text-sm leading-6 text-slate-700">{evaluation.feedbackSummary}</p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-4">
+                {evaluation.turns.map((turn) => (
+                  <div className="rounded-xl border border-slate-200 p-4" key={turn.id}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-extrabold text-slate-900">
+                          {turn.turnType === 'FOLLOWUP' ? `Follow-up ${turn.turnOrder}` : `Turn ${turn.turnOrder}`}
+                        </p>
+                        {turn.promptText ? <p className="mt-1 text-sm leading-6 text-slate-600">{turn.promptText}</p> : null}
+                      </div>
+                      <AudioReplayButton audioUrl={turn.audioUrl} />
+                    </div>
+
+                    <div className="mt-4">
+                      <WordFeedbackText words={Array.isArray(turn.wordFeedback) ? turn.wordFeedback : []} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {evaluation.criteria.map((criterion) => (
+                  <div className="rounded-xl border border-slate-200 bg-white p-4" key={criterion.id}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-extrabold text-slate-900">
+                        {criterion.criterionName ?? criterion.criterionCode ?? 'Tiêu chí'}
+                      </p>
+                      <StatusBadge label={`${formatScore(criterion.finalScore)} điểm`} tone="success" />
+                    </div>
+                    {criterion.rationale ? (
+                      <p className="mt-3 text-sm leading-6 text-slate-600">{criterion.rationale}</p>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-400">Chưa có rationale chi tiết.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {validityRules && validityRules.length > 0 ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle aria-hidden="true" className="size-4 text-amber-600" />
+                    <p className="text-sm font-extrabold text-amber-800">Vi phạm quy tắc</p>
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {validityRules.map((rule, index) => (
+                      <div className="rounded-lg border border-amber-200 bg-white px-3 py-2" key={`${rule?.ruleId ?? 'rule'}-${index}`}>
+                        <p className="text-sm font-bold text-slate-900">{rule?.ruleId ?? 'Rule'}</p>
+                        {rule?.message ? <p className="mt-1 text-sm leading-6 text-slate-600">{rule.message}</p> : null}
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                          {rule?.severity ? <span>Mức độ: {rule.severity}</span> : null}
+                          {rule?.action ? <span>Hành động: {rule.action}</span> : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function ExamResultDetailPage() {
+  const { sessionId } = useParams()
+  const [activeTab, setActiveTab] = useState<string>('overview')
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
+  const resultQuery = useExamSessionResultQuery(sessionId ?? null)
+  const result = resultQuery.data
+  const examQuery = useExamQuery(result?.examId ?? null)
+  const candidatesQuery = useExamCandidatesQuery(result?.examId ?? null)
+  const candidate = useMemo(
+    () => candidatesQuery.data?.find((item) => item.id === result?.candidateId) ?? null,
+    [candidatesQuery.data, result?.candidateId],
+  )
+
+  const paper = useMemo(
+    () => examQuery.data?.papers.find((item) => item.id === result?.paperId) ?? examQuery.data?.papers[0] ?? null,
+    [examQuery.data, result?.paperId],
+  )
+  const itemResultByPaperItemId = useMemo(
+    () => new Map((result?.items ?? []).map((item) => [item.paperItemId, item])),
+    [result?.items],
+  )
+
+  const evaluationQueries = useQueries({
+    queries: (result?.items ?? []).map((item) => ({
+      enabled: Boolean(item.responseId),
+      queryFn: () => fetchExamItemEvaluation(item.responseId),
+      queryKey: examResultQueryKeys.evaluation(item.responseId),
+      retry: false,
+    })),
+  })
+
+  const evaluationByResponseId = useMemo(() => {
+    const entries = (result?.items ?? []).map((item, index) => [item.responseId, evaluationQueries[index]?.data ?? null] as const)
+    return new Map(entries)
+  }, [evaluationQueries, result?.items])
+
+  const sectionTabs = useMemo(() => {
+    const paperSections = paper?.sections ?? []
+    return [
+      { label: 'Tổng quan', value: 'overview' },
+      ...paperSections.map((section) => ({
+        label: section.title ?? `Phần ${section.order}`,
+        value: section.id,
+      })),
+    ]
+  }, [paper?.sections])
+
+  const statusDisplay = getExamResultStatusDisplay(result?.status)
+
+  if (!sessionId) {
+    return null
+  }
+
+  if (resultQuery.isLoading) {
+    return (
+      <section className="mx-auto max-w-240">
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
+          Đang tải chi tiết kết quả...
+        </div>
+      </section>
+    )
+  }
+
+  if (!result) {
+    return (
+      <section className="mx-auto max-w-240">
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
+          Chưa có kết quả cho phiên thi này.
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="mx-auto max-w-290">
+      <DetailHeaderCard
+        metaItems={[
+          { icon: <Hash aria-hidden="true" className="size-3.5" />, label: examQuery.data?.code ?? result.examId },
+          { icon: <UserRound aria-hidden="true" className="size-3.5" />, label: getCandidateName(candidate ?? { studentId: result.candidateId }) },
+          { icon: <Target aria-hidden="true" className="size-3.5" />, label: result.rubricResultBandName ?? result.rubricResultBandCode ?? 'Chưa có band' },
+          { icon: <FileText aria-hidden="true" className="size-3.5" />, label: `Cập nhật ${formatDateTime(examQuery.data?.updatedAt)}` },
+        ]}
+        statusLabel={statusDisplay.label}
+        statusTone={statusDisplay.tone}
+        title={examQuery.data?.name ?? 'Chi tiết kết quả'}
+      />
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-4">
+        <StatCard icon={<Gauge size={19} />} iconTone="indigo" label="Tổng điểm" value={formatScore(result.totalScore)} />
+        <StatCard icon={<Target size={19} />} iconTone="violet" label="Band đạt" value={result.rubricResultBandName ?? result.rubricResultBandCode ?? '-'} />
+        <StatCard icon={<ClipboardList size={19} />} iconTone="amber" label="Band mục tiêu" value={result.targetFrameworkBandLabel ?? result.targetFrameworkBandCode ?? '-'} />
+        <StatCard icon={<Mic2 size={19} />} iconTone="emerald" label="Số câu đã chấm" value={result.items.length} />
+      </div>
+
+      <div className="mt-5.5">
+        <TabPillGroup items={sectionTabs} onChange={setActiveTab} value={activeTab} />
+      </div>
+
+      {activeTab === 'overview' ? (
+        <div className="mt-4">
+          <SectionOverview result={result} />
+        </div>
+      ) : null}
+
+      {activeTab !== 'overview' ? (
+        <div className="mt-4 grid gap-4">
+          {(paper?.sections.find((section) => section.id === activeTab)?.items ?? []).map((item) => {
+            const itemResult = itemResultByPaperItemId.get(item.id)
+            const evaluation = itemResult ? evaluationByResponseId.get(itemResult.responseId) : null
+            const open = expandedItems[item.id] ?? true
+            return (
+              <QuestionEvaluationCard
+                evaluation={evaluation}
+                itemResult={itemResult}
+                key={item.id}
+                onToggle={() => setExpandedItems((current) => ({ ...current, [item.id]: !open }))}
+                open={open}
+                questionCode={item.question?.code}
+                questionText={item.question?.questionText}
+              />
+            )
+          })}
+        </div>
+      ) : null}
+
+      {activeTab !== 'overview' && (paper?.sections.find((section) => section.id === activeTab)?.items ?? []).length === 0 ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-400">
+          Phần này chưa có câu hỏi để hiển thị.
+        </div>
+      ) : null}
+
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center gap-2">
+          <MessageSquareQuote aria-hidden="true" className="size-4 text-slate-500" />
+          <p className="text-sm font-extrabold text-slate-900">Ghi chú hiển thị</p>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Mỗi từ trong transcript được dựng trực tiếp từ `wordFeedback` để giữ đúng màu lỗi và chi tiết phoneme của dữ liệu Python.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+export function SchoolAdminExamResultsListPage() {
+  return <ExamResultsListPage detailBasePath="/school-admin/exam-results" />
+}
+
+export function TeacherExamResultsListPage() {
+  return <ExamResultsListPage detailBasePath="/teacher/exam-results" />
+}
+
+export function SchoolAdminExamResultDetailPage() {
+  return <ExamResultDetailPage />
+}
+
+export function TeacherExamResultDetailPage() {
+  return <ExamResultDetailPage />
+}
