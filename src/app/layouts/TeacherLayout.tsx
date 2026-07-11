@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   FileQuestion,
+  Gavel,
   LogOut,
   Menu,
   MonitorPlay,
@@ -35,6 +36,11 @@ const navigationItems = [
     icon: MonitorPlay,
     label: 'Giám sát thi',
     to: '/teacher/monitoring',
+  },
+  {
+    icon: Gavel,
+    label: 'Chấm phúc khảo',
+    to: '/teacher/reevaluation',
   },
 ]
 

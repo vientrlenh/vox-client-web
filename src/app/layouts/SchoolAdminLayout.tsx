@@ -7,6 +7,7 @@ import {
   DoorOpen,
   FileQuestion,
   FileSpreadsheet,
+  Gavel,
   GraduationCap,
   Home,
   Layers,
@@ -77,6 +78,11 @@ const navigationItems = [
     icon: Presentation,
     label: 'Quản lý Giáo viên',
     to: '/school-admin/teachers',
+  },
+  {
+    icon: Gavel,
+    label: 'Phúc khảo',
+    to: '/school-admin/reevaluation',
   },
 ]
 
