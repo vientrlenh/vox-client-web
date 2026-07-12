@@ -153,6 +153,7 @@ const EXAM_CANDIDATE_FIELDS = `
     totalScore
     rubricResultBandCode
     rubricResultBandName
+    resultStatus
   }
   officialAttempt {
     sessionId
@@ -162,6 +163,7 @@ const EXAM_CANDIDATE_FIELDS = `
     totalScore
     rubricResultBandCode
     rubricResultBandName
+    resultStatus
   }
   officialScore
   scheduleId

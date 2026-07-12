@@ -195,6 +195,7 @@ export type ExamSecurePoolDto = {
 }
 
 export type ExamAttemptSummaryDto = {
+  resultStatus?: string | null
   rubricResultBandCode?: string | null
   rubricResultBandName?: string | null
   sessionId: string

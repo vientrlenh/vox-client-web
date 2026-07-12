@@ -30,6 +30,16 @@ import { formatScore, getExamResultStatusDisplay, type ExamCandidateResultDto, t
 
 const PAGE_SIZE = 10
 
+const RESULT_STATUS_FILTER_OPTIONS = [
+  'PENDING_REVIEW',
+  'RELEASED',
+  'FINAL',
+  'APPEALED',
+  'RE_GRADING',
+  'INVALID',
+  'RETAKE_REQUIRED',
+] as const
+
 function getPendingRowStatus(candidateStatus?: string | null) {
   switch (candidateStatus) {
     case 'ABSENT':
@@ -164,6 +174,7 @@ function ExamResultsListPage({ detailBasePath }: { detailBasePath: string }) {
   const [searchParams] = useSearchParams()
   const examId = searchParams.get('examId')
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [page, setPage] = useState(1)
   const [expandedCandidates, setExpandedCandidates] = useState<Record<string, boolean>>({})
   const examQuery = useExamQuery(examId)
@@ -173,16 +184,19 @@ function ExamResultsListPage({ detailBasePath }: { detailBasePath: string }) {
 
   const filteredRows = useMemo(() => {
     const keyword = search.trim().toLowerCase()
-    if (!keyword) {
-      return rows
-    }
 
     return rows.filter(({ candidate }) => {
+      if (statusFilter !== 'ALL' && candidate.officialAttempt?.resultStatus !== statusFilter) {
+        return false
+      }
+      if (!keyword) {
+        return true
+      }
       const name = getCandidateName(candidate).toLowerCase()
       const email = (candidate.student?.email ?? '').toLowerCase()
       return name.includes(keyword) || email.includes(keyword)
     })
-  }, [rows, search])
+  }, [rows, search, statusFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -236,17 +250,35 @@ function ExamResultsListPage({ detailBasePath }: { detailBasePath: string }) {
       </div>
 
       <div className="mt-3.5 rounded-2xl border border-slate-200 bg-white p-5.5">
-        <div className="relative min-w-50 max-w-120">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-50 max-w-120 flex-1">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setPage(1)
+              }}
+              placeholder="Tìm theo tên hoặc email..."
+              value={search}
+            />
+          </div>
+
+          <select
+            className="h-9.5 rounded-lg border border-slate-200 px-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
             onChange={(event) => {
-              setSearch(event.target.value)
+              setStatusFilter(event.target.value)
               setPage(1)
             }}
-            placeholder="Tìm theo tên hoặc email..."
-            value={search}
-          />
+            value={statusFilter}
+          >
+            <option value="ALL">Tất cả trạng thái chấm</option>
+            {RESULT_STATUS_FILTER_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {getExamResultStatusDisplay(status).label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="mt-3.5 overflow-hidden rounded-xl border border-slate-200">
@@ -604,7 +636,7 @@ function ExamResultDetailPage() {
           <p className="text-sm font-extrabold text-slate-900">Ghi chú hiển thị</p>
         </div>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Mỗi từ trong transcript được dựng trực tiếp từ `wordFeedback` để giữ đúng màu lỗi và chi tiết phoneme của dữ liệu Python.
+          Mỗi từ trong transcript được dựng trực tiếp từ `wordFeedback` để giữ đúng màu lỗi và chi tiết phoneme của dữ liệu.
         </p>
       </div>
     </section>

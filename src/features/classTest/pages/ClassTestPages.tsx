@@ -5,12 +5,14 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ClipboardList,
   Clock,
   Eye,
   FilePenLine,
   Hash,
   Languages,
   LayoutList,
+  Lock,
   Megaphone,
   Pencil,
   PlayCircle,
@@ -1345,10 +1347,21 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const statusDisplay = getClassTestStatusDisplay(exam.status)
   const { completedCount, steps } = getClassTestWorkflowSteps(exam)
   const unlockedSchedule = completedCount >= 2
+  const resultBasePath = canManage ? '/teacher/exam-results' : '/school-admin/exam-results'
   // Khớp rule backend: chỉ sửa được câu hỏi/section/blueprint khi bài còn ở trạng thái đã lên lịch (chưa mở cho học sinh làm bài).
   const canEditContent = canManage && exam.status === 'SCHEDULED'
   // Chỉ soạn câu hỏi trực tiếp được khi KHÔNG có blueprint dùng chung nào đang gắn (dùng "Đổi blueprint khác" nếu có).
   const canEditFreeQuestions = canEditContent && !exam.blueprintId
+  const primaryStatusAction =
+    exam.status === 'DRAFT' && completedCount >= 2
+      ? { action: 'SCHEDULE' as const, icon: <Calendar aria-hidden="true" className="size-4.5" />, label: 'Lên lịch bài kiểm tra' }
+      : exam.status === 'SCHEDULED'
+        ? { action: 'START' as const, icon: <PlayCircle aria-hidden="true" className="size-4.5" />, label: 'Mở bài kiểm tra' }
+        : exam.status === 'IN_PROGRESS'
+          ? { action: 'CLOSE' as const, icon: <Lock aria-hidden="true" className="size-4.5" />, label: 'Đóng bài kiểm tra' }
+          : exam.status === 'CLOSED'
+            ? { action: 'PUBLISH_RESULTS' as const, icon: <Megaphone aria-hidden="true" className="size-4.5" />, label: 'Trả điểm' }
+            : null
 
   const nextAction =
     completedCount === 0
@@ -1385,8 +1398,17 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       <DetailHeaderCard
         actions={
-          canManage ? (
-            <>
+          <>
+            <button
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              onClick={() => navigate(`${resultBasePath}?examId=${exam.id}`)}
+              type="button"
+            >
+              <ClipboardList aria-hidden="true" className="size-4" />
+              Xem kết quả
+            </button>
+            {canManage ? (
+              <>
               <button
                 aria-label="Làm mới"
                 className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
@@ -1413,23 +1435,27 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                 <Trash2 aria-hidden="true" className="size-4" />
                 Xóa
               </button>
-              {exam.status !== 'RESULTS_PUBLISHED' ? (
+              {primaryStatusAction ? (
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-transparent shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
                   onClick={() =>
                     void updateStatusMutation
-                      .mutateAsync({ examId: exam.id, payload: { action: 'PUBLISH_RESULTS' } })
+                      .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
                       .then(() => invalidate())
                       .then(() => setMessage('Đã trả điểm cho bài trên lớp.'))
                   }
                   type="button"
                 >
-                  <Megaphone aria-hidden="true" className="size-4.5" />
+                  <span className="inline-flex items-center gap-2 text-white">
+                    {primaryStatusAction.icon}
+                    {primaryStatusAction.label}
+                  </span>
                   Trả điểm
                 </button>
               ) : null}
-            </>
-          ) : null
+              </>
+            ) : null}
+          </>
         }
         metaItems={[
           { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
