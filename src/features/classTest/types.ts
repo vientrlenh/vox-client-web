@@ -8,6 +8,7 @@ export type ClassTestSectionInput = {
 }
 
 export type CreateClassTestRequest = {
+  assessmentPolicyId?: string | null
   closeAt?: string | null
   description?: string | null
   existingBlueprintId?: string | null

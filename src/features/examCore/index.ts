@@ -17,4 +17,4 @@ export {
   SchoolAdminEditBlueprintVersionPage,
   TeacherEditBlueprintVersionPage,
 } from './pages/EditBlueprintVersionPage'
-export { SchoolAdminSelectRubricVersionPage } from './pages/SelectRubricVersionPage'
+export { SchoolAdminSelectRubricVersionPage, TeacherSelectRubricVersionPage } from './pages/SelectRubricVersionPage'
