@@ -5,6 +5,7 @@ export type ClassTestSectionInput = {
   instruction?: string | null
   questionIds: string[]
   title: string
+  weight?: number | null
 }
 
 export type CreateClassTestRequest = {

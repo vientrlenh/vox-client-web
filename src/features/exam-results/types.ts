@@ -101,6 +101,22 @@ export type ExamItemEvaluationTurnDto = {
   wordFeedback?: WordFeedbackDto[] | null
 }
 
+export type ExamEvaluationSignalsDto = {
+  aiConfidence?: number | null
+  asrConfidenceAvg?: number | null
+  audioQuality?: number | null
+  codeSwitchingRatio?: number | null
+  durationSeconds?: number | null
+  expectedMinWords?: number | null
+  lengthRatio?: number | null
+  offTopicRatio?: number | null
+  sentenceCount?: number | null
+  silenceRatio?: number | null
+  speechRate?: number | null
+  topicRelevanceScore?: number | null
+  wordCount?: number | null
+}
+
 export type ExamItemEvaluationDto = {
   criteria: ExamItemCriterionScoreDto[]
   evaluatedAt?: string | null
@@ -113,9 +129,11 @@ export type ExamItemEvaluationDto = {
   paperItemId: string
   promptVersion?: string | null
   rawItemScore: number
+  requiresHumanReview: boolean
   requiresRetake: boolean
+  reviewReasonCode?: string | null
   responseId: string
-  signals?: unknown
+  signals?: ExamEvaluationSignalsDto | null
   status: string
   suggestions?: unknown
   turns: ExamItemEvaluationTurnDto[]

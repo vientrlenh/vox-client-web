@@ -37,10 +37,17 @@ export type QuestionAssetDto = {
   durationSeconds: number | null
   altText: string | null
   type: QuestionAssetType
-  url: string
+  url: string | null
   transcript: string | null
   description: string | null
+  transcriptManuallyEdited: boolean
+  descriptionManuallyEdited: boolean
   order: number
+}
+
+export type QuestionAssetUploadUrlDto = {
+  uploadUrl: string
+  publicUrl: string
 }
 
 export type QuestionEvaluationGuideDto = {
@@ -199,7 +206,7 @@ export type CreateQuestionAssetRequest = {
   durationSeconds?: number | null
   altText?: string | null
   type: QuestionAssetType
-  url: string
+  url: string | null
   transcript?: string | null
   description?: string | null
   order: number

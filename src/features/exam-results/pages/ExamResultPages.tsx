@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQueries } from '@tanstack/react-query'
+import { useQueries, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowRight,
@@ -13,10 +13,11 @@ import {
   Mic2,
   Search,
   Target,
+  Trash2,
   UserRound,
 } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
-import { useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
+import { examQueryKeys, useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
 import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
 import { Pagination } from '@/shared/components/Pagination'
 import { AudioReplayButton } from '@/shared/ui/AudioReplayButton'
@@ -24,9 +25,17 @@ import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { TabPillGroup } from '@/shared/ui/TabPill'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { WordFeedbackText } from '@/shared/ui/WordFeedbackText'
-import { examResultQueryKeys, fetchExamItemEvaluation, useExamSessionResultQuery } from '../api/useExamResultQueries'
+import {
+  examResultQueryKeys,
+  fetchExamItemEvaluation,
+  useDeleteExamSessionMutation,
+  useExamSessionResultQuery,
+} from '../api/useExamResultQueries'
 import { formatScore, getExamResultStatusDisplay, type ExamCandidateResultDto, type ExamItemEvaluationDto } from '../types'
+
+type ExamResultsUserRole = 'SCHOOL_ADMIN' | 'TEACHER'
 
 const PAGE_SIZE = 10
 
@@ -72,6 +81,25 @@ function getAttemptStatusDisplay(status?: string | null) {
   }
 }
 
+function formatConfidencePercent(value?: number | null) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '-'
+  }
+
+  return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`
+}
+
+function getReviewReasonLabel(code?: string | null) {
+  switch (code) {
+    case 'LOW_CONFIDENCE':
+      return 'Độ tin cậy AI thấp'
+    case 'VALIDITY_FLAGGED':
+      return 'Có cờ validity cần giáo viên xem lại'
+    default:
+      return code ?? null
+  }
+}
+
 function ResultBand({
   attempt,
   officialScore,
@@ -93,16 +121,20 @@ function ResultBand({
 
 function AttemptRows({
   attempts,
+  canDelete,
   detailBasePath,
   navigate,
   officialAttempt,
   officialScore,
+  onDeleteSession,
 }: {
   attempts: ExamAttemptSummaryDto[]
+  canDelete: boolean
   detailBasePath: string
   navigate: ReturnType<typeof useNavigate>
   officialAttempt?: ExamAttemptSummaryDto | null
   officialScore?: number | null
+  onDeleteSession: (sessionId: string) => void
 }) {
   if (attempts.length === 0) {
     return <div className="px-4 py-5 text-center text-xs text-slate-400">Thí sinh này chưa có lượt thi nào.</div>
@@ -110,12 +142,17 @@ function AttemptRows({
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="grid grid-cols-[72px_1.2fr_140px_1fr_110px] gap-3 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+      <div
+        className={`grid gap-3 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500 ${
+          canDelete ? 'grid-cols-[72px_1.2fr_140px_1fr_110px_90px]' : 'grid-cols-[72px_1.2fr_140px_1fr_110px]'
+        }`}
+      >
         <span>Lượt</span>
         <span>Thời gian</span>
         <span>Trạng thái</span>
         <span>Điểm / band</span>
         <span>Chi tiết</span>
+        {canDelete ? <span>Xoá</span> : null}
       </div>
 
       {attempts.map((attempt, index) => {
@@ -123,7 +160,9 @@ function AttemptRows({
         const isOfficialAttempt = officialAttempt?.sessionId === attempt.sessionId
         return (
           <div
-            className="grid grid-cols-[72px_1.2fr_140px_1fr_110px] items-center gap-3 border-t border-slate-100 px-3 py-3"
+            className={`grid items-center gap-3 border-t border-slate-100 px-3 py-3 ${
+              canDelete ? 'grid-cols-[72px_1.2fr_140px_1fr_110px_90px]' : 'grid-cols-[72px_1.2fr_140px_1fr_110px]'
+            }`}
             key={attempt.sessionId}
           >
             <div className="text-sm font-bold text-slate-700">#{attempts.length - index}</div>
@@ -162,6 +201,18 @@ function AttemptRows({
                 <span className="text-xs text-slate-400">-</span>
               )}
             </span>
+            {canDelete ? (
+              <span>
+                <button
+                  aria-label="Xoá phiên thi này"
+                  className="inline-flex size-8.5 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:bg-rose-50"
+                  onClick={() => onDeleteSession(attempt.sessionId)}
+                  type="button"
+                >
+                  <Trash2 aria-hidden="true" className="size-3.5" />
+                </button>
+              </span>
+            ) : null}
           </div>
         )
       })}
@@ -169,8 +220,15 @@ function AttemptRows({
   )
 }
 
-function ExamResultsListPage({ detailBasePath }: { detailBasePath: string }) {
+function ExamResultsListPage({
+  detailBasePath,
+  userRole,
+}: {
+  detailBasePath: string
+  userRole: ExamResultsUserRole
+}) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   const examId = searchParams.get('examId')
   const [search, setSearch] = useState('')
@@ -181,6 +239,26 @@ function ExamResultsListPage({ detailBasePath }: { detailBasePath: string }) {
   const candidatesQuery = useExamCandidatesQuery(examId)
   const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
   const rows = useMemo(() => candidates.map((candidate) => ({ candidate })), [candidates])
+  const deleteSessionMutation = useDeleteExamSessionMutation()
+  const { confirm, dialog: deleteDialog } = useConfirmationDialog()
+  // School admin can delete any exam session. A teacher can only delete sessions for a
+  // CLASS_TEST exam they run -- matches the backend authorization in DeleteExamSessionUseCase
+  // (CENTRALIZED exams stay school-admin-only).
+  const canDeleteSessions = userRole === 'SCHOOL_ADMIN' || (userRole === 'TEACHER' && examQuery.data?.kind === 'CLASS_TEST')
+
+  async function handleDeleteSession(sessionId: string) {
+    if (
+      !(await confirm({
+        message:
+          'Xoá phiên thi này sẽ xoá VĨNH VIỄN toàn bộ dữ liệu liên quan (câu trả lời, kết quả chấm điểm). Không thể hoàn tác. Bạn có chắc chắn?',
+      }))
+    ) {
+      return
+    }
+    await deleteSessionMutation.mutateAsync(sessionId)
+    await queryClient.invalidateQueries({ queryKey: examResultQueryKeys.all })
+    await queryClient.invalidateQueries({ queryKey: examQueryKeys.candidates(examId) })
+  }
 
   const filteredRows = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -233,6 +311,7 @@ function ExamResultsListPage({ detailBasePath }: { detailBasePath: string }) {
 
   return (
     <section className="mx-auto max-w-290">
+      {deleteDialog}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">Kết quả kỳ thi</h1>
@@ -338,10 +417,12 @@ function ExamResultsListPage({ detailBasePath }: { detailBasePath: string }) {
                     <div className="border-t border-slate-100 bg-slate-50/60 px-4 pb-4 pt-3">
                       <AttemptRows
                         attempts={attempts}
+                        canDelete={canDeleteSessions}
                         detailBasePath={detailBasePath}
                         navigate={navigate}
                         officialAttempt={candidate.officialAttempt}
                         officialScore={candidate.officialScore}
+                        onDeleteSession={(sessionId) => void handleDeleteSession(sessionId)}
                       />
                     </div>
                   ) : null}
@@ -426,8 +507,42 @@ function QuestionEvaluationCard({
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge label={getExamResultStatusDisplay(evaluation.status).label} tone={getExamResultStatusDisplay(evaluation.status).tone} />
+                  {evaluation.requiresRetake ? <StatusBadge label="Cần thi lại" tone="danger" /> : null}
+                  {evaluation.requiresHumanReview ? <StatusBadge label="Cần giáo viên duyệt lại" tone="warning" /> : null}
+                  {evaluation.markedInvalid ? <StatusBadge label="Đánh dấu không hợp lệ" tone="danger" /> : null}
                   <span className="text-xs text-slate-500">Chấm lúc {formatDateTime(evaluation.evaluatedAt)}</span>
                 </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Gauge aria-hidden="true" className="size-4" />
+                      <span className="text-xs font-bold uppercase tracking-wide">ASR confidence</span>
+                    </div>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.overallConfidence)}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Gauge aria-hidden="true" className="size-4" />
+                      <span className="text-xs font-bold uppercase tracking-wide">AI confidence</span>
+                    </div>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.signals?.aiConfidence)}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Mic2 aria-hidden="true" className="size-4" />
+                      <span className="text-xs font-bold uppercase tracking-wide">Audio quality</span>
+                    </div>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.signals?.audioQuality)}</p>
+                  </div>
+                </div>
+                {evaluation.requiresHumanReview || evaluation.reviewReasonCode ? (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                      <p>{getReviewReasonLabel(evaluation.reviewReasonCode) ?? 'Bài làm cần được giáo viên xem lại trước khi tin cậy hoàn toàn.'}</p>
+                    </div>
+                  </div>
+                ) : null}
                 {evaluation.feedbackSummary ? (
                   <p className="mt-3 text-sm leading-6 text-slate-700">{evaluation.feedbackSummary}</p>
                 ) : null}
@@ -644,11 +759,11 @@ function ExamResultDetailPage() {
 }
 
 export function SchoolAdminExamResultsListPage() {
-  return <ExamResultsListPage detailBasePath="/school-admin/exam-results" />
+  return <ExamResultsListPage detailBasePath="/school-admin/exam-results" userRole="SCHOOL_ADMIN" />
 }
 
 export function TeacherExamResultsListPage() {
-  return <ExamResultsListPage detailBasePath="/teacher/exam-results" />
+  return <ExamResultsListPage detailBasePath="/teacher/exam-results" userRole="TEACHER" />
 }
 
 export function SchoolAdminExamResultDetailPage() {

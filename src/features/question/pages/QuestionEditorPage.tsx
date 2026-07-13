@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
@@ -23,6 +23,8 @@ import { useReviewQuestionMutation } from '../api/useQuestionReviewMutation'
 import {
   useCreateQuestionAssetMutation,
   useDeleteQuestionAssetMutation,
+  useRegenerateQuestionAssetAnalysisMutation,
+  useUploadQuestionAssetMutation,
   useUpdateQuestionAssetMutation,
   useUpsertQuestionEvaluationGuideMutation,
 } from '../api/useQuestionSectionMutations'
@@ -38,6 +40,7 @@ import {
 } from '../permissions'
 import type {
   CreateQuestionRequest,
+  QuestionAssetDto,
   QuestionCollaboratorPermission,
   QuestionDto,
   QuestionAssetType,
@@ -55,7 +58,16 @@ import {
 type TabKey = 'assets' | 'content' | 'guide' | 'sharing' | 'workflow'
 
 // Tạm ẩn tab "Tài nguyên" khỏi UI (chưa cho người dùng tương tác) — logic/mutations giữ nguyên, chỉ bật lại bằng cách đổi hằng số này.
-const ASSETS_TAB_ENABLED = false
+const ASSETS_TAB_ENABLED = true
+
+// Khớp đúng với việc backend hiện chỉ hỗ trợ IMAGE/VIDEO cho asset (AUDIO/TEXT_PASSAGE để sau)
+// và chặn content type ở GetQuestionAssetUploadUrlUseCase (Java) — giữ danh sách hẹp, cụ thể ở
+// đây thay vì "image/*"/"video/*" chung chung để tránh nhận nhầm định dạng ít dùng/khó phát ở WPF.
+const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png'])
+const ALLOWED_VIDEO_MIME_TYPES = new Set(['video/mp4'])
+const ASSET_FILE_INPUT_ACCEPT = '.jpg,.jpeg,.png,.mp4,image/jpeg,image/png,video/mp4'
+const ASSET_ANALYSIS_POLL_INTERVAL_MS = 3000
+const ASSET_ANALYSIS_POLL_TIMEOUT_MS = 60000
 
 type EditorFormState = {
   instructionText: string
@@ -104,11 +116,14 @@ const QUESTION_SHARING_OPTIONS: Array<{ label: string; value: QuestionSharing }>
 ]
 
 const QUESTION_ASSET_TYPE_OPTIONS: Array<{ label: string; value: QuestionAssetType }> = [
-  { label: 'Audio', value: 'AUDIO' },
   { label: 'Image', value: 'IMAGE' },
   { label: 'Video', value: 'VIDEO' },
-  { label: 'Text passage', value: 'TEXT_PASSAGE' },
+  { label: 'Doan van (Text passage)', value: 'TEXT_PASSAGE' },
 ]
+
+const LEGACY_QUESTION_ASSET_TYPE_LABELS: Partial<Record<QuestionAssetType, string>> = {
+  AUDIO: 'Audio (legacy)',
+}
 
 function createInitialForm() {
   return {
@@ -133,9 +148,103 @@ function createAssetForm(): AssetFormState {
     order: '1',
     title: '',
     transcript: '',
-    type: 'AUDIO',
+    type: 'IMAGE',
     url: '',
   }
+}
+
+function shouldShowTranscriptField(type: QuestionAssetType) {
+  return type === 'VIDEO' || type === 'AUDIO' || type === 'TEXT_PASSAGE'
+}
+
+function isTextPassage(type: QuestionAssetType) {
+  return type === 'TEXT_PASSAGE'
+}
+
+function needsTranscriptAnalysis(asset: Pick<AssetFormState, 'type' | 'transcript'>) {
+  return (asset.type === 'VIDEO' || asset.type === 'AUDIO') && !asset.transcript.trim()
+}
+
+function needsDescriptionAnalysis(asset: Pick<AssetFormState, 'description'>) {
+  return !asset.description.trim()
+}
+
+function hasPendingAnalysis(
+  asset: Pick<AssetFormState, 'id' | 'type' | 'transcript' | 'description'>,
+) {
+  if (!asset.id) {
+    return false
+  }
+
+  return needsTranscriptAnalysis(asset) || needsDescriptionAnalysis(asset)
+}
+
+function createAssetFormFromDto(asset: QuestionAssetDto): AssetFormState {
+  return {
+    altText: asset.altText ?? '',
+    description: asset.description ?? '',
+    durationSeconds: asset.durationSeconds == null ? '' : String(asset.durationSeconds),
+    id: asset.id,
+    order: String(asset.order),
+    title: asset.title ?? '',
+    transcript: asset.transcript ?? '',
+    type: asset.type,
+    url: asset.url ?? '',
+  }
+}
+
+function mergeAssetForms(
+  current: AssetFormState[],
+  serverAssets: QuestionAssetDto[] | null | undefined,
+) {
+  if (!serverAssets?.length) {
+    return [createAssetForm()]
+  }
+
+  return serverAssets.map((asset, index) => {
+    const incoming = createAssetFormFromDto(asset)
+    const existing = current[index]
+
+    if (!existing) {
+      return incoming
+    }
+
+    return {
+      altText: existing.altText || incoming.altText,
+      description: existing.description || incoming.description,
+      durationSeconds: existing.durationSeconds || incoming.durationSeconds,
+      id: incoming.id,
+      order: existing.order || incoming.order,
+      title: existing.title || incoming.title,
+      transcript: existing.transcript || incoming.transcript,
+      type: existing.url ? existing.type : incoming.type,
+      url: existing.url || incoming.url,
+    }
+  })
+}
+
+function resetAssetFieldsForType(type: QuestionAssetType): Partial<AssetFormState> {
+  return {
+    description: '',
+    transcript: '',
+    type,
+    url: '',
+  }
+}
+
+function getAssetTypeOptions(currentType: QuestionAssetType) {
+  const allowedValues = new Set(QUESTION_ASSET_TYPE_OPTIONS.map((option) => option.value))
+  if (allowedValues.has(currentType)) {
+    return QUESTION_ASSET_TYPE_OPTIONS
+  }
+
+  return [
+    {
+      label: LEGACY_QUESTION_ASSET_TYPE_LABELS[currentType] ?? currentType,
+      value: currentType,
+    },
+    ...QUESTION_ASSET_TYPE_OPTIONS,
+  ]
 }
 
 function createGuideForm(): EvaluationGuideFormState {
@@ -186,7 +295,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const locationSuccessMessage =
     (location.state as { successMessage?: string } | null)?.successMessage ?? null
 
-  const questionQuery = useQuestionQuery(mode === 'edit' ? questionId : null)
+  const [analysisPollingUntil, setAnalysisPollingUntil] = useState<number | null>(null)
   const createMutation = useCreateQuestionMutation()
   const updateMutation = useUpdateQuestionMutation()
   const deleteMutation = useDeleteQuestionMutation()
@@ -194,6 +303,8 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const createAssetMutation = useCreateQuestionAssetMutation()
   const updateAssetMutation = useUpdateQuestionAssetMutation()
   const deleteAssetMutation = useDeleteQuestionAssetMutation()
+  const regenerateAssetAnalysisMutation = useRegenerateQuestionAssetAnalysisMutation()
+  const uploadAssetMutation = useUploadQuestionAssetMutation()
   const upsertGuideMutation = useUpsertQuestionEvaluationGuideMutation()
   const createCollaboratorMutation = useCreateQuestionCollaboratorMutation()
   const updateCollaboratorMutation = useUpdateQuestionCollaboratorMutation()
@@ -207,6 +318,8 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const [guideForm, setGuideForm] = useState<EvaluationGuideFormState>(createGuideForm())
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(locationSuccessMessage)
+  const [uploadingAssetIndex, setUploadingAssetIndex] = useState<number | null>(null)
+  const [regeneratingAssetId, setRegeneratingAssetId] = useState<string | null>(null)
   const [workflowAction, setWorkflowAction] = useState('')
   const [workflowNote, setWorkflowNote] = useState('')
   const [teacherSearch, setTeacherSearch] = useState('')
@@ -214,6 +327,16 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const [newPermission, setNewPermission] =
     useState<QuestionCollaboratorPermission>('READ_ONLY')
   const { confirm, dialog } = useConfirmationDialog()
+  const questionQuery = useQuestionQuery(mode === 'edit' ? questionId : null, {
+    refetchInterval:
+      mode === 'edit' &&
+      questionId &&
+      analysisPollingUntil != null &&
+      analysisPollingUntil > Date.now() &&
+      assetForm.some((asset) => hasPendingAnalysis(asset))
+        ? ASSET_ANALYSIS_POLL_INTERVAL_MS
+        : false,
+  })
 
   const actorRole = getQuestionActorRole(user?.roles)
   const teacherContext = resolveTeacherQuestionContext(
@@ -306,22 +429,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       sharing: questionQuery.data.sharing,
       type: questionQuery.data.type,
     })
-    setAssetForm(
-      questionQuery.data.assets?.length
-        ? questionQuery.data.assets.map((asset) => ({
-            altText: asset.altText ?? '',
-            description: asset.description ?? '',
-            durationSeconds:
-              asset.durationSeconds == null ? '' : String(asset.durationSeconds),
-            id: asset.id,
-            order: String(asset.order),
-            title: asset.title ?? '',
-            transcript: asset.transcript ?? '',
-            type: asset.type,
-            url: asset.url,
-          }))
-        : [createAssetForm()],
-    )
+    setAssetForm((current) => mergeAssetForms(current, questionQuery.data.assets))
     setGuideForm({
       acceptableResponses:
         questionQuery.data.evaluationGuide?.acceptableResponses ?? '',
@@ -331,7 +439,20 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       offTopicExamples: questionQuery.data.evaluationGuide?.offTopicExamples ?? '',
       scoringHints: questionQuery.data.evaluationGuide?.scoringHints ?? '',
     })
+    if (questionQuery.data.assets?.some((asset) => hasPendingAnalysis(createAssetFormFromDto(asset)))) {
+      setAnalysisPollingUntil((current) =>
+        current && current > Date.now()
+          ? current
+          : Date.now() + ASSET_ANALYSIS_POLL_TIMEOUT_MS,
+      )
+    }
   }, [questionQuery.data])
+
+  useEffect(() => {
+    if (!assetForm.some((asset) => hasPendingAnalysis(asset))) {
+      setAnalysisPollingUntil(null)
+    }
+  }, [assetForm])
 
   async function refreshQuestionData(targetQuestionId?: string | null) {
     await queryClient.invalidateQueries({ queryKey: questionQueryKeys.all })
@@ -340,6 +461,25 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
         queryKey: questionQueryKeys.question(targetQuestionId),
       })
     }
+  }
+
+  function buildAssetPayload(asset: AssetFormState, index: number, urlOverride?: string | null) {
+    return {
+      altText: asset.altText.trim() || null,
+      description: asset.description.trim() || null,
+      durationSeconds: asset.durationSeconds.trim() ? Number(asset.durationSeconds) : null,
+      order: asset.order.trim() ? Number(asset.order) : index + 1,
+      title: asset.title.trim() || null,
+      transcript: shouldShowTranscriptField(asset.type)
+        ? asset.transcript.trim() || null
+        : null,
+      type: asset.type,
+      url: isTextPassage(asset.type) ? null : (urlOverride ?? (asset.url.trim() || null)),
+    }
+  }
+
+  function startAnalysisPolling() {
+    setAnalysisPollingUntil(Date.now() + ASSET_ANALYSIS_POLL_TIMEOUT_MS)
   }
 
   if (mode === 'create' && !canCreate) {
@@ -468,8 +608,8 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     }
 
     const asset = assetForm[index]
-    if (!asset.url.trim()) {
-      setErrorMessage('URL tài nguyên không được để trống.')
+    if (isTextPassage(asset.type) && !asset.transcript.trim()) {
+      setErrorMessage('Nội dung đoạn văn không được để trống.')
       return
     }
 
@@ -478,18 +618,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     }
 
     try {
-      const payload = {
-        altText: asset.altText.trim() || null,
-        description: asset.description.trim() || null,
-        durationSeconds: asset.durationSeconds.trim()
-          ? Number(asset.durationSeconds)
-          : null,
-        order: asset.order.trim() ? Number(asset.order) : index + 1,
-        title: asset.title.trim() || null,
-        transcript: asset.transcript.trim() || null,
-        type: asset.type,
-        url: asset.url.trim(),
-      }
+      const payload = buildAssetPayload(asset, index)
 
       const message = asset.id
         ? await updateAssetMutation.mutateAsync({
@@ -503,9 +632,130 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
           })
 
       await refreshQuestionData(questionId)
+      if (needsTranscriptAnalysis(asset) || needsDescriptionAnalysis(asset)) {
+        startAnalysisPolling()
+      }
       setSuccessMessage(message)
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
+    }
+  }
+
+  async function handleAssetFileSelected(
+    index: number,
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) {
+      return
+    }
+
+    if (!questionId || !canManageAssetOrGuide) {
+      setErrorMessage('Bạn không có quyền cập nhật tài nguyên cho câu hỏi này.')
+      return
+    }
+
+    const nextType: QuestionAssetType | null = ALLOWED_IMAGE_MIME_TYPES.has(file.type)
+      ? 'IMAGE'
+      : ALLOWED_VIDEO_MIME_TYPES.has(file.type)
+        ? 'VIDEO'
+        : null
+
+    if (!nextType) {
+      setErrorMessage('Chỉ hỗ trợ ảnh JPG/PNG hoặc video MP4.')
+      return
+    }
+
+    setErrorMessage(null)
+    setSuccessMessage(null)
+    setUploadingAssetIndex(index)
+
+    // Only wipe description/transcript when the inferred type actually changes (e.g. a
+    // previously-picked video file gets swapped for an image) -- selecting a file of the
+    // SAME resulting type must not discard content the teacher already typed into the
+    // description/transcript fields before choosing the file.
+    const previousType = assetForm[index].type
+    if (nextType !== previousType) {
+      updateAssetForm(index, resetAssetFieldsForType(nextType), setAssetForm)
+    }
+
+    try {
+      const publicUrl = await uploadAssetMutation.mutateAsync({
+        file,
+        questionId,
+      })
+      const draftAsset = {
+        ...assetForm[index],
+        type: nextType,
+        url: publicUrl,
+      }
+      updateAssetForm(index, draftAsset, setAssetForm)
+      const payload = buildAssetPayload(draftAsset, index, publicUrl)
+      const message = draftAsset.id
+        ? await updateAssetMutation.mutateAsync({
+            assetId: draftAsset.id,
+            payload,
+            questionId,
+          })
+        : await createAssetMutation.mutateAsync({
+            payload,
+            questionId,
+          })
+      await refreshQuestionData(questionId)
+      startAnalysisPolling()
+      setSuccessMessage(message)
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setUploadingAssetIndex(null)
+    }
+  }
+
+  async function handleRegenerateAssetAnalysis(index: number) {
+    const asset = assetForm[index]
+
+    if (!asset.id || !questionId || !canManageAssetOrGuide) {
+      setErrorMessage('Ban khong co quyen tao lai phan tich asset nay.')
+      return
+    }
+
+    if (
+      !(await confirm({
+        message:
+          'Tao lai bang AI se ghi de noi dung transcript/description da co. Ban co muon tiep tuc khong?',
+      }))
+    ) {
+      return
+    }
+
+    setErrorMessage(null)
+    setSuccessMessage(null)
+    setRegeneratingAssetId(asset.id)
+
+    try {
+      const message = await regenerateAssetAnalysisMutation.mutateAsync({
+        assetId: asset.id,
+        questionId,
+      })
+      updateAssetForm(
+        index,
+        isTextPassage(asset.type)
+          ? { description: '' }
+          : {
+              description: '',
+              transcript: shouldShowTranscriptField(asset.type) ? '' : asset.transcript,
+            },
+        setAssetForm,
+      )
+      await refreshQuestionData(questionId)
+      startAnalysisPolling()
+      setSuccessMessage(message)
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setRegeneratingAssetId(null)
     }
   }
 
@@ -865,7 +1115,13 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
 
       {activeTab === 'assets' ? (
         <div className="grid gap-4">
-          {assetForm.map((asset, index) => (
+          {questionId ? null : (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-semibold text-slate-600">
+              Hãy lưu câu hỏi trước, sau đó quay lại tab này để upload ảnh/video.
+            </div>
+          )}
+          {questionId
+            ? assetForm.map((asset, index) => (
             <form
               className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6"
               key={asset.id ?? `draft-${index}`}
@@ -899,26 +1155,43 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                     onChange={(event) =>
                       updateAssetForm(
                         index,
-                        { type: event.target.value as QuestionAssetType },
+                        resetAssetFieldsForType(event.target.value as QuestionAssetType),
                         setAssetForm,
                       )
                     }
                     value={asset.type}
                   >
-                    {QUESTION_ASSET_TYPE_OPTIONS.map((option) => (
+                    {getAssetTypeOptions(asset.type).map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
                   </select>
                 </label>
+                {isTextPassage(asset.type) ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                    Asset TEXT_PASSAGE khong can upload file. Hay nhap doan van o o Transcript ben duoi.
+                  </div>
+                ) : (
+                <label className="grid gap-2 text-sm font-bold text-slate-700">
+                  File asset
+                  <input
+                    accept={ASSET_FILE_INPUT_ACCEPT}
+                    className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-950"
+                    onChange={(event) => void handleAssetFileSelected(index, event)}
+                    type="file"
+                  />
+                  <span className="text-xs font-medium text-slate-500">
+                    {uploadingAssetIndex === index
+                      ? 'Đang upload file...'
+                      : asset.url.trim()
+                        ? 'Đã upload file asset.'
+                        : 'Chưa có file được upload.'}
+                  </span>
+                </label>
+                )}
                 <InputField
-                  label="URL"
-                  onChange={(value) => updateAssetForm(index, { url: value }, setAssetForm)}
-                  value={asset.url}
-                />
-                <InputField
-                  label="Thoi luong"
+                  label="Thời lượng (giây)"
                   onChange={(value) =>
                     updateAssetForm(index, { durationSeconds: value }, setAssetForm)
                   }
@@ -926,7 +1199,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                   value={asset.durationSeconds}
                 />
                 <InputField
-                  label="Thu tu"
+                  label="Thứ tự"
                   onChange={(value) => updateAssetForm(index, { order: value }, setAssetForm)}
                   type="number"
                   value={asset.order}
@@ -938,23 +1211,57 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                 />
               </div>
               <TextareaField
-                label="Mo ta"
+                label="Mô tả"
                 onChange={(value) =>
                   updateAssetForm(index, { description: value }, setAssetForm)
                 }
                 value={asset.description}
               />
-              <TextareaField
-                label="Transcript"
-                onChange={(value) =>
-                  updateAssetForm(index, { transcript: value }, setAssetForm)
-                }
-                value={asset.transcript}
-              />
+              <p className="text-xs font-medium text-slate-500">
+                Để trợ giúp hệ thống tự động tạo bằng AI sau khi upload xong.
+              </p>
+              {shouldShowTranscriptField(asset.type) ? (
+                <>
+                  <TextareaField
+                    label={isTextPassage(asset.type) ? 'Doan van' : 'Transcript'}
+                    onChange={(value) =>
+                      updateAssetForm(index, { transcript: value }, setAssetForm)
+                    }
+                    value={asset.transcript}
+                  />
+                  <p className="text-xs font-medium text-slate-500">
+                    {isTextPassage(asset.type)
+                      ? 'Trường này bắt buộc với TEXT_PASSAGE. AI chỉ tạo phần mô tả, không tạo transcript cho đoạn văn.'
+                      : 'Để trợ giúp hệ thống tự động tạo bằng AI sau khi upload xong.'}
+                  </p>
+                </>
+              ) : null}
 
-              <div className="flex justify-end">
+              {asset.url.trim() ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <span className="font-bold text-slate-900">Asset URL:</span> {asset.url}
+                </div>
+              ) : null}
+              {hasPendingAnalysis(asset) ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+                  Đang phân tích nội dung bằng AI...
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap justify-end gap-3">
+                {asset.id ? (
+                  <button
+                    className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                    disabled={regeneratingAssetId === asset.id}
+                    onClick={() => void handleRegenerateAssetAnalysis(index)}
+                    type="button"
+                  >
+                    {regeneratingAssetId === asset.id ? 'Dang tao lai...' : 'Tao lai bang AI'}
+                  </button>
+                ) : null}
                 <button
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
+                  disabled={uploadingAssetIndex === index || regeneratingAssetId === asset.id}
                   type="submit"
                 >
                   <Save aria-hidden="true" className="size-4" />
@@ -962,18 +1269,22 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                 </button>
               </div>
             </form>
-          ))}
+              ))
+            : null}
 
-          <div className="flex justify-end">
+          {questionId ? (
+            <div className="flex justify-end">
             <button
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
               onClick={() => setAssetForm((current) => [...current, createAssetForm()])}
+              disabled={assetForm.length >= 1}
               type="button"
             >
               <Plus aria-hidden="true" className="size-4" />
               Them asset
             </button>
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

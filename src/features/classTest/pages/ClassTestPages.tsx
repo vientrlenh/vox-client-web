@@ -65,6 +65,7 @@ import {
   useChangeClassTestBlueprintMutation,
   useCreateClassTestMutation,
   useDeleteClassTestMutation,
+  useDeleteClassTestSectionMutation,
   useUpdateClassTestMutation,
   useUpdateClassTestQuestionsMutation,
   useUpdateClassTestStatusMutation,
@@ -317,10 +318,40 @@ type ClassTestSectionDraft = {
   key: string
   questions: QuestionDto[]
   title: string
+  weight: string
 }
 
 function newClassTestSection(order: number): ClassTestSectionDraft {
-  return { instruction: '', key: nextClassTestKey('cts'), questions: [], title: `Phần ${order}` }
+  return { instruction: '', key: nextClassTestKey('cts'), questions: [], title: `Phần ${order}`, weight: '' }
+}
+
+const SECTION_WEIGHT_TOLERANCE = 0.01
+
+function parseOptionalSectionWeight(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : Number.NaN
+}
+
+function validateOptionalSectionWeights(weights: Array<number | null>) {
+  const numericWeights = weights.filter((weight): weight is number => weight !== null)
+  if (numericWeights.some(Number.isNaN)) {
+    return 'Trọng số section phải là số hợp lệ.'
+  }
+  if (numericWeights.length === weights.length) {
+    const sum = numericWeights.reduce((total, weight) => total + weight, 0)
+    if (Math.abs(sum - 1) >= SECTION_WEIGHT_TOLERANCE) {
+      return `Tổng trọng số section phải bằng 1.00 (hiện tại ${sum.toFixed(2)}).`
+    }
+  }
+  return null
+}
+
+function sectionWeightInputValue(weight?: number | null) {
+  return weight == null ? '' : String(weight)
 }
 
 export function TeacherClassTestCreatePage() {
@@ -371,6 +402,10 @@ export function TeacherClassTestCreatePage() {
     )
   }
 
+  function updateSectionWeight(sectionKey: string, weight: string) {
+    setSections((current) => current.map((section) => (section.key === sectionKey ? { ...section, weight } : section)))
+  }
+
   function addQuestionToSection(sectionKey: string, question: QuestionDto) {
     setSections((current) => {
       if (current.some((section) => section.questions.some((existing) => existing.id === question.id))) {
@@ -394,6 +429,7 @@ export function TeacherClassTestCreatePage() {
   const pickerSection = pickerForSectionKey ? sections.find((section) => section.key === pickerForSectionKey) : null
 
   async function handleSubmit() {
+    const parsedSectionWeights = creationMode === 'questions' ? sections.map((section) => parseOptionalSectionWeight(section.weight)) : []
     if (!name.trim() || !schoolClassId) {
       window.alert('Vui lòng nhập tên bài và chọn lớp học.')
       return
@@ -418,6 +454,11 @@ export function TeacherClassTestCreatePage() {
           return
         }
       }
+      const sectionWeightError = validateOptionalSectionWeights(parsedSectionWeights)
+      if (sectionWeightError) {
+        window.alert(sectionWeightError)
+        return
+      }
     }
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo bài trên lớp này không?' }))) {
       return
@@ -437,10 +478,11 @@ export function TeacherClassTestCreatePage() {
           sections:
             creationMode === 'blueprint'
               ? null
-              : sections.map((section) => ({
+              : sections.map((section, index) => ({
                   instruction: section.instruction.trim() || null,
                   questionIds: section.questions.map((question) => question.id),
                   title: section.title.trim(),
+                  weight: parsedSectionWeights[index],
                 })),
         },
         schoolClassName,
@@ -826,6 +868,16 @@ export function TeacherClassTestCreatePage() {
                     onChange={(event) => updateSectionTitle(section.key, event.target.value)}
                     value={section.title}
                   />
+                  <input
+                    className="h-9.5 w-28 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
+                    max="1"
+                    min="0"
+                    onChange={(event) => updateSectionWeight(section.key, event.target.value)}
+                    placeholder="Weight"
+                    step="0.01"
+                    type="number"
+                    value={section.weight}
+                  />
                   <button
                     className="inline-flex h-9.5 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
                     onClick={() => setPickerForSectionKey(section.key)}
@@ -1180,6 +1232,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const updateExamMutation = useUpdateClassTestMutation()
   const updateStatusMutation = useUpdateClassTestStatusMutation()
   const deleteMutation = useDeleteClassTestMutation()
+  const deleteSectionMutation = useDeleteClassTestSectionMutation()
   const setDeliveryModeMutation = useSetExamDeliveryModeMutation()
   const [tab, setTab] = useState<DetailTab>('papers')
   const [message, setMessage] = useState<string | null>(null)
@@ -1195,6 +1248,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const [editingSectionIndex, setEditingSectionIndex] = useState<number | null>(null)
   const [editSectionTitle, setEditSectionTitle] = useState('')
   const [editSectionInstruction, setEditSectionInstruction] = useState('')
+  const [editSectionWeight, setEditSectionWeight] = useState('')
   const { confirm, dialog } = useConfirmationDialog()
 
   async function invalidate() {
@@ -1207,6 +1261,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     return paperSections.map((section) => ({
       instruction: section.instruction ?? null,
       questionIds: (section.items.map((item) => item.questionId).filter(Boolean) as string[]),
+      weight: section.weight ?? null,
       title: section.title?.trim() || 'Phần',
     }))
   }
@@ -1252,17 +1307,28 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     setEditingSectionIndex(sectionIndex)
     setEditSectionTitle(section?.title ?? '')
     setEditSectionInstruction(section?.instruction ?? '')
+    setEditSectionWeight(sectionWeightInputValue(section?.weight))
   }
 
   async function handleSaveSectionMeta(sectionIndex: number) {
     if (!exam) {
       return
     }
+    const nextWeight = parseOptionalSectionWeight(editSectionWeight)
+    if (Number.isNaN(nextWeight)) {
+      window.alert('Trọng số section phải là số hợp lệ.')
+      return
+    }
     const next = currentSectionsPayload().map((section, index) =>
       index === sectionIndex
-        ? { ...section, instruction: editSectionInstruction.trim() || null, title: editSectionTitle.trim() || section.title }
+        ? { ...section, instruction: editSectionInstruction.trim() || null, title: editSectionTitle.trim() || section.title, weight: nextWeight }
         : section,
     )
+    const sectionWeightError = validateOptionalSectionWeights(next.map((section) => section.weight ?? null))
+    if (sectionWeightError) {
+      window.alert(sectionWeightError)
+      return
+    }
     try {
       await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
       await invalidate()
@@ -1327,9 +1393,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     if (!(await confirm({ message: 'Xóa phần này? Toàn bộ câu hỏi trong phần cũng sẽ bị xóa.' }))) {
       return
     }
-    const next = current.filter((_, index) => index !== sectionIndex)
     try {
-      await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+      await deleteSectionMutation.mutateAsync({ examId: exam.id, sectionId: paperSections[sectionIndex].id })
       await invalidate()
     } catch (error) {
       setErrorMessage(toApiError(error).message)
@@ -1624,6 +1689,16 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                           placeholder="Hướng dẫn phần (không bắt buộc)"
                           value={editSectionInstruction}
                         />
+                        <input
+                          className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
+                          max="1"
+                          min="0"
+                          onChange={(event) => setEditSectionWeight(event.target.value)}
+                          placeholder="Trọng số (bỏ trống để chia đều)"
+                          step="0.01"
+                          type="number"
+                          value={editSectionWeight}
+                        />
                         <div className="flex gap-2">
                           <button
                             className="inline-flex h-8 items-center justify-center rounded-full bg-indigo-600 px-3.5 text-xs font-bold text-white"
@@ -1645,6 +1720,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                       <div className="flex items-center justify-between gap-2.5">
                         <div>
                           <span className="text-sm font-bold text-slate-900">{section.title || `Phần ${sectionIndex + 1}`}</span>
+                          {section.weight != null ? <p className="mt-0.5 text-xs font-semibold text-slate-500">Weight: {section.weight.toFixed(2)}</p> : null}
                           {section.instruction ? <p className="mt-0.5 text-xs text-slate-500">{section.instruction}</p> : null}
                         </div>
                         {canEditFreeQuestions ? (

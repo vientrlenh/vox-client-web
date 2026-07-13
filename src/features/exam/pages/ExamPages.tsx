@@ -221,6 +221,7 @@ export function SchoolAdminExamCreatePage() {
   const [languageId, setLanguageId] = useState('')
   const [maxAttempt, setMaxAttempt] = useState('1')
   const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>('HIGHEST')
+  const [requiresOtp, setRequiresOtp] = useState(true)
   const { confirm, dialog } = useConfirmationDialog()
 
   async function handleSubmit() {
@@ -237,6 +238,7 @@ export function SchoolAdminExamCreatePage() {
       languageId,
       maxAttempt: Number(maxAttempt) || 1,
       name,
+      requiresOtp,
       resultDecisionMethod,
     })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -316,6 +318,15 @@ export function SchoolAdminExamCreatePage() {
             </select>
           </label>
         </div>
+        <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700">
+          <input
+            checked={requiresOtp}
+            className="size-4 rounded border-slate-300"
+            onChange={(event) => setRequiresOtp(event.target.checked)}
+            type="checkbox"
+          />
+          Yêu cầu xác thực OTP khi vào thi
+        </label>
         <div className="flex justify-end">
           <button
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
@@ -347,6 +358,7 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
   const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
     exam.resultDecisionMethod ?? 'HIGHEST',
   )
+  const [requiresOtp, setRequiresOtp] = useState(exam.requiresOtp)
 
   async function handleSubmit() {
     if (!name.trim()) {
@@ -361,6 +373,7 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
         maxAttempt: Number(maxAttempt) || 1,
         name: name.trim(),
         openAt: toIsoDateTime(openAt),
+        requiresOtp,
         resultDecisionMethod,
       },
     })
@@ -444,6 +457,15 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
               </select>
             </label>
           </div>
+          <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700">
+            <input
+              checked={requiresOtp}
+              className="size-4 rounded border-slate-300"
+              onChange={(event) => setRequiresOtp(event.target.checked)}
+              type="checkbox"
+            />
+            Yêu cầu xác thực OTP khi vào thi
+          </label>
         </div>
         <div className="flex justify-end gap-2.5 border-t border-slate-200 px-6 py-4">
           <button

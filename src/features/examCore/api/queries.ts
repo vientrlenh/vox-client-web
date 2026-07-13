@@ -38,6 +38,7 @@ const EXAM_PAPER_FIELDS = `
     order
     title
     instruction
+    weight
     sectionTimeLimitSeconds
     items {
       id

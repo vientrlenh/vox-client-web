@@ -84,6 +84,7 @@ export type ExamPaperSectionDto = {
   paperId?: string | null
   sectionTimeLimitSeconds?: number | null
   title?: string | null
+  weight?: number | null
 }
 
 export type ExamPaperDto = {
@@ -249,6 +250,7 @@ export type ExamDto = {
   openAt?: string | null
   papers: ExamPaperDto[]
   papersLocked?: boolean | null
+  requiresOtp: boolean
   resultDecisionMethod?: ResultDecisionMethod | null
   schoolClassId?: string | null
   schoolId: string
@@ -263,6 +265,7 @@ export type UpdateExamRequest = {
   maxAttempt?: number | null
   name?: string
   openAt?: string | null
+  requiresOtp?: boolean | null
   resultDecisionMethod?: ResultDecisionMethod | null
 }
 

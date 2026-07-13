@@ -3,6 +3,7 @@ import { apiClient } from '@/shared/api'
 import type {
   CreateQuestionAssetRequest,
   QuestionAssetDto,
+  QuestionAssetUploadUrlDto,
   QuestionEvaluationGuideDto,
   UpdateQuestionAssetRequest,
   UpsertQuestionEvaluationGuideRequest,
@@ -44,6 +45,46 @@ export async function deleteQuestionAsset(questionId: string, assetId: string) {
   )
 
   return response.data.message
+}
+
+export async function regenerateQuestionAssetAnalysis(
+  questionId: string,
+  assetId: string,
+) {
+  const response = await apiClient.post<ApiResponse<QuestionAssetDto>>(
+    `/v1/questions/${questionId}/assets/${assetId}/regenerate-analysis`,
+  )
+
+  return response.data.message
+}
+
+export async function uploadQuestionAssetFile(
+  questionId: string,
+  file: File,
+) {
+  const response = await apiClient.get<ApiResponse<QuestionAssetUploadUrlDto>>(
+    `/v1/questions/${questionId}/assets/upload-url`,
+    {
+      params: {
+        contentType: file.type,
+      },
+    },
+  )
+
+  const { uploadUrl, publicUrl } = response.data.data
+  const uploadResponse = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type,
+    },
+    body: file,
+  })
+
+  if (!uploadResponse.ok) {
+    throw new Error('Không thể upload file asset. Vui lòng thử lại.')
+  }
+
+  return publicUrl
 }
 
 export async function upsertQuestionEvaluationGuide(
@@ -93,6 +134,30 @@ export function useDeleteQuestionAssetMutation() {
       assetId: string
       questionId: string
     }) => deleteQuestionAsset(questionId, assetId),
+  })
+}
+
+export function useRegenerateQuestionAssetAnalysisMutation() {
+  return useMutation({
+    mutationFn: ({
+      assetId,
+      questionId,
+    }: {
+      assetId: string
+      questionId: string
+    }) => regenerateQuestionAssetAnalysis(questionId, assetId),
+  })
+}
+
+export function useUploadQuestionAssetMutation() {
+  return useMutation({
+    mutationFn: ({
+      file,
+      questionId,
+    }: {
+      file: File
+      questionId: string
+    }) => uploadQuestionAssetFile(questionId, file),
   })
 }
 

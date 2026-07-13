@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiClient, graphQLRequest } from '@/shared/api'
 import type {
   ExamCandidateResultDto,
@@ -72,6 +72,8 @@ const EXAM_ITEM_RESPONSE_EVALUATION_QUERY = `
       rawItemScore
       itemScore
       overallConfidence
+      requiresHumanReview
+      reviewReasonCode
       markedInvalid
       requiresRetake
       status
@@ -177,5 +179,16 @@ export function useExamItemEvaluationQuery(answerId: string | null) {
     queryFn: () => fetchExamItemEvaluation(answerId as string),
     queryKey: examResultQueryKeys.evaluation(answerId),
     retry: false,
+  })
+}
+
+export async function deleteExamSession(sessionId: string) {
+  const response = await apiClient.delete<ApiEnvelope<null>>(`/v1/exam-sessions/${sessionId}`)
+  return response.data.message
+}
+
+export function useDeleteExamSessionMutation() {
+  return useMutation({
+    mutationFn: (sessionId: string) => deleteExamSession(sessionId),
   })
 }
