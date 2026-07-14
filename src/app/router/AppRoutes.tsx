@@ -371,6 +371,156 @@ const SchoolAdminEditBlueprintVersionPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.SchoolAdminEditBlueprintVersionPage })),
 );
 
+const SchoolAdminRubricsPage = lazy(() =>
+  import("@/features/rubrics_school").then((module) => ({
+    default: module.SchoolAdminRubricsPage,
+  })),
+);
+
+const SchoolAdminRubricDetailPage = lazy(() =>
+  import("@/features/rubrics_school").then((module) => ({
+    default: module.SchoolAdminRubricDetailPage,
+  })),
+);
+
+const SchoolAdminRubricVersionDetailPage = lazy(() =>
+  import("@/features/rubrics_school").then((module) => ({
+    default: module.SchoolAdminRubricVersionDetailPage,
+  })),
+);
+
+const SchoolAdminRubricCriterionDetailPage = lazy(() =>
+  import("@/features/rubrics_school").then((module) => ({
+    default: module.SchoolAdminRubricCriterionDetailPage,
+  })),
+);
+
+const SchoolAdminRubricVersionImportPage = lazy(() =>
+  import("@/features/rubrics_school").then((module) => ({
+    default: module.SchoolAdminRubricVersionImportPage,
+  })),
+);
+
+const SchoolAdminRubricCriterionImportPage = lazy(() =>
+  import("@/features/rubrics_school").then((module) => ({
+    default: module.SchoolAdminRubricCriterionImportPage,
+  })),
+);
+
+const SchoolAdminRubricResultBandImportPage = lazy(() =>
+  import("@/features/rubrics_school").then((module) => ({
+    default: module.SchoolAdminRubricResultBandImportPage,
+  })),
+);
+
+const SchoolAdminRubricCriterionBandImportPage = lazy(() =>
+  import("@/features/rubrics_school").then((module) => ({
+    default: module.SchoolAdminRubricCriterionBandImportPage,
+  })),
+);
+
+const SystemAdminRubricsPage = lazy(() =>
+  import("@/features/rubric_system").then((module) => ({
+    default: module.SystemAdminRubricsPage,
+  })),
+);
+
+const SystemAdminAssessmentPoliciesPage = lazy(() =>
+  import("@/features/assessment_policy_system").then((module) => ({
+    default: module.SystemAdminAssessmentPoliciesPage,
+  })),
+);
+
+const SystemAdminAssessmentPolicyDetailPage = lazy(() =>
+  import("@/features/assessment_policy_system").then((module) => ({
+    default: module.SystemAdminAssessmentPolicyDetailPage,
+  })),
+);
+
+const SystemAdminAssessmentPolicyImportPage = lazy(() =>
+  import("@/features/assessment_policy_system").then((module) => ({
+    default: module.SystemAdminAssessmentPolicyImportPage,
+  })),
+);
+
+const SystemAdminRubricDetailPage = lazy(() =>
+  import("@/features/rubric_system").then((module) => ({
+    default: module.SystemAdminRubricDetailPage,
+  })),
+);
+
+const SystemAdminRubricVersionDetailPage = lazy(() =>
+  import("@/features/rubric_system").then((module) => ({
+    default: module.SystemAdminRubricVersionDetailPage,
+  })),
+);
+
+const SystemAdminRubricCriterionDetailPage = lazy(() =>
+  import("@/features/rubric_system").then((module) => ({
+    default: module.SystemAdminRubricCriterionDetailPage,
+  })),
+);
+
+const SystemAdminRubricVersionImportPage = lazy(() =>
+  import("@/features/rubric_system").then((module) => ({
+    default: module.SystemAdminRubricVersionImportPage,
+  })),
+);
+
+const SystemAdminRubricCriterionImportPage = lazy(() =>
+  import("@/features/rubric_system").then((module) => ({
+    default: module.SystemAdminRubricCriterionImportPage,
+  })),
+);
+
+const SystemAdminRubricCriterionBandImportPage = lazy(() =>
+  import("@/features/rubric_system").then((module) => ({
+    default: module.SystemAdminRubricCriterionBandImportPage,
+  })),
+);
+
+const SchoolAdminAssessmentPoliciesPage = lazy(() =>
+  import("@/features/assessment_policy_school").then((module) => ({
+    default: module.SchoolAdminAssessmentPoliciesPage,
+  })),
+);
+
+const SchoolAdminAssessmentPolicyDetailPage = lazy(() =>
+  import("@/features/assessment_policy_school").then((module) => ({
+    default: module.SchoolAdminAssessmentPolicyDetailPage,
+  })),
+);
+
+const SchoolAdminAssessmentPolicyImportPage = lazy(() =>
+  import("@/features/assessment_policy_school").then((module) => ({
+    default: module.SchoolAdminAssessmentPolicyImportPage,
+  })),
+);
+
+const SchoolAdminScoringRulesPage = lazy(() =>
+  import("@/features/scoring_rules_school").then((module) => ({
+    default: module.SchoolAdminScoringRulesPage,
+  })),
+);
+
+const SchoolAdminScoringRulePoliciesPage = lazy(() =>
+  import("@/features/scoring_rules_school").then((module) => ({
+    default: module.SchoolAdminScoringRulePoliciesPage,
+  })),
+);
+
+const SystemAdminScoringRulesPage = lazy(() =>
+  import("@/features/scoring_rules_system").then((module) => ({
+    default: module.SystemAdminScoringRulesPage,
+  })),
+);
+
+const SystemAdminScoringRulePoliciesPage = lazy(() =>
+  import("@/features/scoring_rules_system").then((module) => ({
+    default: module.SystemAdminScoringRulePoliciesPage,
+  })),
+);
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -425,6 +575,54 @@ export function AppRoutes() {
             <Route path="system-admin/questions/create" element={<SystemAdminCreateQuestionPage />} />
             <Route path="system-admin/questions/:questionId/edit" element={<SystemAdminEditQuestionPage />} />
             <Route path="system-admin/questions/:questionId" element={<SystemAdminQuestionDetailPage />} />
+            <Route
+              path="system-admin/rubrics"
+              element={<SystemAdminRubricsPage />}
+            />
+            <Route
+              path="system-admin/rubrics/:rubricId"
+              element={<SystemAdminRubricDetailPage />}
+            />
+            <Route
+              path="system-admin/rubrics/:rubricId/versions/import"
+              element={<SystemAdminRubricVersionImportPage />}
+            />
+            <Route
+              path="system-admin/rubrics/:rubricId/versions/:versionId"
+              element={<SystemAdminRubricVersionDetailPage />}
+            />
+            <Route
+              path="system-admin/rubrics/:rubricId/versions/:versionId/criteria/import"
+              element={<SystemAdminRubricCriterionImportPage />}
+            />
+            <Route
+              path="system-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId"
+              element={<SystemAdminRubricCriterionDetailPage />}
+            />
+            <Route
+              path="system-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId/bands/import"
+              element={<SystemAdminRubricCriterionBandImportPage />}
+            />
+            <Route
+              path="system-admin/assessment-policies"
+              element={<SystemAdminAssessmentPoliciesPage />}
+            />
+            <Route
+              path="system-admin/assessment-policies/import"
+              element={<SystemAdminAssessmentPolicyImportPage />}
+            />
+            <Route
+              path="system-admin/assessment-policies/:policyId"
+              element={<SystemAdminAssessmentPolicyDetailPage />}
+            />
+            <Route
+              path="system-admin/assessment-policies/:policyId/scoring-rules"
+              element={<SystemAdminScoringRulesPage />}
+            />
+            <Route
+              path="system-admin/scoring-rules"
+              element={<SystemAdminScoringRulePoliciesPage />}
+            />
           </Route>
         </Route>
         <Route element={<RequireRole role="SCHOOL_ADMIN" />}>
@@ -539,6 +737,62 @@ export function AppRoutes() {
             />
             <Route path="school-admin/blueprints/:blueprintId" element={<SchoolAdminBlueprintDetailPage />} />
             <Route path="school-admin/blueprints" element={<SchoolAdminBlueprintsPage />} />
+            <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
+            <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
+            <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
+            <Route path="school-admin/class-tests/:examId" element={<SchoolAdminClassTestDetailPage />} />
+            <Route
+              path="school-admin/rubrics"
+              element={<SchoolAdminRubricsPage />}
+            />
+            <Route
+              path="school-admin/rubrics/:rubricId"
+              element={<SchoolAdminRubricDetailPage />}
+            />
+            <Route
+              path="school-admin/rubrics/:rubricId/versions/import"
+              element={<SchoolAdminRubricVersionImportPage />}
+            />
+            <Route
+              path="school-admin/rubrics/:rubricId/versions/:versionId"
+              element={<SchoolAdminRubricVersionDetailPage />}
+            />
+            <Route
+              path="school-admin/rubrics/:rubricId/versions/:versionId/criteria/import"
+              element={<SchoolAdminRubricCriterionImportPage />}
+            />
+            <Route
+              path="school-admin/rubrics/:rubricId/versions/:versionId/bands/import"
+              element={<SchoolAdminRubricResultBandImportPage />}
+            />
+            <Route
+              path="school-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId"
+              element={<SchoolAdminRubricCriterionDetailPage />}
+            />
+            <Route
+              path="school-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId/bands/import"
+              element={<SchoolAdminRubricCriterionBandImportPage />}
+            />
+            <Route
+              path="school-admin/assessment-policies"
+              element={<SchoolAdminAssessmentPoliciesPage />}
+            />
+            <Route
+              path="school-admin/assessment-policies/import"
+              element={<SchoolAdminAssessmentPolicyImportPage />}
+            />
+            <Route
+              path="school-admin/assessment-policies/:policyId"
+              element={<SchoolAdminAssessmentPolicyDetailPage />}
+            />
+            <Route
+              path="school-admin/assessment-policies/:policyId/scoring-rules"
+              element={<SchoolAdminScoringRulesPage />}
+            />
+            <Route
+              path="school-admin/scoring-rules"
+              element={<SchoolAdminScoringRulePoliciesPage />}
+            />
           </Route>
         </Route>
         <Route element={<RequireRole role="TEACHER" />}>

@@ -5,9 +5,11 @@ import {
   ChevronDown,
   ClipboardCheck,
   DoorOpen,
+  ClipboardList,
   FileQuestion,
   FileSpreadsheet,
   GraduationCap,
+  Gavel,
   Home,
   Layers,
   LogOut,
@@ -77,6 +79,21 @@ const navigationItems = [
     icon: Presentation,
     label: 'Quản lý Giáo viên',
     to: '/school-admin/teachers',
+  },
+  {
+    icon: ClipboardList,
+    label: 'Quản lý tiêu chí đánh giá',
+    to: '/school-admin/rubrics',
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Quản lý chính sách đánh giá',
+    to: '/school-admin/assessment-policies',
+  },
+  {
+    icon: Gavel,
+    label: 'Quản lý Quy tắc tính điểm',
+    to: '/school-admin/scoring-rules',
   },
 ]
 
