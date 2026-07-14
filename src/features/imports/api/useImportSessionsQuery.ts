@@ -4,6 +4,7 @@ import type {
   ImportRow,
   ImportSessionDetails,
   ImportSessionFilters,
+  ImportSessionStatus,
   ImportSessionSummary,
   PageResult,
 } from '../types'
@@ -80,6 +81,21 @@ const IMPORT_SESSION_QUERY = `
   }
 `
 
+// Session do System Admin tạo không gắn schoolId, nhưng schema khai báo
+// schoolId là non-null -> query field này sẽ làm cả importSession bị null
+// hóa (GraphQL null-bubbling). Dùng query rút gọn, không đụng schoolId,
+// để polling trạng thái import không bị lỗi.
+const IMPORT_SESSION_STATUS_QUERY = `
+  query ImportSessionStatus($id: ID!) {
+    importSession(id: $id) {
+      id
+      status
+      totalRows
+      importedRows
+    }
+  }
+`
+
 const IMPORT_ROWS_QUERY = `
   query ImportRows($sessionId: ID!, $page: Int!, $size: Int!, $status: String) {
     importRows(sessionId: $sessionId, page: $page, size: $size, status: $status) {
@@ -100,6 +116,10 @@ type ImportSessionsQueryData = {
 
 type ImportSessionQueryData = {
   importSession: ImportSessionDetails | null
+}
+
+type ImportSessionStatusQueryData = {
+  importSession: ImportSessionStatus | null
 }
 
 type ImportRowsQueryData = {
@@ -151,6 +171,15 @@ export async function fetchImportSessions(
 export async function fetchImportSession(id: string) {
   const data = await graphQLRequest<ImportSessionQueryData>(
     IMPORT_SESSION_QUERY,
+    { id },
+  )
+
+  return data.importSession
+}
+
+export async function fetchImportSessionStatus(id: string) {
+  const data = await graphQLRequest<ImportSessionStatusQueryData>(
+    IMPORT_SESSION_STATUS_QUERY,
     { id },
   )
 

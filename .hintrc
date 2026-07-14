@@ -12,7 +12,8 @@
     "axe/aria": [
       "default",
       {
-        "aria-roles": "off"
+        "aria-roles": "off",
+        "aria-valid-attr-value": "off"
       }
     ],
     "axe/forms": [
@@ -21,6 +22,7 @@
         "label": "off",
         "select-name": "off"
       }
-    ]
+    ],
+    "button-type": "off"
   }
 }

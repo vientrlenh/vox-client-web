@@ -94,7 +94,7 @@ export function ActionMenuButton({
     setMenuPosition(getMenuPosition(trigger, align, items.length))
     setIsOpen(true)
   }
-
+  
   useEffect(() => {
     if (!isOpen) {
       return undefined

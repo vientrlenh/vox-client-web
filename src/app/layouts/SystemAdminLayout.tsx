@@ -3,8 +3,10 @@ import {
   Bell,
   Building2,
   ChevronDown,
+  ClipboardCheck,
   ClipboardList,
   FileQuestion,
+  Gavel,
   Home,
   Languages,
   Library,
@@ -71,6 +73,21 @@ const navigationItems: NavigationItem[] = [
     icon: Building2,
     label: 'Quản lý trường học',
     to: '/system-admin/schools',
+  },
+  {
+    icon: ClipboardList,
+    label: 'Quản lý tiêu chí đánh giá',
+    to: '/system-admin/rubrics',
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Quản lý chính sách đánh giá',
+    to: '/system-admin/assessment-policies',
+  },
+  {
+    icon: Gavel,
+    label: 'Quản lý Scoring Rules',
+    to: '/system-admin/scoring-rules',
   },
   {
     icon: Settings,
