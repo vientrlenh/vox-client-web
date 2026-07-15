@@ -245,6 +245,20 @@ export type UpdateQuestionStatusRequest = {
   note?: string | null
 }
 
+export type BulkUpdateQuestionStatusRequest = {
+  questionIds: string[]
+} & UpdateQuestionStatusRequest
+
+export type BulkUpdateQuestionStatusFailure = {
+  questionId: string
+  reason: string
+}
+
+export type BulkUpdateQuestionStatusResponse = {
+  updated: QuestionDto[]
+  failed: BulkUpdateQuestionStatusFailure[]
+}
+
 export type CreateQuestionCollaboratorRequest = {
   userId: string
   permission: QuestionCollaboratorPermission
@@ -365,6 +379,21 @@ export function getQuestionTypeDisplay(type?: QuestionType | null) {
   }
 
   return type ? map[type] ?? type : '-'
+}
+
+export function getQuestionAssetTypeDisplay(type?: QuestionAssetType | null) {
+  switch (type) {
+    case 'IMAGE':
+      return 'Ảnh'
+    case 'VIDEO':
+      return 'Video'
+    case 'TEXT_PASSAGE':
+      return 'Đoạn văn'
+    case 'AUDIO':
+      return 'Âm thanh'
+    default:
+      return String(type ?? '-')
+  }
 }
 
 export function getQuestionStatusDisplay(status?: QuestionStatus | null) {

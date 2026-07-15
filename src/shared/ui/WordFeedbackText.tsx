@@ -1,5 +1,11 @@
 import { useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { AlertTriangle, X } from 'lucide-react'
+
+const VIETNAMESE_CHARS_PATTERN = /[àáạảãăằắặẳẵâầấậẩẫđèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹ]/i
+
+function containsVietnamese(text?: string | null): boolean {
+  return !!text && VIETNAMESE_CHARS_PATTERN.test(text)
+}
 
 export type PhonemeFeedback = {
   accuracyScore?: number | null
@@ -50,13 +56,35 @@ function formatAccuracy(score?: number | null) {
   }).format(score)
 }
 
-export function WordFeedbackText({ words }: { words: WordFeedback[] }) {
+export function WordFeedbackText({
+  fallbackTranscript,
+  words,
+}: {
+  fallbackTranscript?: string | null
+  words: WordFeedback[]
+}) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const selectedWord = selectedIndex == null ? null : words[selectedIndex] ?? null
-  const transcript = useMemo(() => words.map((word) => word.word).join(' '), [words])
+  // Prefer fallbackTranscript (corrected_transcript from the backend) over rebuilding text
+  // from the word tags -- the pronunciation-assessment recognizer is fixed to English only,
+  // so a code-switched Vietnamese word never appears in `words` at all and would silently
+  // vanish from this line if rebuilt from `words`. fallbackTranscript is the accurate record
+  // of what was actually said (Vietnamese included); the tags above it are a narrower view
+  // (only the words Azure could assess for English pronunciation), and that mismatch is
+  // expected -- phoneme scoring for non-English words isn't meaningful anyway.
+  const wordsOnlyTranscript = useMemo(() => words.map((word) => word.word).join(' '), [words])
+  const transcript = fallbackTranscript && fallbackTranscript.trim() ? fallbackTranscript : wordsOnlyTranscript
 
   if (words.length === 0) {
-    return <p className="text-sm text-slate-400">Chưa có word feedback cho turn này.</p>
+    // No phoneme/pronunciation feedback for this turn (e.g. it was rejected by validity before
+    // pronunciation assessment ran) -- still show whatever the student actually said, plain text,
+    // rather than just a "no data" placeholder. Works for any language/script, including
+    // code-switched Vietnamese, since it's rendered as-is with no word-level parsing.
+    return fallbackTranscript && fallbackTranscript.trim() ? (
+      <p className="text-sm leading-6 text-slate-700">{fallbackTranscript}</p>
+    ) : (
+      <p className="text-sm text-slate-400">Chưa có word feedback cho turn này.</p>
+    )
   }
 
   return (
@@ -79,6 +107,16 @@ export function WordFeedbackText({ words }: { words: WordFeedback[] }) {
       </div>
 
       <p className="text-xs leading-6 text-slate-500">{transcript}</p>
+
+      {containsVietnamese(transcript) ? (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <AlertTriangle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+          <p>
+            Câu trả lời có lẫn tiếng Việt — các từ tiếng Việt không nằm trong phần chấm phoneme chi tiết ở trên (chỉ chấm phát âm tiếng
+            Anh), nhưng đã bị trừ điểm ngữ pháp/từ vựng riêng.
+          </p>
+        </div>
+      ) : null}
 
       {selectedWord ? (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

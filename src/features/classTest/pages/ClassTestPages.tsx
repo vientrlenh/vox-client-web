@@ -85,7 +85,9 @@ function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; ste
   // hệ thống tự sinh 1 blueprint riêng ẩn) — nên không dùng được để biết đề đã có nội dung thật hay chưa.
   const hasQuestions = exam.papers.some((paper) => paper.sections.some((section) => section.items.length > 0))
   const totalPapers = exam.papers.length
-  const readyPapers = exam.papers.filter((paper) => paper.status === 'LOCKED' || paper.status === 'APPROVED').length
+  // Class test không có luồng duyệt paper riêng như CENTRALIZED (paper chỉ LOCKED khi exam chuyển IN_PROGRESS) —
+  // dùng lại tiêu chí "đã có câu hỏi" thay vì dựa vào paper.status.
+  const readyPapers = exam.papers.filter((paper) => paper.sections.some((section) => section.items.length > 0)).length
   const papersReady = totalPapers > 0 && readyPapers === totalPapers
   const isPublished = exam.status === 'RESULTS_PUBLISHED' || exam.status === 'CLOSED'
 
@@ -104,7 +106,7 @@ function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; ste
       icon: step2Done ? <Check size={26} /> : <FilePenLine size={24} />,
       label: 'Soạn & giao đề',
       state: !step1Done ? 'upcoming' : step2Done ? 'done' : 'current',
-      sublabel: totalPapers ? `${readyPapers} / ${totalPapers} mã đề đã duyệt` : undefined,
+      sublabel: totalPapers ? `${readyPapers} / ${totalPapers} mã đề đã có câu hỏi` : undefined,
     },
     {
       icon: step3Done ? <Check size={26} /> : <PlayCircle size={24} />,
@@ -1502,20 +1504,26 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               </button>
               {primaryStatusAction ? (
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-transparent shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
                   onClick={() =>
                     void updateStatusMutation
                       .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
                       .then(() => invalidate())
-                      .then(() => setMessage('Đã trả điểm cho bài trên lớp.'))
+                      .then(() =>
+                        setMessage(
+                          {
+                            CLOSE: 'Đã đóng bài kiểm tra.',
+                            PUBLISH_RESULTS: 'Đã trả điểm cho bài trên lớp.',
+                            SCHEDULE: 'Đã lên lịch bài kiểm tra.',
+                            START: 'Đã mở bài kiểm tra cho học sinh.',
+                          }[primaryStatusAction.action],
+                        ),
+                      )
                   }
                   type="button"
                 >
-                  <span className="inline-flex items-center gap-2 text-white">
-                    {primaryStatusAction.icon}
-                    {primaryStatusAction.label}
-                  </span>
-                  Trả điểm
+                  {primaryStatusAction.icon}
+                  {primaryStatusAction.label}
                 </button>
               ) : null}
               </>

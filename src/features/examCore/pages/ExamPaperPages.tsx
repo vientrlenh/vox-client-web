@@ -139,8 +139,13 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
   // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED (không dùng luồng duyệt) nên LOCKED không chặn sửa ở đây.
   const canEditPaperContent =
     canManage && exam?.status !== 'IN_PROGRESS' && (exam?.kind === 'CLASS_TEST' || paper.status !== 'LOCKED')
-  const existingQuestionIds = paper.sections
-    .flatMap((section) => section.items.map((item) => item.questionId))
+  const pickerCurrentItem = pickerItemId
+    ? paper.sections.flatMap((section) => section.items).find((item) => item.id === pickerItemId)
+    : null
+  const pickerExcludeQuestionIds = paper.sections
+    .flatMap((section) => section.items)
+    .filter((item) => item.id !== pickerItemId)
+    .map((item) => item.questionId)
     .filter(Boolean) as string[]
 
   return (
@@ -261,7 +266,15 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
                         <Eye aria-hidden="true" className="size-4" />
                       </a>
                     ) : null}
-                    {canEditPaperContent ? (
+                    {item.blueprintSlotId ? (
+                      <span
+                        className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600"
+                        title="Câu hỏi này cố định theo blueprint, không đổi được ở đây"
+                      >
+                        Cố định theo blueprint
+                      </span>
+                    ) : null}
+                    {canEditPaperContent && !item.blueprintSlotId ? (
                       <button
                         className="inline-flex h-8.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-slate-50"
                         onClick={() => setPickerItemId(item.id)}
@@ -360,6 +373,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
 
       {pickerItemId ? (
         <QuestionPicker
+          excludeQuestionIds={pickerExcludeQuestionIds}
           onClose={() => setPickerItemId(null)}
           onSelect={(question) => {
             void updateItemMutation
@@ -369,7 +383,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
           }}
           publishedOnly={exam?.kind === 'CENTRALIZED'}
           scope="teacher"
-          selectedQuestionIds={existingQuestionIds}
+          selectedQuestionIds={pickerCurrentItem?.questionId ? [pickerCurrentItem.questionId] : []}
         />
       ) : null}
     </section>

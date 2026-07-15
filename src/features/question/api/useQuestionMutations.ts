@@ -23,8 +23,9 @@ type CreateQuestionResponse = {
 
 type UpdateQuestionResponse = {
   question: QuestionDto
-  clonedAsNew: boolean
 }
+
+type CloneQuestionResponse = QuestionDto
 
 type DeleteQuestionResponse = {
   deleted: boolean
@@ -53,9 +54,19 @@ export async function updateQuestion(
   )
 
   return {
-    clonedAsNew: response.data.data.clonedAsNew,
     message: response.data.message,
     questionId: response.data.data.question.id,
+  }
+}
+
+export async function cloneQuestion(id: string) {
+  const response = await apiClient.post<ApiResponse<CloneQuestionResponse>>(
+    `/v1/questions/${id}/clone`,
+  )
+
+  return {
+    message: response.data.message,
+    questionId: response.data.data.id,
   }
 }
 
@@ -121,6 +132,12 @@ export function useUpdateQuestionMutation() {
       id: string
       payload: UpdateQuestionRequest
     }) => updateQuestion(id, payload),
+  })
+}
+
+export function useCloneQuestionMutation() {
+  return useMutation({
+    mutationFn: (id: string) => cloneQuestion(id),
   })
 }
 

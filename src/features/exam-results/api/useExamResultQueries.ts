@@ -14,6 +14,17 @@ type GraphQlExamResultResponse = {
   examSessionResult: ExamCandidateResultDto | null
 }
 
+type ExamSessionStatusDto = {
+  id: string
+  startedAt?: string | null
+  status: string
+  submittedAt?: string | null
+}
+
+type GraphQlExamSessionResponse = {
+  examSession: ExamSessionStatusDto | null
+}
+
 type GraphQlExamItemEvaluationTurn = Omit<ExamItemEvaluationDto['turns'][number], 'pronunciationOverall' | 'wordFeedback'> & {
   pronunciationOverall?: string | null
   wordFeedback?: string | null
@@ -56,6 +67,17 @@ const EXAM_SESSION_RESULT_QUERY = `
         itemScore
         weightedScore
       }
+    }
+  }
+`
+
+const EXAM_SESSION_STATUS_QUERY = `
+  query ExamSessionStatus($id: ID!) {
+    examSession(id: $id) {
+      id
+      startedAt
+      submittedAt
+      status
     }
   }
 `
@@ -149,6 +171,20 @@ export function useExamSessionResultQuery(sessionId: string | null) {
     enabled: Boolean(sessionId),
     queryFn: () => fetchExamSessionResult(sessionId as string),
     queryKey: examResultQueryKeys.session(sessionId),
+    retry: false,
+  })
+}
+
+export async function fetchExamSessionStatus(sessionId: string) {
+  const data = await graphQLRequest<GraphQlExamSessionResponse>(EXAM_SESSION_STATUS_QUERY, { id: sessionId })
+  return data.examSession
+}
+
+export function useExamSessionStatusQuery(sessionId: string | null) {
+  return useQuery({
+    enabled: Boolean(sessionId),
+    queryFn: () => fetchExamSessionStatus(sessionId as string),
+    queryKey: [...examResultQueryKeys.session(sessionId), 'status'],
     retry: false,
   })
 }

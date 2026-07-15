@@ -512,14 +512,7 @@ function QuestionEvaluationCard({
                   {evaluation.markedInvalid ? <StatusBadge label="Đánh dấu không hợp lệ" tone="danger" /> : null}
                   <span className="text-xs text-slate-500">Chấm lúc {formatDateTime(evaluation.evaluatedAt)}</span>
                 </div>
-                <div className="mt-3 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-slate-500">
-                      <Gauge aria-hidden="true" className="size-4" />
-                      <span className="text-xs font-bold uppercase tracking-wide">ASR confidence</span>
-                    </div>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.overallConfidence)}</p>
-                  </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                     <div className="flex items-center gap-2 text-slate-500">
                       <Gauge aria-hidden="true" className="size-4" />
@@ -562,7 +555,10 @@ function QuestionEvaluationCard({
                     </div>
 
                     <div className="mt-4">
-                      <WordFeedbackText words={Array.isArray(turn.wordFeedback) ? turn.wordFeedback : []} />
+                      <WordFeedbackText
+                        fallbackTranscript={turn.transcript}
+                        words={Array.isArray(turn.wordFeedback) ? turn.wordFeedback : []}
+                      />
                     </div>
                   </div>
                 ))}

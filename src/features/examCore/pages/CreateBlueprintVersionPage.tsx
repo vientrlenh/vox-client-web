@@ -217,6 +217,11 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
   const activeSlot = pickerForSlotKey
     ? sections.flatMap((section) => section.slots.map((slot) => ({ section, slot }))).find(({ slot }) => slot.key === pickerForSlotKey)
     : null
+  const pickerExcludeQuestionIds = sections
+    .flatMap((section) => section.slots)
+    .filter((slot) => slot.key !== pickerForSlotKey)
+    .map((slot) => slot.fixedQuestion?.id)
+    .filter(Boolean) as string[]
 
   return (
     <section className="mx-auto max-w-240">
@@ -455,6 +460,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
 
       {activeSlot ? (
         <QuestionPicker
+          excludeQuestionIds={pickerExcludeQuestionIds}
           onClose={() => setPickerForSlotKey(null)}
           onSelect={(question) => {
             updateSlot(activeSlot.section.key, activeSlot.slot.key, { fixedQuestion: question })
@@ -462,7 +468,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
           }}
           publishedOnly
           scope="teacher"
-          selectedQuestionIds={[]}
+          selectedQuestionIds={activeSlot.slot.fixedQuestion ? [activeSlot.slot.fixedQuestion.id] : []}
         />
       ) : null}
     </section>

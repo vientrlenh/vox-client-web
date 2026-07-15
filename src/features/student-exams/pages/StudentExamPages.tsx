@@ -1,7 +1,7 @@
 import { ArrowRight, BookOpenCheck, Clock3, Target } from 'lucide-react'
 import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { useExamSessionResultQuery, useMyExamsQuery } from '@/features/exam-results/api/useExamResultQueries'
+import { useExamSessionResultQuery, useExamSessionStatusQuery, useMyExamsQuery } from '@/features/exam-results/api/useExamResultQueries'
 import { formatScore, getExamResultStatusDisplay, getStudentExamStatusDisplay } from '@/features/exam-results/types'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { StatCard } from '@/shared/ui/StatCard'
@@ -105,6 +105,7 @@ export function StudentExamsPage() {
 export function StudentExamResultPage() {
   const { sessionId } = useParams()
   const resultQuery = useExamSessionResultQuery(sessionId ?? null)
+  const sessionQuery = useExamSessionStatusQuery(sessionId ?? null)
   const result = resultQuery.data
 
   if (!sessionId) {
@@ -122,6 +123,22 @@ export function StudentExamResultPage() {
   }
 
   if (!result) {
+    if (sessionQuery.data?.status === 'GRADING_FAILED') {
+      return (
+        <section className="mx-auto max-w-180">
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-12 text-center">
+            <h1 className="text-2xl font-extrabold text-red-900">Chấm điểm thất bại</h1>
+            <p className="mt-3 text-sm text-red-700">
+              Phiên thi này đã gặp lỗi trong lúc chấm điểm. Vui lòng liên hệ giáo viên hoặc quản trị viên để xử lý lại.
+            </p>
+            <div className="mt-4 inline-flex">
+              <StatusBadge label="Chấm lỗi" tone="danger" />
+            </div>
+          </div>
+        </section>
+      )
+    }
+
     return (
       <section className="mx-auto max-w-180">
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">

@@ -72,16 +72,21 @@ export async function uploadQuestionAssetFile(
   )
 
   const { uploadUrl, publicUrl } = response.data.data
-  const uploadResponse = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': file.type,
-    },
-    body: file,
-  })
+  let uploadResponse: Response
+  try {
+    uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': file.type,
+      },
+      body: file,
+    })
+  } catch {
+    throw new Error('Không thể tải tệp tài nguyên lên vùng lưu trữ. Vui lòng kiểm tra kết nối và thử lại.')
+  }
 
   if (!uploadResponse.ok) {
-    throw new Error('Không thể upload file asset. Vui lòng thử lại.')
+    throw new Error('Không thể tải tệp tài nguyên lên vùng lưu trữ. Vui lòng thử lại.')
   }
 
   return publicUrl

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import { toApiError } from '@/shared/api'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { QuestionPicker } from '../components/QuestionPicker'
 import { examQueryKeys, useExamBlueprintQuery } from '../api/queries'
 import {
@@ -162,6 +163,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const updateVersionMutation = useUpdateBlueprintVersionMutation()
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const [description, setDescription] = useState(version.description ?? '')
   const [totalTimeLimitMinutes, setTotalTimeLimitMinutes] = useState(
@@ -218,6 +220,8 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
   }
 
   async function handleSubmit() {
+    setErrorMessage(null)
+
     if (sections.length === 0) {
       window.alert('Phiên bản phải có ít nhất một phần.')
       return
@@ -289,19 +293,26 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
       await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
       navigate(detailPath, { state: { successMessage: 'Đã cập nhật phiên bản.' } })
     } catch (error) {
-      window.alert(toApiError(error).message)
+      setErrorMessage(toApiError(error).message)
     }
   }
 
   const activeSlot = pickerForSlotKey
     ? sections.flatMap((section) => section.slots.map((slot) => ({ section, slot }))).find(({ slot }) => slot.key === pickerForSlotKey)
     : null
+  const pickerExcludeQuestionIds = sections
+    .flatMap((section) => section.slots)
+    .filter((slot) => slot.key !== pickerForSlotKey)
+    .map((slot) => slot.fixedQuestionId)
+    .filter(Boolean) as string[]
 
   return (
     <section className="mx-auto max-w-240">
       <button className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600" onClick={() => navigate(detailPath)} type="button">
         ← {blueprint.name}
       </button>
+
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
         <h1 className="text-xl font-extrabold text-slate-900">Cập nhật phiên bản {version.code}</h1>
@@ -561,6 +572,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
 
       {activeSlot ? (
         <QuestionPicker
+          excludeQuestionIds={pickerExcludeQuestionIds}
           onClose={() => setPickerForSlotKey(null)}
           onSelect={(question) => {
             updateSlot(activeSlot.section.key, activeSlot.slot.key, { fixedQuestion: question, fixedQuestionId: question.id })
@@ -568,7 +580,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
           }}
           publishedOnly
           scope="teacher"
-          selectedQuestionIds={[]}
+          selectedQuestionIds={activeSlot.slot.fixedQuestionId ? [activeSlot.slot.fixedQuestionId] : []}
         />
       ) : null}
     </section>
