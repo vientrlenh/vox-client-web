@@ -1,8 +1,8 @@
 import { Check, ClipboardList } from 'lucide-react'
-import { avatarClasses, initials, type TeacherLite } from '../types'
+import { avatarClasses, initials, type AppealReviewerLite } from '../types'
 
 type ReviewerPickerCardProps = {
-  reviewer: TeacherLite
+  reviewer: AppealReviewerLite
   selected: boolean
   onToggle: () => void
 }
@@ -44,9 +44,7 @@ export function ReviewerPickerCard({ reviewer, selected, onToggle }: ReviewerPic
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-bold text-slate-900">{reviewer.name}</div>
-        <div className="mb-1.5 text-[11.5px] font-medium text-slate-400">
-          {reviewer.dept} · {reviewer.exp}
-        </div>
+        <div className="mb-1.5 text-[11.5px] font-medium text-slate-400">Giáo viên trong trường</div>
         <span
           className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${load.className}`}
         >

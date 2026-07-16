@@ -1,21 +1,22 @@
-import { ArrowRight, BellRing, Mail } from 'lucide-react'
+import { BellRing, Mail } from 'lucide-react'
 import { formatScore } from '../types'
 
 type PublishDialogProps = {
-  code: string
   student: string
-  original: number
-  finalScore: number
+  partLabel?: string | null
+  partScore: number
   onCancel: () => void
   onConfirm: () => void
 }
 
-/** Modal xác nhận công bố kết quả phúc khảo. */
+/**
+ * Modal xác nhận công bố kết quả phúc khảo. Admin nhập điểm cho PART được phúc khảo;
+ * BE tự tính lại điểm tổng từ tất cả part rồi dò xếp loại — nên ở đây không hiển thị điểm tổng.
+ */
 export function PublishDialog({
-  code,
   student,
-  original,
-  finalScore,
+  partLabel,
+  partScore,
   onCancel,
   onConfirm,
 }: PublishDialogProps) {
@@ -33,29 +34,22 @@ export function PublishDialog({
           <div>
             <h2 className="text-lg font-extrabold text-slate-900">Công bố kết quả phúc khảo</h2>
             <p className="mt-0.5 text-[12.5px] font-medium text-slate-500">
-              {student} · {code}
+              {student}
+              {partLabel ? ` · ${partLabel}` : ''}
             </p>
           </div>
         </div>
-        <div className="mt-4.5 flex items-center justify-center gap-4.5 rounded-xl bg-slate-50 p-4.5">
-          <div className="text-center">
-            <div className="text-[11px] font-bold text-slate-400">ĐIỂM GỐC</div>
-            <div className="text-2xl font-extrabold text-slate-400 line-through">
-              {formatScore(original)}
-            </div>
-          </div>
-          <ArrowRight className="size-5 text-emerald-600" />
-          <div className="text-center">
-            <div className="text-[11px] font-bold text-emerald-600">CÔNG BỐ</div>
-            <div className="text-[32px] font-extrabold leading-none text-emerald-600">
-              {formatScore(finalScore)}
-            </div>
+        <div className="mt-4.5 rounded-xl bg-slate-50 p-4.5 text-center">
+          <div className="text-[11px] font-bold text-emerald-600">ĐIỂM PHẦN THI CÔNG BỐ</div>
+          <div className="mt-1 text-[38px] font-extrabold leading-none text-emerald-600">
+            {formatScore(partScore)}
           </div>
         </div>
         <div className="mt-3.5 flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3">
           <Mail className="mt-0.5 size-4 shrink-0 text-blue-700" />
           <span className="text-xs font-medium leading-relaxed text-blue-700">
-            Hệ thống sẽ gửi thông báo kết quả tới học sinh và cập nhật điểm chính thức.
+            Hệ thống tính lại điểm tổng từ tất cả phần thi, cập nhật điểm chính thức và gửi thông báo
+            tới học sinh.
           </span>
         </div>
         <div className="mt-5 flex gap-2.5">

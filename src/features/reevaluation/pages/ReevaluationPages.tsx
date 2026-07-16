@@ -11,10 +11,10 @@ import {
   Download,
   EyeOff,
   FileUp,
-  Hash,
   Headphones,
   History,
   Inbox,
+  Info,
   Loader,
   Mail,
   MailCheck,
@@ -30,16 +30,19 @@ import {
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { PageLoader } from '@/shared/ui/PageLoader'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { toApiError } from '@/shared/api'
 import {
-  useReevaluationRequestQuery,
-  useReevaluationRequestsQuery,
-  useReevaluationStatsQuery,
-  useReviewersQuery,
-  useTeacherTasksQuery,
+  useAppealQuery,
+  useAppealReviewersQuery,
+  useAppealsQuery,
+  useAppealStatsQuery,
+  useAppealTaskDetailQuery,
+  useMyAppealTasksQuery,
 } from '../api/useReevaluationQueries'
 import {
   useApproveMutation,
@@ -47,49 +50,52 @@ import {
   usePublishMutation,
   useRejectMutation,
   useSubmitReportMutation,
+  type CriterionScoreInput,
 } from '../api/useReevaluationMutations'
 import { AiScoreBars } from '../components/AiScoreBars'
-import { AudioPlayerMock } from '../components/AudioPlayerMock'
+import { ApproveDialog } from '../components/ApproveDialog'
 import { CompareTable } from '../components/CompareTable'
 import { CriteriaScoreCard } from '../components/CriteriaScoreCard'
 import { ProcessTimeline } from '../components/ProcessTimeline'
 import { PublishDialog } from '../components/PublishDialog'
 import { RejectDialog } from '../components/RejectDialog'
 import { ReviewerPickerCard } from '../components/ReviewerPickerCard'
-import { CURRENT_TEACHER_ID, getReviewer, suggestedFinal } from '../mock/reevaluationStore'
+import { TurnList } from '../components/TurnList'
 import {
   avatarClasses,
   avgScore,
   bandRound,
-  CRITERIA,
-  EMPTY_SCORES,
-  formatDuration,
+  buildTimeline,
+  formatIsoDate,
+  formatIsoDateTime,
   formatScore,
-  getReevaluationStatusDisplay,
+  getAppealStatusDisplay,
   initials,
-  type CriterionKey,
-  type CriterionScores,
-  type ReevaluationRequest,
-  type ReevaluationStatus,
+  suggestedPartScore,
+  type AppealDetail,
+  type AppealStatus,
+  type AppealTaskDetail,
 } from '../types'
 
-const STATUS_FILTERS: Array<{ label: string; value: '' | ReevaluationStatus }> = [
+const PAGE_SIZE = 20
+
+const STATUS_FILTERS: Array<{ label: string; value: '' | AppealStatus }> = [
   { label: 'Tất cả', value: '' },
-  { label: 'Chờ duyệt', value: 'pending' },
-  { label: 'Chờ phân công', value: 'approved' },
-  { label: 'Đang chấm lại', value: 'grading' },
-  { label: 'Chờ đối chiếu', value: 'comparing' },
-  { label: 'Đã công bố', value: 'published' },
-  { label: 'Từ chối', value: 'rejected' },
+  { label: 'Chờ duyệt', value: 'PENDING' },
+  { label: 'Chờ phân công', value: 'APPROVED' },
+  { label: 'Đang chấm lại', value: 'GRADING' },
+  { label: 'Chờ đối chiếu', value: 'COMPARING' },
+  { label: 'Đã công bố', value: 'PUBLISHED' },
+  { label: 'Từ chối', value: 'REJECTED' },
 ]
 
-const ACTION_LABEL: Record<ReevaluationStatus, string> = {
-  pending: 'Xem & duyệt',
-  approved: 'Phân công',
-  grading: 'Theo dõi',
-  comparing: 'Đối chiếu',
-  published: 'Xem kết quả',
-  rejected: 'Xem lý do',
+const ACTION_LABEL: Record<AppealStatus, string> = {
+  PENDING: 'Xem & duyệt',
+  APPROVED: 'Phân công',
+  GRADING: 'Theo dõi',
+  COMPARING: 'Đối chiếu',
+  PUBLISHED: 'Xem kết quả',
+  REJECTED: 'Xem lý do',
 }
 
 function StudentCell({ name, sub }: { name: string; sub: string }) {
@@ -112,12 +118,20 @@ function StudentCell({ name, sub }: { name: string; sub: string }) {
 
 export function SchoolAdminReevaluationPage() {
   const navigate = useNavigate()
-  const [status, setStatus] = useState<'' | ReevaluationStatus>('')
-  const requestsQuery = useReevaluationRequestsQuery()
-  const statsQuery = useReevaluationStatsQuery()
+  const [status, setStatus] = useState<'' | AppealStatus>('')
+  const [page, setPage] = useState(1)
+  const appealsQuery = useAppealsQuery(page, PAGE_SIZE, { status })
+  const statsQuery = useAppealStatsQuery()
 
-  const all = requestsQuery.data ?? []
-  const visible = status === '' ? all : all.filter((r) => r.status === status)
+  const pageData = appealsQuery.data
+  const rows = pageData?.content ?? []
+  const totalPages = pageData?.totalPages ?? 0
+  const totalElements = pageData?.totalElements ?? 0
+
+  function changeStatus(next: '' | AppealStatus) {
+    setStatus(next)
+    setPage(1)
+  }
 
   return (
     <section className="mx-auto max-w-300">
@@ -134,7 +148,7 @@ export function SchoolAdminReevaluationPage() {
         <div className="flex gap-2.5">
           <button
             className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-[13.5px] font-bold text-slate-600 transition hover:bg-slate-50"
-            onClick={() => requestsQuery.refetch()}
+            onClick={() => appealsQuery.refetch()}
             type="button"
           >
             <RefreshCw className="size-4" />
@@ -177,11 +191,7 @@ export function SchoolAdminReevaluationPage() {
         />
       </div>
 
-      <FilterChips
-        items={STATUS_FILTERS}
-        onChange={(value) => setStatus(value)}
-        value={status}
-      />
+      <FilterChips items={STATUS_FILTERS} onChange={changeStatus} value={status} />
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
@@ -189,7 +199,7 @@ export function SchoolAdminReevaluationPage() {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="px-5 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Mã / Học sinh
+                  Học sinh
                 </th>
                 <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
                   Kỳ thi · Phần thi
@@ -209,15 +219,21 @@ export function SchoolAdminReevaluationPage() {
               </tr>
             </thead>
             <tbody>
-              {visible.length === 0 ? (
+              {appealsQuery.isLoading ? (
+                <tr>
+                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={6}>
+                    Đang tải…
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
                 <tr>
                   <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={6}>
                     Không có yêu cầu phù hợp.
                   </td>
                 </tr>
               ) : (
-                visible.map((request) => {
-                  const display = getReevaluationStatusDisplay(request.status)
+                rows.map((request) => {
+                  const display = getAppealStatusDisplay(request.status)
                   return (
                     <tr
                       className="cursor-pointer border-b border-slate-100 transition hover:bg-slate-50"
@@ -226,28 +242,28 @@ export function SchoolAdminReevaluationPage() {
                     >
                       <td className="px-5 py-3.5">
                         <StudentCell
-                          name={request.student}
-                          sub={`${request.id} · Lớp ${request.cls}`}
+                          name={request.studentName}
+                          sub={request.className ? `Lớp ${request.className}` : 'Chưa xếp lớp'}
                         />
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="text-[13.5px] font-semibold text-slate-700">
-                          {request.exam}
+                          {request.examName}
                         </div>
                         <div className="mt-0.5 text-xs font-medium text-slate-400">
-                          {request.part}
+                          {request.partLabel ?? '—'}
                         </div>
                       </td>
                       <td className="px-4 py-3.5">
                         <span className="inline-flex h-7.5 min-w-11 items-center justify-center rounded-lg bg-slate-100 px-2.5 text-sm font-extrabold text-slate-700">
-                          {formatScore(request.original)}
+                          {formatScore(request.originalScore)}
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
                         <StatusBadge label={display.label} tone={display.tone} />
                       </td>
                       <td className="px-4 py-3.5 text-[13px] font-semibold text-slate-500">
-                        {request.deadline}
+                        {formatIsoDate(request.deadline)}
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <span className="inline-flex items-center gap-1 text-[13px] font-bold text-cyan-700">
@@ -262,10 +278,29 @@ export function SchoolAdminReevaluationPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3.5">
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-3.5">
           <span className="text-[12.5px] font-semibold text-slate-500">
-            Hiển thị <b className="text-slate-900">{visible.length}</b> / {all.length} yêu cầu
+            <b className="text-slate-900">{totalElements}</b> yêu cầu · trang{' '}
+            {totalPages ? page : 0}/{totalPages}
           </span>
+          <div className="flex items-center gap-2">
+            <button
+              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+              disabled={appealsQuery.isFetching || page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              type="button"
+            >
+              Trước
+            </button>
+            <button
+              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+              disabled={appealsQuery.isFetching || page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              type="button"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -313,22 +348,24 @@ function CardShell({
 }
 
 function DetailPanel({
-  request,
-  onApprove,
+  detail,
+  onOpenApprove,
   onOpenReject,
 }: {
-  request: ReevaluationRequest
-  onApprove: () => void
+  detail: AppealDetail
+  onOpenApprove: () => void
   onOpenReject: () => void
 }) {
-  const display = getReevaluationStatusDisplay(request.status)
-  const aiAvg = bandRound(avgScore(request.aiScores))
+  const display = getAppealStatusDisplay(detail.status)
+  const aiAvg = bandRound(avgScore(detail.aiScores))
+  const publishedReviewers = detail.reviewers.filter((r) => r.done && r.scores)
+  const suggestedPart = suggestedPartScore(detail.reviewers)
 
   return (
     <>
       <DetailHeaderCard
         actions={
-          request.status === 'pending' ? (
+          detail.status === 'PENDING' ? (
             <>
               <button
                 className="inline-flex h-11 items-center gap-2 rounded-lg border border-red-200 bg-white px-4.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
@@ -340,7 +377,7 @@ function DetailPanel({
               </button>
               <button
                 className="inline-flex h-11 items-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-bold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700"
-                onClick={onApprove}
+                onClick={onOpenApprove}
                 type="button"
               >
                 <CircleCheck className="size-4.5" />
@@ -350,31 +387,39 @@ function DetailPanel({
           ) : undefined
         }
         metaItems={[
-          { icon: <Hash className="size-3.5" />, label: request.id },
-          { icon: <Users className="size-3.5" />, label: `Lớp ${request.cls} · ${request.sid}` },
-          { icon: <CalendarClock className="size-3.5" />, label: `Gửi ${request.requestedAt}` },
-          { icon: <Clock4 className="size-3.5" />, label: `Hạn ${request.deadline}` },
+          {
+            icon: <Users className="size-3.5" />,
+            label: detail.className ? `Lớp ${detail.className}` : 'Chưa xếp lớp',
+          },
+          {
+            icon: <CalendarClock className="size-3.5" />,
+            label: `Gửi ${formatIsoDateTime(detail.requestedAt)}`,
+          },
+          { icon: <Clock4 className="size-3.5" />, label: `Hạn ${formatIsoDateTime(detail.deadline)}` },
         ]}
         statusLabel={display.label}
         statusTone={display.tone}
-        title={request.student}
+        title={detail.studentName}
       />
 
       <div className="mt-4.5 grid gap-4.5 lg:grid-cols-[1.7fr_1fr]">
         <div className="grid gap-4.5">
-          {request.status === 'published' && request.finalScore != null ? (
+          {detail.status === 'PUBLISHED' && detail.finalScore != null ? (
             <div className="flex flex-wrap items-center gap-5 rounded-2xl border border-emerald-200 bg-linear-to-r from-emerald-50 to-white px-6 py-5">
               <div className="text-center">
-                <div className="text-[11.5px] font-bold text-slate-400">ĐIỂM GỐC</div>
+                <div className="text-[11.5px] font-bold text-slate-400">ĐIỂM TỔNG GỐC</div>
                 <div className="text-3xl font-extrabold text-slate-400 line-through">
-                  {formatScore(request.original)}
+                  {formatScore(detail.originalScore)}
                 </div>
               </div>
               <ArrowRight className="size-6 text-emerald-600" />
               <div className="text-center">
                 <div className="text-[11.5px] font-bold text-emerald-600">KẾT QUẢ CÔNG BỐ</div>
                 <div className="text-4xl font-extrabold text-emerald-600">
-                  {formatScore(request.finalScore)}
+                  {formatScore(detail.finalScore)}
+                </div>
+                <div className="text-[10.5px] font-semibold text-emerald-600/70">
+                  điểm tổng cả bài
                 </div>
               </div>
               <div className="ml-auto inline-flex items-center gap-1.5 text-[13px] font-bold text-emerald-600">
@@ -384,24 +429,50 @@ function DetailPanel({
             </div>
           ) : null}
 
+          {detail.status === 'PUBLISHED' ? (
+            <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+              <Info className="mt-0.5 size-4.5 shrink-0 text-amber-600" />
+              <div className="text-[12.5px] font-medium leading-relaxed text-amber-800">
+                <b>{formatScore(suggestedPart)}</b> là điểm chấm lại của{' '}
+                <b>riêng {detail.partLabel ?? 'phần được phúc khảo'}</b>. Còn{' '}
+                <b>{formatScore(detail.finalScore)}</b> ở trên là <b>điểm tổng của cả bài</b> sau
+                phúc khảo — hệ thống tính lại từ tất cả các phần, nên hai con số này không bằng nhau.
+              </div>
+            </div>
+          ) : null}
+
+          {detail.status === 'PUBLISHED' && publishedReviewers.length > 0 ? (
+            <div className="grid gap-2.5">
+              <CompareTable aiScores={detail.aiScores} reviewers={publishedReviewers} />
+              {suggestedPart != null ? (
+                <div className="flex items-center justify-between rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+                  <span className="text-[12.5px] font-bold text-cyan-700">
+                    Điểm chấm lại {detail.partLabel ?? 'phần thi'} (giám khảo đề xuất)
+                  </span>
+                  <span className="inline-flex h-8 min-w-12 items-center justify-center rounded-lg bg-white px-3 text-lg font-extrabold text-cyan-700">
+                    {formatScore(suggestedPart)}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <CardShell
             icon={<MessageSquare className="size-4.5 text-cyan-700" />}
             title="Lý do phúc khảo"
           >
             <div className="mt-3 rounded-xl border-l-2 border-cyan-500 bg-slate-50 px-4 py-3.5 text-sm italic leading-relaxed text-slate-700">
-              “{request.reason}”
+              “{detail.reason}”
             </div>
             <div className="mt-3.5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl bg-slate-50 px-3.5 py-3">
                 <div className="text-[11.5px] font-semibold text-slate-400">Kỳ thi</div>
-                <div className="mt-0.5 text-[13.5px] font-bold text-slate-700">{request.exam}</div>
+                <div className="mt-0.5 text-[13.5px] font-bold text-slate-700">{detail.examName}</div>
               </div>
               <div className="rounded-xl bg-slate-50 px-3.5 py-3">
-                <div className="text-[11.5px] font-semibold text-slate-400">
-                  Phần thi · Thời lượng
-                </div>
+                <div className="text-[11.5px] font-semibold text-slate-400">Phần thi</div>
                 <div className="mt-0.5 text-[13.5px] font-bold text-slate-700">
-                  {request.part} · {formatDuration(request.duration)}
+                  {detail.partLabel ?? '—'}
                 </div>
               </div>
             </div>
@@ -416,51 +487,46 @@ function DetailPanel({
             }
             title="Điểm gốc do AI chấm"
           >
-            <AiScoreBars scores={request.aiScores} />
+            <AiScoreBars scores={detail.aiScores} />
           </CardShell>
 
-          {request.status === 'grading' ? (
+          {detail.status === 'GRADING' ? (
             <CardShell
               icon={<UsersRound className="size-4.5 text-violet-600" />}
               title="Tiến độ chấm lại"
             >
               <div className="mt-3.5 grid gap-2.5">
-                {request.assignees.map((assignee, index) => {
-                  const teacher = getReviewer(assignee.tid)
-                  return (
-                    <div
-                      className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3"
-                      key={assignee.tid}
+                {detail.reviewers.map((reviewer, index) => (
+                  <div
+                    className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3"
+                    key={reviewer.reviewerId}
+                  >
+                    <span
+                      className={[
+                        'inline-flex size-9 shrink-0 items-center justify-center rounded-lg',
+                        reviewer.done
+                          ? 'bg-emerald-50 text-emerald-600'
+                          : 'bg-violet-50 text-violet-600',
+                      ].join(' ')}
                     >
-                      <span
-                        className={[
-                          'inline-flex size-9 shrink-0 items-center justify-center rounded-lg',
-                          assignee.done
-                            ? 'bg-emerald-50 text-emerald-600'
-                            : 'bg-violet-50 text-violet-600',
-                        ].join(' ')}
-                      >
-                        {assignee.done ? (
-                          <CircleCheck className="size-4.5" />
-                        ) : (
-                          <Loader className="size-4.5" />
-                        )}
-                      </span>
-                      <div className="flex-1">
-                        <div className="text-[13.5px] font-bold text-slate-700">
-                          {teacher?.name ?? `Người chấm ${index + 1}`}
-                        </div>
-                        <div className="text-[11.5px] font-medium text-slate-400">
-                          {teacher?.dept ? `${teacher.dept} · ` : ''}chấm độc lập
-                        </div>
+                      {reviewer.done ? (
+                        <CircleCheck className="size-4.5" />
+                      ) : (
+                        <Loader className="size-4.5" />
+                      )}
+                    </span>
+                    <div className="flex-1">
+                      <div className="text-[13.5px] font-bold text-slate-700">
+                        {reviewer.reviewerName || `Người chấm ${index + 1}`}
                       </div>
-                      <StatusBadge
-                        label={assignee.done ? 'Đã nộp báo cáo' : 'Đang chấm lại'}
-                        tone={assignee.done ? 'success' : 'violet'}
-                      />
+                      <div className="text-[11.5px] font-medium text-slate-400">chấm độc lập</div>
                     </div>
-                  )
-                })}
+                    <StatusBadge
+                      label={reviewer.done ? 'Đã nộp báo cáo' : 'Đang chấm lại'}
+                      tone={reviewer.done ? 'success' : 'violet'}
+                    />
+                  </div>
+                ))}
               </div>
             </CardShell>
           ) : null}
@@ -471,7 +537,7 @@ function DetailPanel({
             <History className="size-4.5 text-cyan-700" />
             Lịch sử xử lý
           </div>
-          <ProcessTimeline events={request.timeline} />
+          <ProcessTimeline events={buildTimeline(detail)} />
         </div>
       </div>
     </>
@@ -479,13 +545,13 @@ function DetailPanel({
 }
 
 function AssignPanel({
-  request,
+  detail,
   toast,
 }: {
-  request: ReevaluationRequest
+  detail: AppealDetail
   toast: (message: string) => void
 }) {
-  const reviewersQuery = useReviewersQuery()
+  const reviewersQuery = useAppealReviewersQuery()
   const assignMutation = useAssignMutation()
   const [picked, setPicked] = useState<string[]>([])
 
@@ -494,7 +560,7 @@ function AssignPanel({
       if (current.includes(id)) {
         return current.filter((value) => value !== id)
       }
-      if (current.length >= 2) {
+      if (current.length >= 5) {
         return current
       }
       return [...current, id]
@@ -506,11 +572,12 @@ function AssignPanel({
       return
     }
     assignMutation.mutate(
-      { id: request.id, teacherIds: picked },
+      { id: detail.id, reviewerIds: picked },
       {
+        onError: (error) => toast(toApiError(error).message),
         onSuccess: () => {
           setPicked([])
-          toast(`Đã phân công ${picked.length} người chấm lại cho ${request.id}.`)
+          toast(`Đã phân công ${picked.length} giám khảo chấm lại.`)
         },
       },
     )
@@ -519,15 +586,13 @@ function AssignPanel({
   return (
     <>
       <div className="mb-2">
-        <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">
-          Phân công · {request.id}
-        </p>
+        <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">Phân công</p>
         <h1 className="mt-1.5 text-[26px] font-extrabold tracking-tight text-slate-900">
           Phân công giám khảo chấm lại
         </h1>
         <p className="mt-1.5 text-[15px] text-slate-500">
-          Yêu cầu của <b className="text-slate-700">{request.student}</b> · Lớp {request.cls} ·{' '}
-          {request.exam}
+          Yêu cầu của <b className="text-slate-700">{detail.studentName}</b>
+          {detail.className ? ` · Lớp ${detail.className}` : ''} · {detail.examName}
         </p>
       </div>
 
@@ -536,8 +601,8 @@ function AssignPanel({
           <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
             <EyeOff className="mt-0.5 size-5 shrink-0 text-blue-700" />
             <span className="text-[12.5px] font-medium leading-relaxed text-blue-700">
-              Chọn <b>tối thiểu 1 giám khảo</b> chấm lại độc lập (tối đa 2 trong bản demo). Danh tính
-              giám khảo được ẩn danh với học sinh để đảm bảo khách quan (blind re-evaluation).
+              Chọn <b>1–5 giám khảo</b> chấm lại độc lập. Danh tính giám khảo được ẩn danh với học
+              sinh để đảm bảo khách quan (blind re-evaluation).
             </span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -558,7 +623,7 @@ function AssignPanel({
             <span className="text-4xl font-extrabold leading-none text-cyan-600">
               {picked.length}
             </span>
-            <span className="text-lg font-bold text-slate-300">giám khảo</span>
+            <span className="text-lg font-bold text-slate-300">/ 5 giám khảo</span>
           </div>
           <div className="mt-4 grid gap-2">
             <LegendDot className="bg-emerald-500" label="Tải nhẹ (0–1 bài)" />
@@ -598,31 +663,37 @@ function LegendDot({ className, label }: { className: string; label: string }) {
 }
 
 function ComparePanel({
-  request,
+  detail,
   toast,
 }: {
-  request: ReevaluationRequest
+  detail: AppealDetail
   toast: (message: string) => void
 }) {
   const publishMutation = usePublishMutation()
-  const suggested = suggestedFinal(request)
-  const [finalScore, setFinalScore] = useState<number | null>(null)
+  const suggested = suggestedPartScore(detail.reviewers) ?? 0
+  const [partScore, setPartScore] = useState<number | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
-  const effectiveFinal = finalScore == null ? suggested : finalScore
-  const aiAvg = bandRound(avgScore(request.aiScores))
-  const done = request.assignees.filter((a) => a.done && a.scores)
+  const effectivePart = partScore == null ? suggested : partScore
+  const aiAvg = bandRound(avgScore(detail.aiScores))
+  const done = detail.reviewers.filter((r) => r.done && r.scores)
 
+  // TODO: thay clamp cứng 0–9 bằng rubricVersion.scoringScaleMin/Max của đơn
+  // (thang mà BE dùng để validate partScore) khi field này có trên `appeal(id)`.
   function adjust(delta: number) {
-    setFinalScore(Math.max(0, Math.min(9, Number((effectiveFinal + delta).toFixed(2)))))
+    setPartScore(Math.max(0, Math.min(9, Number((effectivePart + delta).toFixed(2)))))
   }
 
   function doPublish() {
     publishMutation.mutate(
-      { id: request.id, finalScore: effectiveFinal },
+      { id: detail.id, partScore: effectivePart },
       {
+        onError: (error) => {
+          setPublishOpen(false)
+          toast(toApiError(error).message)
+        },
         onSuccess: () => {
           setPublishOpen(false)
-          toast(`Đã công bố ${formatScore(effectiveFinal)} cho ${request.id} và thông báo học sinh.`)
+          toast('Đã công bố kết quả phúc khảo và thông báo học sinh.')
         },
       },
     )
@@ -631,28 +702,27 @@ function ComparePanel({
   return (
     <>
       <div className="mb-2">
-        <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">
-          Đối chiếu · {request.id}
-        </p>
+        <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">Đối chiếu</p>
         <h1 className="mt-1.5 text-[26px] font-extrabold tracking-tight text-slate-900">
           So sánh &amp; công bố kết quả
         </h1>
         <p className="mt-1.5 text-[15px] text-slate-500">
-          <b className="text-slate-700">{request.student}</b> · Lớp {request.cls} · {request.exam} ·{' '}
-          {request.part}
+          <b className="text-slate-700">{detail.studentName}</b>
+          {detail.className ? ` · Lớp ${detail.className}` : ''} · {detail.examName} ·{' '}
+          {detail.partLabel ?? '—'}
         </p>
       </div>
 
       <div className="mt-4 grid gap-4.5 lg:grid-cols-[1.7fr_1fr]">
         <div className="grid gap-4.5">
-          <CompareTable aiScores={request.aiScores} doneAssignees={done} />
+          <CompareTable aiScores={detail.aiScores} reviewers={done} />
           <div className="grid gap-3">
             <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
               <MessageSquare className="size-4.5 text-cyan-700" />
               Nhận xét của giám khảo (ẩn danh)
             </div>
-            {done.map((assignee, index) => (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4.5" key={index}>
+            {done.map((reviewer, index) => (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4.5" key={reviewer.reviewerId}>
                 <div className="flex items-center gap-3">
                   <span className="inline-flex size-9 items-center justify-center rounded-lg bg-cyan-50 text-[13px] font-extrabold text-cyan-700">
                     C{index + 1}
@@ -664,10 +734,12 @@ function ComparePanel({
                     <div className="text-[11.5px] font-medium text-slate-400">Điểm đề xuất</div>
                   </div>
                   <span className="inline-flex h-8.5 min-w-12 items-center justify-center rounded-lg bg-cyan-50 px-3 text-[17px] font-extrabold text-cyan-700">
-                    {formatScore(bandRound(avgScore(assignee.scores as CriterionScores)))}
+                    {formatScore(reviewer.suggestedScore)}
                   </span>
                 </div>
-                <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600">{assignee.note}</p>
+                {reviewer.note ? (
+                  <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600">{reviewer.note}</p>
+                ) : null}
               </div>
             ))}
           </div>
@@ -676,11 +748,10 @@ function ComparePanel({
         <div className="self-start rounded-2xl border-2 border-cyan-500 bg-white p-5.5">
           <div className="text-[13px] font-extrabold text-slate-900">Quyết định cuối cùng</div>
           <div className="mt-4 flex justify-between gap-2.5">
-            <ScoreChip className="bg-slate-50 text-slate-400" label="GỐC" value={request.original} />
-            <ScoreChip className="bg-violet-50 text-violet-600" label="AI" value={aiAvg} />
+            <ScoreChip className="bg-violet-50 text-violet-600" label="AI (PHẦN)" value={aiAvg} />
             <ScoreChip className="bg-cyan-50 text-cyan-700" label="ĐỀ XUẤT" value={suggested} />
           </div>
-          <div className="mt-4.5 text-xs font-bold text-slate-500">Điểm công bố</div>
+          <div className="mt-4.5 text-xs font-bold text-slate-500">Điểm phần thi công bố</div>
           <div className="mt-2 flex items-center gap-3">
             <button
               aria-label="Giảm điểm"
@@ -699,11 +770,11 @@ function ComparePanel({
                 if (event.target.value === '' || Number.isNaN(next)) {
                   return
                 }
-                setFinalScore(Math.max(0, Math.min(9, next)))
+                setPartScore(Math.max(0, Math.min(9, next)))
               }}
               step={0.25}
               type="number"
-              value={effectiveFinal}
+              value={effectivePart}
             />
             <button
               aria-label="Tăng điểm"
@@ -724,19 +795,18 @@ function ComparePanel({
           </button>
           <div className="mt-3 flex items-start gap-2 text-[11.5px] font-medium leading-snug text-slate-400">
             <Mail className="mt-0.5 size-4 shrink-0" />
-            Học sinh sẽ nhận thông báo kết quả phúc khảo ngay khi công bố.
+            Điểm tổng được BE tính lại từ tất cả phần thi; học sinh nhận thông báo khi công bố.
           </div>
         </div>
       </div>
 
       {publishOpen ? (
         <PublishDialog
-          code={request.id}
-          finalScore={effectiveFinal}
           onCancel={() => setPublishOpen(false)}
           onConfirm={doPublish}
-          original={request.original}
-          student={request.student}
+          partLabel={detail.partLabel}
+          partScore={effectivePart}
+          student={detail.studentName}
         />
       ) : null}
     </>
@@ -763,15 +833,20 @@ function ScoreChip({
 export function SchoolAdminReevaluationDetailPage() {
   const navigate = useNavigate()
   const { requestId } = useParams()
-  const requestQuery = useReevaluationRequestQuery(requestId ?? null)
+  const appealQuery = useAppealQuery(requestId ?? null)
   const approveMutation = useApproveMutation()
   const rejectMutation = useRejectMutation()
+  const [approveOpen, setApproveOpen] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-  const request = requestQuery.data
+  const detail = appealQuery.data
 
-  if (!request) {
+  if (appealQuery.isLoading) {
+    return <PageLoader />
+  }
+
+  if (!detail) {
     return (
       <section className="mx-auto max-w-300">
         <BackButton onClick={() => navigate('/school-admin/reevaluation')} />
@@ -782,19 +857,27 @@ export function SchoolAdminReevaluationDetailPage() {
     )
   }
 
-  function handleApprove() {
-    approveMutation.mutate(request!.id, {
-      onSuccess: () => setMessage(`Đã duyệt ${request!.id}. Hãy phân công người chấm lại.`),
-    })
+  function handleApprove(deadline: string) {
+    approveMutation.mutate(
+      { deadline, id: detail!.id },
+      {
+        onError: (error) => setMessage(toApiError(error).message),
+        onSuccess: () => {
+          setApproveOpen(false)
+          setMessage('Đã duyệt đơn. Hãy phân công người chấm lại.')
+        },
+      },
+    )
   }
 
   function handleReject(reason: string) {
     rejectMutation.mutate(
-      { id: request!.id, reason },
+      { id: detail!.id, reason },
       {
+        onError: (error) => setMessage(toApiError(error).message),
         onSuccess: () => {
           setRejectOpen(false)
-          setMessage(`Đã từ chối ${request!.id} và thông báo cho học sinh.`)
+          setMessage('Đã từ chối đơn và thông báo cho học sinh.')
         },
       },
     )
@@ -804,17 +887,25 @@ export function SchoolAdminReevaluationDetailPage() {
     <section className="mx-auto max-w-300">
       <BackButton onClick={() => navigate('/school-admin/reevaluation')} />
 
-      {request.status === 'approved' ? (
-        <AssignPanel request={request} toast={setMessage} />
-      ) : request.status === 'comparing' ? (
-        <ComparePanel request={request} toast={setMessage} />
+      {detail.status === 'APPROVED' ? (
+        <AssignPanel detail={detail} toast={setMessage} />
+      ) : detail.status === 'COMPARING' ? (
+        <ComparePanel detail={detail} toast={setMessage} />
       ) : (
         <DetailPanel
-          onApprove={handleApprove}
+          detail={detail}
+          onOpenApprove={() => setApproveOpen(true)}
           onOpenReject={() => setRejectOpen(true)}
-          request={request}
         />
       )}
+
+      {approveOpen ? (
+        <ApproveDialog
+          isPending={approveMutation.isPending}
+          onCancel={() => setApproveOpen(false)}
+          onConfirm={handleApprove}
+        />
+      ) : null}
 
       {rejectOpen ? (
         <RejectDialog onCancel={() => setRejectOpen(false)} onConfirm={handleReject} />
@@ -829,13 +920,15 @@ export function SchoolAdminReevaluationDetailPage() {
 
 export function TeacherReevaluationPage() {
   const navigate = useNavigate()
-  const tasksQuery = useTeacherTasksQuery(CURRENT_TEACHER_ID)
-  const tasks = tasksQuery.data ?? []
+  const [page, setPage] = useState(1)
+  const tasksQuery = useMyAppealTasksQuery(page, PAGE_SIZE)
 
-  const mineOf = (request: ReevaluationRequest) =>
-    request.assignees.find((a) => a.tid === CURRENT_TEACHER_ID)
-  const pending = tasks.filter((r) => !mineOf(r)?.done).length
-  const submitted = tasks.filter((r) => mineOf(r)?.done).length
+  const pageData = tasksQuery.data
+  const tasks = pageData?.content ?? []
+  const totalElements = pageData?.totalElements ?? 0
+  const totalPages = pageData?.totalPages ?? 0
+  const pending = tasks.filter((t) => t.myStatus === 'ASSIGNED').length
+  const submitted = tasks.filter((t) => t.myStatus === 'SUBMITTED').length
 
   return (
     <section className="mx-auto max-w-300">
@@ -847,8 +940,8 @@ export function TeacherReevaluationPage() {
           Bài được phân công chấm lại
         </h1>
         <p className="mt-1.5 max-w-xl text-[15px] text-slate-500">
-          Nghe lại bài nói, chấm theo 5 tiêu chí và nộp báo cáo. Bạn chấm độc lập, ẩn danh với giám
-          khảo khác.
+          Nghe lại bài nói, chấm theo tiêu chí của rubric và nộp báo cáo. Bạn chấm độc lập, ẩn danh
+          với giám khảo khác.
         </p>
       </div>
 
@@ -860,22 +953,24 @@ export function TeacherReevaluationPage() {
           label="Đã nộp"
           value={submitted}
         />
-        <StatCard icon={<Inbox size={19} />} iconTone="indigo" label="Tổng phân công" value={tasks.length} />
+        <StatCard
+          icon={<Inbox size={19} />}
+          iconTone="indigo"
+          label="Tổng phân công"
+          value={totalElements}
+        />
       </div>
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-180 border-collapse text-left">
+          <table className="w-full min-w-160 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="px-5 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Học sinh
-                </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
                   Kỳ thi · Phần thi
                 </th>
                 <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Thời lượng
+                  Hạn xử lý
                 </th>
                 <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
                   Trạng thái
@@ -886,37 +981,33 @@ export function TeacherReevaluationPage() {
               </tr>
             </thead>
             <tbody>
-              {tasks.length === 0 ? (
+              {tasksQuery.isLoading ? (
                 <tr>
-                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={5}>
+                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={4}>
+                    Đang tải…
+                  </td>
+                </tr>
+              ) : tasks.length === 0 ? (
+                <tr>
+                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={4}>
                     Chưa có bài nào được phân công.
                   </td>
                 </tr>
               ) : (
-                tasks.map((request) => {
-                  const mine = mineOf(request)
-                  const done = mine?.done ?? false
+                tasks.map((task) => {
+                  const done = task.myStatus === 'SUBMITTED'
                   return (
-                    <tr className="border-b border-slate-100" key={request.id}>
+                    <tr className="border-b border-slate-100" key={task.appealId}>
                       <td className="px-5 py-3.5">
-                        <StudentCell
-                          name={request.student}
-                          sub={`${request.id} · Lớp ${request.cls}`}
-                        />
-                      </td>
-                      <td className="px-4 py-3.5">
                         <div className="text-[13.5px] font-semibold text-slate-700">
-                          {request.exam}
+                          {task.examName}
                         </div>
                         <div className="mt-0.5 text-xs font-medium text-slate-400">
-                          {request.part}
+                          {task.partLabel ?? '—'}
                         </div>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-slate-600">
-                          <Headphones className="size-4 text-slate-400" />
-                          {formatDuration(request.duration)}
-                        </span>
+                      <td className="px-4 py-3.5 text-[13px] font-semibold text-slate-500">
+                        {formatIsoDateTime(task.deadline)}
                       </td>
                       <td className="px-4 py-3.5">
                         <StatusBadge
@@ -932,7 +1023,7 @@ export function TeacherReevaluationPage() {
                               ? 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                               : 'bg-cyan-600 text-white hover:bg-cyan-700',
                           ].join(' ')}
-                          onClick={() => navigate(`/teacher/reevaluation/${request.id}`)}
+                          onClick={() => navigate(`/teacher/reevaluation/${task.appealId}`)}
                           type="button"
                         >
                           <Mic className="size-4" />
@@ -946,6 +1037,30 @@ export function TeacherReevaluationPage() {
             </tbody>
           </table>
         </div>
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-3.5">
+          <span className="text-[12.5px] font-semibold text-slate-500">
+            <b className="text-slate-900">{totalElements}</b> bài · trang {totalPages ? page : 0}/
+            {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+              disabled={tasksQuery.isFetching || page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              type="button"
+            >
+              Trước
+            </button>
+            <button
+              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+              disabled={tasksQuery.isFetching || page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              type="button"
+            >
+              Sau
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -953,30 +1068,46 @@ export function TeacherReevaluationPage() {
 
 // ============================= Teacher: Rescore =============================
 
+function initialScores(detail: AppealTaskDetail): Record<string, number> {
+  const fromReport = detail.myReport?.scores
+  const result: Record<string, number> = {}
+  for (const criterion of detail.criteria) {
+    const submitted = fromReport?.find((s) => s.criterionId === criterion.id)
+    if (submitted) {
+      result[criterion.id] = submitted.score
+      continue
+    }
+    const ai = detail.aiScores.find((s) => s.criterionId === criterion.id)
+    const start = ai ? ai.score : criterion.minScore
+    result[criterion.id] = Math.max(criterion.minScore, Math.min(criterion.maxScore, start))
+  }
+  return result
+}
+
 export function TeacherReevaluationRescorePage() {
   const navigate = useNavigate()
   const { requestId } = useParams()
-  const requestQuery = useReevaluationRequestQuery(requestId ?? null)
+  const detailQuery = useAppealTaskDetailQuery(requestId ?? null)
   const submitMutation = useSubmitReportMutation()
-  const request = requestQuery.data
+  const detail = detailQuery.data
 
-  const mine = request?.assignees.find((a) => a.tid === CURRENT_TEACHER_ID)
-  const [scores, setScores] = useState<CriterionScores>(() =>
-    mine?.done && mine.scores ? { ...mine.scores } : { ...EMPTY_SCORES },
-  )
-  const [comment, setComment] = useState(() => (mine?.done ? mine.note ?? '' : ''))
+  const [scores, setScores] = useState<Record<string, number>>({})
+  const [comment, setComment] = useState('')
   const [message, setMessage] = useState<string | null>(null)
-  const [initializedFor, setInitializedFor] = useState<string | null>(request?.id ?? null)
+  const [initializedFor, setInitializedFor] = useState<string | null>(null)
 
-  // Đồng bộ state khi mở một request khác (điều hướng trực tiếp giữa các bài).
-  if (request && request.id !== initializedFor) {
-    const assignee = request.assignees.find((a) => a.tid === CURRENT_TEACHER_ID)
-    setScores(assignee?.done && assignee.scores ? { ...assignee.scores } : { ...EMPTY_SCORES })
-    setComment(assignee?.done ? assignee.note ?? '' : '')
-    setInitializedFor(request.id)
+  // Đồng bộ state khi mở một bài khác (điều hướng trực tiếp giữa các bài).
+  if (detail && detail.appealId !== initializedFor) {
+    setScores(initialScores(detail))
+    setComment(detail.myReport?.done ? detail.myReport.note ?? '' : '')
+    setInitializedFor(detail.appealId)
   }
 
-  if (!request) {
+  if (detailQuery.isLoading) {
+    return <PageLoader />
+  }
+
+  if (!detail) {
     return (
       <section className="mx-auto max-w-300">
         <BackButton onClick={() => navigate('/teacher/reevaluation')} />
@@ -987,20 +1118,38 @@ export function TeacherReevaluationRescorePage() {
     )
   }
 
-  const overall = bandRound(avgScore(scores))
-  const delta = avgScore(scores) - request.original
-  const aiAvg = bandRound(avgScore(request.aiScores))
+  // BE chặn nộp lại sau khi đã SUBMITTED — màn này thành chỉ-đọc khi đã nộp.
+  const readOnly = detail.myReport?.done ?? false
+  const criterionScores = detail.criteria.map((c) => ({
+    criterionId: c.id,
+    criterionCode: c.code,
+    label: c.label,
+    score: scores[c.id] ?? c.minScore,
+  }))
+  const overall = bandRound(avgScore(criterionScores))
+  const aiAvg = bandRound(avgScore(detail.aiScores))
+  const aiValueOf = (criterionId: string) =>
+    detail.aiScores.find((s) => s.criterionId === criterionId)?.score ?? null
 
-  function setScore(key: CriterionKey, value: number) {
-    setScores((current) => ({ ...current, [key]: value }))
+  function setScore(criterionId: string, value: number) {
+    setScores((current) => ({ ...current, [criterionId]: value }))
   }
 
   function submit() {
+    if (readOnly) {
+      return
+    }
+    const payload: CriterionScoreInput[] = detail!.criteria.map((c) => ({
+      criterionId: c.id,
+      rationale: undefined,
+      score: scores[c.id] ?? c.minScore,
+    }))
     submitMutation.mutate(
-      { id: request!.id, teacherId: CURRENT_TEACHER_ID, scores, note: comment },
+      { id: detail!.appealId, note: comment, scores: payload },
       {
+        onError: (error) => setMessage(toApiError(error).message),
         onSuccess: () => {
-          setMessage(`Đã nộp báo cáo chấm lại cho ${request!.id}.`)
+          setMessage('Đã nộp báo cáo chấm lại.')
           window.setTimeout(() => navigate('/teacher/reevaluation'), 900)
         },
       },
@@ -1013,20 +1162,27 @@ export function TeacherReevaluationRescorePage() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3.5">
         <div>
-          <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">
-            Chấm lại · {request.id}
-          </p>
+          <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">Chấm lại</p>
           <h1 className="mt-1.5 text-[25px] font-extrabold tracking-tight text-slate-900">
-            {request.student} · Lớp {request.cls}
+            {detail.partLabel ?? 'Phần thi'}
           </h1>
           <p className="mt-1 text-[13.5px] font-medium text-slate-500">
-            {request.exam} · {request.part}
+            Chấm đủ {detail.criteria.length} tiêu chí của rubric.
           </p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700">
-          <EyeOff className="size-4" />
-          Chấm ẩn danh, độc lập
-        </div>
+        {readOnly ? (
+          <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700">
+            <CircleCheck className="size-4" />
+            Đã nộp báo cáo {detail.myReport?.submittedAt
+              ? `· ${formatIsoDateTime(detail.myReport.submittedAt)}`
+              : ''}
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700">
+            <EyeOff className="size-4" />
+            Chấm ẩn danh, độc lập
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4.5 lg:grid-cols-[1.15fr_1fr]">
@@ -1038,11 +1194,11 @@ export function TeacherReevaluationRescorePage() {
                 Bản ghi bài nói
               </div>
               <span className="text-xs font-semibold text-slate-400">
-                Phần thi {formatDuration(request.duration)}
+                {detail.turns.length} lượt
               </span>
             </div>
             <div className="mt-4">
-              <AudioPlayerMock duration={request.duration} />
+              <TurnList turns={detail.turns} />
             </div>
             <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-violet-50 px-3.5 py-3">
               <Bot className="size-4.5 text-violet-600" />
@@ -1050,7 +1206,7 @@ export function TeacherReevaluationRescorePage() {
                 Điểm tham chiếu do AI chấm
               </span>
               <span className="text-[12.5px] font-bold text-violet-700">
-                Tổng {formatScore(aiAvg)} · Gốc {formatScore(request.original)}
+                TB {formatScore(aiAvg)}
               </span>
             </div>
           </div>
@@ -1061,7 +1217,8 @@ export function TeacherReevaluationRescorePage() {
               Nhận xét &amp; căn cứ chấm lại
             </div>
             <textarea
-              className="mt-3 min-h-30 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[13.5px] leading-relaxed text-slate-700 outline-none focus:border-cyan-400"
+              className="mt-3 min-h-30 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[13.5px] leading-relaxed text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
+              disabled={readOnly}
               onChange={(event) => setComment(event.target.value)}
               placeholder="Ghi rõ căn cứ điều chỉnh điểm theo từng tiêu chí..."
               value={comment}
@@ -1074,38 +1231,43 @@ export function TeacherReevaluationRescorePage() {
             <div>
               <div className="text-[12.5px] font-bold text-cyan-700">Điểm chấm lại của bạn</div>
               <div className="text-[11.5px] font-medium text-slate-400">
-                Trung bình 5 tiêu chí · Gốc {formatScore(request.original)}
+                Trung bình {detail.criteria.length} tiêu chí
               </div>
             </div>
             <div className="text-right">
               <div className="text-[38px] font-extrabold leading-none text-cyan-600">
                 {formatScore(overall)}
               </div>
-              <div className="text-xs font-bold text-emerald-600">
-                {(delta > 0 ? '+' : '') + formatScore(delta)} so với gốc
-              </div>
             </div>
           </div>
 
-          {CRITERIA.map((criterion) => (
+          {detail.criteria.map((criterion) => (
             <CriteriaScoreCard
-              aiValue={request.aiScores[criterion.key]}
+              aiValue={aiValueOf(criterion.id)}
               criterion={criterion}
-              key={criterion.key}
-              onChange={(value) => setScore(criterion.key, value)}
-              value={scores[criterion.key]}
+              key={criterion.id}
+              onChange={(value) => setScore(criterion.id, value)}
+              readOnly={readOnly}
+              value={scores[criterion.id] ?? criterion.minScore}
             />
           ))}
 
-          <button
-            className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 text-[15px] font-bold text-white shadow-lg shadow-cyan-600/30 transition hover:bg-cyan-700 disabled:opacity-60"
-            disabled={submitMutation.isPending}
-            onClick={submit}
-            type="button"
-          >
-            <FileUp className="size-5" />
-            Nộp báo cáo chấm lại
-          </button>
+          {readOnly ? (
+            <div className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-[15px] font-bold text-emerald-700">
+              <CircleCheck className="size-5" />
+              Đã nộp — không thể chỉnh sửa
+            </div>
+          ) : (
+            <button
+              className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 text-[15px] font-bold text-white shadow-lg shadow-cyan-600/30 transition hover:bg-cyan-700 disabled:opacity-60"
+              disabled={submitMutation.isPending}
+              onClick={submit}
+              type="button"
+            >
+              <FileUp className="size-5" />
+              Nộp báo cáo chấm lại
+            </button>
+          )}
         </div>
       </div>
 
