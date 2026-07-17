@@ -85,6 +85,8 @@ const APPEAL_QUERY = `
       approvedAt
       resolvedAt
       overdue
+      scoringScaleMin
+      scoringScaleMax
       aiScores { ${CRITERION_SCORE_FIELDS} }
       turns { ${TURN_FIELDS} }
       reviewers {

@@ -111,6 +111,9 @@ export type AppealDetail = {
   turns: AppealTurn[]
   reviewers: AppealReviewer[]
   overdue: boolean
+  // Thang điểm rubric — chính là khoảng BE validate partScore khi công bố.
+  scoringScaleMin: number
+  scoringScaleMax: number
 }
 
 // Một dòng trong việc của giám khảo (GraphQL `myAppealTasks`).

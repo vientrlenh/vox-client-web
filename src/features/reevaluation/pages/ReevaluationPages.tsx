@@ -736,19 +736,23 @@ function ComparePanel({
   const [publishOpen, setPublishOpen] = useState(false)
   // Tạm khóa chỉnh điểm sau khi đã có điểm giám khảo: công bố đúng điểm đề xuất.
   const scoreLocked = true
+  const { scoringScaleMin, scoringScaleMax } = detail
   const effectivePart = partScore == null ? suggested : partScore
   const aiAvg = bandRound(avgScore(detail.aiScores))
   const done = detail.reviewers.filter((r) => r.done && r.scores)
 
-  // TODO: thay clamp cứng 0–9 bằng rubricVersion.scoringScaleMin/Max của đơn
-  // (thang mà BE dùng để validate partScore) khi field này có trên `appeal(id)`.
+  const clampToScale = (value: number) =>
+    Math.max(scoringScaleMin, Math.min(scoringScaleMax, value))
+
   function adjust(delta: number) {
-    setPartScore(Math.max(0, Math.min(9, Number((effectivePart + delta).toFixed(2)))))
+    setPartScore(clampToScale(Number((effectivePart + delta).toFixed(2))))
   }
 
   function doPublish() {
     publishMutation.mutate(
-      { id: detail.id, partScore: effectivePart },
+      // Kẹp lần cuối theo thang rubric: điểm đề xuất đã qua bandRound (bậc 0.5) nên có thể
+      // vượt trần nếu thang không nằm trên bậc 0.5 — BE sẽ từ chối mà admin đang bị khoá.
+      { id: detail.id, partScore: clampToScale(effectivePart) },
       {
         onError: (error) => {
           setPublishOpen(false)
@@ -814,7 +818,12 @@ function ComparePanel({
             <ScoreChip className="bg-violet-50 text-violet-600" label="AI (PHẦN)" value={aiAvg} />
             <ScoreChip className="bg-cyan-50 text-cyan-700" label="ĐỀ XUẤT" value={suggested} />
           </div>
-          <div className="mt-4.5 text-xs font-bold text-slate-500">Điểm phần thi công bố</div>
+          <div className="mt-4.5 text-xs font-bold text-slate-500">
+            Điểm phần thi công bố{' '}
+            <span className="font-semibold text-slate-400">
+              (thang {formatScore(scoringScaleMin)}–{formatScore(scoringScaleMax)})
+            </span>
+          </div>
           <div className="mt-2 flex items-center gap-3">
             <button
               aria-label="Giảm điểm"
@@ -828,14 +837,14 @@ function ComparePanel({
             <input
               className="min-w-0 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-0 py-2 text-center text-3xl font-extrabold text-emerald-600 outline-none disabled:cursor-not-allowed"
               disabled={scoreLocked}
-              max={9}
-              min={0}
+              max={scoringScaleMax}
+              min={scoringScaleMin}
               onChange={(event) => {
                 const next = Number(event.target.value)
                 if (event.target.value === '' || Number.isNaN(next)) {
                   return
                 }
-                setPartScore(Math.max(0, Math.min(9, next)))
+                setPartScore(clampToScale(next))
               }}
               step={0.25}
               type="number"
