@@ -4,7 +4,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   FileQuestion,
-  Gavel,
+  FileSearch,
   LogOut,
   Menu,
   MonitorPlay,
@@ -38,7 +38,7 @@ const navigationItems = [
     to: '/teacher/monitoring',
   },
   {
-    icon: Gavel,
+    icon: FileSearch,
     label: 'Chấm phúc khảo',
     to: '/teacher/reevaluation',
   },
