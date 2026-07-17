@@ -87,6 +87,7 @@ export type AppealSummary = {
   deadline?: string | null
   reviewerCount: number
   doneCount: number
+  overdue: boolean
 }
 
 // Chi tiết đơn cho admin (GraphQL `appeal(id)`).
@@ -109,6 +110,7 @@ export type AppealDetail = {
   aiScores: AppealCriterionScore[]
   turns: AppealTurn[]
   reviewers: AppealReviewer[]
+  overdue: boolean
 }
 
 // Một dòng trong việc của giám khảo (GraphQL `myAppealTasks`).
@@ -118,6 +120,7 @@ export type AppealTask = {
   partLabel?: string | null
   deadline?: string | null
   myStatus: AppealReviewerStatus
+  overdue: boolean
 }
 
 // Màn chấm lại của giám khảo (GraphQL `appealTaskDetail`) — chấm mù, KHÔNG có reviewers khác.

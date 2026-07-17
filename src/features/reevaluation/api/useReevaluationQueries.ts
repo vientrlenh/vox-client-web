@@ -45,6 +45,7 @@ const APPEALS_QUERY = `
         deadline
         reviewerCount
         doneCount
+        overdue
       }
       page
       size
@@ -83,6 +84,7 @@ const APPEAL_QUERY = `
       finalScore
       approvedAt
       resolvedAt
+      overdue
       aiScores { ${CRITERION_SCORE_FIELDS} }
       turns { ${TURN_FIELDS} }
       reviewers {
@@ -109,6 +111,7 @@ const MY_APPEAL_TASKS_QUERY = `
         partLabel
         deadline
         myStatus
+        overdue
       }
       page
       size

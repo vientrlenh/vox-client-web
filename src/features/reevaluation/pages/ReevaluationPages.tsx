@@ -24,6 +24,7 @@ import {
   Plus,
   RefreshCw,
   UserCheck,
+  UserMinus,
   Users,
   UsersRound,
   X,
@@ -49,6 +50,7 @@ import {
   useAssignMutation,
   usePublishMutation,
   useRejectMutation,
+  useRemoveReviewerMutation,
   useSubmitReportMutation,
   type CriterionScoreInput,
 } from '../api/useReevaluationMutations'
@@ -59,6 +61,7 @@ import { CriteriaScoreCard } from '../components/CriteriaScoreCard'
 import { ProcessTimeline } from '../components/ProcessTimeline'
 import { PublishDialog } from '../components/PublishDialog'
 import { RejectDialog } from '../components/RejectDialog'
+import { RemoveReviewerDialog } from '../components/RemoveReviewerDialog'
 import { ReviewerPickerCard } from '../components/ReviewerPickerCard'
 import { TurnList } from '../components/TurnList'
 import {
@@ -73,6 +76,7 @@ import {
   initials,
   suggestedPartScore,
   type AppealDetail,
+  type AppealReviewer,
   type AppealStatus,
   type AppealTaskDetail,
 } from '../types'
@@ -111,6 +115,15 @@ function StudentCell({ name, sub }: { name: string; sub: string }) {
         <div className="text-xs font-semibold text-slate-400">{sub}</div>
       </div>
     </div>
+  )
+}
+
+function OverdueBadge() {
+  return (
+    <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-[10.5px] font-bold text-red-600">
+      <Clock4 className="size-3" />
+      Quá hạn
+    </span>
   )
 }
 
@@ -263,7 +276,8 @@ export function SchoolAdminReevaluationPage() {
                         <StatusBadge label={display.label} tone={display.tone} />
                       </td>
                       <td className="px-4 py-3.5 text-[13px] font-semibold text-slate-500">
-                        {formatIsoDate(request.deadline)}
+                        <div>{formatIsoDate(request.deadline)}</div>
+                        {request.overdue ? <OverdueBadge /> : null}
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <span className="inline-flex items-center gap-1 text-[13px] font-bold text-cyan-700">
@@ -351,15 +365,35 @@ function DetailPanel({
   detail,
   onOpenApprove,
   onOpenReject,
+  toast,
 }: {
   detail: AppealDetail
   onOpenApprove: () => void
   onOpenReject: () => void
+  toast: (message: string) => void
 }) {
   const display = getAppealStatusDisplay(detail.status)
   const aiAvg = bandRound(avgScore(detail.aiScores))
   const publishedReviewers = detail.reviewers.filter((r) => r.done && r.scores)
   const suggestedPart = suggestedPartScore(detail.reviewers)
+  const removeMutation = useRemoveReviewerMutation()
+  const [pendingRemove, setPendingRemove] = useState<AppealReviewer | null>(null)
+
+  function confirmRemove(reviewer: AppealReviewer) {
+    removeMutation.mutate(
+      { id: detail.id, reviewerId: reviewer.reviewerId },
+      {
+        onError: (error) => {
+          setPendingRemove(null)
+          toast(toApiError(error).message)
+        },
+        onSuccess: () => {
+          setPendingRemove(null)
+          toast('Đã gỡ giám khảo khỏi đơn phúc khảo.')
+        },
+      },
+    )
+  }
 
   return (
     <>
@@ -404,6 +438,13 @@ function DetailPanel({
 
       <div className="mt-4.5 grid gap-4.5 lg:grid-cols-[1.7fr_1fr]">
         <div className="grid gap-4.5">
+          {detail.overdue ? (
+            <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] font-bold text-red-700">
+              <Clock4 className="size-4" />
+              Đơn đã quá hạn xử lý
+            </div>
+          ) : null}
+
           {detail.status === 'PUBLISHED' && detail.finalScore != null ? (
             <div className="flex flex-wrap items-center gap-5 rounded-2xl border border-emerald-200 bg-linear-to-r from-emerald-50 to-white px-6 py-5">
               <div className="text-center">
@@ -525,6 +566,17 @@ function DetailPanel({
                       label={reviewer.done ? 'Đã nộp báo cáo' : 'Đang chấm lại'}
                       tone={reviewer.done ? 'success' : 'violet'}
                     />
+                    {!reviewer.done && detail.reviewers.length > 1 ? (
+                      <button
+                        aria-label="Gỡ giám khảo"
+                        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                        disabled={removeMutation.isPending}
+                        onClick={() => setPendingRemove(reviewer)}
+                        type="button"
+                      >
+                        <UserMinus className="size-4" />
+                      </button>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -540,6 +592,15 @@ function DetailPanel({
           <ProcessTimeline events={buildTimeline(detail)} />
         </div>
       </div>
+
+      {pendingRemove ? (
+        <RemoveReviewerDialog
+          isPending={removeMutation.isPending}
+          onCancel={() => setPendingRemove(null)}
+          onConfirm={() => confirmRemove(pendingRemove)}
+          reviewerName={pendingRemove.reviewerName || 'giám khảo này'}
+        />
+      ) : null}
     </>
   )
 }
@@ -673,6 +734,8 @@ function ComparePanel({
   const suggested = suggestedPartScore(detail.reviewers) ?? 0
   const [partScore, setPartScore] = useState<number | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
+  // Tạm khóa chỉnh điểm sau khi đã có điểm giám khảo: công bố đúng điểm đề xuất.
+  const scoreLocked = true
   const effectivePart = partScore == null ? suggested : partScore
   const aiAvg = bandRound(avgScore(detail.aiScores))
   const done = detail.reviewers.filter((r) => r.done && r.scores)
@@ -755,14 +818,16 @@ function ComparePanel({
           <div className="mt-2 flex items-center gap-3">
             <button
               aria-label="Giảm điểm"
-              className="inline-flex size-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex size-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={scoreLocked}
               onClick={() => adjust(-0.25)}
               type="button"
             >
               <Minus className="size-5" />
             </button>
             <input
-              className="min-w-0 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-0 py-2 text-center text-3xl font-extrabold text-emerald-600 outline-none"
+              className="min-w-0 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-0 py-2 text-center text-3xl font-extrabold text-emerald-600 outline-none disabled:cursor-not-allowed"
+              disabled={scoreLocked}
               max={9}
               min={0}
               onChange={(event) => {
@@ -778,7 +843,8 @@ function ComparePanel({
             />
             <button
               aria-label="Tăng điểm"
-              className="inline-flex size-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex size-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={scoreLocked}
               onClick={() => adjust(0.25)}
               type="button"
             >
@@ -896,6 +962,7 @@ export function SchoolAdminReevaluationDetailPage() {
           detail={detail}
           onOpenApprove={() => setApproveOpen(true)}
           onOpenReject={() => setRejectOpen(true)}
+          toast={setMessage}
         />
       )}
 
@@ -1007,7 +1074,8 @@ export function TeacherReevaluationPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-[13px] font-semibold text-slate-500">
-                        {formatIsoDateTime(task.deadline)}
+                        <div>{formatIsoDateTime(task.deadline)}</div>
+                        {task.overdue ? <OverdueBadge /> : null}
                       </td>
                       <td className="px-4 py-3.5">
                         <StatusBadge
