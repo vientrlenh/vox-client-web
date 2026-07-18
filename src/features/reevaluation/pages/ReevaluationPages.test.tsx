@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import {
+  SchoolAdminReevaluationDetailPage,
   SchoolAdminReevaluationPage,
   TeacherReevaluationPage,
   TeacherReevaluationRescorePage,
@@ -90,6 +91,80 @@ describe('TeacherReevaluationPage', () => {
     ).toBeInTheDocument()
     expect(await screen.findByText('Speaking Part 2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Chấm ngay/ })).toBeInTheDocument()
+  })
+})
+
+describe('SchoolAdminReevaluationDetailPage — màn so sánh & công bố', () => {
+  beforeEach(() => mockedPost.mockReset())
+
+  const comparingAppeal = {
+    aiScores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 6.5 }],
+    approvedAt: '2026-07-16T09:00:00+07:00',
+    className: '12A1',
+    deadline: '2026-07-22T17:00:00+07:00',
+    decisionNote: null,
+    examName: 'Kỳ thi giữa kỳ',
+    finalScore: null,
+    id: 'appeal-1',
+    notes: null,
+    originalScore: 6.5,
+    overdue: false,
+    partLabel: 'Speaking Part 2',
+    reason: 'Xin chấm lại phần nói',
+    requestedAt: '2026-07-15T09:00:00+07:00',
+    resolvedAt: null,
+    reviewers: [
+      {
+        assignedAt: '2026-07-16T09:00:00+07:00',
+        done: true,
+        note: 'Phát âm tốt.',
+        reviewerId: 't1',
+        reviewerName: 'Trần Thu Hà',
+        scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 7 }],
+        status: 'SUBMITTED',
+        submittedAt: '2026-07-16T10:00:00+07:00',
+        suggestedScore: 7,
+      },
+      {
+        assignedAt: '2026-07-16T09:00:00+07:00',
+        done: true,
+        note: null,
+        reviewerId: 't2',
+        reviewerName: 'Nguyễn Văn Minh',
+        scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 7.5 }],
+        status: 'SUBMITTED',
+        submittedAt: '2026-07-16T10:30:00+07:00',
+        suggestedScore: 7.5,
+      },
+    ],
+    scoringScaleMax: 9,
+    scoringScaleMin: 0,
+    status: 'COMPARING',
+    studentName: 'Nguyễn Minh An',
+    turns: [],
+  }
+
+  it('hiển thị tên giám khảo (không còn ẩn danh) ở bảng đối chiếu và thẻ nhận xét', async () => {
+    routeGraphql({ appeal: comparingAppeal })
+
+    renderWithProviders(
+      <Routes>
+        <Route
+          element={<SchoolAdminReevaluationDetailPage />}
+          path="/school-admin/reevaluation/:requestId"
+        />
+      </Routes>,
+      { route: '/school-admin/reevaluation/appeal-1' },
+    )
+
+    // Tên xuất hiện ở cả header bảng lẫn thẻ nhận xét.
+    expect((await screen.findAllByText('Trần Thu Hà')).length).toBeGreaterThan(1)
+    expect(screen.getAllByText('Nguyễn Văn Minh').length).toBeGreaterThan(1)
+
+    // Không còn nhãn ẩn danh cũ.
+    expect(screen.getByText('Nhận xét của giám khảo')).toBeInTheDocument()
+    expect(screen.queryByText(/Người chấm 1/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Chấm 1$/)).not.toBeInTheDocument()
   })
 })
 

@@ -786,18 +786,20 @@ function ComparePanel({
           <div className="grid gap-3">
             <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
               <MessageSquare className="size-4.5 text-cyan-700" />
-              Nhận xét của giám khảo (ẩn danh)
+              Nhận xét của giám khảo
             </div>
-            {done.map((reviewer, index) => (
+            {done.map((reviewer, index) => {
+              const displayName = reviewer.reviewerName || `Người chấm ${index + 1}`
+              return (
               <div className="rounded-2xl border border-slate-200 bg-white p-4.5" key={reviewer.reviewerId}>
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex size-9 items-center justify-center rounded-lg bg-cyan-50 text-[13px] font-extrabold text-cyan-700">
-                    C{index + 1}
+                  <span
+                    className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${avatarClasses(displayName)}`}
+                  >
+                    {initials(displayName)}
                   </span>
                   <div className="flex-1">
-                    <div className="text-[13.5px] font-bold text-slate-900">
-                      Người chấm {index + 1}
-                    </div>
+                    <div className="text-[13.5px] font-bold text-slate-900">{displayName}</div>
                     <div className="text-[11.5px] font-medium text-slate-400">Điểm đề xuất</div>
                   </div>
                   <span className="inline-flex h-8.5 min-w-12 items-center justify-center rounded-lg bg-cyan-50 px-3 text-[17px] font-extrabold text-cyan-700">
@@ -808,7 +810,8 @@ function ComparePanel({
                   <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600">{reviewer.note}</p>
                 ) : null}
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 

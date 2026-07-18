@@ -1,5 +1,11 @@
 import { Table } from 'lucide-react'
-import { formatScore, type AppealCriterionScore, type AppealReviewer } from '../types'
+import {
+  avatarClasses,
+  formatScore,
+  initials,
+  type AppealCriterionScore,
+  type AppealReviewer,
+} from '../types'
 
 type CompareTableProps = {
   aiScores: AppealCriterionScore[]
@@ -29,14 +35,26 @@ export function CompareTable({ aiScores, reviewers }: CompareTableProps) {
               <th className="px-2.5 py-2.5 text-[11px] font-extrabold uppercase text-violet-600">
                 AI
               </th>
-              {reviewers.map((_, index) => (
-                <th
-                  className="px-2.5 py-2.5 text-[11px] font-extrabold uppercase text-cyan-700"
-                  key={index}
-                >
-                  Chấm {index + 1}
-                </th>
-              ))}
+              {reviewers.map((reviewer, index) => {
+                const displayName = reviewer.reviewerName || `Người chấm ${index + 1}`
+                return (
+                  <th
+                    className="px-2.5 py-2.5 text-[11px] font-extrabold text-cyan-700"
+                    key={reviewer.reviewerId}
+                  >
+                    <div className="mx-auto flex min-w-20 max-w-28 flex-col items-center gap-1 leading-tight">
+                      <span
+                        className={`inline-flex size-7 items-center justify-center rounded-full text-[10px] font-bold ${avatarClasses(displayName)}`}
+                      >
+                        {initials(displayName)}
+                      </span>
+                      <span className="text-[11.5px] font-bold normal-case text-slate-700">
+                        {displayName}
+                      </span>
+                    </div>
+                  </th>
+                )
+              })}
               <th className="px-2.5 py-2.5 text-[11px] font-extrabold uppercase text-slate-700">
                 TB lại
               </th>
@@ -63,8 +81,8 @@ export function CompareTable({ aiScores, reviewers }: CompareTableProps) {
                   <td className="px-2.5 py-3 text-sm font-bold text-slate-400">
                     {formatScore(c.score)}
                   </td>
-                  {reviewers.map((r, index) => (
-                    <td className="px-2.5 py-3 text-sm font-bold text-slate-700" key={index}>
+                  {reviewers.map((r) => (
+                    <td className="px-2.5 py-3 text-sm font-bold text-slate-700" key={r.reviewerId}>
                       {formatScore(scoreOf(r, c.criterionId))}
                     </td>
                   ))}
