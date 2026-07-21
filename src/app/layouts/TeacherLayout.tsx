@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   FileQuestion,
+  FileSearch,
   LogOut,
   Menu,
   MonitorPlay,
@@ -40,6 +41,11 @@ const navigationItems = [
     icon: ClipboardCheck,
     label: 'Điểm danh',
     to: '/teacher/proctor-attendance',
+  },
+  {
+    icon: FileSearch,
+    label: 'Chấm phúc khảo',
+    to: '/teacher/reevaluation',
   },
 ]
 

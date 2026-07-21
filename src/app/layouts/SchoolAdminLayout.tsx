@@ -7,9 +7,10 @@ import {
   DoorOpen,
   ClipboardList,
   FileQuestion,
+  FileSearch,
   FileSpreadsheet,
-  GraduationCap,
   Gavel,
+  GraduationCap,
   Home,
   Layers,
   LogOut,
@@ -79,6 +80,11 @@ const navigationItems = [
     icon: Presentation,
     label: 'Quản lý Giáo viên',
     to: '/school-admin/teachers',
+  },
+  {
+    icon: FileSearch,
+    label: 'Phúc khảo',
+    to: '/school-admin/reevaluation',
   },
   {
     icon: ClipboardList,

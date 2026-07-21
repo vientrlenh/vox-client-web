@@ -376,6 +376,20 @@ const StudentExamResultPage = lazy(() =>
   })),
 );
 
+// reevaluation: phúc khảo
+const SchoolAdminReevaluationPage = lazy(() =>
+  import("@/features/reevaluation").then((m) => ({ default: m.SchoolAdminReevaluationPage })),
+);
+const SchoolAdminReevaluationDetailPage = lazy(() =>
+  import("@/features/reevaluation").then((m) => ({ default: m.SchoolAdminReevaluationDetailPage })),
+);
+const TeacherReevaluationPage = lazy(() =>
+  import("@/features/reevaluation").then((m) => ({ default: m.TeacherReevaluationPage })),
+);
+const TeacherReevaluationRescorePage = lazy(() =>
+  import("@/features/reevaluation").then((m) => ({ default: m.TeacherReevaluationRescorePage })),
+);
+
 // examCore: exam papers + blueprints (shared by exam & classTest)
 const TeacherExamPaperEditPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.TeacherExamPaperEditPage })),
@@ -778,6 +792,8 @@ export function AppRoutes() {
             <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
             <Route path="school-admin/exam-results" element={<SchoolAdminExamResultsListPage />} />
             <Route path="school-admin/exam-results/:sessionId" element={<SchoolAdminExamResultDetailPage />} />
+            <Route path="school-admin/reevaluation/:requestId" element={<SchoolAdminReevaluationDetailPage />} />
+            <Route path="school-admin/reevaluation" element={<SchoolAdminReevaluationPage />} />
             <Route path="school-admin/blueprints/:blueprintId/versions/new" element={<SchoolAdminCreateBlueprintVersionPage />} />
             <Route
               path="school-admin/blueprints/:blueprintId/versions/:versionId/edit"
@@ -885,6 +901,8 @@ export function AppRoutes() {
             <Route path="teacher/exams" element={<TeacherExamsPage />} />
             <Route path="teacher/exam-results" element={<TeacherExamResultsListPage />} />
             <Route path="teacher/exam-results/:sessionId" element={<TeacherExamResultDetailPage />} />
+            <Route path="teacher/reevaluation/:requestId" element={<TeacherReevaluationRescorePage />} />
+            <Route path="teacher/reevaluation" element={<TeacherReevaluationPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/new" element={<TeacherCreateBlueprintVersionPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/:versionId/edit" element={<TeacherEditBlueprintVersionPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/:versionId" element={<TeacherBlueprintVersionDetailPage />} />
