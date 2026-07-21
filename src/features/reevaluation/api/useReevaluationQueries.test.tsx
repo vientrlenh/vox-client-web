@@ -45,7 +45,7 @@ describe('reevaluation GraphQL queries', () => {
   })
 
   it('fetches a single appeal detail by id', async () => {
-    const detail = { id: 'a1', studentName: 'An', aiScores: [], turns: [], reviewers: [] }
+    const detail = { id: 'a1', studentName: 'An', items: [], reviewers: [] }
     mockedPost.mockResolvedValue({ data: { data: { appeal: detail } } })
 
     await expect(fetchAppeal('a1')).resolves.toEqual(detail)
@@ -68,7 +68,7 @@ describe('reevaluation GraphQL queries', () => {
   })
 
   it('fetches the teacher task detail (blind grading view)', async () => {
-    const taskDetail = { appealId: 'a1', turns: [], aiScores: [], criteria: [], myReport: null }
+    const taskDetail = { appealId: 'a1', items: [], criteria: [], myReport: [] }
     mockedPost.mockResolvedValue({ data: { data: { appealTaskDetail: taskDetail } } })
 
     await expect(fetchAppealTaskDetail('a1')).resolves.toEqual(taskDetail)

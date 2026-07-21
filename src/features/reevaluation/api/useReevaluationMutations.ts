@@ -15,6 +15,19 @@ export type CriterionScoreInput = {
   rationale?: string
 }
 
+/** Báo cáo chấm lại cho MỘT phần thi. */
+export type ItemReportInput = {
+  appealItemId: string
+  scores: CriterionScoreInput[]
+  note?: string
+}
+
+/** Điểm công bố cho MỘT phần thi. */
+export type ItemScoreInput = {
+  appealItemId: string
+  partScore: number
+}
+
 export async function approveAppeal(id: string, deadline: string) {
   const response = await apiClient.post<ApiResponse<string>>(`${BASE}/${id}/approve`, { deadline })
   return response.data.message
@@ -39,18 +52,24 @@ export async function removeReviewer(id: string, reviewerId: string) {
   return response.data.message
 }
 
-export async function submitReport(id: string, scores: CriterionScoreInput[], note: string) {
+/** BE yêu cầu nộp TRỌN GÓI mọi phần thi của đơn trong một request — không có nộp lẻ. */
+export async function submitReport(id: string, items: ItemReportInput[]) {
   const response = await apiClient.post<ApiResponse<string>>(
     `${BASE}/${id}/reviewers/me/report`,
-    { note, scores },
+    { items },
   )
   return response.data.message
 }
 
-export async function publishAppeal(id: string, partScore: number, decisionNote?: string) {
+/** Tương tự: phải nhập điểm cho đủ mọi phần thi của đơn. */
+export async function publishAppeal(
+  id: string,
+  itemScores: ItemScoreInput[],
+  decisionNote?: string,
+) {
   const response = await apiClient.post<ApiResponse<string>>(`${BASE}/${id}/publish`, {
     decisionNote,
-    partScore,
+    itemScores,
   })
   return response.data.message
 }
@@ -97,15 +116,8 @@ export function useRemoveReviewerMutation() {
 export function useSubmitReportMutation() {
   const invalidate = useInvalidateReevaluation()
   return useMutation({
-    mutationFn: ({
-      id,
-      scores,
-      note,
-    }: {
-      id: string
-      scores: CriterionScoreInput[]
-      note: string
-    }) => submitReport(id, scores, note),
+    mutationFn: ({ id, items }: { id: string; items: ItemReportInput[] }) =>
+      submitReport(id, items),
     onSuccess: invalidate,
   })
 }
@@ -115,13 +127,13 @@ export function usePublishMutation() {
   return useMutation({
     mutationFn: ({
       id,
-      partScore,
+      itemScores,
       decisionNote,
     }: {
       id: string
-      partScore: number
+      itemScores: ItemScoreInput[]
       decisionNote?: string
-    }) => publishAppeal(id, partScore, decisionNote),
+    }) => publishAppeal(id, itemScores, decisionNote),
     onSuccess: invalidate,
   })
 }

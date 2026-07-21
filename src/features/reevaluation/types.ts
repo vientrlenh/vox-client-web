@@ -62,6 +62,28 @@ export type AppealTurn = {
   durationSeconds?: number | null
 }
 
+// Một phần thi được phúc khảo. Một đơn có thể có nhiều phần.
+export type AppealItem = {
+  appealItemId: string
+  paperItemId: string
+  partLabel?: string | null
+  // Điểm của bản chấm ĐANG CÓ HIỆU LỰC: vòng đầu là bản AI, vòng phúc khảo sau là
+  // bản chấm tay của vòng trước. Không phải lúc nào cũng là điểm AI.
+  baselineScores: AppealCriterionScore[]
+  // Luôn lấy từ bản AI — chỉ bản AI mới có lượt nói.
+  turns: AppealTurn[]
+  finalScore?: number | null
+}
+
+// Báo cáo chấm lại của một giám khảo cho MỘT phần thi.
+export type AppealReviewerItem = {
+  appealItemId: string
+  partLabel?: string | null
+  suggestedScore: number
+  note?: string | null
+  scores: AppealCriterionScore[]
+}
+
 export type AppealReviewer = {
   reviewerId: string
   reviewerName: string
@@ -69,9 +91,10 @@ export type AppealReviewer = {
   done: boolean
   assignedAt: string
   submittedAt?: string | null
+  // Trung bình điểm đề xuất của các phần; null khi chưa nộp.
   suggestedScore?: number | null
-  note?: string | null
-  scores?: AppealCriterionScore[] | null
+  // Rỗng khi giám khảo chưa nộp báo cáo.
+  items: AppealReviewerItem[]
 }
 
 // Một dòng trong danh sách đơn (GraphQL `appeals`).
@@ -80,7 +103,8 @@ export type AppealSummary = {
   studentName: string
   className?: string | null
   examName: string
-  partLabel?: string | null
+  // Nhãn các phần thi được phúc khảo — một đơn có thể gồm nhiều phần.
+  partLabels: string[]
   originalScore?: number | null
   status: AppealStatus
   requestedAt: string
@@ -96,7 +120,6 @@ export type AppealDetail = {
   studentName: string
   className?: string | null
   examName: string
-  partLabel?: string | null
   originalScore?: number | null
   status: AppealStatus
   requestedAt: string
@@ -107,8 +130,8 @@ export type AppealDetail = {
   finalScore?: number | null
   approvedAt?: string | null
   resolvedAt?: string | null
-  aiScores: AppealCriterionScore[]
-  turns: AppealTurn[]
+  // Các phần thi được phúc khảo, mỗi phần kèm điểm đối chiếu và lượt nói riêng.
+  items: AppealItem[]
   reviewers: AppealReviewer[]
   overdue: boolean
   // Thang điểm rubric — chính là khoảng BE validate partScore khi công bố.
@@ -120,7 +143,7 @@ export type AppealDetail = {
 export type AppealTask = {
   appealId: string
   examName: string
-  partLabel?: string | null
+  partLabels: string[]
   deadline?: string | null
   myStatus: AppealReviewerStatus
   overdue: boolean
@@ -129,11 +152,11 @@ export type AppealTask = {
 // Màn chấm lại của giám khảo (GraphQL `appealTaskDetail`) — chấm mù, KHÔNG có reviewers khác.
 export type AppealTaskDetail = {
   appealId: string
-  partLabel?: string | null
-  turns: AppealTurn[]
-  aiScores: AppealCriterionScore[]
+  // Các phần thi phải chấm lại, mỗi phần kèm lượt nói và điểm đối chiếu riêng.
+  items: AppealItem[]
   criteria: AppealCriterionMeta[]
-  myReport?: AppealReviewer | null
+  // Báo cáo của chính mình theo từng phần; RỖNG khi chưa nộp.
+  myReport: AppealReviewerItem[]
 }
 
 // Ứng viên cho picker phân công (GraphQL `appealReviewers`).
@@ -180,8 +203,9 @@ export function avgScore(scores: AppealCriterionScore[]): number {
 }
 
 /**
- * Điểm đề xuất cho phần thi = trung bình `suggestedScore` của các giám khảo đã nộp.
- * BE đã tính sẵn `suggestedScore` (trung bình các tiêu chí, HALF_UP scale 2) — không tự tính lại.
+ * Điểm đề xuất chung của đơn = trung bình `suggestedScore` của các giám khảo đã nộp.
+ * BE đã tính sẵn `suggestedScore` (trung bình các phần, HALF_UP scale 2) — không tự tính lại.
+ * Đơn nhiều phần thì đây là con số tổng quan; điểm công bố lấy theo TỪNG phần bên dưới.
  */
 export function suggestedPartScore(reviewers: AppealReviewer[]): number | null {
   const submitted = reviewers.filter((r) => r.done && r.suggestedScore != null)
@@ -190,6 +214,34 @@ export function suggestedPartScore(reviewers: AppealReviewer[]): number | null {
   }
   const sum = submitted.reduce((total, r) => total + (r.suggestedScore ?? 0), 0)
   return bandRound(sum / submitted.length)
+}
+
+/** Điểm đề xuất cho MỘT phần thi = trung bình điểm các giám khảo đã chấm phần đó. */
+export function suggestedScoreForItem(
+  reviewers: AppealReviewer[],
+  appealItemId: string,
+): number | null {
+  const scores = reviewers
+    .flatMap((reviewer) => reviewer.items)
+    .filter((item) => item.appealItemId === appealItemId)
+    .map((item) => item.suggestedScore)
+  if (scores.length === 0) {
+    return null
+  }
+  return bandRound(scores.reduce((total, score) => total + score, 0) / scores.length)
+}
+
+/** Báo cáo của các giám khảo cho MỘT phần thi, kèm tên người chấm để hiển thị. */
+export function reviewerItemsForItem(reviewers: AppealReviewer[], appealItemId: string) {
+  return reviewers.flatMap((reviewer) => {
+    const found = reviewer.items.find((item) => item.appealItemId === appealItemId)
+    return found ? [{ reviewer, item: found }] : []
+  })
+}
+
+/** Nhãn gộp các phần thi của một đơn cho danh sách. */
+export function partLabelsText(labels: string[]): string {
+  return labels.length > 0 ? labels.join(' · ') : '—'
 }
 
 /**

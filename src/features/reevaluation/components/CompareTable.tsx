@@ -3,27 +3,33 @@ import {
   avatarClasses,
   formatScore,
   initials,
-  type AppealCriterionScore,
+  reviewerItemsForItem,
+  type AppealItem,
   type AppealReviewer,
 } from '../types'
 
 type CompareTableProps = {
-  aiScores: AppealCriterionScore[]
+  item: AppealItem
   reviewers: AppealReviewer[]
 }
 
-function scoreOf(reviewer: AppealReviewer, criterionId: string): number | null {
-  const found = reviewer.scores?.find((s) => s.criterionId === criterionId)
-  return found ? found.score : null
-}
+/**
+ * Bảng đối chiếu điểm cho MỘT phần thi: mốc hiện hành / các giám khảo / trung bình lại / Δ.
+ *
+ * Cột mốc là `baselineScores` của phần đó — vòng đầu là điểm AI, vòng phúc khảo sau là
+ * điểm chấm tay của vòng trước, nên nhãn cột đổi theo dữ liệu chứ không cứng là "AI".
+ */
+export function CompareTable({ item, reviewers }: CompareTableProps) {
+  const entries = reviewerItemsForItem(reviewers, item.appealItemId)
 
-/** Bảng đối chiếu điểm AI / các giám khảo / trung bình lại / Δ theo tiêu chí. */
-export function CompareTable({ aiScores, reviewers }: CompareTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3.5 text-[13px] font-extrabold text-slate-900">
         <Table className="size-4.5 text-cyan-700" />
         Bảng đối chiếu điểm theo tiêu chí
+        {item.partLabel ? (
+          <span className="font-bold text-slate-400">· {item.partLabel}</span>
+        ) : null}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-140 border-collapse text-center">
@@ -33,9 +39,9 @@ export function CompareTable({ aiScores, reviewers }: CompareTableProps) {
                 Tiêu chí
               </th>
               <th className="px-2.5 py-2.5 text-[11px] font-extrabold uppercase text-violet-600">
-                AI
+                Điểm hiện hành
               </th>
-              {reviewers.map((reviewer, index) => {
+              {entries.map(({ reviewer }, index) => {
                 const displayName = reviewer.reviewerName || `Người chấm ${index + 1}`
                 return (
                   <th
@@ -62,9 +68,10 @@ export function CompareTable({ aiScores, reviewers }: CompareTableProps) {
             </tr>
           </thead>
           <tbody>
-            {aiScores.map((c) => {
-              const reviewerValues = reviewers
-                .map((r) => scoreOf(r, c.criterionId))
+            {item.baselineScores.map((c) => {
+              const reviewerValues = entries
+                .map(({ item: report }) => report.scores.find((s) => s.criterionId === c.criterionId))
+                .map((found) => (found ? found.score : null))
                 .filter((v): v is number => v != null)
               const reAvg = reviewerValues.length
                 ? reviewerValues.reduce((x, y) => x + y, 0) / reviewerValues.length
@@ -81,11 +88,17 @@ export function CompareTable({ aiScores, reviewers }: CompareTableProps) {
                   <td className="px-2.5 py-3 text-sm font-bold text-slate-400">
                     {formatScore(c.score)}
                   </td>
-                  {reviewers.map((r) => (
-                    <td className="px-2.5 py-3 text-sm font-bold text-slate-700" key={r.reviewerId}>
-                      {formatScore(scoreOf(r, c.criterionId))}
-                    </td>
-                  ))}
+                  {entries.map(({ reviewer, item: report }) => {
+                    const found = report.scores.find((s) => s.criterionId === c.criterionId)
+                    return (
+                      <td
+                        className="px-2.5 py-3 text-sm font-bold text-slate-700"
+                        key={reviewer.reviewerId}
+                      >
+                        {formatScore(found ? found.score : null)}
+                      </td>
+                    )
+                  })}
                   <td className="px-2.5 py-3">
                     <span className="inline-flex h-7 min-w-10 items-center justify-center rounded-lg bg-cyan-50 px-1.5 text-sm font-extrabold text-cyan-700">
                       {formatScore(reAvg)}

@@ -55,23 +55,29 @@ describe('reevaluation REST mutations', () => {
     expect(del).toHaveBeenCalledWith('/v1/exam-appeals/a1/reviewers/t1')
   })
 
-  it('submits a report with scores and note', async () => {
-    post.mockResolvedValue(okResponse('Nộp báo cáo chấm lại thành công!', 'eval-1'))
+  it('submits one report per appeal item in a single request', async () => {
+    post.mockResolvedValue(okResponse('Nộp báo cáo chấm lại thành công!', 'a1'))
 
-    await submitReport('a1', [{ criterionId: 'c1', score: 8, rationale: 'ok' }], 'note')
-    expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/reviewers/me/report', {
-      note: 'note',
-      scores: [{ criterionId: 'c1', score: 8, rationale: 'ok' }],
-    })
+    const items = [
+      { appealItemId: 'i1', note: 'note', scores: [{ criterionId: 'c1', score: 8, rationale: 'ok' }] },
+      { appealItemId: 'i2', note: undefined, scores: [{ criterionId: 'c1', score: 6 }] },
+    ]
+    await submitReport('a1', items)
+    // BE bắt nộp trọn gói mọi phần thi — không có endpoint nộp lẻ từng phần.
+    expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/reviewers/me/report', { items })
   })
 
-  it('publishes with partScore, not a total finalScore', async () => {
+  it('publishes a partScore per item, not a total finalScore', async () => {
     post.mockResolvedValue(okResponse('Công bố kết quả phúc khảo thành công!'))
 
-    await publishAppeal('a1', 8, 'quyết định')
+    const itemScores = [
+      { appealItemId: 'i1', partScore: 8 },
+      { appealItemId: 'i2', partScore: 6.5 },
+    ]
+    await publishAppeal('a1', itemScores, 'quyết định')
     expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/publish', {
       decisionNote: 'quyết định',
-      partScore: 8,
+      itemScores,
     })
   })
 })
