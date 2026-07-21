@@ -192,6 +192,12 @@ const TeacherMonitoringRoomsPage = lazy(() =>
   })),
 );
 
+const TeacherProctorAttendancePage = lazy(() =>
+  import("@/features/exam-proctor").then((module) => ({
+    default: module.TeacherProctorAttendancePage,
+  })),
+);
+
 const SchoolAdminMonitoringRoomsPage = lazy(() =>
   import("@/features/monitoring").then((module) => ({
     default: module.SchoolAdminMonitoringRoomsPage,
@@ -843,6 +849,10 @@ export function AppRoutes() {
             <Route
               path="teacher/monitoring"
               element={<TeacherMonitoringRoomsPage />}
+            />
+            <Route
+              path="teacher/proctor-attendance"
+              element={<TeacherProctorAttendancePage />}
             />
             <Route
               path="teacher/monitoring/exams/:examId/rooms/:roomId"

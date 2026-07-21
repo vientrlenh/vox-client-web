@@ -56,7 +56,7 @@ function StudentSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Dong menu hoc sinh"
+            aria-label="Đóng menu học sinh"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -67,10 +67,10 @@ function StudentSidebar({
       </div>
 
       <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-cyan-100/80">
-        Hoc sinh
+        Học sinh
       </p>
 
-      <nav aria-label="Hoc sinh" className="mt-6 grid gap-2">
+      <nav aria-label="Học sinh" className="mt-6 grid gap-2">
         <NavLink
           className={({ isActive }) =>
             [
@@ -84,14 +84,14 @@ function StudentSidebar({
           to="/student/exams"
         >
           <BookOpenCheck aria-hidden="true" className="size-5 shrink-0" />
-          <span>Bai thi cua toi</span>
+          <span>Bài thi của tôi</span>
         </NavLink>
       </nav>
 
       <div className="mt-auto rounded-lg border border-white/15 bg-white/10 p-5 text-white backdrop-blur">
-        <p className="text-sm font-bold leading-6">Xem ket qua tren web</p>
+        <p className="text-sm font-bold leading-6">Xem kết quả trên web</p>
         <p className="mt-2 text-xs leading-5 text-cyan-50/80">
-          Bai thi da hoan thanh se hien thi diem tong va diem tung phan ngay trong muc bai thi cua toi.
+          Bài thi đã hoàn thành sẽ hiển thị điểm tổng và điểm từng phần ngay trong mục bài thi của tôi.
         </p>
       </div>
     </div>
@@ -124,12 +124,12 @@ export function StudentLayout() {
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Dong menu hoc sinh bang lop phu"
+            aria-label="Đóng menu học sinh"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />
-          <aside aria-label="Menu hoc sinh" aria-modal="true" className="relative h-full w-70 max-w-[86vw]" role="dialog">
+          <aside aria-label="Menu học sinh" aria-modal="true" className="relative h-full w-70 max-w-[86vw]" role="dialog">
             <StudentSidebar
               onClose={() => setIsMobileMenuOpen(false)}
               onNavigate={() => setIsMobileMenuOpen(false)}
@@ -142,7 +142,7 @@ export function StudentLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mo menu hoc sinh"
+            aria-label="Mở menu học sinh"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-slate-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
@@ -156,9 +156,9 @@ export function StudentLayout() {
               className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500"
             />
             <input
-              aria-label="Tim kiem bai thi"
+              aria-label="Tìm kiếm bài thi"
               className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              placeholder="Danh sach bai thi va ket qua cua ban"
+              placeholder="Danh sách bài thi và kết quả của bạn"
               readOnly
               type="search"
             />
@@ -166,7 +166,7 @@ export function StudentLayout() {
 
           <div className="ml-auto flex items-center gap-3">
             <button
-              aria-label="Thong bao"
+              aria-label="Thông báo"
               className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-slate-950 transition hover:border-slate-200 hover:bg-slate-50"
               type="button"
             >
@@ -177,7 +177,7 @@ export function StudentLayout() {
               <button
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
-                aria-label="Mo menu tai khoan"
+                aria-label="Mở menu tài khoản"
                 className="inline-flex items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50"
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
                 type="button"
@@ -187,7 +187,7 @@ export function StudentLayout() {
                 </span>
                 <span className="hidden max-w-56 sm:block">
                   <span className="block truncate text-sm font-bold text-slate-950">{profile?.fullName}</span>
-                  <span className="block truncate uppercase text-xs font-medium text-slate-500">Hoc sinh</span>
+                  <span className="block truncate uppercase text-xs font-medium text-slate-500">Học sinh</span>
                 </span>
                 <ChevronDown aria-hidden="true" className="hidden size-4 text-slate-950 sm:block" />
               </button>
@@ -208,7 +208,7 @@ export function StudentLayout() {
                     type="button"
                   >
                     <UserRound aria-hidden="true" className="size-4" />
-                    Thong tin ca nhan
+                    Thông tin cá nhân
                   </button>
                   <button
                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-red-600"
@@ -217,7 +217,7 @@ export function StudentLayout() {
                     type="button"
                   >
                     <LogOut aria-hidden="true" className="size-4" />
-                    Dang xuat
+                    Đăng xuất
                   </button>
                 </div>
               ) : null}

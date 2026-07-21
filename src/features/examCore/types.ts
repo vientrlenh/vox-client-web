@@ -20,7 +20,7 @@ export type ExamBlueprintSlotType = 'FIXED' | 'SELECTION'
 
 export type CreateExamPaperSource = 'blueprint' | 'copy'
 
-export type ExamCandidateStatus = 'ASSIGNED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED'
+export type ExamCandidateStatus = 'ASSIGNED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
 
 export type ExamScheduleStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'MOVED' | 'CANCELLED'
 
@@ -196,6 +196,8 @@ export type ExamSecurePoolDto = {
 }
 
 export type ExamAttemptSummaryDto = {
+  flagged: boolean
+  flagReason?: string | null
   resultStatus?: string | null
   rubricResultBandCode?: string | null
   rubricResultBandName?: string | null
@@ -210,6 +212,7 @@ export type ExamCandidateDto = {
   assignedAt?: string | null
   assignedPaperId?: string | null
   attempts: ExamAttemptSummaryDto[]
+  blockedAt?: string | null
   examId: string
   id: string
   latestSessionId?: string | null
@@ -223,6 +226,29 @@ export type ExamCandidateDto = {
     id: string
   } | null
   studentId: string
+}
+
+export type ProctorScheduleSummaryDto = {
+  endDate?: string | null
+  examId: string
+  examName?: string | null
+  roomName?: string | null
+  scheduleId: string
+  schoolRoomId?: string | null
+  startDate?: string | null
+  status?: string | null
+}
+
+export type ProctorCandidateSummaryDto = {
+  blockedAt?: string | null
+  candidateId: string
+  sessionFlagged: boolean
+  sessionId?: string | null
+  sessionStatus?: string | null
+  status: ExamCandidateStatus | string
+  studentEmail?: string | null
+  studentId: string
+  studentName?: string | null
 }
 
 export function getScheduleLabel(schedule: Pick<ExamScheduleDto, 'room'>) {
@@ -414,6 +440,7 @@ export function getCandidateStatusDisplay(status?: string | null): { tone: Statu
     case 'COMPLETED':
       return { tone: 'info', label: 'Đã hoàn thành' }
     case 'EXEMPTED':
+    case 'CANCELLED':
       return { tone: 'neutral', label: 'Miễn thi' }
     default:
       return { tone: 'warning', label: 'Chưa xếp ca' }

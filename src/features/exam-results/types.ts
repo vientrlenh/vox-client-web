@@ -1,14 +1,27 @@
 import type { StatusTone } from '@/shared/ui/StatusBadge'
 
 export type StudentExamSummaryDto = {
+  attemptsUsed: number
+  canEnter: boolean
   description?: string | null
   duration: number
   examDate?: string | null
   id: string
-  sessionId?: string | null
+  kind?: string | null
+  entryMessage?: string | null
+  maxAttempt?: number | null
+  requiresOtp: boolean
+  sessions: StudentExamSessionSummaryDto[]
   status: string
   subject: string
   title: string
+}
+
+export type StudentExamSessionSummaryDto = {
+  attemptNumber: number
+  flagged: boolean
+  sessionId: string
+  status: string
 }
 
 export type ExamResultSectionDto = {
@@ -28,9 +41,12 @@ export type ExamResultItemDto = {
 export type ExamCandidateResultDto = {
   candidateId: string
   examId: string
+  flagged: boolean
+  flagReason?: string | null
   id: string
   items: ExamResultItemDto[]
   paperId: string
+  scoreVisible: boolean
   rubricResultBandCode?: string | null
   rubricResultBandId?: string | null
   rubricResultBandName?: string | null
@@ -40,7 +56,7 @@ export type ExamCandidateResultDto = {
   targetFrameworkBandCode?: string | null
   targetFrameworkBandId?: string | null
   targetFrameworkBandLabel?: string | null
-  totalScore: number
+  totalScore?: number | null
 }
 
 export type ExamItemCriterionScoreDto = {
@@ -167,6 +183,27 @@ export function getExamResultStatusDisplay(status?: string | null): { label: str
       return { label: 'Không hợp lệ', tone: 'danger' }
     case 'RETAKE_REQUIRED':
       return { label: 'Cần thi lại', tone: 'danger' }
+    default:
+      return { label: status ?? 'Chưa có kết quả', tone: 'neutral' }
+  }
+}
+
+export function getAttemptStatusDisplay(status?: string | null): { label: string; tone: StatusTone } {
+  switch (status) {
+    case 'GRADED':
+      return { label: 'Đã chấm', tone: 'success' }
+    case 'GRADING':
+      return { label: 'Đang chấm', tone: 'info' }
+    case 'GRADING_FAILED':
+      return { label: 'Chấm lỗi', tone: 'danger' }
+    case 'SUBMITTED':
+      return { label: 'Đã nộp', tone: 'info' }
+    case 'IN_PROGRESS':
+      return { label: 'Đang làm', tone: 'warning' }
+    case 'INTERRUPTED':
+      return { label: 'Bị gián đoạn', tone: 'warning' }
+    case 'EXPIRED':
+      return { label: 'Hết giờ', tone: 'neutral' }
     default:
       return { label: status ?? 'Chưa có kết quả', tone: 'neutral' }
   }

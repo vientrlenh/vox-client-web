@@ -22,6 +22,7 @@ import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/
 import { Pagination } from '@/shared/components/Pagination'
 import { AudioReplayButton } from '@/shared/ui/AudioReplayButton'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { TabPillGroup } from '@/shared/ui/TabPill'
@@ -32,8 +33,17 @@ import {
   fetchExamItemEvaluation,
   useDeleteExamSessionMutation,
   useExamSessionResultQuery,
+  useExamSessionStatusQuery,
+  useRetryGradingExamSessionMutation,
+  useReviewFlaggedExamResultMutation,
 } from '../api/useExamResultQueries'
-import { formatScore, getExamResultStatusDisplay, type ExamCandidateResultDto, type ExamItemEvaluationDto } from '../types'
+import {
+  formatScore,
+  getAttemptStatusDisplay,
+  getExamResultStatusDisplay,
+  type ExamCandidateResultDto,
+  type ExamItemEvaluationDto,
+} from '../types'
 
 type ExamResultsUserRole = 'SCHOOL_ADMIN' | 'TEACHER'
 
@@ -62,25 +72,6 @@ function getPendingRowStatus(candidateStatus?: string | null) {
   }
 }
 
-function getAttemptStatusDisplay(status?: string | null) {
-  switch (status) {
-    case 'GRADED':
-      return { label: 'Đã chấm', tone: 'success' as const }
-    case 'GRADING':
-      return { label: 'Đang chấm', tone: 'info' as const }
-    case 'GRADING_FAILED':
-      return { label: 'Chấm lỗi', tone: 'danger' as const }
-    case 'SUBMITTED':
-      return { label: 'Đã nộp', tone: 'info' as const }
-    case 'IN_PROGRESS':
-      return { label: 'Đang làm', tone: 'warning' as const }
-    case 'EXPIRED':
-      return { label: 'Hết giờ', tone: 'neutral' as const }
-    default:
-      return { label: status ?? 'Chưa có kết quả', tone: 'neutral' as const }
-  }
-}
-
 function formatConfidencePercent(value?: number | null) {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     return '-'
@@ -94,10 +85,36 @@ function getReviewReasonLabel(code?: string | null) {
     case 'LOW_CONFIDENCE':
       return 'Độ tin cậy AI thấp'
     case 'VALIDITY_FLAGGED':
-      return 'Có cờ validity cần giáo viên xem lại'
+      return 'Có cảnh báo validity cần giáo viên xem lại'
     default:
       return code ?? null
   }
+}
+
+function StatePanel({
+  description,
+  tone,
+  title,
+}: {
+  description: string
+  tone: 'danger' | 'info' | 'warning'
+  title: string
+}) {
+  const className =
+    tone === 'danger'
+      ? 'border-red-200 bg-red-50'
+      : tone === 'warning'
+        ? 'border-amber-200 bg-amber-50'
+        : 'border-slate-200 bg-white'
+  const titleClassName = tone === 'danger' ? 'text-red-900' : tone === 'warning' ? 'text-amber-900' : 'text-slate-900'
+  const descriptionClassName = tone === 'danger' ? 'text-red-700' : tone === 'warning' ? 'text-amber-700' : 'text-slate-500'
+
+  return (
+    <div className={`rounded-2xl border px-6 py-12 text-center ${className}`}>
+      <h2 className={`text-2xl font-extrabold ${titleClassName}`}>{title}</h2>
+      <p className={`mt-3 text-sm ${descriptionClassName}`}>{description}</p>
+    </div>
+  )
 }
 
 function ResultBand({
@@ -152,12 +169,13 @@ function AttemptRows({
         <span>Trạng thái</span>
         <span>Điểm / band</span>
         <span>Chi tiết</span>
-        {canDelete ? <span>Xoá</span> : null}
+        {canDelete ? <span>Xóa</span> : null}
       </div>
 
       {attempts.map((attempt, index) => {
         const attemptStatus = getAttemptStatusDisplay(attempt.status)
         const isOfficialAttempt = officialAttempt?.sessionId === attempt.sessionId
+
         return (
           <div
             className={`grid items-center gap-3 border-t border-slate-100 px-3 py-3 ${
@@ -188,23 +206,19 @@ function AttemptRows({
               ) : null}
             </div>
             <span>
-              {attempt.totalScore != null ? (
-                <button
-                  className="inline-flex h-8.5 items-center justify-center gap-1 rounded-full border border-slate-200 px-3 text-xs font-bold text-indigo-600 transition hover:bg-slate-50"
-                  onClick={() => navigate(`${detailBasePath}/${attempt.sessionId}`)}
-                  type="button"
-                >
-                  Xem
-                  <ArrowRight aria-hidden="true" className="size-3.5" />
-                </button>
-              ) : (
-                <span className="text-xs text-slate-400">-</span>
-              )}
+              <button
+                className="inline-flex h-8.5 items-center justify-center gap-1 rounded-full border border-slate-200 px-3 text-xs font-bold text-indigo-600 transition hover:bg-slate-50"
+                onClick={() => navigate(`${detailBasePath}/${attempt.sessionId}`)}
+                type="button"
+              >
+                Xem
+                <ArrowRight aria-hidden="true" className="size-3.5" />
+              </button>
             </span>
             {canDelete ? (
               <span>
                 <button
-                  aria-label="Xoá phiên thi này"
+                  aria-label="Xóa phiên thi này"
                   className="inline-flex size-8.5 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:bg-rose-50"
                   onClick={() => onDeleteSession(attempt.sessionId)}
                   type="button"
@@ -241,20 +255,18 @@ function ExamResultsListPage({
   const rows = useMemo(() => candidates.map((candidate) => ({ candidate })), [candidates])
   const deleteSessionMutation = useDeleteExamSessionMutation()
   const { confirm, dialog: deleteDialog } = useConfirmationDialog()
-  // School admin can delete any exam session. A teacher can only delete sessions for a
-  // CLASS_TEST exam they run -- matches the backend authorization in DeleteExamSessionUseCase
-  // (CENTRALIZED exams stay school-admin-only).
   const canDeleteSessions = userRole === 'SCHOOL_ADMIN' || (userRole === 'TEACHER' && examQuery.data?.kind === 'CLASS_TEST')
 
   async function handleDeleteSession(sessionId: string) {
     if (
       !(await confirm({
         message:
-          'Xoá phiên thi này sẽ xoá VĨNH VIỄN toàn bộ dữ liệu liên quan (câu trả lời, kết quả chấm điểm). Không thể hoàn tác. Bạn có chắc chắn?',
+          'Xóa phiên thi này sẽ xóa vĩnh viễn toàn bộ dữ liệu liên quan. Không thể hoàn tác. Bạn có chắc chắn?',
       }))
     ) {
       return
     }
+
     await deleteSessionMutation.mutateAsync(sessionId)
     await queryClient.invalidateQueries({ queryKey: examResultQueryKeys.all })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.candidates(examId) })
@@ -270,6 +282,7 @@ function ExamResultsListPage({
       if (!keyword) {
         return true
       }
+
       const name = getCandidateName(candidate).toLowerCase()
       const email = (candidate.student?.email ?? '').toLowerCase()
       return name.includes(keyword) || email.includes(keyword)
@@ -291,10 +304,11 @@ function ExamResultsListPage({
   if (!examId) {
     return (
       <section className="mx-auto max-w-240">
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
-          <h1 className="text-2xl font-extrabold text-slate-900">Kết quả kỳ thi</h1>
-          <p className="mt-3 text-sm text-slate-500">Trang này cần `examId` để nạp danh sách thí sinh và kết quả.</p>
-        </div>
+        <StatePanel
+          description="Trang này cần `examId` để nạp danh sách kết quả."
+          title="Kết quả kỳ thi"
+          tone="info"
+        />
       </section>
     )
   }
@@ -312,6 +326,7 @@ function ExamResultsListPage({
   return (
     <section className="mx-auto max-w-290">
       {deleteDialog}
+
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">Kết quả kỳ thi</h1>
@@ -422,7 +437,7 @@ function ExamResultsListPage({
                         navigate={navigate}
                         officialAttempt={candidate.officialAttempt}
                         officialScore={candidate.officialScore}
-                        onDeleteSession={(sessionId) => void handleDeleteSession(sessionId)}
+                        onDeleteSession={(targetSessionId) => void handleDeleteSession(targetSessionId)}
                       />
                     </div>
                   ) : null}
@@ -474,7 +489,7 @@ function QuestionEvaluationCard({
   questionText?: string | null
 }) {
   const validityRules = Array.isArray(evaluation?.validity?.ruleResults)
-    ? evaluation?.validity?.ruleResults?.filter((rule) => rule?.ruleId || rule?.message)
+    ? evaluation.validity?.ruleResults?.filter((rule) => rule?.ruleId || rule?.message)
     : []
 
   return (
@@ -614,18 +629,29 @@ function ExamResultDetailPage() {
   const { sessionId } = useParams()
   const [activeTab, setActiveTab] = useState<string>('overview')
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
+  const [message, setMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+  const { confirm, dialog } = useConfirmationDialog()
+  const sessionQuery = useExamSessionStatusQuery(sessionId ?? null)
   const resultQuery = useExamSessionResultQuery(sessionId ?? null)
+  const reviewFlaggedResultMutation = useReviewFlaggedExamResultMutation()
+  const retryGradingMutation = useRetryGradingExamSessionMutation()
+  const session = sessionQuery.data
   const result = resultQuery.data
-  const examQuery = useExamQuery(result?.examId ?? null)
-  const candidatesQuery = useExamCandidatesQuery(result?.examId ?? null)
+  const examId = session?.examId ?? result?.examId ?? null
+  const candidateId = session?.candidateId ?? result?.candidateId ?? null
+  const paperId = session?.paperId ?? result?.paperId ?? null
+  const examQuery = useExamQuery(examId)
+  const candidatesQuery = useExamCandidatesQuery(examId)
   const candidate = useMemo(
-    () => candidatesQuery.data?.find((item) => item.id === result?.candidateId) ?? null,
-    [candidatesQuery.data, result?.candidateId],
+    () => candidatesQuery.data?.find((item) => item.id === candidateId) ?? null,
+    [candidateId, candidatesQuery.data],
   )
 
   const paper = useMemo(
-    () => examQuery.data?.papers.find((item) => item.id === result?.paperId) ?? examQuery.data?.papers[0] ?? null,
-    [examQuery.data, result?.paperId],
+    () => examQuery.data?.papers.find((item) => item.id === paperId) ?? examQuery.data?.papers[0] ?? null,
+    [examQuery.data, paperId],
   )
   const itemResultByPaperItemId = useMemo(
     () => new Map((result?.items ?? []).map((item) => [item.paperItemId, item])),
@@ -657,13 +683,15 @@ function ExamResultDetailPage() {
     ]
   }, [paper?.sections])
 
-  const statusDisplay = getExamResultStatusDisplay(result?.status)
+  const statusDisplay = result ? getExamResultStatusDisplay(result.status) : getAttemptStatusDisplay(session?.status)
+  const hiddenPendingReview = Boolean(result && session?.flagged && result.status === 'PENDING_REVIEW')
+  const canRetry = session?.status === 'GRADING_FAILED' && examQuery.data?.status !== 'RESULTS_PUBLISHED'
 
   if (!sessionId) {
     return null
   }
 
-  if (resultQuery.isLoading) {
+  if (sessionQuery.isLoading || resultQuery.isLoading) {
     return (
       <section className="mx-auto max-w-240">
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
@@ -673,23 +701,110 @@ function ExamResultDetailPage() {
     )
   }
 
-  if (!result) {
+  if (!session) {
     return (
       <section className="mx-auto max-w-240">
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
-          Chưa có kết quả cho phiên thi này.
-        </div>
+        <StatePanel description="Không tìm thấy phiên thi này." title="Không có dữ liệu" tone="info" />
       </section>
     )
   }
 
+  const currentSessionId = session.id
+
+  async function invalidateDetail() {
+    await queryClient.invalidateQueries({ queryKey: examResultQueryKeys.all })
+    await queryClient.invalidateQueries({ queryKey: examQueryKeys.candidates(examId) })
+    await queryClient.invalidateQueries({ queryKey: examQueryKeys.exam(examId) })
+  }
+
+  async function handleReview(decision: 'FINAL' | 'INVALID' | 'RETAKE_REQUIRED') {
+    const actionMessage =
+      decision === 'FINAL'
+        ? 'Duyệt kết quả này để tính điểm chính thức cho học sinh?'
+        : decision === 'INVALID'
+          ? 'Vô hiệu kết quả này? Lượt thi vẫn được tính là đã sử dụng.'
+          : 'Yêu cầu thi lại? Học sinh sẽ được thêm một lượt thi mới.'
+
+    if (!(await confirm({ message: actionMessage, title: 'Xác nhận xử lý kết quả' }))) {
+      return
+    }
+
+    if (!result) {
+      return
+    }
+
+    try {
+      await reviewFlaggedResultMutation.mutateAsync({ candidateResultId: result.id, decision })
+      await invalidateDetail()
+      setMessage('Đã cập nhật trạng thái kết quả.')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể cập nhật trạng thái kết quả.')
+    }
+  }
+
+  async function handleRetryGrading() {
+    if (!(await confirm({ message: 'Thực hiện chấm lại phiên thi này?', title: 'Xác nhận chấm lại' }))) {
+      return
+    }
+
+    try {
+      await retryGradingMutation.mutateAsync(currentSessionId)
+      await invalidateDetail()
+      setMessage('Đã gửi yêu cầu chấm lại.')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể chấm lại phiên thi.')
+    }
+  }
+
   return (
     <section className="mx-auto max-w-290">
+      <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+      {dialog}
+
       <DetailHeaderCard
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {session.flagged && result?.status === 'PENDING_REVIEW' ? (
+              <>
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700"
+                  onClick={() => void handleReview('FINAL')}
+                  type="button"
+                >
+                  Duyệt
+                </button>
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-red-200 px-4 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                  onClick={() => void handleReview('INVALID')}
+                  type="button"
+                >
+                  Vô hiệu
+                </button>
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-amber-200 px-4 text-sm font-bold text-amber-700 transition hover:bg-amber-50"
+                  onClick={() => void handleReview('RETAKE_REQUIRED')}
+                  type="button"
+                >
+                  Yêu cầu thi lại
+                </button>
+              </>
+            ) : null}
+            {canRetry ? (
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-full bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
+                onClick={() => void handleRetryGrading()}
+                type="button"
+              >
+                Chấm lại
+              </button>
+            ) : null}
+          </div>
+        }
         metaItems={[
-          { icon: <Hash aria-hidden="true" className="size-3.5" />, label: examQuery.data?.code ?? result.examId },
-          { icon: <UserRound aria-hidden="true" className="size-3.5" />, label: getCandidateName(candidate ?? { studentId: result.candidateId }) },
-          { icon: <Target aria-hidden="true" className="size-3.5" />, label: result.rubricResultBandName ?? result.rubricResultBandCode ?? 'Chưa có band' },
+          { icon: <Hash aria-hidden="true" className="size-3.5" />, label: examQuery.data?.code ?? examId ?? session.id },
+          { icon: <UserRound aria-hidden="true" className="size-3.5" />, label: getCandidateName(candidate ?? { studentId: candidateId ?? session.candidateId }) },
+          { icon: <Target aria-hidden="true" className="size-3.5" />, label: result?.rubricResultBandName ?? result?.rubricResultBandCode ?? 'Chưa có band' },
           { icon: <FileText aria-hidden="true" className="size-3.5" />, label: `Cập nhật ${formatDateTime(examQuery.data?.updatedAt)}` },
         ]}
         statusLabel={statusDisplay.label}
@@ -697,59 +812,123 @@ function ExamResultDetailPage() {
         title={examQuery.data?.name ?? 'Chi tiết kết quả'}
       />
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-4">
-        <StatCard icon={<Gauge size={19} />} iconTone="indigo" label="Tổng điểm" value={formatScore(result.totalScore)} />
-        <StatCard icon={<Target size={19} />} iconTone="violet" label="Band đạt" value={result.rubricResultBandName ?? result.rubricResultBandCode ?? '-'} />
-        <StatCard icon={<ClipboardList size={19} />} iconTone="amber" label="Band mục tiêu" value={result.targetFrameworkBandLabel ?? result.targetFrameworkBandCode ?? '-'} />
-        <StatCard icon={<Mic2 size={19} />} iconTone="emerald" label="Số câu đã chấm" value={result.items.length} />
-      </div>
-
-      <div className="mt-5.5">
-        <TabPillGroup items={sectionTabs} onChange={setActiveTab} value={activeTab} />
-      </div>
-
-      {activeTab === 'overview' ? (
-        <div className="mt-4">
-          <SectionOverview result={result} />
+      {hiddenPendingReview ? (
+        <div className="mt-5">
+          <StatePanel
+            description="Điểm số đang được tạm ẩn cho tới khi giáo viên đưa ra kết luận cuối cùng."
+            title="Đang chờ giáo viên xem xét"
+            tone="warning"
+          />
         </div>
       ) : null}
 
-      {activeTab !== 'overview' ? (
-        <div className="mt-4 grid gap-4">
-          {(paper?.sections.find((section) => section.id === activeTab)?.items ?? []).map((item) => {
-            const itemResult = itemResultByPaperItemId.get(item.id)
-            const evaluation = itemResult ? evaluationByResponseId.get(itemResult.responseId) : null
-            const open = expandedItems[item.id] ?? true
-            return (
-              <QuestionEvaluationCard
-                evaluation={evaluation}
-                itemResult={itemResult}
-                key={item.id}
-                onToggle={() => setExpandedItems((current) => ({ ...current, [item.id]: !open }))}
-                open={open}
-                questionCode={item.question?.code}
-                questionText={item.question?.questionText}
-              />
-            )
-          })}
+      {!hiddenPendingReview && result ? (
+        <>
+          <div className="mt-5 grid gap-4 sm:grid-cols-4">
+            <StatCard icon={<Gauge size={19} />} iconTone="indigo" label="Tổng điểm" value={formatScore(result.totalScore)} />
+            <StatCard icon={<Target size={19} />} iconTone="violet" label="Band đạt" value={result.rubricResultBandName ?? result.rubricResultBandCode ?? '-'} />
+            <StatCard icon={<ClipboardList size={19} />} iconTone="amber" label="Band mục tiêu" value={result.targetFrameworkBandLabel ?? result.targetFrameworkBandCode ?? '-'} />
+            <StatCard icon={<Mic2 size={19} />} iconTone="emerald" label="Số câu đã chấm" value={result.items.length} />
+          </div>
+
+          <div className="mt-5.5">
+            <TabPillGroup items={sectionTabs} onChange={setActiveTab} value={activeTab} />
+          </div>
+
+          {activeTab === 'overview' ? (
+            <div className="mt-4">
+              <SectionOverview result={result} />
+            </div>
+          ) : null}
+
+          {activeTab !== 'overview' ? (
+            <div className="mt-4 grid gap-4">
+              {(paper?.sections.find((section) => section.id === activeTab)?.items ?? []).map((item) => {
+                const itemResult = itemResultByPaperItemId.get(item.id)
+                const evaluation = itemResult ? evaluationByResponseId.get(itemResult.responseId) : null
+                const open = expandedItems[item.id] ?? true
+                return (
+                  <QuestionEvaluationCard
+                    evaluation={evaluation}
+                    itemResult={itemResult}
+                    key={item.id}
+                    onToggle={() => setExpandedItems((current) => ({ ...current, [item.id]: !open }))}
+                    open={open}
+                    questionCode={item.question?.code}
+                    questionText={item.question?.questionText}
+                  />
+                )
+              })}
+            </div>
+          ) : null}
+
+          {activeTab !== 'overview' && (paper?.sections.find((section) => section.id === activeTab)?.items ?? []).length === 0 ? (
+            <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-400">
+              Phần này chưa có câu hỏi để hiển thị.
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {!result ? (
+        <div className="mt-5">
+          {session.status === 'GRADING_FAILED' ? (
+            <StatePanel
+              description="Phiên thi này đã gặp lỗi trong lúc chấm. Giáo viên có thể chấm lại nếu cần."
+              title="Chấm điểm thất bại"
+              tone="danger"
+            />
+          ) : session.status === 'GRADED' ? (
+            <StatePanel
+              description="Không có câu trả lời nào được ghi nhận cho phiên thi này."
+              title="Không có dữ liệu trả lời"
+              tone="info"
+            />
+          ) : session.status === 'EXPIRED' ? (
+            <StatePanel
+              description="Phiên thi này sẽ được chấm sau khi kỳ thi đóng."
+              title="Đang chờ hoãn chấm"
+              tone="warning"
+            />
+          ) : session.status === 'SUBMITTED' || session.status === 'GRADING' ? (
+            <StatePanel
+              description="Hệ thống đang xử lý kết quả cho phiên thi này."
+              title="Đang được chấm điểm"
+              tone="info"
+            />
+          ) : session.status === 'INTERRUPTED' && session.candidateBlocked ? (
+            <StatePanel
+              description="Phiên thi này đang bị tạm dừng để xem xét."
+              title="Đang tạm dừng để xem xét"
+              tone="warning"
+            />
+          ) : session.status === 'IN_PROGRESS' || session.status === 'INTERRUPTED' ? (
+            <StatePanel
+              description="Học sinh chưa hoàn thành bài thi này."
+              title="Chưa hoàn thành bài thi"
+              tone="info"
+            />
+          ) : (
+            <StatePanel
+              description="Phiên thi này chưa có dữ liệu kết quả để hiển thị."
+              title="Chưa có kết quả"
+              tone="info"
+            />
+          )}
         </div>
       ) : null}
 
-      {activeTab !== 'overview' && (paper?.sections.find((section) => section.id === activeTab)?.items ?? []).length === 0 ? (
-        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-400">
-          Phần này chưa có câu hỏi để hiển thị.
+      {result && !hiddenPendingReview ? (
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center gap-2">
+            <MessageSquareQuote aria-hidden="true" className="size-4 text-slate-500" />
+            <p className="text-sm font-extrabold text-slate-900">Ghi chú hiển thị</p>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Mỗi từ trong transcript được dựng trực tiếp từ `wordFeedback` để giữ đúng màu lỗi và chi tiết phoneme của dữ liệu.
+          </p>
         </div>
       ) : null}
-
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="flex items-center gap-2">
-          <MessageSquareQuote aria-hidden="true" className="size-4 text-slate-500" />
-          <p className="text-sm font-extrabold text-slate-900">Ghi chú hiển thị</p>
-        </div>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Mỗi từ trong transcript được dựng trực tiếp từ `wordFeedback` để giữ đúng màu lỗi và chi tiết phoneme của dữ liệu.
-        </p>
-      </div>
     </section>
   )
 }

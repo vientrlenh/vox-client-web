@@ -14,15 +14,21 @@ type GraphQlExamResultResponse = {
   examSessionResult: ExamCandidateResultDto | null
 }
 
-type ExamSessionStatusDto = {
+export type ExamSessionDto = {
+  candidateBlocked: boolean
+  candidateId: string
+  examId: string
+  flagged: boolean
+  flagReason?: string | null
   id: string
+  paperId: string
   startedAt?: string | null
   status: string
   submittedAt?: string | null
 }
 
 type GraphQlExamSessionResponse = {
-  examSession: ExamSessionStatusDto | null
+  examSession: ExamSessionDto | null
 }
 
 type GraphQlExamItemEvaluationTurn = Omit<ExamItemEvaluationDto['turns'][number], 'pronunciationOverall' | 'wordFeedback'> & {
@@ -47,6 +53,9 @@ const EXAM_SESSION_RESULT_QUERY = `
       examId
       paperId
       candidateId
+      flagged
+      flagReason
+      scoreVisible
       totalScore
       targetFrameworkBandId
       targetFrameworkBandCode
@@ -75,9 +84,15 @@ const EXAM_SESSION_STATUS_QUERY = `
   query ExamSessionStatus($id: ID!) {
     examSession(id: $id) {
       id
+      examId
+      candidateId
+      paperId
       startedAt
       submittedAt
       status
+      flagged
+      flagReason
+      candidateBlocked
     }
   }
 `
@@ -226,5 +241,46 @@ export async function deleteExamSession(sessionId: string) {
 export function useDeleteExamSessionMutation() {
   return useMutation({
     mutationFn: (sessionId: string) => deleteExamSession(sessionId),
+  })
+}
+
+const REVIEW_FLAGGED_EXAM_RESULT_MUTATION = `
+  mutation ReviewFlaggedExamResult($candidateResultId: ID!, $decision: ExamCandidateResultStatus!) {
+    reviewFlaggedExamResult(candidateResultId: $candidateResultId, decision: $decision)
+  }
+`
+
+const RETRY_GRADING_EXAM_SESSION_MUTATION = `
+  mutation RetryGradingExamSession($sessionId: ID!) {
+    retryGradingExamSession(sessionId: $sessionId)
+  }
+`
+
+export function useReviewFlaggedExamResultMutation() {
+  return useMutation({
+    mutationFn: async ({
+      candidateResultId,
+      decision,
+    }: {
+      candidateResultId: string
+      decision: 'FINAL' | 'INVALID' | 'RETAKE_REQUIRED'
+    }) => {
+      const data = await graphQLRequest<{ reviewFlaggedExamResult: string }>(REVIEW_FLAGGED_EXAM_RESULT_MUTATION, {
+        candidateResultId,
+        decision,
+      })
+      return data.reviewFlaggedExamResult
+    },
+  })
+}
+
+export function useRetryGradingExamSessionMutation() {
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const data = await graphQLRequest<{ retryGradingExamSession: string }>(RETRY_GRADING_EXAM_SESSION_MUTATION, {
+        sessionId,
+      })
+      return data.retryGradingExamSession
+    },
   })
 }

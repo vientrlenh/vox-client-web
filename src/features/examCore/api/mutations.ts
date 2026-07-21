@@ -501,3 +501,72 @@ export function useRemoveProctorFromScheduleMutation() {
     },
   })
 }
+
+const FLAG_EXAM_SESSION_MUTATION = `
+  mutation FlagExamSession($sessionId: ID!, $reason: String!) {
+    flagExamSession(sessionId: $sessionId, reason: $reason)
+  }
+`
+
+const FORCE_END_EXAM_SESSION_MUTATION = `
+  mutation ForceEndExamSession($sessionId: ID!, $reason: String!) {
+    forceEndExamSession(sessionId: $sessionId, reason: $reason)
+  }
+`
+
+const UNBLOCK_EXAM_CANDIDATE_MUTATION = `
+  mutation UnblockExamCandidate($candidateId: ID!, $reason: String!) {
+    unblockExamCandidate(candidateId: $candidateId, reason: $reason)
+  }
+`
+
+const UPDATE_EXAM_CANDIDATE_STATUS_MUTATION = `
+  mutation UpdateExamCandidateStatus($candidateId: ID!, $status: ExamCandidateStatus!) {
+    updateExamCandidateStatus(candidateId: $candidateId, status: $status)
+  }
+`
+
+export function useFlagExamSessionMutation() {
+  return useMutation({
+    mutationFn: async ({ reason, sessionId }: { reason: string; sessionId: string }) => {
+      const data = await graphQLRequest<{ flagExamSession: string }>(FLAG_EXAM_SESSION_MUTATION, { reason, sessionId })
+      return data.flagExamSession
+    },
+  })
+}
+
+export function useForceEndExamSessionMutation() {
+  return useMutation({
+    mutationFn: async ({ reason, sessionId }: { reason: string; sessionId: string }) => {
+      const data = await graphQLRequest<{ forceEndExamSession: string }>(FORCE_END_EXAM_SESSION_MUTATION, { reason, sessionId })
+      return data.forceEndExamSession
+    },
+  })
+}
+
+export function useUnblockExamCandidateMutation() {
+  return useMutation({
+    mutationFn: async ({ candidateId, reason }: { candidateId: string; reason: string }) => {
+      const data = await graphQLRequest<{ unblockExamCandidate: string }>(UNBLOCK_EXAM_CANDIDATE_MUTATION, { candidateId, reason })
+      return data.unblockExamCandidate
+    },
+  })
+}
+
+export function useUpdateExamCandidateStatusMutation() {
+  return useMutation({
+    mutationFn: async ({
+      candidateId,
+      status,
+    }: {
+      candidateId: string
+      status: 'ABSENT' | 'ASSIGNED' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
+    }) => {
+      const data = await graphQLRequest<{ updateExamCandidateStatus: string }>(UPDATE_EXAM_CANDIDATE_STATUS_MUTATION, {
+        candidateId,
+        status,
+      })
+      return data.updateExamCandidateStatus
+    },
+  })
+}

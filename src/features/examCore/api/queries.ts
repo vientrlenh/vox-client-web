@@ -7,6 +7,8 @@ import type {
   ExamPaperDto,
   ExamScheduleDto,
   Paged,
+  ProctorCandidateSummaryDto,
+  ProctorScheduleSummaryDto,
   SchoolRoomLite,
 } from '../types'
 
@@ -151,6 +153,8 @@ const EXAM_CANDIDATE_FIELDS = `
     startedAt
     submittedAt
     status
+    flagged
+    flagReason
     totalScore
     rubricResultBandCode
     rubricResultBandName
@@ -161,6 +165,8 @@ const EXAM_CANDIDATE_FIELDS = `
     startedAt
     submittedAt
     status
+    flagged
+    flagReason
     totalScore
     rubricResultBandCode
     rubricResultBandName
@@ -171,11 +177,35 @@ const EXAM_CANDIDATE_FIELDS = `
   assignedPaperId
   status
   assignedAt
+  blockedAt
   student {
     id
     fullName
     email
   }
+`
+
+const PROCTOR_SCHEDULE_FIELDS = `
+  scheduleId
+  examId
+  examName
+  schoolRoomId
+  roomName
+  startDate
+  endDate
+  status
+`
+
+const PROCTOR_CANDIDATE_FIELDS = `
+  candidateId
+  studentId
+  studentName
+  studentEmail
+  status
+  blockedAt
+  sessionId
+  sessionStatus
+  sessionFlagged
 `
 
 const EXAM_SCHEDULES_QUERY = `
@@ -190,6 +220,22 @@ const EXAM_CANDIDATES_QUERY = `
   query ExamCandidates($examId: ID!, $scheduleId: ID, $status: ExamCandidateStatus) {
     examCandidates(examId: $examId, scheduleId: $scheduleId, status: $status) {
       ${EXAM_CANDIDATE_FIELDS}
+    }
+  }
+`
+
+const MY_PROCTOR_SCHEDULES_QUERY = `
+  query MyProctorSchedules {
+    myProctorSchedules {
+      ${PROCTOR_SCHEDULE_FIELDS}
+    }
+  }
+`
+
+const MY_PROCTOR_SCHEDULE_CANDIDATES_QUERY = `
+  query MyProctorScheduleCandidates($scheduleId: ID!) {
+    myProctorScheduleCandidates(scheduleId: $scheduleId) {
+      ${PROCTOR_CANDIDATE_FIELDS}
     }
   }
 `
@@ -350,6 +396,8 @@ export const examQueryKeys = {
   examPaper: (paperId: string | null) => [...examQueryKeys.all, 'exam-paper', paperId] as const,
   examStats: () => [...examQueryKeys.all, 'exam-stats'] as const,
   exams: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'exams', filters] as const,
+  proctorCandidates: (scheduleId: string | null) => [...examQueryKeys.all, 'proctor-candidates', scheduleId] as const,
+  proctorSchedules: () => [...examQueryKeys.all, 'proctor-schedules'] as const,
   schedules: (examId: string | null) => [...examQueryKeys.all, 'schedules', examId] as const,
   schoolRooms: (page: number, size: number, search: string) =>
     [...examQueryKeys.all, 'school-rooms', page, size, search] as const,
@@ -473,6 +521,34 @@ export function useExamCandidatesQuery(examId: string | null) {
     enabled: Boolean(examId),
     queryFn: () => fetchExamCandidates(examId as string),
     queryKey: examQueryKeys.candidates(examId),
+  })
+}
+
+async function fetchMyProctorSchedules() {
+  const data = await graphQLRequest<{ myProctorSchedules: ProctorScheduleSummaryDto[] }>(MY_PROCTOR_SCHEDULES_QUERY)
+  return data.myProctorSchedules
+}
+
+export function useMyProctorSchedulesQuery() {
+  return useQuery({
+    queryFn: fetchMyProctorSchedules,
+    queryKey: examQueryKeys.proctorSchedules(),
+  })
+}
+
+async function fetchMyProctorScheduleCandidates(scheduleId: string) {
+  const data = await graphQLRequest<{ myProctorScheduleCandidates: ProctorCandidateSummaryDto[] }>(
+    MY_PROCTOR_SCHEDULE_CANDIDATES_QUERY,
+    { scheduleId },
+  )
+  return data.myProctorScheduleCandidates
+}
+
+export function useMyProctorScheduleCandidatesQuery(scheduleId: string | null) {
+  return useQuery({
+    enabled: Boolean(scheduleId),
+    queryFn: () => fetchMyProctorScheduleCandidates(scheduleId as string),
+    queryKey: examQueryKeys.proctorCandidates(scheduleId),
   })
 }
 

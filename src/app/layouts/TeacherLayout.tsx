@@ -36,6 +36,11 @@ const navigationItems = [
     label: 'Giám sát thi',
     to: '/teacher/monitoring',
   },
+  {
+    icon: ClipboardCheck,
+    label: 'Điểm danh',
+    to: '/teacher/proctor-attendance',
+  },
 ]
 
 const navigationGroups: NavigationGroup[] = [
@@ -179,7 +184,7 @@ function TeacherSidebar({
     <div className="flex h-full flex-col overflow-hidden bg-linear-to-b from-cyan-950 via-blue-900 to-indigo-900 px-6 py-7 text-white">
       <div className="flex items-center justify-between">
         <NavLink
-          aria-label="VOX giám thị"
+          aria-label="VOX giáo viên"
           className="inline-flex"
           onClick={onNavigate}
           to="/teacher/monitoring"
@@ -189,7 +194,7 @@ function TeacherSidebar({
 
         {showCloseButton ? (
           <button
-            aria-label="Đóng menu giám thị"
+            aria-label="Đóng menu giáo viên"
             className="inline-flex size-10 items-center justify-center rounded-lg border border-white/15 text-white transition hover:bg-white/10 lg:hidden"
             onClick={onClose}
             type="button"
@@ -200,11 +205,11 @@ function TeacherSidebar({
       </div>
 
       <p className="mt-10 text-xs font-medium uppercase tracking-[0.08em] text-cyan-100/80">
-        Giảng viên
+        Giáo viên
       </p>
 
       <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-color:rgba(255,255,255,0.28)_transparent] scrollbar-thin">
-        <nav aria-label="Giám thị" className="grid gap-2 pb-4">
+        <nav aria-label="Điều hướng giáo viên" className="grid gap-2 pb-4">
           {navigationItems.map(({ icon: Icon, label, to }) => (
             <NavLink
               className={({ isActive }) =>
@@ -240,7 +245,7 @@ function TeacherSidebar({
         </div>
         <p className="mt-4 text-sm font-bold leading-6">Giám sát phòng thi</p>
         <p className="mt-2 text-xs leading-5 text-cyan-50/80">
-          Theo dõi màn hình và camera của học sinh trong các phòng bạn gác thi.
+          Theo dõi màn hình và camera của học sinh trong các phòng bạn được phân công.
         </p>
       </div>
     </div>
@@ -296,13 +301,13 @@ export function TeacherLayout() {
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Đóng menu giám thị bằng lớp phủ"
+            aria-label="Đóng menu giáo viên bằng lớp phủ"
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />
           <aside
-            aria-label="Menu giám thị"
+            aria-label="Menu giáo viên"
             aria-modal="true"
             className="relative h-full w-70 max-w-[86vw]"
             role="dialog"
@@ -320,7 +325,7 @@ export function TeacherLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-19 items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
-            aria-label="Mở menu giám thị"
+            aria-label="Mở menu giáo viên"
             className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 text-slate-950 transition hover:bg-slate-50 lg:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             type="button"
@@ -369,7 +374,7 @@ export function TeacherLayout() {
                     {profile?.fullName}
                   </span>
                   <span className="block truncate uppercase text-xs font-medium text-slate-500">
-                    Giảng viên
+                    Giáo viên
                   </span>
                 </span>
                 <ChevronDown
