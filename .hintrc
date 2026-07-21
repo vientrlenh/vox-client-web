@@ -19,8 +19,8 @@
     "axe/forms": [
       "default",
       {
-        "select-name": "off",
-        "label": "off"
+        "label": "off",
+        "select-name": "off"
       }
     ],
     "button-type": "off"

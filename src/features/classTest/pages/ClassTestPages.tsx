@@ -18,12 +18,11 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
-  Smartphone,
   Trash2,
   Users,
   NotebookPen,
 } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { useMySchoolClassesQuery } from '@/features/classes/api/useMySchoolClassesQuery'
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery'
@@ -37,6 +36,7 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
@@ -45,9 +45,12 @@ import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab
 import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
 import { examQueryKeys, fetchExamPaper, useExamBlueprintQuery, useExamBlueprintsQuery, useExamQuery } from '@/features/examCore/api/queries'
 import { useSetExamDeliveryModeMutation, useUpdateExamPaperItemMutation } from '@/features/examCore/api/mutations'
+import { useMatchingTeacherAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
 import {
+  formatDate,
   formatDateTime,
   formatNullableText,
+  getAssessmentPolicyStrictnessLabel,
   getExamChairName,
   getResultDecisionMethodDisplay,
   RESULT_DECISION_METHODS,
@@ -98,7 +101,7 @@ function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; ste
   const steps: WorkflowStep[] = [
     {
       icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
-      label: 'Soạn đề bài',
+      label: 'Đề bài',
       state: step1Done ? 'done' : 'current',
       sublabel: step1Done ? 'Đã có câu hỏi trong đề' : 'Chưa gắn blueprint hoặc thêm câu hỏi',
     },
@@ -110,7 +113,7 @@ function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; ste
     },
     {
       icon: step3Done ? <Check size={26} /> : <PlayCircle size={24} />,
-      label: 'Mở bài & chấm',
+      label: 'Xếp lịch & chấm',
       state: !step2Done ? 'upcoming' : step3Done ? 'done' : 'current',
       sublabel: step3Done ? 'Đã trả điểm' : 'Chọn thời gian làm bài',
     },
@@ -289,13 +292,13 @@ function ClassPicker({ onChange, value }: { onChange: (id: string, name: string)
   const isTeacher = user?.roles.includes('TEACHER') ?? false
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const teacherClassesQuery = useMySchoolClassesQuery(page, 10, user?.schoolId ?? '', 'ACTIVE')
-  const adminClassesQuery = useSchoolClassesQuery(page, 10, {
-    languageId: '',
-    schoolGradeId: '',
-    search,
-    status: 'ACTIVE',
-  })
+  const teacherClassesQuery = useMySchoolClassesQuery(page, 10, isTeacher ? user?.schoolId ?? '' : '', 'ACTIVE')
+  const adminClassesQuery = useSchoolClassesQuery(
+    page,
+    10,
+    { languageId: '', schoolGradeId: '', search, status: 'ACTIVE' },
+    { enabled: !isTeacher },
+  )
 
   return (
     <ClassPickerTable
@@ -356,35 +359,113 @@ function sectionWeightInputValue(weight?: number | null) {
   return weight == null ? '' : String(weight)
 }
 
+type SelectedRubricVersion = { code: string; id: string; languageId: string; name: string; version: number }
+
+type ClassTestCreateDraft = {
+  closeAt: string
+  creationMode: 'questions' | 'blueprint'
+  description: string
+  maxAttempt: string
+  name: string
+  openAt: string
+  resultDecisionMethod: ResultDecisionMethod
+  schoolClassId: string
+  schoolClassName: string
+  sections: ClassTestSectionDraft[]
+  selectedBlueprint: ExamBlueprintDto | null
+  selectedVersion: ExamBlueprintVersionDto | null
+  selectionAssignments: Record<string, QuestionDto>
+}
+
+type ClassTestCreateLocationState = {
+  draft?: ClassTestCreateDraft
+  selectedRubricVersion?: SelectedRubricVersion
+} | null
+
 export function TeacherClassTestCreatePage() {
+  const location = useLocation()
+  // key={location.key} forces a full remount whenever navigate() lands here with a fresh
+  // history entry (e.g. returning from the rubric-version picker), so the useState
+  // initializers below can pick up the new location.state instead of going stale.
+  return <ClassTestCreateForm key={location.key} locationState={location.state as ClassTestCreateLocationState} />
+}
+
+function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreateLocationState }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createMutation = useCreateClassTestMutation()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [schoolClassId, setSchoolClassId] = useState('')
-  const [schoolClassName, setSchoolClassName] = useState('')
-  const [openAt, setOpenAt] = useState('')
-  const [closeAt, setCloseAt] = useState('')
-  const [maxAttempt, setMaxAttempt] = useState('1')
-  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>('HIGHEST')
-  const [sections, setSections] = useState<ClassTestSectionDraft[]>([newClassTestSection(1)])
+  const draft = locationState?.draft
+  const [name, setName] = useState(draft?.name ?? '')
+  const [description, setDescription] = useState(draft?.description ?? '')
+  const [schoolClassId, setSchoolClassId] = useState(draft?.schoolClassId ?? '')
+  const [schoolClassName, setSchoolClassName] = useState(draft?.schoolClassName ?? '')
+  const [openAt, setOpenAt] = useState(draft?.openAt ?? '')
+  const [closeAt, setCloseAt] = useState(draft?.closeAt ?? '')
+  const [maxAttempt, setMaxAttempt] = useState(draft?.maxAttempt ?? '1')
+  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(draft?.resultDecisionMethod ?? 'HIGHEST')
+  const [sections, setSections] = useState<ClassTestSectionDraft[]>(draft?.sections ?? [newClassTestSection(1)])
   const [pickerForSectionKey, setPickerForSectionKey] = useState<string | null>(null)
-  const [creationMode, setCreationMode] = useState<'questions' | 'blueprint'>('questions')
+  const [creationMode, setCreationMode] = useState<'questions' | 'blueprint'>(draft?.creationMode ?? 'questions')
   const [blueprintKeyword, setBlueprintKeyword] = useState('')
   const [blueprintPage, setBlueprintPage] = useState(1)
   const [browsingBlueprint, setBrowsingBlueprint] = useState<ExamBlueprintDto | null>(null)
-  const [selectedBlueprint, setSelectedBlueprint] = useState<ExamBlueprintDto | null>(null)
-  const [selectedVersion, setSelectedVersion] = useState<ExamBlueprintVersionDto | null>(null)
+  const [selectedBlueprint, setSelectedBlueprint] = useState<ExamBlueprintDto | null>(draft?.selectedBlueprint ?? null)
+  const [selectedVersion, setSelectedVersion] = useState<ExamBlueprintVersionDto | null>(draft?.selectedVersion ?? null)
   const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword: blueprintKeyword, page: blueprintPage, size: 8 })
   const { confirm, dialog } = useConfirmationDialog()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [selectionAssignments, setSelectionAssignments] = useState<Record<string, QuestionDto>>({})
+  const [selectionAssignments, setSelectionAssignments] = useState<Record<string, QuestionDto>>(
+    draft?.selectionAssignments ?? {},
+  )
   const [selectionPickerSlotId, setSelectionPickerSlotId] = useState<string | null>(null)
   const updateItemMutation = useUpdateExamPaperItemMutation()
   const hasSelectionSlot = selectedVersion?.sections.some((section) =>
     section.slots.some((slot) => slot.slotType === 'SELECTION'),
   )
+
+  const [selectedRubricVersion, setSelectedRubricVersion] = useState<SelectedRubricVersion | null>(
+    locationState?.selectedRubricVersion ?? null,
+  )
+  const [manualPolicyId, setManualPolicyId] = useState<string | null>(null)
+  const matchingPoliciesQuery = useMatchingTeacherAssessmentPoliciesQuery({
+    languageId: selectedRubricVersion?.languageId,
+    rubricVersionId: selectedRubricVersion?.id,
+  })
+  const matchingPolicies = matchingPoliciesQuery.data ?? []
+  // Chỉ 1 chính sách khớp -> tự dùng luôn; nhiều chính sách khớp -> chờ người dùng chọn tay.
+  const assessmentPolicyId = matchingPolicies.length === 1 ? matchingPolicies[0].id : manualPolicyId
+  const isResolvingPolicy = Boolean(selectedRubricVersion) && matchingPoliciesQuery.isLoading
+  const hasNoMatchingPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length === 0
+  const hasAmbiguousPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length > 1 && !manualPolicyId
+  const canSubmitPolicy = !isResolvingPolicy && !hasAmbiguousPolicy
+
+  function goToSelectRubricVersion() {
+    navigate('/teacher/rubric-versions/select', {
+      state: {
+        draft: {
+          closeAt,
+          creationMode,
+          description,
+          maxAttempt,
+          name,
+          openAt,
+          resultDecisionMethod,
+          schoolClassId,
+          schoolClassName,
+          sections,
+          selectedBlueprint,
+          selectedVersion,
+          selectionAssignments,
+        } satisfies ClassTestCreateDraft,
+        returnTo: '/teacher/class-tests/create',
+      },
+    })
+  }
+
+  function clearSelectedRubricVersion() {
+    setSelectedRubricVersion(null)
+    setManualPolicyId(null)
+  }
 
   function addSection() {
     setSections((current) => [...current, newClassTestSection(current.length + 1)])
@@ -462,12 +543,17 @@ export function TeacherClassTestCreatePage() {
         return
       }
     }
+    if (hasAmbiguousPolicy) {
+      window.alert('Vui lòng chọn một chính sách đánh giá phù hợp trước khi tạo.')
+      return
+    }
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo bài trên lớp này không?' }))) {
       return
     }
     try {
       const created = await createMutation.mutateAsync({
         payload: {
+          assessmentPolicyId,
           closeAt: toIsoDateTime(closeAt),
           description: description || null,
           existingBlueprintId: creationMode === 'blueprint' ? selectedBlueprint?.id : null,
@@ -582,6 +668,82 @@ export function TeacherClassTestCreatePage() {
               ))}
             </select>
           </label>
+        </div>
+
+        <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
+          <p className="text-xs text-slate-500">
+            Không bắt buộc — chọn để tự động gắn chính sách đánh giá (Assessment Policy) phù hợp cho bài trên lớp.
+          </p>
+
+          {!selectedRubricVersion ? (
+            <button
+              className="mt-1.5 inline-flex h-9.5 w-fit items-center justify-center rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50"
+              onClick={goToSelectRubricVersion}
+              type="button"
+            >
+              Chọn phiên bản thang đánh giá
+            </button>
+          ) : (
+            <div className="mt-1.5 grid gap-2 rounded-lg border border-indigo-200 bg-white p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[13px] text-slate-700">
+                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b> ({selectedRubricVersion.code} · v
+                  {selectedRubricVersion.version})
+                </p>
+                <button
+                  className="shrink-0 text-xs font-bold text-slate-400 hover:text-red-600"
+                  onClick={clearSelectedRubricVersion}
+                  type="button"
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+
+              {isResolvingPolicy ? <p className="text-xs text-slate-400">Đang tìm chính sách đánh giá phù hợp…</p> : null}
+
+              {hasNoMatchingPolicy ? (
+                <p className="text-xs font-semibold text-amber-700">
+                  Chưa có chính sách đánh giá (Assessment Policy) đã xuất bản cho phiên bản này. Vẫn có thể tạo bài và gắn chính sách
+                  sau, hoặc chọn phiên bản khác.
+                </p>
+              ) : null}
+
+              {matchingPolicies.length > 1 ? (
+                <div className="grid gap-1.5">
+                  <p className="text-xs font-semibold text-slate-600">Có {matchingPolicies.length} chính sách khớp — chọn một:</p>
+                  {matchingPolicies.map((policy) => (
+                    <button
+                      className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-semibold ${
+                        manualPolicyId === policy.id
+                          ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                      key={policy.id}
+                      onClick={() => setManualPolicyId(policy.id)}
+                      type="button"
+                    >
+                      <span>
+                        Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt{' '}
+                        {policy.passingScore ?? '-'}
+                      </span>
+                      <span>
+                        {formatDate(policy.effectiveFrom)}
+                        {policy.effectiveTo ? ` – ${formatDate(policy.effectiveTo)}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {assessmentPolicyId && matchingPolicies.length === 1 ? (
+                <p className="text-xs font-semibold text-emerald-700">
+                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
+                  {matchingPolicies[0].passingScore ?? '-'}
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
 
         <div>
@@ -950,8 +1112,9 @@ export function TeacherClassTestCreatePage() {
         <div className="flex justify-end">
           <button
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
-            disabled={createMutation.isPending}
+            disabled={createMutation.isPending || !canSubmitPolicy}
             onClick={handleSubmit}
+            title={hasAmbiguousPolicy ? 'Chọn một chính sách đánh giá phù hợp trước khi tạo' : undefined}
             type="button"
           >
             Tạo bài trên lớp
@@ -1222,7 +1385,7 @@ type ClassTestDetailPageProps = {
   canManage: boolean
 }
 
-type DetailTab = 'blueprint' | 'papers' | 'schedule' | 'students'
+type DetailTab = 'assessment' | 'blueprint' | 'papers' | 'schedule' | 'students'
 
 function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const navigate = useNavigate()
@@ -1641,10 +1804,11 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       <div className="mt-5.5">
         <TabPillGroup
           items={[
+            { label: 'Phương thức đánh giá', value: 'assessment' },
+            { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
             { label: 'Đề bài', value: 'papers' },
             { label: 'Học sinh', value: 'students' },
-            { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
-            { icon: <Smartphone aria-hidden="true" className="size-4" />, label: 'Phân lịch', value: 'schedule' },
+            { icon: <Calendar aria-hidden="true" className="size-4" />, label: 'Xếp lịch', value: 'schedule' },
           ]}
           onChange={setTab}
           value={tab}
@@ -1844,7 +2008,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} /> : null}
+      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
+
+      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} papers={exam.papers} /> : null}
 
       {tab === 'blueprint' ? (
         <ClassTestBlueprintTab

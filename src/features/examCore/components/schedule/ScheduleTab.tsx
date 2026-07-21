@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Laptop, Lock, MonitorSmartphone, Plus, Search, UserPlus, Wand2, X } from 'lucide-react'
+import { Lock, Monitor, Plus, Search, Smartphone, UserPlus, Wand2, X } from 'lucide-react'
 import { toApiError } from '@/shared/api'
 import type { ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
@@ -295,12 +295,12 @@ export function ScheduleTab({
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex items-center gap-2.5">
         <span className="flex size-9 items-center justify-center rounded-[10px] bg-indigo-50 text-indigo-600">
-          <MonitorSmartphone aria-hidden="true" className="size-4.5" />
+          <Monitor aria-hidden="true" className="size-4.5" />
         </span>
         <div>
           <div className="text-sm font-extrabold text-slate-900">Hình thức làm bài</div>
           <div className="text-xs text-slate-500">
-            Chọn nơi thí sinh làm bài — có thể thi ngay trên thiết bị cá nhân.
+            Chọn thiết bị thí sinh dùng để làm bài — điện thoại hoặc máy vi tính. Cả hai đều xếp ca thi, phòng và giám thị.
           </div>
         </div>
       </div>
@@ -314,8 +314,8 @@ export function ScheduleTab({
           type="button"
         >
           <div className="flex items-center gap-2">
-            <MonitorSmartphone aria-hidden="true" className="size-4.5 text-indigo-600" />
-            <span className="text-[13px] font-bold text-slate-900">Thiết bị thí sinh</span>
+            <Smartphone aria-hidden="true" className="size-4.5 text-indigo-600" />
+            <span className="text-[13px] font-bold text-slate-900">Điện thoại</span>
             {effectiveMode === 'DEVICE' ? (
               <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
                 Đang chọn
@@ -323,7 +323,7 @@ export function ScheduleTab({
             ) : null}
           </div>
           <div className="mt-1.5 text-xs leading-5 text-slate-600">
-            Thí sinh dùng điện thoại/laptop cá nhân. Không cần xếp phòng máy, chỉ cần khung giờ mở – đóng bài.
+            Thí sinh làm bài trên điện thoại cá nhân. Vẫn xếp ca thi, phòng và giám thị như thi tập trung.
           </div>
         </button>
         <button
@@ -335,8 +335,8 @@ export function ScheduleTab({
           type="button"
         >
           <div className="flex items-center gap-2">
-            <Laptop aria-hidden="true" className="size-4.5 text-slate-500" />
-            <span className="text-[13px] font-bold text-slate-900">Phòng máy của trường</span>
+            <Monitor aria-hidden="true" className="size-4.5 text-slate-500" />
+            <span className="text-[13px] font-bold text-slate-900">Máy vi tính</span>
             {effectiveMode === 'LAB' ? (
               <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
                 Đang chọn
@@ -344,7 +344,7 @@ export function ScheduleTab({
             ) : null}
           </div>
           <div className="mt-1.5 text-xs leading-5 text-slate-600">
-            Thi tập trung tại phòng máy. Xếp ca thi và phân đề theo ca như bên dưới.
+            Thí sinh làm bài trên máy vi tính tại phòng máy của trường. Xếp ca thi, phòng và giám thị.
           </div>
         </button>
       </div>
@@ -380,24 +380,6 @@ export function ScheduleTab({
             Quay lại Đề thi
           </button>
         </div>
-      </div>
-    )
-  }
-
-  if (effectiveMode === 'DEVICE') {
-    return (
-      <div className="mt-4 grid gap-4">
-        {toasts}
-        {deviceModeSection}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5.5 text-[13px] text-slate-600">
-          Học sinh làm bài trực tiếp trên thiết bị cá nhân trong khung giờ mở – đóng bài đã cấu hình ở phần thông tin
-          chung. Không cần xếp ca thi/phòng máy.
-        </div>
-        <div className="grid gap-3.5 sm:grid-cols-2">
-          <StatBlock label="Thí sinh" value={candidates.length} />
-          <StatBlock label="Mã đề đã khóa" value={papers.filter((paper) => paper.status === 'LOCKED').length} />
-        </div>
-        <PaperAssignmentPanel candidates={candidates} examId={examId} onApplied={() => void invalidate()} papers={papers} schedules={[]} />
       </div>
     )
   }

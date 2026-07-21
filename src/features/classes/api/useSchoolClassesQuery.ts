@@ -96,8 +96,10 @@ export function useSchoolClassesQuery(
   page: number,
   size: number,
   filters: ClassFilters,
+  options?: { enabled?: boolean },
 ) {
   return useQuery({
+    enabled: options?.enabled ?? true,
     queryFn: () => fetchSchoolClasses({ filters, page, size }),
     queryKey: classManagementQueryKeys.classes(page, size, filters),
   })

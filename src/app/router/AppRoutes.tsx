@@ -413,6 +413,12 @@ const SchoolAdminBlueprintVersionDetailPage = lazy(() =>
 const SchoolAdminEditBlueprintVersionPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.SchoolAdminEditBlueprintVersionPage })),
 );
+const SchoolAdminSelectRubricVersionPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminSelectRubricVersionPage })),
+);
+const TeacherSelectRubricVersionPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.TeacherSelectRubricVersionPage })),
+);
 
 const SchoolAdminRubricsPage = lazy(() =>
   import("@/features/rubrics_school").then((module) => ({
@@ -767,6 +773,7 @@ export function AppRoutes() {
             <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
             <Route path="school-admin/exam-papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
+            <Route path="school-admin/rubric-versions/select" element={<SchoolAdminSelectRubricVersionPage />} />
             <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
             <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
             <Route path="school-admin/exam-results" element={<SchoolAdminExamResultsListPage />} />
@@ -870,6 +877,7 @@ export function AppRoutes() {
             <Route path="teacher/questions/:questionId/edit" element={<TeacherEditQuestionPage />} />
             <Route path="teacher/questions/:questionId" element={<TeacherQuestionDetailPage />} />
             <Route path="teacher/class-tests/create" element={<TeacherClassTestCreatePage />} />
+            <Route path="teacher/rubric-versions/select" element={<TeacherSelectRubricVersionPage />} />
             <Route path="teacher/class-tests/:examId" element={<TeacherClassTestDetailPage />} />
             <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
             <Route path="teacher/exam-papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />

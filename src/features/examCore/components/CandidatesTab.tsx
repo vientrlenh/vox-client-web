@@ -19,7 +19,14 @@ import {
   useUnblockExamCandidateMutation,
 } from '../api/mutations'
 import { examQueryKeys, useExamCandidatesQuery, useExamSchedulesQuery } from '../api/queries'
-import { getCandidateName, getCandidateStatusDisplay, getScheduleLabel, type ExamAttemptSummaryDto, type ExamCandidateDto } from '../types'
+import {
+  getCandidateName,
+  getCandidateStatusDisplay,
+  getScheduleLabel,
+  type ExamAttemptSummaryDto,
+  type ExamCandidateDto,
+  type ExamPaperDto,
+} from '../types'
 import { ImportCandidatesModal } from './ImportCandidatesModal'
 import { StudentPickerModal } from './StudentPickerModal'
 
@@ -31,6 +38,7 @@ const UNBLOCK_REASON = 'Giám thị dỡ cấm để học sinh tiếp tục bà
 type CandidatesTabProps = {
   canManage: boolean
   examId: string
+  papers: ExamPaperDto[]
 }
 
 function getLatestAttemptByStatuses(
@@ -56,7 +64,7 @@ function getCandidateBadge(candidate: ExamCandidateDto) {
   return getCandidateStatusDisplay(candidate.scheduleId ? candidate.status : undefined)
 }
 
-export function CandidatesTab({ canManage, examId }: CandidatesTabProps) {
+export function CandidatesTab({ canManage, examId, papers }: CandidatesTabProps) {
   const queryClient = useQueryClient()
   const candidatesQuery = useExamCandidatesQuery(examId)
   const schedulesQuery = useExamSchedulesQuery(examId)
@@ -79,6 +87,7 @@ export function CandidatesTab({ canManage, examId }: CandidatesTabProps) {
     () => new Map((schedulesQuery.data ?? []).map((schedule) => [schedule.id, getScheduleLabel(schedule)])),
     [schedulesQuery.data],
   )
+  const paperCodeById = useMemo(() => new Map(papers.map((paper) => [paper.id, paper.code])), [papers])
   const filteredCandidates = useMemo(
     () =>
       candidates.filter((candidate) => {
@@ -294,9 +303,10 @@ export function CandidatesTab({ canManage, examId }: CandidatesTabProps) {
         </div>
 
         <div className="mt-3.5 overflow-hidden rounded-xl border border-slate-200">
-          <div className="grid grid-cols-[1fr_1fr_140px_56px] gap-2.5 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+          <div className="grid grid-cols-[1fr_1fr_120px_140px_56px] gap-2.5 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
             <span>Họ tên</span>
             <span>Ca thi</span>
+            <span>Mã đề</span>
             <span>Trạng thái</span>
             <span />
           </div>
@@ -309,12 +319,15 @@ export function CandidatesTab({ canManage, examId }: CandidatesTabProps) {
 
               return (
                 <div
-                  className="grid grid-cols-[1fr_1fr_140px_56px] items-center gap-2.5 border-t border-slate-100 px-4 py-2.5"
+                  className="grid grid-cols-[1fr_1fr_120px_140px_56px] items-center gap-2.5 border-t border-slate-100 px-4 py-2.5"
                   key={candidate.id}
                 >
                   <span className="text-[13px] text-slate-900">{getCandidateName(candidate)}</span>
                   <span className="text-[13px] text-slate-500">
                     {candidate.scheduleId ? scheduleLabelById.get(candidate.scheduleId) ?? '-' : '-'}
+                  </span>
+                  <span className="text-[13px] font-semibold text-indigo-700">
+                    {candidate.assignedPaperId ? paperCodeById.get(candidate.assignedPaperId) ?? '-' : '-'}
                   </span>
                   <span>
                     <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
