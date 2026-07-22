@@ -36,6 +36,7 @@ import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { TabPillGroup, type TabPillItem } from '@/shared/ui/TabPill'
 import { toApiError } from '@/shared/api'
 import {
   useAppealQuery,
@@ -86,6 +87,14 @@ import {
 } from '../types'
 
 const PAGE_SIZE = 20
+
+/** Tab theo từng phần thi: value là appealItemId, nhãn lấy partLabel (thiếu thì "Phần N"). */
+function itemTabItems(items: AppealItem[]): TabPillItem[] {
+  return items.map((item, index) => ({
+    value: item.appealItemId,
+    label: item.partLabel ?? `Phần ${index + 1}`,
+  }))
+}
 
 const STATUS_FILTERS: Array<{ label: string; value: '' | AppealStatus }> = [
   { label: 'Tất cả', value: '' },
@@ -382,6 +391,8 @@ function DetailPanel({
   const partLabels = detail.items.map((item) => item.partLabel ?? 'Phần thi')
   const removeMutation = useRemoveReviewerMutation()
   const [pendingRemove, setPendingRemove] = useState<AppealReviewer | null>(null)
+  const [activeItemId, setActiveItemId] = useState<string>(detail.items[0]?.appealItemId ?? '')
+  const activeItem = detail.items.find((i) => i.appealItemId === activeItemId) ?? detail.items[0]
 
   function confirmRemove(reviewer: AppealReviewer) {
     removeMutation.mutate(
@@ -486,9 +497,17 @@ function DetailPanel({
             </div>
           ) : null}
 
+          {detail.items.length > 1 ? (
+            <TabPillGroup
+              items={itemTabItems(detail.items)}
+              onChange={setActiveItemId}
+              value={activeItem?.appealItemId ?? ''}
+            />
+          ) : null}
+
           {detail.status === 'PUBLISHED' && publishedReviewers.length > 0 ? (
             <div className="grid gap-2.5">
-              {detail.items.map((item) => {
+              {(activeItem ? [activeItem] : []).map((item) => {
                 const itemSuggested = suggestedScoreForItem(detail.reviewers, item.appealItemId)
                 return (
                   <div className="grid gap-2.5" key={item.appealItemId}>
@@ -532,7 +551,7 @@ function DetailPanel({
             </div>
           </CardShell>
 
-          {detail.items.map((item) => (
+          {(activeItem ? [activeItem] : []).map((item) => (
             <CardShell
               icon={<Bot className="size-4.5 text-violet-600" />}
               key={item.appealItemId}
@@ -755,6 +774,8 @@ function ComparePanel({
   const scoreLocked = true
   const { scoringScaleMin, scoringScaleMax } = detail
   const done = detail.reviewers.filter((r) => r.done && r.items.length > 0)
+  const [activeItemId, setActiveItemId] = useState<string>(detail.items[0]?.appealItemId ?? '')
+  const activeItem = detail.items.find((i) => i.appealItemId === activeItemId) ?? detail.items[0]
 
   const clampToScale = (value: number) =>
     Math.max(scoringScaleMin, Math.min(scoringScaleMax, value))
@@ -822,7 +843,14 @@ function ComparePanel({
 
       <div className="mt-4 grid gap-4.5 lg:grid-cols-[1.7fr_1fr]">
         <div className="grid gap-4.5">
-          {detail.items.map((item) => (
+          {detail.items.length > 1 ? (
+            <TabPillGroup
+              items={itemTabItems(detail.items)}
+              onChange={setActiveItemId}
+              value={activeItem?.appealItemId ?? ''}
+            />
+          ) : null}
+          {(activeItem ? [activeItem] : []).map((item) => (
             <div className="grid gap-3" key={item.appealItemId}>
               <CompareTable item={item} reviewers={done} />
               <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
@@ -1253,11 +1281,13 @@ export function TeacherReevaluationRescorePage() {
   const [comments, setComments] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [initializedFor, setInitializedFor] = useState<string | null>(null)
+  const [activeItemId, setActiveItemId] = useState<string>('')
 
   // Đồng bộ state khi mở một bài khác (điều hướng trực tiếp giữa các bài).
   if (detail && detail.appealId !== initializedFor) {
     setScores(initialScores(detail))
     setComments(initialComments(detail))
+    setActiveItemId(detail.items[0]?.appealItemId ?? '')
     setInitializedFor(detail.appealId)
   }
 
@@ -1279,6 +1309,7 @@ export function TeacherReevaluationRescorePage() {
   // BE chặn nộp lại sau khi đã SUBMITTED — màn này thành chỉ-đọc khi đã nộp.
   // myReport rỗng nghĩa là chưa nộp (BE trả mảng rỗng, không phải null).
   const readOnly = detail.myReport.length > 0
+  const activeItem = detail.items.find((i) => i.appealItemId === activeItemId) ?? detail.items[0]
 
   const scoreOf = (appealItemId: string, criterion: { id: string; minScore: number }) =>
     scores[appealItemId]?.[criterion.id] ?? criterion.minScore
@@ -1357,7 +1388,14 @@ export function TeacherReevaluationRescorePage() {
       </div>
 
       <div className="grid gap-7">
-        {detail.items.map((item) => {
+        {detail.items.length > 1 ? (
+          <TabPillGroup
+            items={itemTabItems(detail.items)}
+            onChange={setActiveItemId}
+            value={activeItem?.appealItemId ?? ''}
+          />
+        ) : null}
+        {(activeItem ? [activeItem] : []).map((item) => {
           const baselineAvg = bandRound(avgScore(item.baselineScores))
           const baselineValueOf = (criterionId: string) =>
             item.baselineScores.find((s) => s.criterionId === criterionId)?.score ?? null

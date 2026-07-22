@@ -222,8 +222,9 @@ function GradeDeleteDialog({
             Xóa năm học
           </h2>
           <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-            Năm học <strong>{grade.name}</strong> ({grade.code}) sẽ bị xóa.
-            Không thể xóa nếu năm học đang được dùng bởi các lớp học.
+            Năm học <strong>{grade.name}</strong> ({grade.code}) sẽ bị lưu trữ.
+            Các lớp học và thành viên đang hoạt động thuộc năm học này cũng sẽ
+            bị lưu trữ/vô hiệu hóa theo.
           </p>
         </div>
 

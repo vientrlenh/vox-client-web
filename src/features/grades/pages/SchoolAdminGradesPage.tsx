@@ -107,7 +107,8 @@ function DeleteDialog({
           </h2>
           <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
             Khối <strong>{gradeLevel.name}</strong> ({gradeLevel.code}) sẽ bị
-            xóa khỏi trường. Không thể xóa nếu khối còn chứa năm học.
+            xóa khỏi trường. Không thể xóa nếu khối còn chứa năm học chưa
+            được lưu trữ.
           </p>
         </div>
 
@@ -350,8 +351,9 @@ export function SchoolAdminGradesPage() {
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SchoolGradeLevel | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState('')
 
-  const gradeLevelsQuery = useSchoolGradeLevelsQuery(page, pageSize)
+  const gradeLevelsQuery = useSchoolGradeLevelsQuery(page, pageSize, '', statusFilter)
   const gradeLevels = gradeLevelsQuery.data?.content ?? []
   const createMutation = useCreateSchoolGradeLevelMutation()
   const updateMutation = useUpdateSchoolGradeLevelMutation()
@@ -361,6 +363,11 @@ export function SchoolAdminGradesPage() {
   function handlePageSizeChange(nextPageSize: number) {
     setPage(DEFAULT_PAGE)
     setPageSize(nextPageSize)
+  }
+
+  function handleStatusFilterChange(nextStatus: string) {
+    setPage(DEFAULT_PAGE)
+    setStatusFilter(nextStatus)
   }
 
   function openCreateDialog() {
@@ -507,6 +514,18 @@ export function SchoolAdminGradesPage() {
       ) : null}
 
       <div className="grid h-fit gap-4">
+        <label className="grid w-full max-w-xs gap-2 text-sm font-bold text-slate-700">
+          Trạng thái
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+            onChange={(event) => handleStatusFilterChange(event.target.value)}
+            value={statusFilter}
+          >
+            <option value="">Tất cả</option>
+            <option value="ACTIVE">Đang hoạt động</option>
+            <option value="INACTIVE">Tạm dừng</option>
+          </select>
+        </label>
         <GradeLevelTable
           errorMessage={getErrorMessage(gradeLevelsQuery.error)}
           gradeLevels={gradeLevels}

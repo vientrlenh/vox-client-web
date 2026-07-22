@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
@@ -208,13 +209,14 @@ describe('SchoolAdminReevaluationDetailPage — màn so sánh & công bố', () 
     expect((await screen.findAllByText('Trần Thu Hà')).length).toBeGreaterThan(1)
     expect(screen.getAllByText('Nguyễn Văn Minh').length).toBeGreaterThan(1)
 
-    // Không còn nhãn ẩn danh cũ.
-    expect(screen.getAllByText(/^Nhận xét của giám khảo ·/)).toHaveLength(2)
+    // Chỉ hiện khối nhận xét của phần đang chọn (tab đầu tiên).
+    expect(screen.getAllByText(/^Nhận xét của giám khảo ·/)).toHaveLength(1)
     expect(screen.queryByText(/Người chấm 1/)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Chấm 1$/)).not.toBeInTheDocument()
   })
 
-  it('tách bảng đối chiếu và điểm đề xuất theo TỪNG phần thi', async () => {
+  it('chia tab bảng đối chiếu theo phần thi; điểm công bố vẫn hiện đủ phần', async () => {
+    const user = userEvent.setup()
     routeGraphql({ appeal: comparingAppeal })
 
     renderWithProviders(
@@ -227,13 +229,19 @@ describe('SchoolAdminReevaluationDetailPage — màn so sánh & công bố', () 
       { route: '/school-admin/reevaluation/appeal-1' },
     )
 
-    // Mỗi phần thi có bảng đối chiếu riêng và ô nhập điểm công bố riêng.
-    expect(await screen.findAllByText(/Bảng đối chiếu điểm theo tiêu chí/)).toHaveLength(2)
+    // Mặc định chỉ hiện bảng đối chiếu của phần đang chọn (tab đầu tiên).
+    expect(await screen.findAllByText(/Bảng đối chiếu điểm theo tiêu chí/)).toHaveLength(1)
+
+    // Thẻ "Quyết định cuối cùng" không chia tab — vẫn có ô nhập điểm cho ĐỦ mọi phần.
     const inputs = screen.getAllByRole('spinbutton')
     expect(inputs).toHaveLength(2)
     // Part 2: TB(7, 7.5) = 7.25 -> bandRound -> 7.5 ; Part 3: TB(6, 6.5) = 6.25 -> 6.5
     expect(inputs[0]).toHaveValue(7.5)
     expect(inputs[1]).toHaveValue(6.5)
+
+    // Chuyển sang tab phần thi thứ hai vẫn chỉ hiện một bảng đối chiếu.
+    await user.click(screen.getByRole('button', { name: 'Speaking Part 3' }))
+    expect(screen.getAllByText(/Bảng đối chiếu điểm theo tiêu chí/)).toHaveLength(1)
   })
 })
 
