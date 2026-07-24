@@ -8,22 +8,21 @@ export const monitorTokenQueryKeys = {
 
 type MonitorTokenParams = {
     examId: string 
-    roomIds?: string[]
+    scheduleIds?: string[]
 }
 
 async function fetchMonitorToken(params: MonitorTokenParams): Promise<string> {
     const payload: StreamTokenRequest = {
         examId: params.examId, 
-        roomIds: params.roomIds ?? [], 
-        streamTypes: [],
+        scheduleIds: params.scheduleIds ?? [],
     }
-    const response = await apiClient.post<ApiResponse<string>>('/v1/streams/token', payload)
+    const response = await apiClient.post<ApiResponse<string>>('/v1/streams/monitor/token', payload)
     return response.data.data
 }
 
 export function useMonitorToken(params: MonitorTokenParams) {
     return useQuery({
-        queryKey: [...monitorTokenQueryKeys.all, params.examId, params.roomIds ?? 'all'],
+        queryKey: [...monitorTokenQueryKeys.all, params.examId, params.scheduleIds ?? 'all'],
         queryFn: () => fetchMonitorToken(params), 
         enabled: Boolean(params.examId),
         staleTime: 60_000, 

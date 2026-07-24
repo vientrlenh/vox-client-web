@@ -636,7 +636,7 @@ export function AppRoutes() {
               element={<SchoolAdminMonitoringRoomsPage />}
             />
             <Route
-              path="school-admin/monitoring/exams/:examId/rooms/:roomId"
+              path="school-admin/monitoring/exams/:examId/schedules/:scheduleId"
               element={<MonitoringRoomPage />}
             />
             <Route
@@ -806,7 +806,7 @@ export function AppRoutes() {
               element={<TeacherMonitoringRoomsPage />}
             />
             <Route
-              path="teacher/monitoring/exams/:examId/rooms/:roomId"
+              path="teacher/monitoring/exams/:examId/schedules/:scheduleId"
               element={<MonitoringRoomPage />}
             />
             <Route path="teacher/question-banks" element={<TeacherQuestionBanksPage />} />

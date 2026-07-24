@@ -1,7 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { getStreamTypeLabel, type MonitorConnectionState } from '../types'
-import { useRoomMonitor, type StreamView } from '../api/useRoomMonitor'
+import { useScheduleMonitor, type StreamView } from '../api/useRoomMonitor'
 import { useEffect, useMemo, useState } from 'react'
 
 
@@ -44,8 +44,8 @@ function StreamTile({ stream, now }: { stream: StreamView, now: number }) {
   )
 } 
 export function MonitoringRoomPage() {
-  const { examId, roomId } = useParams()
-  const { connectionState, streams } = useRoomMonitor({ examId, roomId })
+  const { examId, scheduleId } = useParams()
+  const { connectionState, streams } = useScheduleMonitor({ examId, scheduleId })
 
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -82,7 +82,7 @@ export function MonitoringRoomPage() {
               className="mt-2 text-3xl font-black tracking-0 text-slate-950"
               id="monitoring-room-title"
             >
-              Phòng thi {roomId ?? '—'}
+              Phòng thi {scheduleId ?? '—'}
             </h1>
           </div>
           <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600">

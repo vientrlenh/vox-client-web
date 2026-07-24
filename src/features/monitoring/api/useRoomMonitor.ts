@@ -83,15 +83,15 @@ function streamsReducer(
     }
 }
 
-type UseRoomMonitorParams = {
+type UseScheduleMonitorParams = {
     examId?: string 
-    roomId?: string
+    scheduleId?: string
 }
 
-export function useRoomMonitor({ examId, roomId }: UseRoomMonitorParams) {
+export function useScheduleMonitor({ examId, scheduleId }: UseScheduleMonitorParams) {
     const { data: token, refetch: refetchToken } = useMonitorToken({
         examId: examId ?? '', 
-        roomIds: roomId ? [roomId] : []
+        scheduleIds: scheduleId ? [scheduleId] : []
     })
     const [streamMap, dispatch] = useReducer(
         streamsReducer, 
@@ -114,7 +114,7 @@ export function useRoomMonitor({ examId, roomId }: UseRoomMonitorParams) {
     }, [token])
 
     useEffect(() => {
-        if (!roomId || !hasToken) {
+        if (!scheduleId || !hasToken) {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing connection state with the external WebSocket lifecycle
             setConnectionState('idle')
             return
@@ -127,7 +127,7 @@ export function useRoomMonitor({ examId, roomId }: UseRoomMonitorParams) {
             if (!activeToken || closedRef.current) return
 
             setConnectionState(reconnectRef.current === 0 ? 'connecting' : 'reconnecting')
-            const ws = new WebSocket(buildMonitorSocketUrl(roomId!, activeToken))
+            const ws = new WebSocket(buildMonitorSocketUrl(scheduleId!, activeToken))
             socketRef.current = ws
 
             ws.onopen = () => {
@@ -185,7 +185,7 @@ export function useRoomMonitor({ examId, roomId }: UseRoomMonitorParams) {
             dispatch({ type: 'reset' })
             setConnectionState('closed')
         }
-    }, [roomId, hasToken, refetchToken])
+    }, [scheduleId, hasToken, refetchToken])
 
     const streams = useMemo(() => Array.from(streamMap.values()), [streamMap])
     return { connectionState, streams }
