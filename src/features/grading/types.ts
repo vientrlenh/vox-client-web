@@ -109,12 +109,14 @@ export type GradingAssignmentRow = {
   completedAt?: string | null
 }
 
-/** `totalToGrade` CHỈ đếm bài đang chờ chấm — bài đã công bố không nằm trong khối lượng. */
+/**
+ * `totalToGrade` CHỈ đếm bài đang chờ chấm — bài đã công bố không nằm trong khối lượng.
+ * Không có `completed`: bài chấm xong rời khỏi phạm vi màn phân công của admin.
+ */
 export type GradingStats = {
   totalToGrade: number
   unassigned: number
   assigned: number
-  completed: number
 }
 
 export type AssignableTeacher = {
@@ -188,6 +190,11 @@ export function isEveryRequiredCriterionFilled(
   detail: GradingTaskDetail,
   scores: Record<string, Record<string, number | null>>,
 ): boolean {
+  // Bài không có phần thi nào thì không có gì để nộp — `[].every()` trả true nên
+  // phải chặn tường minh, tránh bật nút "Nộp điểm cho 0 phần thi" và gửi items rỗng.
+  if (detail.items.length === 0) {
+    return false
+  }
   const required = detail.criteria.filter((criterion) => criterion.required)
   return detail.items.every((item) =>
     required.every((criterion) => scores[item.paperItemId]?.[criterion.id] != null),

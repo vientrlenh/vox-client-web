@@ -44,6 +44,7 @@ describe('grading helpers', () => {
   describe('isEveryRequiredCriterionFilled', () => {
     const detail: GradingTaskDetail = {
       assignmentId: 'a1',
+      candidateResultId: 'cr1',
       criteria: [
         criterion({ id: 'c1', required: true }),
         criterion({ id: 'c2', required: false }),
@@ -73,6 +74,12 @@ describe('grading helpers', () => {
       expect(
         isEveryRequiredCriterionFilled(detail, { p1: { c1: 8 }, p2: { c1: 6 } }),
       ).toBe(true)
+    })
+
+    it('is false when there are no parts to grade', () => {
+      // Bài không có phần thi nào: `[].every()` trả true nên phải chặn tường minh,
+      // nếu không nút Nộp sẽ bật và gửi items rỗng.
+      expect(isEveryRequiredCriterionFilled({ ...detail, items: [] }, {})).toBe(false)
     })
   })
 

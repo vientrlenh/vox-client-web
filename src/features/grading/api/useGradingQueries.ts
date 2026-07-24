@@ -77,7 +77,6 @@ const GRADING_STATS_QUERY = `
       totalToGrade
       unassigned
       assigned
-      completed
     }
   }
 `
@@ -249,9 +248,11 @@ export async function fetchAssignableTeachers(search?: string) {
 }
 
 export async function fetchGradingExamOptions() {
+  // Cap mềm: đủ cho gần như mọi trường. Vượt trần này thì bộ lọc mới cần chuyển
+  // sang combobox tìm kiếm server-side thay vì kéo toàn bộ về một lần.
   const data = await graphQLRequest<{ exams: { content: GradingExamOption[] } }>(
     GRADING_EXAM_OPTIONS_QUERY,
-    { page: 0, size: 100 },
+    { page: 0, size: 500 },
   )
   return data.exams.content
 }
@@ -313,6 +314,9 @@ export function useGradingTaskDetailQuery(assignmentId: string | null) {
     enabled: assignmentId != null,
     queryFn: () => fetchGradingTaskDetail(assignmentId as string),
     queryKey: gradingKeys.taskDetail(assignmentId),
+    // Điểm giáo viên đang nhập nằm ở state cục bộ; refetch khi focus lại chỉ tốn
+    // request mà không đổi gì trên màn — tắt cho nhất quán với preview.
+    refetchOnWindowFocus: false,
   })
 }
 

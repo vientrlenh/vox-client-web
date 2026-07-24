@@ -40,7 +40,7 @@ describe('grading GraphQL queries', () => {
   })
 
   it('fetches grading stats scoped by exam', async () => {
-    const stats = { assigned: 2, completed: 1, totalToGrade: 5, unassigned: 2 }
+    const stats = { assigned: 2, totalToGrade: 5, unassigned: 2 }
     mockedPost.mockResolvedValue({ data: { data: { gradingStats: stats } } })
 
     await expect(fetchGradingStats({ examId: 'e1' })).resolves.toEqual(stats)
@@ -95,6 +95,6 @@ describe('grading GraphQL queries', () => {
 
     const body = bodyOf()
     expect(body.query).toContain('exams(')
-    expect(body.variables).toEqual({ page: 0, size: 100 })
+    expect(body.variables).toEqual({ page: 0, size: 500 })
   })
 })

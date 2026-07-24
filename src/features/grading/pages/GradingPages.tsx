@@ -68,7 +68,15 @@ import {
 const PAGE_SIZE = 20
 const PREVIEW_DEBOUNCE_MS = 500
 
-const STATUS_FILTERS: Array<{ label: string; value: '' | GradingAssignmentStatus }> = [
+// Màn admin chỉ liệt kê bài đang chờ chấm (PENDING_REVIEW) nên không có bài
+// COMPLETED để lọc — bài chấm xong rời khỏi bảng. Filter COMPLETED chỉ có ở màn
+// giáo viên (họ vẫn thấy việc đã hoàn thành của mình).
+const ADMIN_STATUS_FILTERS: Array<{ label: string; value: '' | GradingAssignmentStatus }> = [
+  { label: 'Tất cả', value: '' },
+  { label: 'Đã phân công', value: 'ASSIGNED' },
+]
+
+const TEACHER_STATUS_FILTERS: Array<{ label: string; value: '' | GradingAssignmentStatus }> = [
   { label: 'Tất cả', value: '' },
   { label: 'Đang chờ chấm', value: 'ASSIGNED' },
   { label: 'Đã chấm xong', value: 'COMPLETED' },
@@ -251,7 +259,7 @@ export function SchoolAdminGradingPage() {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <StatCard
           icon={<Inbox size={19} />}
           iconTone="indigo"
@@ -267,14 +275,8 @@ export function SchoolAdminGradingPage() {
         <StatCard
           icon={<ClipboardList size={19} />}
           iconTone="violet"
-          label="Đang chờ chấm"
+          label="Đã phân công"
           value={stats?.assigned ?? '-'}
-        />
-        <StatCard
-          icon={<CircleCheck size={19} />}
-          iconTone="emerald"
-          label="Đã chấm xong"
-          value={stats?.completed ?? '-'}
         />
       </div>
 
@@ -304,7 +306,7 @@ export function SchoolAdminGradingPage() {
         </div>
       </div>
 
-      <FilterChips items={STATUS_FILTERS} onChange={resetToFirstPage(setStatus)} value={status} />
+      <FilterChips items={ADMIN_STATUS_FILTERS} onChange={resetToFirstPage(setStatus)} value={status} />
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
@@ -513,12 +515,20 @@ export function TeacherGradingPage() {
   const [status, setStatus] = useState<'' | GradingAssignmentStatus>('')
   const tasksQuery = useMyGradingTasksQuery(page, PAGE_SIZE, { status })
 
+  // Số cho thẻ thống kê phải là TỔNG toàn bộ, không phải đếm trên trang hiện tại
+  // (và phải độc lập với filter đang chọn). Hai query size=1 chỉ để lấy totalElements;
+  // enum chỉ có ASSIGNED/COMPLETED nên tổng được giao = pending + done.
+  const assignedCountQuery = useMyGradingTasksQuery(1, 1, { status: 'ASSIGNED' })
+  const completedCountQuery = useMyGradingTasksQuery(1, 1, { status: 'COMPLETED' })
+
   const pageData = tasksQuery.data
   const tasks = pageData?.content ?? []
+  // Footer phân trang bám theo list đang xem (đã lọc); thẻ thống kê dùng tổng chung.
   const totalElements = pageData?.totalElements ?? 0
   const totalPages = pageData?.totalPages ?? 0
-  const pending = tasks.filter((task) => task.status === 'ASSIGNED').length
-  const done = tasks.filter((task) => task.status === 'COMPLETED').length
+  const pending = assignedCountQuery.data?.totalElements ?? 0
+  const done = completedCountQuery.data?.totalElements ?? 0
+  const totalAssigned = pending + done
 
   return (
     <section className="mx-auto max-w-300">
@@ -545,12 +555,12 @@ export function TeacherGradingPage() {
           icon={<Inbox size={19} />}
           iconTone="indigo"
           label="Tổng được giao"
-          value={totalElements}
+          value={totalAssigned}
         />
       </div>
 
       <FilterChips
-        items={STATUS_FILTERS}
+        items={TEACHER_STATUS_FILTERS}
         onChange={(next) => {
           setStatus(next)
           setPage(1)
@@ -739,16 +749,18 @@ export function TeacherGradingTaskPage() {
         required.every((criterion) => scores[item.paperItemId]?.[criterion.id] != null),
       )
       .map((item) => ({
+        // KHÔNG đưa feedbackSummary vào đây: tổng điểm chỉ phụ thuộc bộ điểm, mà
+        // payload nằm trong queryKey — kèm feedback thì mỗi lần gõ nhận xét lại bắn
+        // một request preview trả về đúng con số cũ. Feedback vẫn gửi đủ ở lúc nộp.
         criterionScores: detail.criteria
           .filter((criterion) => scores[item.paperItemId]?.[criterion.id] != null)
           .map((criterion) => ({
             rubricCriterionId: criterion.id,
             score: scores[item.paperItemId][criterion.id] as number,
           })),
-        feedbackSummary: feedback[item.paperItemId] || undefined,
         paperItemId: item.paperItemId,
       }))
-  }, [detail, feedback, scores])
+  }, [detail, scores])
 
   const debouncedPreviewItems = useDebouncedValue(previewItems, PREVIEW_DEBOUNCE_MS)
   const previewQuery = useGradingPreviewQuery(assignmentId ?? null, debouncedPreviewItems, {
