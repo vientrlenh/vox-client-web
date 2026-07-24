@@ -36,6 +36,7 @@ import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { TabPillGroup, type TabPillItem } from '@/shared/ui/TabPill'
 import { toApiError } from '@/shared/api'
 import {
   useAppealQuery,
@@ -52,7 +53,7 @@ import {
   useRejectMutation,
   useRemoveReviewerMutation,
   useSubmitReportMutation,
-  type CriterionScoreInput,
+  type ItemReportInput,
 } from '../api/useReevaluationMutations'
 import { AiScoreBars } from '../components/AiScoreBars'
 import { ApproveDialog } from '../components/ApproveDialog'
@@ -74,14 +75,26 @@ import {
   formatScore,
   getAppealStatusDisplay,
   initials,
+  partLabelsText,
+  reviewerItemsForItem,
   suggestedPartScore,
+  suggestedScoreForItem,
   type AppealDetail,
+  type AppealItem,
   type AppealReviewer,
   type AppealStatus,
   type AppealTaskDetail,
 } from '../types'
 
 const PAGE_SIZE = 20
+
+/** Tab theo từng phần thi: value là appealItemId, nhãn lấy partLabel (thiếu thì "Phần N"). */
+function itemTabItems(items: AppealItem[]): TabPillItem[] {
+  return items.map((item, index) => ({
+    value: item.appealItemId,
+    label: item.partLabel ?? `Phần ${index + 1}`,
+  }))
+}
 
 const STATUS_FILTERS: Array<{ label: string; value: '' | AppealStatus }> = [
   { label: 'Tất cả', value: '' },
@@ -264,7 +277,7 @@ export function SchoolAdminReevaluationPage() {
                           {request.examName}
                         </div>
                         <div className="mt-0.5 text-xs font-medium text-slate-400">
-                          {request.partLabel ?? '—'}
+                          {partLabelsText(request.partLabels)}
                         </div>
                       </td>
                       <td className="px-4 py-3.5">
@@ -373,11 +386,13 @@ function DetailPanel({
   toast: (message: string) => void
 }) {
   const display = getAppealStatusDisplay(detail.status)
-  const aiAvg = bandRound(avgScore(detail.aiScores))
-  const publishedReviewers = detail.reviewers.filter((r) => r.done && r.scores)
+  const publishedReviewers = detail.reviewers.filter((r) => r.done && r.items.length > 0)
   const suggestedPart = suggestedPartScore(detail.reviewers)
+  const partLabels = detail.items.map((item) => item.partLabel ?? 'Phần thi')
   const removeMutation = useRemoveReviewerMutation()
   const [pendingRemove, setPendingRemove] = useState<AppealReviewer | null>(null)
+  const [activeItemId, setActiveItemId] = useState<string>(detail.items[0]?.appealItemId ?? '')
+  const activeItem = detail.items.find((i) => i.appealItemId === activeItemId) ?? detail.items[0]
 
   function confirmRemove(reviewer: AppealReviewer) {
     removeMutation.mutate(
@@ -474,27 +489,42 @@ function DetailPanel({
             <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
               <Info className="mt-0.5 size-4.5 shrink-0 text-amber-600" />
               <div className="text-[12.5px] font-medium leading-relaxed text-amber-800">
-                <b>{formatScore(suggestedPart)}</b> là điểm chấm lại của{' '}
-                <b>riêng {detail.partLabel ?? 'phần được phúc khảo'}</b>. Còn{' '}
+                <b>{formatScore(suggestedPart)}</b> là điểm chấm lại trung bình của{' '}
+                <b>riêng {partLabelsText(partLabels)}</b>. Còn{' '}
                 <b>{formatScore(detail.finalScore)}</b> ở trên là <b>điểm tổng của cả bài</b> sau
                 phúc khảo — hệ thống tính lại từ tất cả các phần, nên hai con số này không bằng nhau.
               </div>
             </div>
           ) : null}
 
+          {detail.items.length > 1 ? (
+            <TabPillGroup
+              items={itemTabItems(detail.items)}
+              onChange={setActiveItemId}
+              value={activeItem?.appealItemId ?? ''}
+            />
+          ) : null}
+
           {detail.status === 'PUBLISHED' && publishedReviewers.length > 0 ? (
             <div className="grid gap-2.5">
-              <CompareTable aiScores={detail.aiScores} reviewers={publishedReviewers} />
-              {suggestedPart != null ? (
-                <div className="flex items-center justify-between rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3">
-                  <span className="text-[12.5px] font-bold text-cyan-700">
-                    Điểm chấm lại {detail.partLabel ?? 'phần thi'} (giám khảo đề xuất)
-                  </span>
-                  <span className="inline-flex h-8 min-w-12 items-center justify-center rounded-lg bg-white px-3 text-lg font-extrabold text-cyan-700">
-                    {formatScore(suggestedPart)}
-                  </span>
-                </div>
-              ) : null}
+              {(activeItem ? [activeItem] : []).map((item) => {
+                const itemSuggested = suggestedScoreForItem(detail.reviewers, item.appealItemId)
+                return (
+                  <div className="grid gap-2.5" key={item.appealItemId}>
+                    <CompareTable item={item} reviewers={publishedReviewers} />
+                    {itemSuggested != null ? (
+                      <div className="flex items-center justify-between rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+                        <span className="text-[12.5px] font-bold text-cyan-700">
+                          Điểm chấm lại {item.partLabel ?? 'phần thi'} (giám khảo đề xuất)
+                        </span>
+                        <span className="inline-flex h-8 min-w-12 items-center justify-center rounded-lg bg-white px-3 text-lg font-extrabold text-cyan-700">
+                          {formatScore(itemSuggested)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
             </div>
           ) : null}
 
@@ -511,25 +541,30 @@ function DetailPanel({
                 <div className="mt-0.5 text-[13.5px] font-bold text-slate-700">{detail.examName}</div>
               </div>
               <div className="rounded-xl bg-slate-50 px-3.5 py-3">
-                <div className="text-[11.5px] font-semibold text-slate-400">Phần thi</div>
+                <div className="text-[11.5px] font-semibold text-slate-400">
+                  Phần thi ({detail.items.length})
+                </div>
                 <div className="mt-0.5 text-[13.5px] font-bold text-slate-700">
-                  {detail.partLabel ?? '—'}
+                  {partLabelsText(partLabels)}
                 </div>
               </div>
             </div>
           </CardShell>
 
-          <CardShell
-            icon={<Bot className="size-4.5 text-violet-600" />}
-            right={
-              <span className="inline-flex h-9 min-w-13 items-center justify-center rounded-lg bg-violet-50 px-3 text-lg font-extrabold text-violet-700">
-                {formatScore(aiAvg)}
-              </span>
-            }
-            title="Điểm gốc do AI chấm"
-          >
-            <AiScoreBars scores={detail.aiScores} />
-          </CardShell>
+          {(activeItem ? [activeItem] : []).map((item) => (
+            <CardShell
+              icon={<Bot className="size-4.5 text-violet-600" />}
+              key={item.appealItemId}
+              right={
+                <span className="inline-flex h-9 min-w-13 items-center justify-center rounded-lg bg-violet-50 px-3 text-lg font-extrabold text-violet-700">
+                  {formatScore(bandRound(avgScore(item.baselineScores)))}
+                </span>
+              }
+              title={`Điểm hiện hành · ${item.partLabel ?? 'Phần thi'}`}
+            >
+              <AiScoreBars scores={item.baselineScores} />
+            </CardShell>
+          ))}
 
           {detail.status === 'GRADING' ? (
             <CardShell
@@ -732,27 +767,53 @@ function ComparePanel({
 }) {
   const publishMutation = usePublishMutation()
   const suggested = suggestedPartScore(detail.reviewers) ?? 0
-  const [partScore, setPartScore] = useState<number | null>(null)
+  // Điểm admin tự chỉnh, theo từng phần thi; thiếu khoá nào thì dùng điểm đề xuất của phần đó.
+  const [partScores, setPartScores] = useState<Record<string, number>>({})
   const [publishOpen, setPublishOpen] = useState(false)
   // Tạm khóa chỉnh điểm sau khi đã có điểm giám khảo: công bố đúng điểm đề xuất.
   const scoreLocked = true
   const { scoringScaleMin, scoringScaleMax } = detail
-  const effectivePart = partScore == null ? suggested : partScore
-  const aiAvg = bandRound(avgScore(detail.aiScores))
-  const done = detail.reviewers.filter((r) => r.done && r.scores)
+  const done = detail.reviewers.filter((r) => r.done && r.items.length > 0)
+  const [activeItemId, setActiveItemId] = useState<string>(detail.items[0]?.appealItemId ?? '')
+  const activeItem = detail.items.find((i) => i.appealItemId === activeItemId) ?? detail.items[0]
 
   const clampToScale = (value: number) =>
     Math.max(scoringScaleMin, Math.min(scoringScaleMax, value))
 
-  function adjust(delta: number) {
-    setPartScore(clampToScale(Number((effectivePart + delta).toFixed(2))))
+  function effectiveScoreFor(item: AppealItem): number {
+    const override = partScores[item.appealItemId]
+    if (override != null) {
+      return override
+    }
+    return suggestedScoreForItem(detail.reviewers, item.appealItemId) ?? 0
   }
+
+  function setScoreFor(item: AppealItem, value: number) {
+    setPartScores((current) => ({ ...current, [item.appealItemId]: clampToScale(value) }))
+  }
+
+  function adjust(item: AppealItem, delta: number) {
+    setScoreFor(item, Number((effectiveScoreFor(item) + delta).toFixed(2)))
+  }
+
+  // Kẹp lần cuối theo thang rubric: điểm đề xuất đã qua bandRound (bậc 0.5) nên có thể
+  // vượt trần nếu thang không nằm trên bậc 0.5 — BE sẽ từ chối mà admin đang bị khoá.
+  const publishItems = detail.items.map((item) => ({
+    appealItemId: item.appealItemId,
+    partLabel: item.partLabel,
+    partScore: clampToScale(effectiveScoreFor(item)),
+  }))
 
   function doPublish() {
     publishMutation.mutate(
-      // Kẹp lần cuối theo thang rubric: điểm đề xuất đã qua bandRound (bậc 0.5) nên có thể
-      // vượt trần nếu thang không nằm trên bậc 0.5 — BE sẽ từ chối mà admin đang bị khoá.
-      { id: detail.id, partScore: clampToScale(effectivePart) },
+      // BE bắt buộc nhập điểm cho ĐỦ mọi phần thi của đơn, không nhận nộp thiếu.
+      {
+        id: detail.id,
+        itemScores: publishItems.map(({ appealItemId, partScore }) => ({
+          appealItemId,
+          partScore,
+        })),
+      },
       {
         onError: (error) => {
           setPublishOpen(false)
@@ -776,90 +837,121 @@ function ComparePanel({
         <p className="mt-1.5 text-[15px] text-slate-500">
           <b className="text-slate-700">{detail.studentName}</b>
           {detail.className ? ` · Lớp ${detail.className}` : ''} · {detail.examName} ·{' '}
-          {detail.partLabel ?? '—'}
+          {partLabelsText(detail.items.map((item) => item.partLabel ?? 'Phần thi'))}
         </p>
       </div>
 
       <div className="mt-4 grid gap-4.5 lg:grid-cols-[1.7fr_1fr]">
         <div className="grid gap-4.5">
-          <CompareTable aiScores={detail.aiScores} reviewers={done} />
-          <div className="grid gap-3">
-            <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
-              <MessageSquare className="size-4.5 text-cyan-700" />
-              Nhận xét của giám khảo (ẩn danh)
-            </div>
-            {done.map((reviewer, index) => (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4.5" key={reviewer.reviewerId}>
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex size-9 items-center justify-center rounded-lg bg-cyan-50 text-[13px] font-extrabold text-cyan-700">
-                    C{index + 1}
-                  </span>
-                  <div className="flex-1">
-                    <div className="text-[13.5px] font-bold text-slate-900">
-                      Người chấm {index + 1}
-                    </div>
-                    <div className="text-[11.5px] font-medium text-slate-400">Điểm đề xuất</div>
-                  </div>
-                  <span className="inline-flex h-8.5 min-w-12 items-center justify-center rounded-lg bg-cyan-50 px-3 text-[17px] font-extrabold text-cyan-700">
-                    {formatScore(reviewer.suggestedScore)}
-                  </span>
-                </div>
-                {reviewer.note ? (
-                  <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600">{reviewer.note}</p>
-                ) : null}
+          {detail.items.length > 1 ? (
+            <TabPillGroup
+              items={itemTabItems(detail.items)}
+              onChange={setActiveItemId}
+              value={activeItem?.appealItemId ?? ''}
+            />
+          ) : null}
+          {(activeItem ? [activeItem] : []).map((item) => (
+            <div className="grid gap-3" key={item.appealItemId}>
+              <CompareTable item={item} reviewers={done} />
+              <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
+                <MessageSquare className="size-4.5 text-cyan-700" />
+                Nhận xét của giám khảo · {item.partLabel ?? 'Phần thi'}
               </div>
-            ))}
-          </div>
+              {reviewerItemsForItem(done, item.appealItemId).map(
+                ({ reviewer, item: report }, index) => {
+                  const displayName = reviewer.reviewerName || `Người chấm ${index + 1}`
+                  return (
+                    <div
+                      className="rounded-2xl border border-slate-200 bg-white p-4.5"
+                      key={reviewer.reviewerId}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${avatarClasses(displayName)}`}
+                        >
+                          {initials(displayName)}
+                        </span>
+                        <div className="flex-1">
+                          <div className="text-[13.5px] font-bold text-slate-900">{displayName}</div>
+                          <div className="text-[11.5px] font-medium text-slate-400">
+                            Điểm đề xuất cho phần này
+                          </div>
+                        </div>
+                        <span className="inline-flex h-8.5 min-w-12 items-center justify-center rounded-lg bg-cyan-50 px-3 text-[17px] font-extrabold text-cyan-700">
+                          {formatScore(report.suggestedScore)}
+                        </span>
+                      </div>
+                      {report.note ? (
+                        <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600">
+                          {report.note}
+                        </p>
+                      ) : null}
+                    </div>
+                  )
+                },
+              )}
+            </div>
+          ))}
         </div>
 
         <div className="self-start rounded-2xl border-2 border-cyan-500 bg-white p-5.5">
           <div className="text-[13px] font-extrabold text-slate-900">Quyết định cuối cùng</div>
           <div className="mt-4 flex justify-between gap-2.5">
-            <ScoreChip className="bg-violet-50 text-violet-600" label="AI (PHẦN)" value={aiAvg} />
-            <ScoreChip className="bg-cyan-50 text-cyan-700" label="ĐỀ XUẤT" value={suggested} />
+            <ScoreChip
+              className="bg-cyan-50 text-cyan-700"
+              label="ĐỀ XUẤT (TB)"
+              value={suggested}
+            />
           </div>
           <div className="mt-4.5 text-xs font-bold text-slate-500">
-            Điểm phần thi công bố{' '}
+            Điểm công bố từng phần thi{' '}
             <span className="font-semibold text-slate-400">
               (thang {formatScore(scoringScaleMin)}–{formatScore(scoringScaleMax)})
             </span>
           </div>
-          <div className="mt-2 flex items-center gap-3">
-            <button
-              aria-label="Giảm điểm"
-              className="inline-flex size-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={scoreLocked}
-              onClick={() => adjust(-0.25)}
-              type="button"
-            >
-              <Minus className="size-5" />
-            </button>
-            <input
-              className="min-w-0 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-0 py-2 text-center text-3xl font-extrabold text-emerald-600 outline-none disabled:cursor-not-allowed"
-              disabled={scoreLocked}
-              max={scoringScaleMax}
-              min={scoringScaleMin}
-              onChange={(event) => {
-                const next = Number(event.target.value)
-                if (event.target.value === '' || Number.isNaN(next)) {
-                  return
-                }
-                setPartScore(clampToScale(next))
-              }}
-              step={0.25}
-              type="number"
-              value={effectivePart}
-            />
-            <button
-              aria-label="Tăng điểm"
-              className="inline-flex size-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={scoreLocked}
-              onClick={() => adjust(0.25)}
-              type="button"
-            >
-              <Plus className="size-5" />
-            </button>
-          </div>
+          {detail.items.map((item) => (
+            <div className="mt-3" key={item.appealItemId}>
+              <div className="text-[12px] font-bold text-slate-600">
+                {item.partLabel ?? 'Phần thi'}
+              </div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <button
+                  aria-label={`Giảm điểm ${item.partLabel ?? 'phần thi'}`}
+                  className="inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={scoreLocked}
+                  onClick={() => adjust(item, -0.25)}
+                  type="button"
+                >
+                  <Minus className="size-4.5" />
+                </button>
+                <input
+                  className="min-w-0 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-0 py-2 text-center text-2xl font-extrabold text-emerald-600 outline-none disabled:cursor-not-allowed"
+                  disabled={scoreLocked}
+                  max={scoringScaleMax}
+                  min={scoringScaleMin}
+                  onChange={(event) => {
+                    const next = Number(event.target.value)
+                    if (event.target.value === '' || Number.isNaN(next)) {
+                      return
+                    }
+                    setScoreFor(item, next)
+                  }}
+                  step={0.25}
+                  type="number"
+                  value={effectiveScoreFor(item)}
+                />
+                <button
+                  aria-label={`Tăng điểm ${item.partLabel ?? 'phần thi'}`}
+                  className="inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={scoreLocked}
+                  onClick={() => adjust(item, 0.25)}
+                  type="button"
+                >
+                  <Plus className="size-4.5" />
+                </button>
+              </div>
+            </div>
+          ))}
           <button
             className="mt-4.5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-[14.5px] font-bold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700"
             onClick={() => setPublishOpen(true)}
@@ -877,10 +969,9 @@ function ComparePanel({
 
       {publishOpen ? (
         <PublishDialog
+          items={publishItems}
           onCancel={() => setPublishOpen(false)}
           onConfirm={doPublish}
-          partLabel={detail.partLabel}
-          partScore={effectivePart}
           student={detail.studentName}
         />
       ) : null}
@@ -1079,7 +1170,7 @@ export function TeacherReevaluationPage() {
                           {task.examName}
                         </div>
                         <div className="mt-0.5 text-xs font-medium text-slate-400">
-                          {task.partLabel ?? '—'}
+                          {partLabelsText(task.partLabels)}
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-[13px] font-semibold text-slate-500">
@@ -1145,18 +1236,35 @@ export function TeacherReevaluationPage() {
 
 // ============================= Teacher: Rescore =============================
 
-function initialScores(detail: AppealTaskDetail): Record<string, number> {
-  const fromReport = detail.myReport?.scores
-  const result: Record<string, number> = {}
-  for (const criterion of detail.criteria) {
-    const submitted = fromReport?.find((s) => s.criterionId === criterion.id)
-    if (submitted) {
-      result[criterion.id] = submitted.score
-      continue
+/** Điểm khởi tạo cho MỌI phần thi: đã nộp thì lấy lại báo cáo, chưa thì mồi từ điểm hiện hành. */
+function initialScores(detail: AppealTaskDetail): Record<string, Record<string, number>> {
+  const result: Record<string, Record<string, number>> = {}
+  for (const item of detail.items) {
+    const submitted = detail.myReport.find((report) => report.appealItemId === item.appealItemId)
+    const perCriterion: Record<string, number> = {}
+    for (const criterion of detail.criteria) {
+      const fromReport = submitted?.scores.find((s) => s.criterionId === criterion.id)
+      if (fromReport) {
+        perCriterion[criterion.id] = fromReport.score
+        continue
+      }
+      const baseline = item.baselineScores.find((s) => s.criterionId === criterion.id)
+      const start = baseline ? baseline.score : criterion.minScore
+      perCriterion[criterion.id] = Math.max(
+        criterion.minScore,
+        Math.min(criterion.maxScore, start),
+      )
     }
-    const ai = detail.aiScores.find((s) => s.criterionId === criterion.id)
-    const start = ai ? ai.score : criterion.minScore
-    result[criterion.id] = Math.max(criterion.minScore, Math.min(criterion.maxScore, start))
+    result[item.appealItemId] = perCriterion
+  }
+  return result
+}
+
+function initialComments(detail: AppealTaskDetail): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const item of detail.items) {
+    const submitted = detail.myReport.find((report) => report.appealItemId === item.appealItemId)
+    result[item.appealItemId] = submitted?.note ?? ''
   }
   return result
 }
@@ -1168,15 +1276,18 @@ export function TeacherReevaluationRescorePage() {
   const submitMutation = useSubmitReportMutation()
   const detail = detailQuery.data
 
-  const [scores, setScores] = useState<Record<string, number>>({})
-  const [comment, setComment] = useState('')
+  // Điểm và nhận xét theo TỪNG phần thi: appealItemId -> (criterionId -> điểm).
+  const [scores, setScores] = useState<Record<string, Record<string, number>>>({})
+  const [comments, setComments] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [initializedFor, setInitializedFor] = useState<string | null>(null)
+  const [activeItemId, setActiveItemId] = useState<string>('')
 
   // Đồng bộ state khi mở một bài khác (điều hướng trực tiếp giữa các bài).
   if (detail && detail.appealId !== initializedFor) {
     setScores(initialScores(detail))
-    setComment(detail.myReport?.done ? detail.myReport.note ?? '' : '')
+    setComments(initialComments(detail))
+    setActiveItemId(detail.items[0]?.appealItemId ?? '')
     setInitializedFor(detail.appealId)
   }
 
@@ -1196,33 +1307,48 @@ export function TeacherReevaluationRescorePage() {
   }
 
   // BE chặn nộp lại sau khi đã SUBMITTED — màn này thành chỉ-đọc khi đã nộp.
-  const readOnly = detail.myReport?.done ?? false
-  const criterionScores = detail.criteria.map((c) => ({
-    criterionId: c.id,
-    criterionCode: c.code,
-    label: c.label,
-    score: scores[c.id] ?? c.minScore,
-  }))
-  const overall = bandRound(avgScore(criterionScores))
-  const aiAvg = bandRound(avgScore(detail.aiScores))
-  const aiValueOf = (criterionId: string) =>
-    detail.aiScores.find((s) => s.criterionId === criterionId)?.score ?? null
+  // myReport rỗng nghĩa là chưa nộp (BE trả mảng rỗng, không phải null).
+  const readOnly = detail.myReport.length > 0
+  const activeItem = detail.items.find((i) => i.appealItemId === activeItemId) ?? detail.items[0]
 
-  function setScore(criterionId: string, value: number) {
-    setScores((current) => ({ ...current, [criterionId]: value }))
+  const scoreOf = (appealItemId: string, criterion: { id: string; minScore: number }) =>
+    scores[appealItemId]?.[criterion.id] ?? criterion.minScore
+
+  const overallOf = (appealItemId: string) =>
+    bandRound(
+      avgScore(
+        detail!.criteria.map((c) => ({
+          criterionId: c.id,
+          criterionCode: c.code,
+          label: c.label,
+          score: scoreOf(appealItemId, c),
+        })),
+      ),
+    )
+
+  function setScore(appealItemId: string, criterionId: string, value: number) {
+    setScores((current) => ({
+      ...current,
+      [appealItemId]: { ...current[appealItemId], [criterionId]: value },
+    }))
   }
 
   function submit() {
     if (readOnly) {
       return
     }
-    const payload: CriterionScoreInput[] = detail!.criteria.map((c) => ({
-      criterionId: c.id,
-      rationale: undefined,
-      score: scores[c.id] ?? c.minScore,
+    // BE yêu cầu nộp TRỌN GÓI: đủ mọi phần thi, mỗi phần đủ mọi tiêu chí của rubric.
+    const payload: ItemReportInput[] = detail!.items.map((item) => ({
+      appealItemId: item.appealItemId,
+      note: comments[item.appealItemId] || undefined,
+      scores: detail!.criteria.map((c) => ({
+        criterionId: c.id,
+        rationale: undefined,
+        score: scoreOf(item.appealItemId, c),
+      })),
     }))
     submitMutation.mutate(
-      { id: detail!.appealId, note: comment, scores: payload },
+      { id: detail!.appealId, items: payload },
       {
         onError: (error) => setMessage(toApiError(error).message),
         onSuccess: () => {
@@ -1241,18 +1367,17 @@ export function TeacherReevaluationRescorePage() {
         <div>
           <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">Chấm lại</p>
           <h1 className="mt-1.5 text-[25px] font-extrabold tracking-tight text-slate-900">
-            {detail.partLabel ?? 'Phần thi'}
+            {partLabelsText(detail.items.map((item) => item.partLabel ?? 'Phần thi'))}
           </h1>
           <p className="mt-1 text-[13.5px] font-medium text-slate-500">
-            Chấm đủ {detail.criteria.length} tiêu chí của rubric.
+            Chấm đủ {detail.criteria.length} tiêu chí cho cả {detail.items.length} phần thi — nộp
+            một lần cho toàn bộ.
           </p>
         </div>
         {readOnly ? (
           <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700">
             <CircleCheck className="size-4" />
-            Đã nộp báo cáo {detail.myReport?.submittedAt
-              ? `· ${formatIsoDateTime(detail.myReport.submittedAt)}`
-              : ''}
+            Đã nộp báo cáo
           </div>
         ) : (
           <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700">
@@ -1262,90 +1387,113 @@ export function TeacherReevaluationRescorePage() {
         )}
       </div>
 
-      <div className="grid gap-4.5 lg:grid-cols-[1.15fr_1fr]">
-        <div className="grid gap-4.5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
-                <Mic className="size-4.5 text-cyan-700" />
-                Bản ghi bài nói
+      <div className="grid gap-7">
+        {detail.items.length > 1 ? (
+          <TabPillGroup
+            items={itemTabItems(detail.items)}
+            onChange={setActiveItemId}
+            value={activeItem?.appealItemId ?? ''}
+          />
+        ) : null}
+        {(activeItem ? [activeItem] : []).map((item) => {
+          const baselineAvg = bandRound(avgScore(item.baselineScores))
+          const baselineValueOf = (criterionId: string) =>
+            item.baselineScores.find((s) => s.criterionId === criterionId)?.score ?? null
+          return (
+            <div className="grid gap-4.5 lg:grid-cols-[1.15fr_1fr]" key={item.appealItemId}>
+              <div className="grid gap-4.5">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
+                      <Mic className="size-4.5 text-cyan-700" />
+                      Bản ghi bài nói · {item.partLabel ?? 'Phần thi'}
+                    </div>
+                    <span className="text-xs font-semibold text-slate-400">
+                      {item.turns.length} lượt
+                    </span>
+                  </div>
+                  <div className="mt-4">
+                    <TurnList turns={item.turns} />
+                  </div>
+                  <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-violet-50 px-3.5 py-3">
+                    <Bot className="size-4.5 text-violet-600" />
+                    <span className="flex-1 text-[12.5px] font-semibold text-violet-700">
+                      Điểm tham chiếu của bản chấm hiện hành
+                    </span>
+                    <span className="text-[12.5px] font-bold text-violet-700">
+                      TB {formatScore(baselineAvg)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
+                  <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
+                    <MessageSquare className="size-4.5 text-cyan-700" />
+                    Nhận xét &amp; căn cứ chấm lại
+                  </div>
+                  <textarea
+                    className="mt-3 min-h-30 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[13.5px] leading-relaxed text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={readOnly}
+                    onChange={(event) =>
+                      setComments((current) => ({
+                        ...current,
+                        [item.appealItemId]: event.target.value,
+                      }))
+                    }
+                    placeholder="Ghi rõ căn cứ điều chỉnh điểm theo từng tiêu chí..."
+                    value={comments[item.appealItemId] ?? ''}
+                  />
+                </div>
               </div>
-              <span className="text-xs font-semibold text-slate-400">
-                {detail.turns.length} lượt
-              </span>
-            </div>
-            <div className="mt-4">
-              <TurnList turns={detail.turns} />
-            </div>
-            <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-violet-50 px-3.5 py-3">
-              <Bot className="size-4.5 text-violet-600" />
-              <span className="flex-1 text-[12.5px] font-semibold text-violet-700">
-                Điểm tham chiếu do AI chấm
-              </span>
-              <span className="text-[12.5px] font-bold text-violet-700">
-                TB {formatScore(aiAvg)}
-              </span>
-            </div>
-          </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
-            <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
-              <MessageSquare className="size-4.5 text-cyan-700" />
-              Nhận xét &amp; căn cứ chấm lại
-            </div>
-            <textarea
-              className="mt-3 min-h-30 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[13.5px] leading-relaxed text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
-              disabled={readOnly}
-              onChange={(event) => setComment(event.target.value)}
-              placeholder="Ghi rõ căn cứ điều chỉnh điểm theo từng tiêu chí..."
-              value={comment}
-            />
-          </div>
-        </div>
+              <div className="grid gap-3.5">
+                <div className="flex items-center justify-between rounded-2xl border-2 border-cyan-500 bg-linear-to-r from-cyan-50 to-white px-5 py-4">
+                  <div>
+                    <div className="text-[12.5px] font-bold text-cyan-700">
+                      Điểm chấm lại · {item.partLabel ?? 'Phần thi'}
+                    </div>
+                    <div className="text-[11.5px] font-medium text-slate-400">
+                      Trung bình {detail.criteria.length} tiêu chí
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[38px] font-extrabold leading-none text-cyan-600">
+                      {formatScore(overallOf(item.appealItemId))}
+                    </div>
+                  </div>
+                </div>
 
-        <div className="grid gap-3.5">
-          <div className="flex items-center justify-between rounded-2xl border-2 border-cyan-500 bg-linear-to-r from-cyan-50 to-white px-5 py-4">
-            <div>
-              <div className="text-[12.5px] font-bold text-cyan-700">Điểm chấm lại của bạn</div>
-              <div className="text-[11.5px] font-medium text-slate-400">
-                Trung bình {detail.criteria.length} tiêu chí
+                {detail.criteria.map((criterion) => (
+                  <CriteriaScoreCard
+                    aiValue={baselineValueOf(criterion.id)}
+                    criterion={criterion}
+                    key={criterion.id}
+                    onChange={(value) => setScore(item.appealItemId, criterion.id, value)}
+                    readOnly={readOnly}
+                    value={scoreOf(item.appealItemId, criterion)}
+                  />
+                ))}
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-[38px] font-extrabold leading-none text-cyan-600">
-                {formatScore(overall)}
-              </div>
-            </div>
+          )
+        })}
+
+        {readOnly ? (
+          <div className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-[15px] font-bold text-emerald-700">
+            <CircleCheck className="size-5" />
+            Đã nộp — không thể chỉnh sửa
           </div>
-
-          {detail.criteria.map((criterion) => (
-            <CriteriaScoreCard
-              aiValue={aiValueOf(criterion.id)}
-              criterion={criterion}
-              key={criterion.id}
-              onChange={(value) => setScore(criterion.id, value)}
-              readOnly={readOnly}
-              value={scores[criterion.id] ?? criterion.minScore}
-            />
-          ))}
-
-          {readOnly ? (
-            <div className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-[15px] font-bold text-emerald-700">
-              <CircleCheck className="size-5" />
-              Đã nộp — không thể chỉnh sửa
-            </div>
-          ) : (
-            <button
-              className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 text-[15px] font-bold text-white shadow-lg shadow-cyan-600/30 transition hover:bg-cyan-700 disabled:opacity-60"
-              disabled={submitMutation.isPending}
-              onClick={submit}
-              type="button"
-            >
-              <FileUp className="size-5" />
-              Nộp báo cáo chấm lại
-            </button>
-          )}
-        </div>
+        ) : (
+          <button
+            className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 text-[15px] font-bold text-white shadow-lg shadow-cyan-600/30 transition hover:bg-cyan-700 disabled:opacity-60"
+            disabled={submitMutation.isPending}
+            onClick={submit}
+            type="button"
+          >
+            <FileUp className="size-5" />
+            Nộp báo cáo cho {detail.items.length} phần thi
+          </button>
+        )}
       </div>
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />

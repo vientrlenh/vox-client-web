@@ -30,6 +30,23 @@ const TURN_FIELDS = `
   durationSeconds
 `
 
+const APPEAL_ITEM_FIELDS = `
+  appealItemId
+  paperItemId
+  partLabel
+  finalScore
+  baselineScores { ${CRITERION_SCORE_FIELDS} }
+  turns { ${TURN_FIELDS} }
+`
+
+const REVIEWER_ITEM_FIELDS = `
+  appealItemId
+  partLabel
+  suggestedScore
+  note
+  scores { ${CRITERION_SCORE_FIELDS} }
+`
+
 const APPEALS_QUERY = `
   query Appeals($status: AppealStatus, $keyword: String, $page: Int, $size: Int) {
     appeals(status: $status, keyword: $keyword, page: $page, size: $size) {
@@ -38,7 +55,7 @@ const APPEALS_QUERY = `
         studentName
         className
         examName
-        partLabel
+        partLabels
         originalScore
         status
         requestedAt
@@ -73,7 +90,6 @@ const APPEAL_QUERY = `
       studentName
       className
       examName
-      partLabel
       originalScore
       status
       requestedAt
@@ -87,8 +103,7 @@ const APPEAL_QUERY = `
       overdue
       scoringScaleMin
       scoringScaleMax
-      aiScores { ${CRITERION_SCORE_FIELDS} }
-      turns { ${TURN_FIELDS} }
+      items { ${APPEAL_ITEM_FIELDS} }
       reviewers {
         reviewerId
         reviewerName
@@ -97,8 +112,7 @@ const APPEAL_QUERY = `
         assignedAt
         submittedAt
         suggestedScore
-        note
-        scores { ${CRITERION_SCORE_FIELDS} }
+        items { ${REVIEWER_ITEM_FIELDS} }
       }
     }
   }
@@ -110,7 +124,7 @@ const MY_APPEAL_TASKS_QUERY = `
       content {
         appealId
         examName
-        partLabel
+        partLabels
         deadline
         myStatus
         overdue
@@ -127,9 +141,7 @@ const APPEAL_TASK_DETAIL_QUERY = `
   query AppealTaskDetail($appealId: ID!) {
     appealTaskDetail(appealId: $appealId) {
       appealId
-      partLabel
-      turns { ${TURN_FIELDS} }
-      aiScores { ${CRITERION_SCORE_FIELDS} }
+      items { ${APPEAL_ITEM_FIELDS} }
       criteria {
         id
         code
@@ -138,17 +150,7 @@ const APPEAL_TASK_DETAIL_QUERY = `
         minScore
         maxScore
       }
-      myReport {
-        reviewerId
-        reviewerName
-        status
-        done
-        assignedAt
-        submittedAt
-        suggestedScore
-        note
-        scores { ${CRITERION_SCORE_FIELDS} }
-      }
+      myReport { ${REVIEWER_ITEM_FIELDS} }
     }
   }
 `

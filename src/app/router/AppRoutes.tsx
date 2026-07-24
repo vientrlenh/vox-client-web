@@ -390,6 +390,17 @@ const TeacherReevaluationRescorePage = lazy(() =>
   import("@/features/reevaluation").then((m) => ({ default: m.TeacherReevaluationRescorePage })),
 );
 
+// grading: chấm điểm thủ công (admin phân công -> giáo viên chấm bài chờ chấm)
+const SchoolAdminGradingPage = lazy(() =>
+  import("@/features/grading").then((m) => ({ default: m.SchoolAdminGradingPage })),
+);
+const TeacherGradingPage = lazy(() =>
+  import("@/features/grading").then((m) => ({ default: m.TeacherGradingPage })),
+);
+const TeacherGradingTaskPage = lazy(() =>
+  import("@/features/grading").then((m) => ({ default: m.TeacherGradingTaskPage })),
+);
+
 // examCore: exam papers + blueprints (shared by exam & classTest)
 const TeacherExamPaperEditPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.TeacherExamPaperEditPage })),
@@ -798,6 +809,7 @@ export function AppRoutes() {
             <Route path="school-admin/exam-results/:sessionId" element={<SchoolAdminExamResultDetailPage />} />
             <Route path="school-admin/reevaluation/:requestId" element={<SchoolAdminReevaluationDetailPage />} />
             <Route path="school-admin/reevaluation" element={<SchoolAdminReevaluationPage />} />
+            <Route path="school-admin/grading" element={<SchoolAdminGradingPage />} />
             <Route path="school-admin/blueprints/:blueprintId/versions/new" element={<SchoolAdminCreateBlueprintVersionPage />} />
             <Route
               path="school-admin/blueprints/:blueprintId/versions/:versionId/edit"
@@ -907,6 +919,8 @@ export function AppRoutes() {
             <Route path="teacher/exam-results/:sessionId" element={<TeacherExamResultDetailPage />} />
             <Route path="teacher/reevaluation/:requestId" element={<TeacherReevaluationRescorePage />} />
             <Route path="teacher/reevaluation" element={<TeacherReevaluationPage />} />
+            <Route path="teacher/grading/:assignmentId" element={<TeacherGradingTaskPage />} />
+            <Route path="teacher/grading" element={<TeacherGradingPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/new" element={<TeacherCreateBlueprintVersionPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/:versionId/edit" element={<TeacherEditBlueprintVersionPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/:versionId" element={<TeacherBlueprintVersionDetailPage />} />

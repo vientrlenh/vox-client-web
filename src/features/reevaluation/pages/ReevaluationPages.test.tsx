@@ -1,8 +1,10 @@
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import {
+  SchoolAdminReevaluationDetailPage,
   SchoolAdminReevaluationPage,
   TeacherReevaluationPage,
   TeacherReevaluationRescorePage,
@@ -22,7 +24,7 @@ const appealsPage = {
       id: 'appeal-1',
       originalScore: 6.5,
       overdue: false,
-      partLabel: 'Speaking Part 2',
+      partLabels: ['Speaking Part 2'],
       requestedAt: '2026-07-15T09:00:00+07:00',
       reviewerCount: 0,
       status: 'PENDING',
@@ -45,7 +47,7 @@ const tasksPage = {
       examName: 'Kỳ thi giữa kỳ',
       myStatus: 'ASSIGNED',
       overdue: false,
-      partLabel: 'Speaking Part 2',
+      partLabels: ['Speaking Part 2'],
     },
   ],
   page: 0,
@@ -93,28 +95,185 @@ describe('TeacherReevaluationPage', () => {
   })
 })
 
+describe('SchoolAdminReevaluationDetailPage — màn so sánh & công bố', () => {
+  beforeEach(() => mockedPost.mockReset())
+
+  const baselineScores = [
+    { criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 6.5 },
+  ]
+
+  const comparingAppeal = {
+    approvedAt: '2026-07-16T09:00:00+07:00',
+    className: '12A1',
+    deadline: '2026-07-22T17:00:00+07:00',
+    decisionNote: null,
+    examName: 'Kỳ thi giữa kỳ',
+    finalScore: null,
+    id: 'appeal-1',
+    notes: null,
+    items: [
+      {
+        appealItemId: 'i1',
+        baselineScores,
+        finalScore: null,
+        paperItemId: 'p1',
+        partLabel: 'Speaking Part 2',
+        turns: [],
+      },
+      {
+        appealItemId: 'i2',
+        baselineScores,
+        finalScore: null,
+        paperItemId: 'p2',
+        partLabel: 'Speaking Part 3',
+        turns: [],
+      },
+    ],
+    originalScore: 6.5,
+    overdue: false,
+    reason: 'Xin chấm lại phần nói',
+    requestedAt: '2026-07-15T09:00:00+07:00',
+    resolvedAt: null,
+    reviewers: [
+      {
+        assignedAt: '2026-07-16T09:00:00+07:00',
+        done: true,
+        items: [
+          {
+            appealItemId: 'i1',
+            note: 'Phát âm tốt.',
+            partLabel: 'Speaking Part 2',
+            scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 7 }],
+            suggestedScore: 7,
+          },
+          {
+            appealItemId: 'i2',
+            note: null,
+            partLabel: 'Speaking Part 3',
+            scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 6 }],
+            suggestedScore: 6,
+          },
+        ],
+        reviewerId: 't1',
+        reviewerName: 'Trần Thu Hà',
+        status: 'SUBMITTED',
+        submittedAt: '2026-07-16T10:00:00+07:00',
+        suggestedScore: 6.5,
+      },
+      {
+        assignedAt: '2026-07-16T09:00:00+07:00',
+        done: true,
+        items: [
+          {
+            appealItemId: 'i1',
+            note: null,
+            partLabel: 'Speaking Part 2',
+            scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 7.5 }],
+            suggestedScore: 7.5,
+          },
+          {
+            appealItemId: 'i2',
+            note: null,
+            partLabel: 'Speaking Part 3',
+            scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 6.5 }],
+            suggestedScore: 6.5,
+          },
+        ],
+        reviewerId: 't2',
+        reviewerName: 'Nguyễn Văn Minh',
+        status: 'SUBMITTED',
+        submittedAt: '2026-07-16T10:30:00+07:00',
+        suggestedScore: 7,
+      },
+    ],
+    scoringScaleMax: 9,
+    scoringScaleMin: 0,
+    status: 'COMPARING',
+    studentName: 'Nguyễn Minh An',
+  }
+
+  it('hiển thị tên giám khảo (không còn ẩn danh) ở bảng đối chiếu và thẻ nhận xét', async () => {
+    routeGraphql({ appeal: comparingAppeal })
+
+    renderWithProviders(
+      <Routes>
+        <Route
+          element={<SchoolAdminReevaluationDetailPage />}
+          path="/school-admin/reevaluation/:requestId"
+        />
+      </Routes>,
+      { route: '/school-admin/reevaluation/appeal-1' },
+    )
+
+    // Tên xuất hiện ở cả header bảng lẫn thẻ nhận xét.
+    expect((await screen.findAllByText('Trần Thu Hà')).length).toBeGreaterThan(1)
+    expect(screen.getAllByText('Nguyễn Văn Minh').length).toBeGreaterThan(1)
+
+    // Chỉ hiện khối nhận xét của phần đang chọn (tab đầu tiên).
+    expect(screen.getAllByText(/^Nhận xét của giám khảo ·/)).toHaveLength(1)
+    expect(screen.queryByText(/Người chấm 1/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Chấm 1$/)).not.toBeInTheDocument()
+  })
+
+  it('chia tab bảng đối chiếu theo phần thi; điểm công bố vẫn hiện đủ phần', async () => {
+    const user = userEvent.setup()
+    routeGraphql({ appeal: comparingAppeal })
+
+    renderWithProviders(
+      <Routes>
+        <Route
+          element={<SchoolAdminReevaluationDetailPage />}
+          path="/school-admin/reevaluation/:requestId"
+        />
+      </Routes>,
+      { route: '/school-admin/reevaluation/appeal-1' },
+    )
+
+    // Mặc định chỉ hiện bảng đối chiếu của phần đang chọn (tab đầu tiên).
+    expect(await screen.findAllByText(/Bảng đối chiếu điểm theo tiêu chí/)).toHaveLength(1)
+
+    // Thẻ "Quyết định cuối cùng" không chia tab — vẫn có ô nhập điểm cho ĐỦ mọi phần.
+    const inputs = screen.getAllByRole('spinbutton')
+    expect(inputs).toHaveLength(2)
+    // Part 2: TB(7, 7.5) = 7.25 -> bandRound -> 7.5 ; Part 3: TB(6, 6.5) = 6.25 -> 6.5
+    expect(inputs[0]).toHaveValue(7.5)
+    expect(inputs[1]).toHaveValue(6.5)
+
+    // Chuyển sang tab phần thi thứ hai vẫn chỉ hiện một bảng đối chiếu.
+    await user.click(screen.getByRole('button', { name: 'Speaking Part 3' }))
+    expect(screen.getAllByText(/Bảng đối chiếu điểm theo tiêu chí/)).toHaveLength(1)
+  })
+})
+
 describe('TeacherReevaluationRescorePage', () => {
   beforeEach(() => mockedPost.mockReset())
 
   const submittedTaskDetail = {
-    aiScores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 7 }],
     appealId: 'appeal-1',
     criteria: [
       { code: 'FLU', description: null, id: 'c1', label: 'Độ trôi chảy', maxScore: 9, minScore: 0 },
     ],
-    myReport: {
-      assignedAt: '2026-07-16T09:00:00+07:00',
-      done: true,
-      note: 'Đã chấm',
-      reviewerId: 't1',
-      reviewerName: 'Trần Thu Hà',
-      scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 8 }],
-      status: 'SUBMITTED',
-      submittedAt: '2026-07-16T10:00:00+07:00',
-      suggestedScore: 8,
-    },
-    partLabel: 'Speaking Part 2',
-    turns: [],
+    items: [
+      {
+        appealItemId: 'i1',
+        baselineScores: [
+          { criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 7 },
+        ],
+        finalScore: null,
+        paperItemId: 'p1',
+        partLabel: 'Speaking Part 2',
+        turns: [],
+      },
+    ],
+    myReport: [
+      {
+        appealItemId: 'i1',
+        note: 'Đã chấm',
+        partLabel: 'Speaking Part 2',
+        scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 8 }],
+        suggestedScore: 8,
+      },
+    ],
   }
 
   it('khoá màn chấm lại (chỉ-đọc) khi giám khảo đã nộp', async () => {
