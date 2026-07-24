@@ -714,7 +714,7 @@ export function AppRoutes() {
               element={<TeacherProctorAttendancePage />}
             />
             <Route
-              path="school-admin/monitoring/exams/:examId/rooms/:roomId"
+              path="school-admin/monitoring/exams/:examId/schedules/:scheduleId"
               element={<MonitoringRoomPage />}
             />
             <Route
@@ -890,11 +890,15 @@ export function AppRoutes() {
               element={<TeacherMonitoringRoomsPage />}
             />
             <Route
+<<<<<<< HEAD
               path="teacher/proctor-attendance"
               element={<TeacherProctorAttendancePage />}
             />
             <Route
               path="teacher/monitoring/exams/:examId/rooms/:roomId"
+=======
+              path="teacher/monitoring/exams/:examId/schedules/:scheduleId"
+>>>>>>> main
               element={<MonitoringRoomPage />}
             />
             <Route path="teacher/question-banks" element={<TeacherQuestionBanksPage />} />
