@@ -3,8 +3,7 @@ export type StreamType = 'camera' | 'screen'
 
 export type StreamTokenRequest = {
   examId: string
-  roomIds: string[]
-  streamTypes: StreamType[]
+  scheduleIds: string[]
 }
 
 export type AlertType =
@@ -18,7 +17,7 @@ export type AlertType =
 
 export type ParticipantEventType = 'joined' | 'left'
 
-/** Một stream đang hoạt động — phần tử trong `snapshot` và `/rooms/active`. */
+/** An active stream returned by a monitor snapshot or `/schedules/active`. */
 export type StreamSnapshot = {
   participantId: string
   startedAt: string
@@ -47,7 +46,7 @@ export type AlertEvent = {
   capturedAt: string
   confidence: number
   participantId: string
-  roomId: string
+  scheduleId: string
   streamId: string
 }
 
@@ -58,9 +57,9 @@ export type MonitorMessage =
   | { alert: AlertEvent; type: 'alert' }
 
 
-export type ActiveRoom = {
+export type ActiveSchedule = {
   activeCount: number
-  roomId: string
+  scheduleId: string
   streams: StreamSnapshot[]
 }
 
@@ -75,7 +74,7 @@ export type MonitorConnectionState =
 
 export type MonitorToken = {
   expiresAt: string
-  roomIds: string[]
+  scheduleIds: string[]
   token: string
 }
 
