@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   MonitorPlay,
+  PenLine,
   Search,
   ShieldCheck,
   UserRound,
@@ -36,6 +37,11 @@ const navigationItems = [
     icon: MonitorPlay,
     label: 'Giám sát thi',
     to: '/teacher/monitoring',
+  },
+  {
+    icon: PenLine,
+    label: 'Chấm bài',
+    to: '/teacher/grading',
   },
   {
     icon: FileSearch,

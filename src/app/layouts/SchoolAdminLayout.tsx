@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   MonitorPlay,
+  PenLine,
   Search,
   ShieldCheck,
   UserRound,
@@ -80,6 +81,11 @@ const navigationItems = [
     icon: Presentation,
     label: 'Quản lý Giáo viên',
     to: '/school-admin/teachers',
+  },
+  {
+    icon: PenLine,
+    label: 'Phân công chấm bài',
+    to: '/school-admin/grading',
   },
   {
     icon: FileSearch,
