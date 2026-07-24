@@ -52,6 +52,11 @@ const navigationItems = [
     to: '/school-admin/monitoring',
   },
   {
+    icon: ClipboardCheck,
+    label: 'Điểm danh ca thi',
+    to: '/school-admin/proctor-attendance',
+  },
+  {
     icon: BookOpen,
     label: 'Quản lý lớp học',
     to: '/school-admin/classes',

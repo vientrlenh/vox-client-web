@@ -32,6 +32,7 @@ const EXAM_PAPER_FIELDS = `
   code
   variant
   status
+  timeDurationSeconds
   createdAt
   updatedAt
   sections {
@@ -55,6 +56,9 @@ const EXAM_PAPER_FIELDS = `
         code
         questionText
         status
+        preparationTimeSeconds
+        minResponseSeconds
+        maxResponseSeconds
       }
     }
   }
@@ -81,6 +85,7 @@ export const EXAM_LIST_FIELDS = `
   papers {
     id
     status
+    timeDurationSeconds
     sections {
       id
       items {

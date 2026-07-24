@@ -20,7 +20,7 @@ export type ExamBlueprintSlotType = 'FIXED' | 'SELECTION'
 
 export type CreateExamPaperSource = 'blueprint' | 'copy'
 
-export type ExamCandidateStatus = 'ASSIGNED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
+export type ExamCandidateStatus = 'ASSIGNED' | 'ATTENDED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
 
 export type ExamScheduleStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'MOVED' | 'CANCELLED'
 
@@ -70,6 +70,9 @@ export type ExamPaperItemDto = {
   question?: {
     code?: string | null
     id: string
+    maxResponseSeconds?: number | null
+    minResponseSeconds?: number | null
+    preparationTimeSeconds?: number | null
     questionText?: string | null
     status?: string | null
   } | null
@@ -97,6 +100,7 @@ export type ExamPaperDto = {
   id: string
   sections: ExamPaperSectionDto[]
   status: ExamPaperStatus
+  timeDurationSeconds?: number | null
   updatedAt?: string | null
   variant: number
 }
@@ -226,6 +230,11 @@ export type ExamScheduleDto = {
 export type ExamSecurePoolDto = {
   id: string
   status: ExamSecurePoolStatus
+}
+
+export type ExamScheduleOtpDto = {
+  expiresSeconds: number
+  otp: string
 }
 
 export type ExamAttemptSummaryDto = {
@@ -414,6 +423,18 @@ export function toDateTimeLocalValue(value?: string | null): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+export function formatDurationSeconds(value?: number | null): string {
+  if (value == null) {
+    return '-'
+  }
+  if (value < 60) {
+    return `${value} giây`
+  }
+  const minutes = Math.floor(value / 60)
+  const seconds = value % 60
+  return seconds === 0 ? `${minutes} phút` : `${minutes} phút ${seconds} giây`
+}
+
 export function formatDate(value?: string | null) {
   if (!value) {
     return '-'
@@ -481,7 +502,9 @@ export function getAssessmentPolicyStrictnessLabel(strictness?: AssessmentPolicy
 export function getCandidateStatusDisplay(status?: string | null): { tone: StatusTone; label: string } {
   switch (status) {
     case 'ASSIGNED':
-      return { tone: 'success', label: 'Đã vào phòng' }
+      return { tone: 'warning', label: 'Chưa điểm danh' }
+    case 'ATTENDED':
+      return { tone: 'success', label: 'Đã có mặt' }
     case 'ABSENT':
       return { tone: 'danger', label: 'Vắng thi' }
     case 'COMPLETED':

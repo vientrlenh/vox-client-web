@@ -10,40 +10,10 @@ import type {
   UpdateClassTestQuestionsRequest,
 } from '../types'
 
-function normalizeSections(
-  payload:
-    | { name?: string; questionIds?: string[] | null; sections?: ClassTestSectionInput[] | null }
-    | { questionIds?: string[]; sections?: ClassTestSectionInput[] }
-    | undefined,
-) {
-  if (payload?.sections?.length) {
-    return payload.sections
-  }
-
-  if (payload?.questionIds?.length) {
-    const title =
-      payload && 'name' in payload && typeof payload.name === 'string' && payload.name.trim()
-        ? payload.name.trim()
-        : 'Phan 1'
-
-    return [
-      {
-        questionIds: payload.questionIds,
-        title,
-      },
-    ]
-  }
-
-  return undefined
-}
-
 export function useCreateClassTestMutation() {
   return useMutation({
     mutationFn: async ({ payload }: { payload: CreateClassTestRequest; schoolClassName?: string }) => {
-      const response = await apiClient.post<ApiResponse<CreateClassTestResponse>>('/v1/class-tests', {
-        ...payload,
-        sections: normalizeSections(payload),
-      })
+      const response = await apiClient.post<ApiResponse<CreateClassTestResponse>>('/v1/class-tests', payload)
       return unwrap(response)
     },
   })
@@ -70,9 +40,7 @@ export function useChangeClassTestBlueprintMutation() {
 export function useUpdateClassTestQuestionsMutation() {
   return useMutation({
     mutationFn: async ({ examId, payload }: { examId: string; payload: UpdateClassTestQuestionsRequest }) => {
-      const response = await apiClient.put<ApiResponse<ExamDto>>(`/v1/class-tests/${examId}/questions`, {
-        sections: normalizeSections(payload),
-      })
+      const response = await apiClient.put<ApiResponse<ExamDto>>(`/v1/class-tests/${examId}/questions`, payload)
       return unwrap(response)
     },
   })

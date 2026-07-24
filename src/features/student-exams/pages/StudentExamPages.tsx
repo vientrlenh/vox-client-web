@@ -244,6 +244,7 @@ export function StudentExamResultPage() {
   }
 
   const resultHiddenForReview = Boolean(result && session.flagged && result.status === 'PENDING_REVIEW')
+  const resultInvalid = Boolean(result && result.status === 'INVALID')
   const headerStatus = result ? getExamResultStatusDisplay(result.status) : getAttemptStatusDisplay(session.status)
 
   return (
@@ -271,7 +272,17 @@ export function StudentExamResultPage() {
         </div>
       ) : null}
 
-      {!resultHiddenForReview && result ? (
+      {!resultHiddenForReview && resultInvalid ? (
+        <div className="mt-5">
+          <ResultStatePanel
+            description="Bài thi của bạn không hợp lệ do vi phạm quy chế thi. Vui lòng liên hệ giám thị/nhà trường nếu có thắc mắc."
+            title="Bài thi không hợp lệ"
+            tone="danger"
+          />
+        </div>
+      ) : null}
+
+      {!resultHiddenForReview && !resultInvalid && result ? (
         <>
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <StatCard icon={<Target size={19} />} iconTone="indigo" label="Tổng điểm" value={formatScore(result.totalScore)} />

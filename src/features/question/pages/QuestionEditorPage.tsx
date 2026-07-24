@@ -60,7 +60,7 @@ import {
 type TabKey = 'assets' | 'content' | 'guide' | 'sharing' | 'workflow'
 
 // Tạm ẩn tab "Tài nguyên" khỏi UI (chưa cho người dùng tương tác) — logic/mutations giữ nguyên, chỉ bật lại bằng cách đổi hằng số này.
-const ASSETS_TAB_ENABLED = true
+const ASSETS_TAB_ENABLED = false
 
 // Khớp đúng với việc backend hiện chỉ hỗ trợ IMAGE/VIDEO cho asset (AUDIO/TEXT_PASSAGE để sau)
 // và chặn content type ở GetQuestionAssetUploadUrlUseCase (Java) — giữ danh sách hẹp, cụ thể ở

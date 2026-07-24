@@ -15,6 +15,7 @@ import type {
   ExamPaperItemDto,
   ExamPaperSectionDto,
   ExamScheduleDto,
+  ExamScheduleOtpDto,
   ExamSecurePoolDto,
   QuestionSelectionSpec,
   UpdateExamBlueprintVersionStatusRequest,
@@ -526,6 +527,22 @@ const UPDATE_EXAM_CANDIDATE_STATUS_MUTATION = `
   }
 `
 
+const UPDATE_EXAM_CANDIDATES_ATTENDANCE_MUTATION = `
+  mutation UpdateExamCandidatesAttendance($scheduleId: ID!, $candidateIds: [ID!]!) {
+    updateExamCandidatesAttendance(scheduleId: $scheduleId, candidateIds: $candidateIds) {
+      id
+      examId
+      studentId
+      scheduleId
+      assignedPaperId
+      status
+      assignedAt
+      updatedAt
+      blockedAt
+    }
+  }
+`
+
 export function useFlagExamSessionMutation() {
   return useMutation({
     mutationFn: async ({ reason, sessionId }: { reason: string; sessionId: string }) => {
@@ -560,13 +577,41 @@ export function useUpdateExamCandidateStatusMutation() {
       status,
     }: {
       candidateId: string
-      status: 'ABSENT' | 'ASSIGNED' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
+      status: 'ABSENT' | 'ASSIGNED' | 'ATTENDED' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
     }) => {
       const data = await graphQLRequest<{ updateExamCandidateStatus: string }>(UPDATE_EXAM_CANDIDATE_STATUS_MUTATION, {
         candidateId,
         status,
       })
       return data.updateExamCandidateStatus
+    },
+  })
+}
+
+export function useUpdateExamCandidatesAttendanceMutation() {
+  return useMutation({
+    mutationFn: async ({ candidateIds, scheduleId }: { candidateIds: string[]; scheduleId: string }) => {
+      const data = await graphQLRequest<{ updateExamCandidatesAttendance: ExamCandidateDto[] }>(
+        UPDATE_EXAM_CANDIDATES_ATTENDANCE_MUTATION,
+        { candidateIds, scheduleId },
+      )
+      return data.updateExamCandidatesAttendance
+    },
+  })
+}
+
+export function useGetExamScheduleOtpMutation() {
+  return useMutation({
+    mutationFn: async ({ examId, scheduleId }: { examId: string; scheduleId: string }) => {
+      const response = await apiClient.get<ApiResponse<{ expiresAt: number; otp: string }>>(
+        `/v1/exams/${examId}/schedules/${scheduleId}/otp`,
+      )
+      const data = unwrap(response)
+      const normalized: ExamScheduleOtpDto = {
+        expiresSeconds: data.expiresAt ?? 0,
+        otp: data.otp,
+      }
+      return normalized
     },
   })
 }

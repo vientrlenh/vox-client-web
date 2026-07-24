@@ -1,9 +1,14 @@
 import type { StatusTone } from '@/shared/ui/StatusBadge'
 import type { ExamDto, ExamStatus, ResultDecisionMethod } from '@/features/examCore/types'
 
+export type ClassTestSectionQuestionInput = {
+  questionId: string
+  weight: number
+}
+
 export type ClassTestSectionInput = {
   instruction?: string | null
-  questionIds: string[]
+  questions: ClassTestSectionQuestionInput[]
   title: string
   weight?: number | null
 }
@@ -17,15 +22,13 @@ export type CreateClassTestRequest = {
   maxAttempt?: number | null
   name: string
   openAt?: string | null
-  questionIds?: string[] | null
   resultDecisionMethod?: ResultDecisionMethod | null
   sections?: ClassTestSectionInput[] | null
   schoolClassId: string
 }
 
 export type UpdateClassTestQuestionsRequest = {
-  questionIds?: string[]
-  sections?: ClassTestSectionInput[]
+  sections: ClassTestSectionInput[]
 }
 
 export type ChangeClassTestBlueprintRequest = {

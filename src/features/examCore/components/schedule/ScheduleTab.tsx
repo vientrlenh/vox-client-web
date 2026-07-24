@@ -250,7 +250,7 @@ export function ScheduleTab({
       return []
     }
     const items: ActionMenuItem[] = []
-    if (schedule.status === 'DRAFT') {
+    if (schedule.status === 'DRAFT' || (isClassTest && schedule.status === 'PUBLISHED')) {
       items.push({ id: 'edit', label: 'Sửa ca thi', onSelect: () => setEditingSchedule(schedule) })
     }
     items.push({ id: 'proctors', label: 'Quản lý giám thị', onSelect: () => setManagingProctorsFor(schedule) })

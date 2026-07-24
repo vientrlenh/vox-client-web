@@ -4,6 +4,7 @@ import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import { toApiError } from '@/shared/api'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { autoDistributeWeights } from '@/shared/weightDistribution'
 import { QuestionPicker } from '../components/QuestionPicker'
 import { examQueryKeys, useExamBlueprintQuery } from '../api/queries'
 import {
@@ -37,9 +38,7 @@ type SlotDraft = {
   fixedQuestionId: string | null
   id?: string
   key: string
-  prepTimeSecondsOverride: string
   questionType: string
-  responseTimeSecondsOverride: string
   skillCode: string
   slotType: ExamBlueprintSlotType
   targetBandLevel: string
@@ -51,7 +50,6 @@ type SectionDraft = {
   id?: string
   instruction: string
   key: string
-  sectionTimeLimitMinutes: string
   sectionWeight: string
   slots: SlotDraft[]
   title: string
@@ -63,9 +61,7 @@ function newSlot(): SlotDraft {
     fixedQuestion: null,
     fixedQuestionId: null,
     key: nextKey('slot'),
-    prepTimeSecondsOverride: '',
     questionType: 'SHORT_ANSWER',
-    responseTimeSecondsOverride: '',
     skillCode: '',
     slotType: 'FIXED',
     targetBandLevel: '',
@@ -78,10 +74,9 @@ function newSection(order: number): SectionDraft {
   return {
     instruction: '',
     key: nextKey('section'),
-    sectionTimeLimitMinutes: '',
     sectionWeight: '',
     slots: [newSlot()],
-    title: `Phần ${order}`,
+    title: `Part ${order}`,
   }
 }
 
@@ -96,9 +91,7 @@ function slotFromDto(slot: ExamBlueprintSectionDto['slots'][number]): SlotDraft 
     fixedQuestionId: slot.fixedQuestionId ?? null,
     id: slot.id,
     key: nextKey('slot'),
-    prepTimeSecondsOverride: slot.prepTimeSecondsOverride != null ? String(slot.prepTimeSecondsOverride) : '',
     questionType: slot.selectionSpec?.questionType ?? 'SHORT_ANSWER',
-    responseTimeSecondsOverride: slot.responseTimeSecondsOverride != null ? String(slot.responseTimeSecondsOverride) : '',
     skillCode: slot.selectionSpec?.skillCode ?? '',
     slotType: slot.slotType,
     targetBandLevel: slot.selectionSpec?.targetBandLevel ?? '',
@@ -112,7 +105,6 @@ function sectionFromDto(section: ExamBlueprintSectionDto): SectionDraft {
     id: section.id,
     instruction: section.instruction ?? '',
     key: nextKey('section'),
-    sectionTimeLimitMinutes: section.sectionTimeLimitSeconds ? String(Math.round(section.sectionTimeLimitSeconds / 60)) : '',
     sectionWeight: section.sectionWeight != null ? String(section.sectionWeight) : '',
     slots: section.slots.map(slotFromDto),
     title: section.title,
@@ -219,6 +211,25 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
     )
   }
 
+  function autoDistributeSectionWeights() {
+    const resolved = autoDistributeWeights(
+      sections.map((section) => (section.sectionWeight.trim() ? Number(section.sectionWeight) : null)),
+    )
+    setSections((current) => current.map((section, index) => ({ ...section, sectionWeight: String(resolved[index]) })))
+  }
+
+  function autoDistributeSlotWeights(sectionKey: string) {
+    setSections((current) =>
+      current.map((section) => {
+        if (section.key !== sectionKey) {
+          return section
+        }
+        const resolved = autoDistributeWeights(section.slots.map((slot) => (slot.weight.trim() ? Number(slot.weight) : null)))
+        return { ...section, slots: section.slots.map((slot, index) => ({ ...slot, weight: String(resolved[index]) })) }
+      }),
+    )
+  }
+
   async function handleSubmit() {
     setErrorMessage(null)
 
@@ -255,14 +266,14 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
       id: section.id ?? null,
       instruction: section.instruction.trim() || null,
       order: sectionIndex + 1,
-      sectionTimeLimitSeconds: section.sectionTimeLimitMinutes.trim() ? Number(section.sectionTimeLimitMinutes) * 60 : null,
+      sectionTimeLimitSeconds: null,
       sectionWeight: sectionWeightOf(section),
       slots: section.slots.map((slot, slotIndex): UpdateBlueprintVersionSlotInput => ({
         id: slot.id ?? null,
         fixedQuestionId: slot.slotType === 'FIXED' ? slot.fixedQuestionId ?? slot.fixedQuestion?.id ?? null : null,
         order: slotIndex + 1,
-        prepTimeSecondsOverride: slot.prepTimeSecondsOverride.trim() ? Number(slot.prepTimeSecondsOverride) : null,
-        responseTimeSecondsOverride: slot.responseTimeSecondsOverride.trim() ? Number(slot.responseTimeSecondsOverride) : null,
+        prepTimeSecondsOverride: null,
+        responseTimeSecondsOverride: null,
         selectionSpec:
           slot.slotType === 'SELECTION'
             ? {
@@ -355,9 +366,18 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
               value={effectiveTo}
             />
           </label>
-          <div className="grid content-end text-sm font-semibold text-slate-500 sm:col-span-2">
-            Tổng trọng số các phần hiện tại: <span className={weightSum === 1 ? 'text-emerald-600' : 'text-amber-600'}>{weightSum.toFixed(2)}</span>{' '}
-            (nên bằng 1.00 trước khi xuất bản)
+          <div className="grid content-end gap-2 text-sm font-semibold text-slate-500 sm:col-span-2">
+            <span>
+              Tổng trọng số các phần hiện tại: <span className={weightSum === 1 ? 'text-emerald-600' : 'text-amber-600'}>{weightSum.toFixed(2)}</span>{' '}
+              (nên bằng 1.00 trước khi xuất bản)
+            </span>
+            <button
+              className="w-fit rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+              onClick={autoDistributeSectionWeights}
+              type="button"
+            >
+              Chia trọng số phần tự động
+            </button>
           </div>
         </div>
       </div>
@@ -384,16 +404,6 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                     step="0.01"
                     type="number"
                     value={section.sectionWeight}
-                  />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Thời lượng phần (phút)
-                  <input
-                    className="h-10.5 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-                    onChange={(event) => updateSection(section.key, { sectionTimeLimitMinutes: event.target.value })}
-                    placeholder="Không bắt buộc"
-                    type="number"
-                    value={section.sectionTimeLimitMinutes}
                   />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
@@ -524,13 +534,22 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                   )}
                 </div>
               ))}
-              <button
-                className="rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50"
-                onClick={() => addSlot(section.key)}
-                type="button"
-              >
-                + Thêm ô câu hỏi
-              </button>
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  className="rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+                  onClick={() => addSlot(section.key)}
+                  type="button"
+                >
+                  + Thêm ô câu hỏi
+                </button>
+                <button
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+                  onClick={() => autoDistributeSlotWeights(section.key)}
+                  type="button"
+                >
+                  Chia trọng số ô câu hỏi tự động
+                </button>
+              </div>
             </div>
             <p className="mt-2.5 text-xs font-semibold text-slate-500">
               Tổng trọng số các ô câu hỏi trong phần này:{' '}

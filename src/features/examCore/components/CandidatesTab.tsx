@@ -74,7 +74,7 @@ export function CandidatesTab({ canManage, examId, papers }: CandidatesTabProps)
   const flagExamSessionMutation = useFlagExamSessionMutation()
   const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const unblockExamCandidateMutation = useUnblockExamCandidateMutation()
-  const { confirm, dialog } = useConfirmationDialog()
+  const { confirm, confirmWithReason, dialog } = useConfirmationDialog()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showStudentPicker, setShowStudentPicker] = useState(false)
@@ -199,17 +199,21 @@ export function CandidatesTab({ canManage, examId, papers }: CandidatesTabProps)
         label: 'Đánh dấu nghi vấn',
         onSelect: () => {
           void (async () => {
-            if (
-              !(await confirm({
-                message: `Đánh dấu bài thi của ${candidateName} là nghi vấn? Học sinh vẫn tiếp tục thi bình thường, kết quả sẽ được giữ lại chờ giáo viên xem xét sau khi chấm xong.`,
-                title: 'Xác nhận đánh dấu nghi vấn',
-              }))
-            ) {
+            const result = await confirmWithReason({
+              message: `Đánh dấu bài thi của ${candidateName} là nghi vấn? Học sinh vẫn tiếp tục thi bình thường, kết quả sẽ được giữ lại chờ giáo viên xem xét sau khi chấm xong.`,
+              reasonLabel: 'Lý do đánh dấu nghi vấn',
+              reasonPlaceholder: 'Nhập lý do nếu cần...',
+              title: 'Xác nhận đánh dấu nghi vấn',
+            })
+            if (!result.confirmed) {
               return
             }
 
             try {
-              await flagExamSessionMutation.mutateAsync({ reason: FLAG_REASON, sessionId: pendingSession.sessionId })
+              await flagExamSessionMutation.mutateAsync({
+                reason: result.reason || FLAG_REASON,
+                sessionId: pendingSession.sessionId,
+              })
               await invalidateAll()
               setMessage(`Đã đánh dấu nghi vấn cho ${candidateName}.`)
             } catch (error) {
@@ -227,17 +231,21 @@ export function CandidatesTab({ canManage, examId, papers }: CandidatesTabProps)
         label: 'Buộc kết thúc',
         onSelect: () => {
           void (async () => {
-            if (
-              !(await confirm({
-                message: `Tạm dừng bài thi của ${candidateName} để xem xét? Học sinh sẽ bị ngắt kết nối ngay và không vào lại được cho tới khi được dỡ cấm.`,
-                title: 'Xác nhận buộc kết thúc',
-              }))
-            ) {
+            const result = await confirmWithReason({
+              message: `Tạm dừng bài thi của ${candidateName} để xem xét? Học sinh sẽ bị ngắt kết nối ngay và không vào lại được cho tới khi được dỡ cấm.`,
+              reasonLabel: 'Lý do buộc kết thúc',
+              reasonPlaceholder: 'Nhập lý do nếu cần...',
+              title: 'Xác nhận buộc kết thúc',
+            })
+            if (!result.confirmed) {
               return
             }
 
             try {
-              await forceEndExamSessionMutation.mutateAsync({ reason: FORCE_END_REASON, sessionId: forceEndSession.sessionId })
+              await forceEndExamSessionMutation.mutateAsync({
+                reason: result.reason || FORCE_END_REASON,
+                sessionId: forceEndSession.sessionId,
+              })
               await invalidateAll()
               setMessage(`Đã buộc kết thúc bài thi của ${candidateName}.`)
             } catch (error) {

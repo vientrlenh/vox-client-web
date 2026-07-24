@@ -17,6 +17,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { useForceEndExamSessionMutation } from '@/features/examCore/api/mutations'
 import { examQueryKeys, useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
 import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
 import { Pagination } from '@/shared/components/Pagination'
@@ -35,7 +36,9 @@ import {
   useExamSessionResultQuery,
   useExamSessionStatusQuery,
   useRetryGradingExamSessionMutation,
-  useReviewFlaggedExamResultMutation,
+  useRegradeExamSessionForTestMutation,
+  useDecideExamCandidateResultOutcomeMutation,
+  useReleasePendingExamResultMutation,
 } from '../api/useExamResultQueries'
 import {
   formatScore,
@@ -43,6 +46,7 @@ import {
   getExamResultStatusDisplay,
   type ExamCandidateResultDto,
   type ExamItemEvaluationDto,
+  type ExamValidityRuleResultDto,
 } from '../types'
 
 type ExamResultsUserRole = 'SCHOOL_ADMIN' | 'TEACHER'
@@ -57,10 +61,16 @@ const RESULT_STATUS_FILTER_OPTIONS = [
   'RE_GRADING',
   'INVALID',
   'RETAKE_REQUIRED',
+  'PASSED',
+  'FAILED',
 ] as const
 
 function getPendingRowStatus(candidateStatus?: string | null) {
   switch (candidateStatus) {
+    case 'ASSIGNED':
+      return { label: 'Chưa điểm danh', tone: 'warning' as const }
+    case 'ATTENDED':
+      return { label: 'Đã có mặt, chưa có kết quả', tone: 'info' as const }
     case 'ABSENT':
       return { label: 'Vắng thi', tone: 'danger' as const }
     case 'EXEMPTED':
@@ -80,15 +90,174 @@ function formatConfidencePercent(value?: number | null) {
   return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`
 }
 
-function getReviewReasonLabel(code?: string | null) {
-  switch (code) {
-    case 'LOW_CONFIDENCE':
-      return 'Độ tin cậy AI thấp'
-    case 'VALIDITY_FLAGGED':
-      return 'Có cảnh báo validity cần giáo viên xem lại'
-    default:
-      return code ?? null
+function getResultScoreTone(value?: number | null) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'neutral' as const
   }
+  if (value > 80) {
+    return 'success' as const
+  }
+  if (value >= 45) {
+    return 'warning' as const
+  }
+  return 'danger' as const
+}
+
+function getResultScoreTextClass(value?: number | null) {
+  const tone = getResultScoreTone(value)
+  if (tone === 'success') {
+    return 'text-emerald-600'
+  }
+  if (tone === 'warning') {
+    return 'text-amber-600'
+  }
+  if (tone === 'danger') {
+    return 'text-red-600'
+  }
+  return 'text-slate-400'
+}
+
+type DisplayValidityRule = ExamValidityRuleResultDto & {
+  occurrenceCount: number
+}
+
+function asFiniteNumber(value: unknown): number | null {
+  const number = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+function validitySeverityRank(value?: string | null) {
+  return {
+    none: 0,
+    low: 1,
+    medium: 2,
+    high: 3,
+    critical: 4,
+  }[String(value ?? 'none').toLowerCase()] ?? 0
+}
+
+function buildValidityRulesForDisplay(evaluation: ExamItemEvaluationDto): DisplayValidityRule[] {
+  const sourceRules = Array.isArray(evaluation.validity?.ruleResults)
+    ? evaluation.validity.ruleResults.filter((rule) => rule?.ruleId || rule?.message)
+    : []
+  const grouped = new Map<string, DisplayValidityRule>()
+
+  sourceRules.forEach((rule) => {
+    const key = rule.ruleId || rule.message || 'unknown-rule'
+    const existing = grouped.get(key)
+    if (!existing) {
+      grouped.set(key, { ...rule, occurrenceCount: 1 })
+      return
+    }
+
+    grouped.set(key, {
+      ...(validitySeverityRank(rule.severity) > validitySeverityRank(existing.severity)
+        ? rule
+        : existing),
+      occurrenceCount: existing.occurrenceCount + 1,
+    })
+  })
+
+  const wordCount = asFiniteNumber(evaluation.signals?.wordCount)
+  const expectedMinWords = asFiniteNumber(evaluation.signals?.expectedMinWords)
+  const totalDuration = asFiniteNumber(evaluation.signals?.durationSeconds)
+
+  return Array.from(grouped.values()).flatMap((rule) => {
+    if (rule.ruleId === 'answer_length.too_short' && wordCount !== null && expectedMinWords !== null) {
+      if (wordCount >= expectedMinWords) {
+        return []
+      }
+      return [{
+        ...rule,
+        message: `Toàn bộ câu trả lời có ${wordCount} từ, mức tối thiểu dự kiến là ${expectedMinWords} từ.`,
+      }]
+    }
+
+    if (rule.ruleId === 'answer_duration.too_short' && totalDuration !== null) {
+      const expectedDuration = asFiniteNumber(rule.evidence?.expectedMinResponseSeconds)
+      if (expectedDuration !== null) {
+        if (totalDuration >= expectedDuration * 0.5) {
+          return []
+        }
+        return [{
+          ...rule,
+          message: `Tổng thời gian nói là ${totalDuration} giây, thời gian tối thiểu dự kiến là ${expectedDuration} giây.`,
+        }]
+      }
+    }
+
+    return [rule]
+  })
+}
+
+function getReviewReasonLabel(code?: string | null) {
+  if (!code) {
+    return null
+  }
+
+  const labels: Record<string, string> = {
+    ALIGNMENT_COVERAGE_LOW: 'Độ phủ alignment thấp',
+    ALIGNMENT_MISCUE_HIGH: 'Alignment có nhiều miscue bất thường',
+    ALIGNMENT_TIMING_ANOMALY: 'Mốc thời gian alignment bất thường',
+    ASR_LOW_CONF: 'ASR chính có độ tin cậy thấp',
+    AUDIO_CLIPPING: 'Audio bị clipping nghiêm trọng',
+    AUDIO_QUALITY_LOW: 'Chất lượng audio thấp',
+    AUDIO_SNR_TOO_LOW: 'Tỷ lệ tín hiệu trên nhiễu quá thấp',
+    AUDIO_TOO_MUCH_SILENCE: 'Audio có quá ít lời nói hữu ích',
+    CONDUCT_VIOLATION: 'Có vi phạm trong quá trình làm bài',
+    LLM_UNSTABLE_DISCOURSE: 'Chấm discourse chưa ổn định',
+    LLM_UNSTABLE_GRAMMAR: 'Chấm grammar chưa ổn định',
+    LLM_UNSTABLE_VOCABULARY: 'Chấm vocabulary chưa ổn định',
+    LOW_CONFIDENCE: 'Độ tin cậy AI thấp',
+    REFERENCE_DRIFT: 'Reference transcript chưa ổn định',
+    VALIDITY_FLAGGED: 'Có cảnh báo validity cần giáo viên xem lại',
+  }
+  return code.split(',').map((reason) => labels[reason] ?? reason).join(' · ')
+}
+
+function getEvidenceReasonLabel(code: string) {
+  switch (code) {
+    case 'ANSWER_TOO_SHORT':
+      return 'Câu trả lời quá ngắn so với yêu cầu'
+    case 'RESPONSE_DURATION_TOO_SHORT':
+      return 'Thời lượng trả lời quá ngắn so với yêu cầu'
+    case 'TARGET_LANGUAGE_EVIDENCE_TOO_LOW':
+      return 'Chưa có đủ nội dung bằng ngôn ngữ mục tiêu'
+    case 'SPEECH_EVIDENCE_TOO_LOW':
+      return 'Thời lượng lời nói hữu ích quá ít'
+    default:
+      return code
+  }
+}
+
+function getAudioGateLabel(status?: string | null) {
+  switch (status) {
+    case 'HARD_FAIL':
+      return 'Không đạt hard gate'
+    case 'SOFT_WARN':
+      return 'Chất lượng thấp'
+    case 'PASS':
+      return 'Đạt'
+    default:
+      return 'Chưa đủ dữ liệu'
+  }
+}
+
+function getConfidenceModeLabel(mode?: string | null) {
+  switch (mode) {
+    case 'HIGH_STAKES':
+      return 'Profile: High-stakes'
+    case 'MOCK_TEST':
+      return 'Profile: Mock test'
+    case 'PRACTICE':
+      return 'Profile: Practice'
+    default:
+      return null
+  }
+}
+
+function getAudioReasonLabel(code: string) {
+  return getReviewReasonLabel(code) ?? code
 }
 
 function StatePanel({
@@ -130,7 +299,7 @@ function ResultBand({
 
   return (
     <div>
-      <p className="text-[13px] font-bold text-slate-900">{formatScore(officialScore)}</p>
+      <p className={`text-[13px] font-bold ${getResultScoreTextClass(officialScore)}`}>{formatScore(officialScore)}</p>
       <p className="text-xs text-slate-500">{attempt?.rubricResultBandName ?? attempt?.rubricResultBandCode ?? 'Chưa gán band'}</p>
     </div>
   )
@@ -192,7 +361,7 @@ function AttemptRows({
               <StatusBadge label={attemptStatus.label} tone={attemptStatus.tone} />
             </span>
             <div>
-              <p className="text-sm font-bold text-slate-900">{formatScore(attempt.totalScore)}</p>
+              <p className={`text-sm font-bold ${getResultScoreTextClass(attempt.totalScore)}`}>{formatScore(attempt.totalScore)}</p>
               <p className="text-xs text-slate-500">
                 {attempt.rubricResultBandName ?? attempt.rubricResultBandCode ?? 'Chưa gán band'}
               </p>
@@ -200,7 +369,9 @@ function AttemptRows({
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <StatusBadge label="Chính thức" tone="violet" />
                   {officialScore != null && officialScore !== attempt.totalScore ? (
-                    <span className="text-xs text-slate-500">Điểm chính thức: {formatScore(officialScore)}</span>
+                    <span className={`text-xs ${getResultScoreTextClass(officialScore)}`}>
+                      Điểm chính thức: {formatScore(officialScore)}
+                    </span>
                   ) : null}
                 </div>
               ) : null}
@@ -296,10 +467,10 @@ function ExamResultsListPage({
   const pendingReviewCount = rows.filter((row) =>
     (row.candidate.attempts ?? []).some((attempt) => attempt.status === 'SUBMITTED' || attempt.status === 'GRADING'),
   ).length
-  const averageScore =
+  const averageScoreValue =
     gradedRows.length === 0
-      ? '-'
-      : formatScore(gradedRows.reduce((sum, row) => sum + (row.candidate.officialScore ?? 0), 0) / gradedRows.length)
+      ? null
+      : gradedRows.reduce((sum, row) => sum + (row.candidate.officialScore ?? 0), 0) / gradedRows.length
 
   if (!examId) {
     return (
@@ -340,7 +511,12 @@ function ExamResultsListPage({
         <StatCard icon={<UserRound size={19} />} iconTone="indigo" label="Tổng thí sinh" value={rows.length} />
         <StatCard icon={<CheckCircle2 size={19} />} iconTone="emerald" label="Đã có kết quả" value={gradedRows.length} />
         <StatCard icon={<ClipboardList size={19} />} iconTone="amber" label="Chờ chấm" value={pendingReviewCount} />
-        <StatCard icon={<Gauge size={19} />} iconTone="violet" label="Điểm trung bình" value={averageScore} />
+        <StatCard
+          icon={<Gauge size={19} />}
+          iconTone="violet"
+          label="Điểm trung bình"
+          value={<span className={getResultScoreTextClass(averageScoreValue)}>{formatScore(averageScoreValue)}</span>}
+        />
       </div>
 
       <div className="mt-3.5 rounded-2xl border border-slate-200 bg-white p-5.5">
@@ -465,7 +641,7 @@ function SectionOverview({ result }: { result: ExamCandidateResultDto }) {
       {result.sections.map((section) => (
         <div className="rounded-2xl border border-slate-200 bg-white p-4" key={section.sectionId}>
           <p className="text-sm font-bold text-slate-900">{section.title ?? 'Section'}</p>
-          <p className="mt-2 text-2xl font-extrabold text-indigo-600">{formatScore(section.score)}</p>
+          <p className={`mt-2 text-2xl font-extrabold ${getResultScoreTextClass(section.score)}`}>{formatScore(section.score)}</p>
           <p className="mt-1 text-xs text-slate-500">Điểm quy đổi của phần này</p>
         </div>
       ))}
@@ -488,9 +664,7 @@ function QuestionEvaluationCard({
   questionCode?: string | null
   questionText?: string | null
 }) {
-  const validityRules = Array.isArray(evaluation?.validity?.ruleResults)
-    ? evaluation.validity?.ruleResults?.filter((rule) => rule?.ruleId || rule?.message)
-    : []
+  const validityRules = evaluation ? buildValidityRulesForDisplay(evaluation) : []
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white">
@@ -504,8 +678,12 @@ function QuestionEvaluationCard({
           <p className="mt-1 text-sm leading-6 text-slate-600">{questionText ?? 'Không có nội dung câu hỏi.'}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {itemResult ? <StatusBadge label={`Điểm câu ${formatScore(itemResult.itemScore)}`} tone="info" /> : null}
-          {itemResult ? <StatusBadge label={`Quy đổi ${formatScore(itemResult.weightedScore)}`} tone="violet" /> : null}
+          {itemResult ? (
+            <StatusBadge label={`Điểm câu ${formatScore(itemResult.itemScore)}`} tone={getResultScoreTone(itemResult.itemScore)} />
+          ) : null}
+          {itemResult ? (
+            <StatusBadge label={`Quy đổi ${formatScore(itemResult.weightedScore)}`} tone="violet" />
+          ) : null}
           <ChevronDown
             aria-hidden="true"
             className={`size-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -524,6 +702,15 @@ function QuestionEvaluationCard({
                   <StatusBadge label={getExamResultStatusDisplay(evaluation.status).label} tone={getExamResultStatusDisplay(evaluation.status).tone} />
                   {evaluation.requiresRetake ? <StatusBadge label="Cần thi lại" tone="danger" /> : null}
                   {evaluation.requiresHumanReview ? <StatusBadge label="Cần giáo viên duyệt lại" tone="warning" /> : null}
+                  {evaluation.signals?.uncertaintyType === 'SYSTEM_UNCERTAINTY' || evaluation.signals?.uncertaintyType === 'MIXED' ? (
+                    <StatusBadge label="System uncertainty" tone="warning" />
+                  ) : null}
+                  {evaluation.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
+                    <StatusBadge label="Chưa đủ bằng chứng chấm điểm" tone="info" />
+                  ) : null}
+                  {getConfidenceModeLabel(evaluation.signals?.confidenceMode) ? (
+                    <StatusBadge label={getConfidenceModeLabel(evaluation.signals?.confidenceMode) as string} tone="neutral" />
+                  ) : null}
                   {evaluation.markedInvalid ? <StatusBadge label="Đánh dấu không hợp lệ" tone="danger" /> : null}
                   <span className="text-xs text-slate-500">Chấm lúc {formatDateTime(evaluation.evaluatedAt)}</span>
                 </div>
@@ -531,18 +718,43 @@ function QuestionEvaluationCard({
                   <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                     <div className="flex items-center gap-2 text-slate-500">
                       <Gauge aria-hidden="true" className="size-4" />
-                      <span className="text-xs font-bold uppercase tracking-wide">AI confidence</span>
+                      <span className="text-xs font-bold uppercase tracking-wide">Overall confidence</span>
                     </div>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.signals?.aiConfidence)}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.overallConfidence)}</p>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                     <div className="flex items-center gap-2 text-slate-500">
                       <Mic2 aria-hidden="true" className="size-4" />
                       <span className="text-xs font-bold uppercase tracking-wide">Audio quality</span>
                     </div>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.signals?.audioQuality)}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.signals?.audioQuality)}</p>
+                      <StatusBadge
+                        label={getAudioGateLabel(evaluation.signals?.audioGateStatus)}
+                        tone={evaluation.signals?.audioGateStatus === 'HARD_FAIL' ? 'danger' : evaluation.signals?.audioGateStatus === 'SOFT_WARN' ? 'warning' : 'neutral'}
+                      />
+                    </div>
+                    {evaluation.signals?.audioGateReasonCodes?.length ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {evaluation.signals.audioGateReasonCodes.map(getAudioReasonLabel).join(' · ')}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
+                {evaluation.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
+                  <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-900">
+                    <div className="flex items-start gap-2">
+                      <FileText aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                      <div>
+                        <p className="font-bold">Điểm thấp có thể hợp lệ vì chưa đủ bằng chứng.</p>
+                        <p className="mt-1 text-sky-800">
+                          {(evaluation.signals.evidenceReasonCodes ?? []).map(getEvidenceReasonLabel).join(' · ')}
+                        </p>
+                        <p className="mt-1 text-xs text-sky-700">Cờ này không tự động được xem là lỗi hệ thống và không tự bật human review.</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 {evaluation.requiresHumanReview || evaluation.reviewReasonCode ? (
                   <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
                     <div className="flex items-start gap-2">
@@ -586,7 +798,10 @@ function QuestionEvaluationCard({
                       <p className="text-sm font-extrabold text-slate-900">
                         {criterion.criterionName ?? criterion.criterionCode ?? 'Tiêu chí'}
                       </p>
-                      <StatusBadge label={`${formatScore(criterion.finalScore)} điểm`} tone="success" />
+                      <StatusBadge
+                        label={`${formatScore(criterion.finalScore)} điểm`}
+                        tone={getResultScoreTone(criterion.finalScore)}
+                      />
                     </div>
                     {criterion.rationale ? (
                       <p className="mt-3 text-sm leading-6 text-slate-600">{criterion.rationale}</p>
@@ -604,13 +819,25 @@ function QuestionEvaluationCard({
                     <p className="text-sm font-extrabold text-amber-800">Vi phạm quy tắc</p>
                   </div>
                   <div className="mt-3 grid gap-2">
-                    {validityRules.map((rule, index) => (
-                      <div className="rounded-lg border border-amber-200 bg-white px-3 py-2" key={`${rule?.ruleId ?? 'rule'}-${index}`}>
-                        <p className="text-sm font-bold text-slate-900">{rule?.ruleId ?? 'Rule'}</p>
+                    {validityRules.map((rule) => (
+                      <div className="rounded-lg border border-amber-200 bg-white px-3 py-2" key={rule.ruleId ?? rule.message ?? 'rule'}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold text-slate-900">{rule.ruleId ?? 'Rule'}</p>
+                          {rule.occurrenceCount > 1 ? (
+                            <StatusBadge label={`${rule.occurrenceCount} lượt`} tone="warning" />
+                          ) : null}
+                        </div>
                         {rule?.message ? <p className="mt-1 text-sm leading-6 text-slate-600">{rule.message}</p> : null}
                         <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
                           {rule?.severity ? <span>Mức độ: {rule.severity}</span> : null}
-                          {rule?.action ? <span>Hành động: {rule.action}</span> : null}
+                          {rule?.action ? (
+                            <span>
+                              Hành động:{' '}
+                              {evaluation.validity?.validForScoring !== false && rule.action === 'reject_or_zero'
+                                ? 'chỉ áp dụng ở lượt bị gắn cờ; toàn bài vẫn được chấm'
+                                : rule.action}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     ))}
@@ -632,11 +859,14 @@ function ExamResultDetailPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const queryClient = useQueryClient()
-  const { confirm, dialog } = useConfirmationDialog()
+  const { confirm, confirmWithReason, dialog } = useConfirmationDialog()
   const sessionQuery = useExamSessionStatusQuery(sessionId ?? null)
   const resultQuery = useExamSessionResultQuery(sessionId ?? null)
-  const reviewFlaggedResultMutation = useReviewFlaggedExamResultMutation()
+  const releasePendingResultMutation = useReleasePendingExamResultMutation()
+  const decideOutcomeMutation = useDecideExamCandidateResultOutcomeMutation()
+  const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const retryGradingMutation = useRetryGradingExamSessionMutation()
+  const regradeForTestMutation = useRegradeExamSessionForTestMutation()
   const session = sessionQuery.data
   const result = resultQuery.data
   const examId = session?.examId ?? result?.examId ?? null
@@ -684,8 +914,18 @@ function ExamResultDetailPage() {
   }, [paper?.sections])
 
   const statusDisplay = result ? getExamResultStatusDisplay(result.status) : getAttemptStatusDisplay(session?.status)
-  const hiddenPendingReview = Boolean(result && session?.flagged && result.status === 'PENDING_REVIEW')
+  // Giáo viên/nhà trường cần xem điểm và breakdown của PENDING_REVIEW để có căn cứ duyệt.
+  // Chỉ ẩn khi backend nói rõ điểm không được phép hiển thị cho user hiện tại.
+  const hiddenPendingReview = Boolean(result && result.status === 'PENDING_REVIEW' && !result.scoreVisible)
   const canRetry = session?.status === 'GRADING_FAILED' && examQuery.data?.status !== 'RESULTS_PUBLISHED'
+  const regradeForTestBlockedReason =
+    examQuery.data?.kind === 'CENTRALIZED' && candidate?.status !== 'ATTENDED'
+      ? 'Kỳ thi tập trung chỉ chấm lại bằng AI khi thí sinh đã được điểm danh có mặt.'
+      : result && result.items.length === 0
+        ? 'Phiên này không có câu trả lời được ghi nhận nên không có dữ liệu để gửi AI chấm lại.'
+        : session?.status === 'IN_PROGRESS' || session?.status === 'INTERRUPTED'
+          ? 'Chỉ chấm lại khi phiên đã nộp, hết giờ, đã chấm hoặc lỗi chấm.'
+          : null
 
   if (!sessionId) {
     return null
@@ -717,28 +957,68 @@ function ExamResultDetailPage() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.exam(examId) })
   }
 
-  async function handleReview(decision: 'FINAL' | 'INVALID' | 'RETAKE_REQUIRED') {
-    const actionMessage =
-      decision === 'FINAL'
-        ? 'Duyệt kết quả này để tính điểm chính thức cho học sinh?'
-        : decision === 'INVALID'
-          ? 'Vô hiệu kết quả này? Lượt thi vẫn được tính là đã sử dụng.'
-          : 'Yêu cầu thi lại? Học sinh sẽ được thêm một lượt thi mới.'
-
-    if (!(await confirm({ message: actionMessage, title: 'Xác nhận xử lý kết quả' }))) {
-      return
-    }
-
-    if (!result) {
+  async function handleReleasePendingResult() {
+    if (!(await confirm({ message: 'Duyệt kết quả này để tính điểm chính thức cho học sinh?', title: 'Xác nhận duyệt kết quả' }))) {
       return
     }
 
     try {
-      await reviewFlaggedResultMutation.mutateAsync({ candidateResultId: result.id, decision })
+      await releasePendingResultMutation.mutateAsync({ sessionId: currentSessionId })
       await invalidateDetail()
-      setMessage('Đã cập nhật trạng thái kết quả.')
+      setMessage('Đã duyệt kết quả.')
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể cập nhật trạng thái kết quả.')
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể duyệt kết quả.')
+    }
+  }
+
+  // FINAL: kỳ thi đã RESULTS_PUBLISHED nhưng assessmentPolicy không có passingScore nên
+  // backend không tự suy ra được PASSED/FAILED - nhà trường tự chốt thủ công tại đây.
+  async function handleDecideOutcome(decision: 'PASSED' | 'FAILED') {
+    if (!result) {
+      return
+    }
+    const confirmation = await confirm({
+      message:
+        decision === 'PASSED'
+          ? 'Chốt kết quả này là ĐẬU? Không thể đổi lại sau khi đã chốt.'
+          : 'Chốt kết quả này là RỚT? Không thể đổi lại sau khi đã chốt.',
+      title: 'Xác nhận chốt đậu/rớt',
+    })
+    if (!confirmation) {
+      return
+    }
+
+    try {
+      await decideOutcomeMutation.mutateAsync({ candidateResultId: result.id, decision })
+      await invalidateDetail()
+      setMessage(decision === 'PASSED' ? 'Đã chốt ĐẬU.' : 'Đã chốt RỚT.')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể chốt kết quả.')
+    }
+  }
+
+  // PENDING_REVIEW mà xem lại thấy không ổn (vi phạm quy chế thi) -> vô hiệu ngay, tái dùng
+  // đúng forceEndExamSession (tự set blockedAt + chốt INVALID ngay vì session đã GRADED).
+  async function handleInvalidatePendingResult() {
+    const confirmation = await confirmWithReason({
+      message: 'Vô hiệu kết quả này do vi phạm quy chế thi? Điểm sẽ bị huỷ, lượt thi vẫn tính là đã sử dụng.',
+      reasonLabel: 'Lý do vô hiệu',
+      reasonPlaceholder: 'Nhập lý do nếu cần...',
+      title: 'Xác nhận vô hiệu kết quả',
+    })
+    if (!confirmation.confirmed) {
+      return
+    }
+
+    try {
+      await forceEndExamSessionMutation.mutateAsync({
+        reason: confirmation.reason || 'Giáo viên xác nhận vi phạm khi xem lại kết quả chờ duyệt.',
+        sessionId: currentSessionId,
+      })
+      await invalidateDetail()
+      setMessage('Đã vô hiệu kết quả.')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể vô hiệu kết quả.')
     }
   }
 
@@ -756,6 +1036,27 @@ function ExamResultDetailPage() {
     }
   }
 
+  // TEST-ONLY: chấm lại bằng AI từ đầu bất kể trạng thái (kể cả đã GRADED). Cần agents Python
+  // đang chạy để xử lý; kết quả cũ bị ghi đè (upsert). Dùng để kiểm thử pipeline chấm điểm.
+  async function handleRegradeForTest() {
+    if (
+      !(await confirm({
+        message: 'Chấm lại phiên thi này bằng AI từ đầu (test)? Điểm và confidence cũ sẽ bị ghi đè.',
+        title: 'Test: chấm lại bằng AI',
+      }))
+    ) {
+      return
+    }
+
+    try {
+      await regradeForTestMutation.mutateAsync(currentSessionId)
+      await invalidateDetail()
+      setMessage('Đã gửi yêu cầu chấm lại bằng AI (test). Chờ pipeline xử lý rồi tải lại trang.')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể chấm lại phiên thi (test).')
+    }
+  }
+
   return (
     <section className="mx-auto max-w-290">
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
@@ -765,28 +1066,39 @@ function ExamResultDetailPage() {
       <DetailHeaderCard
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {session.flagged && result?.status === 'PENDING_REVIEW' ? (
+            {result?.status === 'PENDING_REVIEW' ? (
               <>
                 <button
                   className="inline-flex h-10 items-center justify-center rounded-full bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700"
-                  onClick={() => void handleReview('FINAL')}
+                  onClick={() => void handleReleasePendingResult()}
                   type="button"
                 >
                   Duyệt
                 </button>
                 <button
                   className="inline-flex h-10 items-center justify-center rounded-full border border-red-200 px-4 text-sm font-bold text-red-600 transition hover:bg-red-50"
-                  onClick={() => void handleReview('INVALID')}
+                  onClick={() => void handleInvalidatePendingResult()}
                   type="button"
                 >
                   Vô hiệu
                 </button>
+              </>
+            ) : null}
+            {result?.status === 'FINAL' ? (
+              <>
                 <button
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-amber-200 px-4 text-sm font-bold text-amber-700 transition hover:bg-amber-50"
-                  onClick={() => void handleReview('RETAKE_REQUIRED')}
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700"
+                  onClick={() => void handleDecideOutcome('PASSED')}
                   type="button"
                 >
-                  Yêu cầu thi lại
+                  Chốt đậu
+                </button>
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-red-200 px-4 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                  onClick={() => void handleDecideOutcome('FAILED')}
+                  type="button"
+                >
+                  Chốt rớt
                 </button>
               </>
             ) : null}
@@ -799,6 +1111,16 @@ function ExamResultDetailPage() {
                 Chấm lại
               </button>
             ) : null}
+            <button
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-dashed border-amber-400 bg-amber-50 px-4 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+              disabled={regradeForTestMutation.isPending || Boolean(regradeForTestBlockedReason)}
+              onClick={() => void handleRegradeForTest()}
+              title={regradeForTestBlockedReason ?? undefined}
+              type="button"
+            >
+              🔧 Test: Chấm lại AI
+            </button>
+            {regradeForTestBlockedReason ? <span className="max-w-80 text-xs font-semibold text-amber-700">{regradeForTestBlockedReason}</span> : null}
           </div>
         }
         metaItems={[
@@ -815,7 +1137,7 @@ function ExamResultDetailPage() {
       {hiddenPendingReview ? (
         <div className="mt-5">
           <StatePanel
-            description="Điểm số đang được tạm ẩn cho tới khi giáo viên đưa ra kết luận cuối cùng."
+            description="Điểm số đang được tạm ẩn cho người dùng hiện tại cho tới khi giáo viên đưa ra kết luận cuối cùng."
             title="Đang chờ giáo viên xem xét"
             tone="warning"
           />
@@ -825,7 +1147,12 @@ function ExamResultDetailPage() {
       {!hiddenPendingReview && result ? (
         <>
           <div className="mt-5 grid gap-4 sm:grid-cols-4">
-            <StatCard icon={<Gauge size={19} />} iconTone="indigo" label="Tổng điểm" value={formatScore(result.totalScore)} />
+            <StatCard
+              icon={<Gauge size={19} />}
+              iconTone="indigo"
+              label="Tổng điểm"
+              value={<span className={getResultScoreTextClass(result.totalScore)}>{formatScore(result.totalScore)}</span>}
+            />
             <StatCard icon={<Target size={19} />} iconTone="violet" label="Band đạt" value={result.rubricResultBandName ?? result.rubricResultBandCode ?? '-'} />
             <StatCard icon={<ClipboardList size={19} />} iconTone="amber" label="Band mục tiêu" value={result.targetFrameworkBandLabel ?? result.targetFrameworkBandCode ?? '-'} />
             <StatCard icon={<Mic2 size={19} />} iconTone="emerald" label="Số câu đã chấm" value={result.items.length} />

@@ -217,7 +217,6 @@ type ExamCreateDraft = {
   code: string
   description: string
   languageId: string
-  maxAttempt: string
   name: string
   resultDecisionMethod: ResultDecisionMethod
 }
@@ -246,11 +245,9 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   const [code, setCode] = useState(locationState?.draft?.code ?? '')
   const [description, setDescription] = useState(locationState?.draft?.description ?? '')
   const [languageId, setLanguageId] = useState(locationState?.draft?.languageId ?? '')
-  const [maxAttempt, setMaxAttempt] = useState(locationState?.draft?.maxAttempt ?? '1')
   const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
     locationState?.draft?.resultDecisionMethod ?? 'HIGHEST',
   )
-  const [requiresOtp, setRequiresOtp] = useState(true)
   const [selectedRubricVersion, setSelectedRubricVersion] = useState<SelectedRubricVersion | null>(
     locationState?.selectedRubricVersion ?? null,
   )
@@ -272,7 +269,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   function goToSelectRubricVersion() {
     navigate('/school-admin/rubric-versions/select', {
       state: {
-        draft: { code, description, languageId, maxAttempt, name, resultDecisionMethod },
+        draft: { code, description, languageId, name, resultDecisionMethod },
         languageId,
         returnTo: '/school-admin/exams/create',
       },
@@ -297,9 +294,10 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
       code: code.trim(),
       description: description || null,
       languageId,
-      maxAttempt: Number(maxAttempt) || 1,
+      // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
+      maxAttempt: 1,
       name,
-      requiresOtp,
+      requiresOtp: true,
       resultDecisionMethod,
     })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -353,40 +351,19 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             ))}
           </select>
         </label>
-        <div className="grid gap-3.5 sm:grid-cols-2">
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Số lượt thi tối đa
-            <input
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              min={1}
-              onChange={(event) => setMaxAttempt(event.target.value)}
-              type="number"
-              value={maxAttempt}
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Cách chốt điểm
-            <select
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
-              value={resultDecisionMethod}
-            >
-              {RESULT_DECISION_METHODS.map((method) => (
-                <option key={method} value={method}>
-                  {getResultDecisionMethodDisplay(method)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700">
-          <input
-            checked={requiresOtp}
-            className="size-4 rounded border-slate-300"
-            onChange={(event) => setRequiresOtp(event.target.checked)}
-            type="checkbox"
-          />
-          Yêu cầu xác thực OTP khi vào thi
+        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          Cách chốt điểm
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+            onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+            value={resultDecisionMethod}
+          >
+            {RESULT_DECISION_METHODS.map((method) => (
+              <option key={method} value={method}>
+                {getResultDecisionMethodDisplay(method)}
+              </option>
+            ))}
+          </select>
         </label>
 
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
@@ -494,11 +471,9 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
   const [description, setDescription] = useState(exam.description ?? '')
   const [openAt, setOpenAt] = useState(toDateTimeLocalValue(exam.openAt))
   const [closeAt, setCloseAt] = useState(toDateTimeLocalValue(exam.closeAt))
-  const [maxAttempt, setMaxAttempt] = useState(String(exam.maxAttempt ?? 1))
   const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
     exam.resultDecisionMethod ?? 'HIGHEST',
   )
-  const [requiresOtp, setRequiresOtp] = useState(exam.requiresOtp)
 
   async function handleSubmit() {
     if (!name.trim()) {
@@ -510,10 +485,11 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
       payload: {
         closeAt: toIsoDateTime(closeAt),
         description: description || null,
-        maxAttempt: Number(maxAttempt) || 1,
+        // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
+        maxAttempt: 1,
         name: name.trim(),
         openAt: toIsoDateTime(openAt),
-        requiresOtp,
+        requiresOtp: true,
         resultDecisionMethod,
       },
     })
@@ -571,40 +547,19 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
               />
             </label>
           </div>
-          <div className="grid gap-3.5 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              Số lượt thi tối đa
-              <input
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-                min={1}
-                onChange={(event) => setMaxAttempt(event.target.value)}
-                type="number"
-                value={maxAttempt}
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              Cách chốt điểm
-              <select
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-                onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
-                value={resultDecisionMethod}
-              >
-                {RESULT_DECISION_METHODS.map((method) => (
-                  <option key={method} value={method}>
-                    {getResultDecisionMethodDisplay(method)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700">
-            <input
-              checked={requiresOtp}
-              className="size-4 rounded border-slate-300"
-              onChange={(event) => setRequiresOtp(event.target.checked)}
-              type="checkbox"
-            />
-            Yêu cầu xác thực OTP khi vào thi
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Cách chốt điểm
+            <select
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+              value={resultDecisionMethod}
+            >
+              {RESULT_DECISION_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {getResultDecisionMethodDisplay(method)}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         <div className="flex justify-end gap-2.5 border-t border-slate-200 px-6 py-4">

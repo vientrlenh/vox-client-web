@@ -14,7 +14,13 @@ import {
   useUpdateExamPaperSectionMutation,
   useUpdateExamPaperStatusMutation,
 } from '../api/mutations'
-import { formatNullableText, getExamPaperStatusDisplay, type ExamMemberRole, type UpdateExamPaperStatusRequest } from '../types'
+import {
+  formatDurationSeconds,
+  formatNullableText,
+  getExamPaperStatusDisplay,
+  type ExamMemberRole,
+  type UpdateExamPaperStatusRequest,
+} from '../types'
 
 const STATUS_ACTION_LABEL: Record<UpdateExamPaperStatusRequest['action'], string> = {
   APPROVE: 'Duyệt mã đề',
@@ -170,7 +176,8 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
               {paper.code} · Mã đề {paper.variant}
             </div>
             <div className="text-sm text-slate-500">
-              {filledItems}/{totalItems} câu hỏi đã gán · {paper.sections.length} phần
+              {filledItems}/{totalItems} câu hỏi đã gán · {paper.sections.length} phần · Thời lượng:{' '}
+              {formatDurationSeconds(paper.timeDurationSeconds)}
             </div>
           </div>
         </div>
@@ -253,6 +260,19 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
                         )}
                       </div>
                       <p className="truncate text-xs text-slate-500">{formatNullableText(item.question?.questionText)}</p>
+                      {item.question ? (
+                        <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-500">
+                          <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                            Chuẩn bị: {formatDurationSeconds(item.question.preparationTimeSeconds)}
+                          </span>
+                          <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                            Tối thiểu: {formatDurationSeconds(item.question.minResponseSeconds)}
+                          </span>
+                          <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                            Tối đa: {formatDurationSeconds(item.question.maxResponseSeconds)}
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                     {item.question ? (
                       <a

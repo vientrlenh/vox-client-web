@@ -699,6 +699,10 @@ export function AppRoutes() {
               element={<SchoolAdminMonitoringRoomsPage />}
             />
             <Route
+              path="school-admin/proctor-attendance"
+              element={<TeacherProctorAttendancePage />}
+            />
+            <Route
               path="school-admin/monitoring/exams/:examId/rooms/:roomId"
               element={<MonitoringRoomPage />}
             />

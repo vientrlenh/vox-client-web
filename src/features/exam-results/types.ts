@@ -73,6 +73,7 @@ export type ExamValidityRuleResultDto = {
   action?: string | null
   blocking?: boolean | null
   category?: string | null
+  evidence?: Record<string, unknown> | null
   message?: string | null
   ruleId?: string | null
   severity?: string | null
@@ -118,11 +119,15 @@ export type ExamItemEvaluationTurnDto = {
 }
 
 export type ExamEvaluationSignalsDto = {
-  aiConfidence?: number | null
   asrConfidenceAvg?: number | null
+  audioGateReasonCodes?: string[] | null
+  audioGateStatus?: 'HARD_FAIL' | 'PASS' | 'SOFT_WARN' | 'UNKNOWN' | null
   audioQuality?: number | null
   codeSwitchingRatio?: number | null
+  confidenceMode?: 'HIGH_STAKES' | 'MOCK_TEST' | 'PRACTICE' | null
   durationSeconds?: number | null
+  evidenceReasonCodes?: string[] | null
+  evidenceStatus?: 'INSUFFICIENT_EVIDENCE' | 'SUFFICIENT' | null
   expectedMinWords?: number | null
   lengthRatio?: number | null
   offTopicRatio?: number | null
@@ -130,6 +135,7 @@ export type ExamEvaluationSignalsDto = {
   silenceRatio?: number | null
   speechRate?: number | null
   topicRelevanceScore?: number | null
+  uncertaintyType?: 'INSUFFICIENT_EVIDENCE' | 'MIXED' | 'NONE' | 'SYSTEM_UNCERTAINTY' | null
   wordCount?: number | null
 }
 
@@ -183,6 +189,10 @@ export function getExamResultStatusDisplay(status?: string | null): { label: str
       return { label: 'Không hợp lệ', tone: 'danger' }
     case 'RETAKE_REQUIRED':
       return { label: 'Cần thi lại', tone: 'danger' }
+    case 'PASSED':
+      return { label: 'Đạt', tone: 'success' }
+    case 'FAILED':
+      return { label: 'Không đạt', tone: 'danger' }
     default:
       return { label: status ?? 'Chưa có kết quả', tone: 'neutral' }
   }

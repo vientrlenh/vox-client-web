@@ -250,9 +250,21 @@ const REVIEW_FLAGGED_EXAM_RESULT_MUTATION = `
   }
 `
 
+const RELEASE_PENDING_EXAM_RESULT_MUTATION = `
+  mutation ReleasePendingExamResult($sessionId: ID!) {
+    releasePendingExamResult(sessionId: $sessionId)
+  }
+`
+
 const RETRY_GRADING_EXAM_SESSION_MUTATION = `
   mutation RetryGradingExamSession($sessionId: ID!) {
     retryGradingExamSession(sessionId: $sessionId)
+  }
+`
+
+const DECIDE_EXAM_CANDIDATE_RESULT_OUTCOME_MUTATION = `
+  mutation DecideExamCandidateResultOutcome($candidateResultId: ID!, $decision: ExamCandidateResultStatus!) {
+    decideExamCandidateResultOutcome(candidateResultId: $candidateResultId, decision: $decision)
   }
 `
 
@@ -274,6 +286,38 @@ export function useReviewFlaggedExamResultMutation() {
   })
 }
 
+// State diagram: PENDING_REVIEW chỉ có 1 lối ra là RELEASED - giáo viên xác nhận điểm AI ổn.
+export function useReleasePendingExamResultMutation() {
+  return useMutation({
+    mutationFn: async ({ sessionId }: { sessionId: string }) => {
+      const data = await graphQLRequest<{ releasePendingExamResult: string }>(RELEASE_PENDING_EXAM_RESULT_MUTATION, {
+        sessionId,
+      })
+      return data.releasePendingExamResult
+    },
+  })
+}
+
+// Chỉ áp dụng khi result đang FINAL (kỳ thi đã RESULTS_PUBLISHED nhưng assessmentPolicy không
+// có passingScore) - nhà trường tự chốt PASSED/FAILED thủ công.
+export function useDecideExamCandidateResultOutcomeMutation() {
+  return useMutation({
+    mutationFn: async ({
+      candidateResultId,
+      decision,
+    }: {
+      candidateResultId: string
+      decision: 'PASSED' | 'FAILED'
+    }) => {
+      const data = await graphQLRequest<{ decideExamCandidateResultOutcome: string }>(
+        DECIDE_EXAM_CANDIDATE_RESULT_OUTCOME_MUTATION,
+        { candidateResultId, decision },
+      )
+      return data.decideExamCandidateResultOutcome
+    },
+  })
+}
+
 export function useRetryGradingExamSessionMutation() {
   return useMutation({
     mutationFn: async (sessionId: string) => {
@@ -281,6 +325,24 @@ export function useRetryGradingExamSessionMutation() {
         sessionId,
       })
       return data.retryGradingExamSession
+    },
+  })
+}
+
+// TEST-ONLY: chấm lại bằng AI từ đầu bất kể trạng thái (kể cả đã GRADED).
+const REGRADE_EXAM_SESSION_FOR_TEST_MUTATION = `
+  mutation RegradeExamSessionForTest($sessionId: ID!) {
+    regradeExamSessionForTest(sessionId: $sessionId)
+  }
+`
+
+export function useRegradeExamSessionForTestMutation() {
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const data = await graphQLRequest<{ regradeExamSessionForTest: string }>(REGRADE_EXAM_SESSION_FOR_TEST_MUTATION, {
+        sessionId,
+      })
+      return data.regradeExamSessionForTest
     },
   })
 }

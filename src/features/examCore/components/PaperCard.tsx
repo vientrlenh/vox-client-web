@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react'
 import { FileText } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { getExamPaperStatusDisplay, type ExamKind, type ExamPaperDto } from '../types'
+import { formatDurationSeconds, getExamPaperStatusDisplay, type ExamKind, type ExamPaperDto } from '../types'
 
 type PaperCardAction = {
   disabled?: boolean
@@ -44,6 +44,8 @@ export function PaperCard({ actions = [], examKind, onOpen, openLabel = 'Xem đ�
             </div>
             <div className="text-xs text-slate-500">
               {subtitle ?? `${paper.sections.length} phần · ${totalItems} câu hỏi`}
+              <span className="mx-1.5 text-slate-300">·</span>
+              <span>Thời lượng: {formatDurationSeconds(paper.timeDurationSeconds)}</span>
             </div>
           </div>
           <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
