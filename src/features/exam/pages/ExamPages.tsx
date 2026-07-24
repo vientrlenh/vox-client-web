@@ -246,7 +246,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   const [code, setCode] = useState(locationState?.draft?.code ?? '')
   const [description, setDescription] = useState(locationState?.draft?.description ?? '')
   const [languageId, setLanguageId] = useState(locationState?.draft?.languageId ?? '')
-  const [maxAttempt, setMaxAttempt] = useState(locationState?.draft?.maxAttempt ?? '1')
+  const [maxAttempt] = useState(locationState?.draft?.maxAttempt ?? '1')
   const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
     locationState?.draft?.resultDecisionMethod ?? 'HIGHEST',
   )
@@ -296,8 +296,10 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
       code: code.trim(),
       description: description || null,
       languageId,
-      maxAttempt: Number(maxAttempt) || 1,
+      // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
+      maxAttempt: 1,
       name,
+      requiresOtp: true,
       resultDecisionMethod,
     })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -351,31 +353,96 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             ))}
           </select>
         </label>
-        <div className="grid gap-3.5 sm:grid-cols-2">
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Số lượt thi tối đa
-            <input
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              min={1}
-              onChange={(event) => setMaxAttempt(event.target.value)}
-              type="number"
-              value={maxAttempt}
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Cách chốt điểm
-            <select
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
-              value={resultDecisionMethod}
+        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          Cách chốt điểm
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+            onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+            value={resultDecisionMethod}
+          >
+            {RESULT_DECISION_METHODS.map((method) => (
+              <option key={method} value={method}>
+                {getResultDecisionMethodDisplay(method)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
+          <p className="text-xs text-slate-500">
+            Không bắt buộc — chọn để tự động gắn chính sách đánh giá (Assessment Policy) phù hợp cho kỳ thi.
+          </p>
+
+          {!selectedRubricVersion ? (
+            <button
+              className="mt-1.5 inline-flex h-9.5 w-fit items-center justify-center rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!languageId}
+              onClick={goToSelectRubricVersion}
+              title={!languageId ? 'Chọn ngôn ngữ trước' : undefined}
+              type="button"
             >
-              {RESULT_DECISION_METHODS.map((method) => (
-                <option key={method} value={method}>
-                  {getResultDecisionMethodDisplay(method)}
-                </option>
-              ))}
-            </select>
-          </label>
+              Chọn phiên bản thang đánh giá
+            </button>
+          ) : (
+            <div className="mt-1.5 grid gap-2 rounded-lg border border-indigo-200 bg-white p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[13px] text-slate-700">
+                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b> ({selectedRubricVersion.code} · v
+                  {selectedRubricVersion.version})
+                </p>
+                <button
+                  className="shrink-0 text-xs font-bold text-slate-400 hover:text-red-600"
+                  onClick={clearSelectedRubricVersion}
+                  type="button"
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+
+              {isResolvingPolicy ? <p className="text-xs text-slate-400">Đang tìm chính sách đánh giá phù hợp…</p> : null}
+
+              {hasNoMatchingPolicy ? (
+                <p className="text-xs font-semibold text-amber-700">
+                  Chưa có chính sách đánh giá (Assessment Policy) đã xuất bản cho phiên bản này với ngôn ngữ đã chọn. Vẫn có thể tạo kỳ
+                  thi và gắn chính sách sau, hoặc chọn phiên bản khác.
+                </p>
+              ) : null}
+
+              {matchingPolicies.length > 1 ? (
+                <div className="grid gap-1.5">
+                  <p className="text-xs font-semibold text-slate-600">Có {matchingPolicies.length} chính sách khớp — chọn một:</p>
+                  {matchingPolicies.map((policy) => (
+                    <button
+                      className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-semibold ${
+                        manualPolicyId === policy.id
+                          ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                      key={policy.id}
+                      onClick={() => setManualPolicyId(policy.id)}
+                      type="button"
+                    >
+                      <span>
+                        Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt {policy.passingScore ?? '-'}
+                      </span>
+                      <span>
+                        {formatDate(policy.effectiveFrom)}
+                        {policy.effectiveTo ? ` – ${formatDate(policy.effectiveTo)}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {assessmentPolicyId && matchingPolicies.length === 1 ? (
+                <p className="text-xs font-semibold text-emerald-700">
+                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
+                  {matchingPolicies[0].passingScore ?? '-'}
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
 
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
@@ -483,7 +550,6 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
   const [description, setDescription] = useState(exam.description ?? '')
   const [openAt, setOpenAt] = useState(toDateTimeLocalValue(exam.openAt))
   const [closeAt, setCloseAt] = useState(toDateTimeLocalValue(exam.closeAt))
-  const [maxAttempt, setMaxAttempt] = useState(String(exam.maxAttempt ?? 1))
   const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
     exam.resultDecisionMethod ?? 'HIGHEST',
   )
@@ -498,9 +564,11 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
       payload: {
         closeAt: toIsoDateTime(closeAt),
         description: description || null,
-        maxAttempt: Number(maxAttempt) || 1,
+        // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
+        maxAttempt: 1,
         name: name.trim(),
         openAt: toIsoDateTime(openAt),
+        requiresOtp: true,
         resultDecisionMethod,
       },
     })
@@ -558,32 +626,20 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
               />
             </label>
           </div>
-          <div className="grid gap-3.5 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              Số lượt thi tối đa
-              <input
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-                min={1}
-                onChange={(event) => setMaxAttempt(event.target.value)}
-                type="number"
-                value={maxAttempt}
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              Cách chốt điểm
-              <select
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-                onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
-                value={resultDecisionMethod}
-              >
-                {RESULT_DECISION_METHODS.map((method) => (
-                  <option key={method} value={method}>
-                    {getResultDecisionMethodDisplay(method)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Cách chốt điểm
+            <select
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+              value={resultDecisionMethod}
+            >
+              {RESULT_DECISION_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {getResultDecisionMethodDisplay(method)}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="flex justify-end gap-2.5 border-t border-slate-200 px-6 py-4">
           <button
@@ -748,41 +804,51 @@ function ExamDetailPage({
 
       <DetailHeaderCard
         actions={
-          canManageStatus ? (
-            <>
-              <button
-                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
-                onClick={() => {
-                  void (async () => {
-                    if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
-                      return
-                    }
-                    await deleteMutation.mutateAsync(exam.id)
-                    await invalidate()
-                    navigate(basePath)
-                  })()
-                }}
-                type="button"
-              >
-                <Trash2 aria-hidden="true" className="size-4" />
-                Xóa
-              </button>
-              {primaryStatusAction ? (
+          <>
+            <button
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              onClick={() => navigate(`${basePath.replace('/exams', '/exam-results')}?examId=${exam.id}`)}
+              type="button"
+            >
+              <ClipboardList aria-hidden="true" className="size-4" />
+              Xem kết quả
+            </button>
+            {canManageStatus ? (
+              <>
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
-                  onClick={() =>
-                    void updateStatusMutation
-                      .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
-                      .then(() => invalidate())
-                  }
+                  className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                  onClick={() => {
+                    void (async () => {
+                      if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
+                        return
+                      }
+                      await deleteMutation.mutateAsync(exam.id)
+                      await invalidate()
+                      navigate(basePath)
+                    })()
+                  }}
                   type="button"
                 >
-                  {primaryStatusAction.icon}
-                  {primaryStatusAction.label}
+                  <Trash2 aria-hidden="true" className="size-4" />
+                  Xóa
                 </button>
-              ) : null}
-            </>
-          ) : null
+                {primaryStatusAction ? (
+                  <button
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                    onClick={() =>
+                      void updateStatusMutation
+                        .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
+                        .then(() => invalidate())
+                    }
+                    type="button"
+                  >
+                    {primaryStatusAction.icon}
+                    {primaryStatusAction.label}
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+          </>
         }
         metaItems={[
           { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },

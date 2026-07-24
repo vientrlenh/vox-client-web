@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, LayoutList, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
+import { toApiError } from '@/shared/api'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { Pagination } from '@/shared/components/Pagination'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
@@ -296,6 +297,7 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
   const blueprint = blueprintQuery.data
   const updateVersionStatusMutation = useUpdateBlueprintVersionStatusMutation()
   const deleteVersionMutation = useDeleteBlueprintVersionMutation()
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const { confirm, dialog } = useConfirmationDialog()
 
@@ -312,27 +314,42 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
   }
 
   async function handlePublish(version: ExamBlueprintVersionDto) {
-    await updateVersionStatusMutation.mutateAsync({ payload: { action: 'PUBLISH' }, versionId: version.id })
-    await invalidate()
-    setMessage(`Đã xuất bản phiên bản ${version.code}.`)
+    setErrorMessage(null)
+    try {
+      await updateVersionStatusMutation.mutateAsync({ payload: { action: 'PUBLISH' }, versionId: version.id })
+      await invalidate()
+      setMessage(`Đã xuất bản phiên bản ${version.code}.`)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   async function handleArchive(version: ExamBlueprintVersionDto) {
+    setErrorMessage(null)
+    try {
     if (!(await confirm({ message: 'Lưu trữ phiên bản này? Các kỳ thi đang dùng sẽ không bị ảnh hưởng.' }))) {
       return
     }
-    await updateVersionStatusMutation.mutateAsync({ payload: { action: 'ARCHIVE' }, versionId: version.id })
-    await invalidate()
-    setMessage(`Đã lưu trữ phiên bản ${version.code}.`)
+      await updateVersionStatusMutation.mutateAsync({ payload: { action: 'ARCHIVE' }, versionId: version.id })
+      await invalidate()
+      setMessage(`Đã lưu trữ phiên bản ${version.code}.`)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   async function handleDeleteVersion(version: ExamBlueprintVersionDto) {
+    setErrorMessage(null)
+    try {
     if (!(await confirm({ message: `Xóa phiên bản ${version.code}? Toàn bộ phần và ô câu hỏi trong phiên bản cũng sẽ bị xóa.` }))) {
       return
     }
-    await deleteVersionMutation.mutateAsync(version.id)
-    await invalidate()
-    setMessage(`Đã xóa phiên bản ${version.code}.`)
+      await deleteVersionMutation.mutateAsync(version.id)
+      await invalidate()
+      setMessage(`Đã xóa phiên bản ${version.code}.`)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   return (
@@ -346,6 +363,7 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
       </button>
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
       {dialog}
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6">

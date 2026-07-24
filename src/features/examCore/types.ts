@@ -20,17 +20,17 @@ export type ExamBlueprintSlotType = 'FIXED' | 'SELECTION'
 
 export type CreateExamPaperSource = 'blueprint' | 'copy'
 
-export type ExamCandidateStatus = 'ASSIGNED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED'
+export type ExamCandidateStatus = 'ASSIGNED' | 'ATTENDED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
 
 export type ExamScheduleStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'MOVED' | 'CANCELLED'
 
 export type ExamDeliveryMode = 'DEVICE' | 'LAB'
 
-export type ResultDecisionMethod = 'HIGHEST' | 'LATEST' | 'AVERAGE' | 'FIRST'
+export type ResultDecisionMethod = 'HIGHEST' | 'LATEST' | 'AVERAGE' | 'FIRST' | 'LOWEST'
 
+export const RESULT_DECISION_METHODS: ResultDecisionMethod[] = ['HIGHEST', 'LATEST', 'AVERAGE', 'FIRST', 'LOWEST']
 export type AssessmentPolicyStrictness = 'LENIENT' | 'STANDARD' | 'STRICT'
 
-export const RESULT_DECISION_METHODS: ResultDecisionMethod[] = ['HIGHEST', 'LATEST', 'AVERAGE', 'FIRST']
 
 export type ExamSecurePoolStatus = 'SEALED' | 'RELEASED'
 
@@ -70,6 +70,9 @@ export type ExamPaperItemDto = {
   question?: {
     code?: string | null
     id: string
+    maxResponseSeconds?: number | null
+    minResponseSeconds?: number | null
+    preparationTimeSeconds?: number | null
     questionText?: string | null
     status?: string | null
   } | null
@@ -86,6 +89,7 @@ export type ExamPaperSectionDto = {
   paperId?: string | null
   sectionTimeLimitSeconds?: number | null
   title?: string | null
+  weight?: number | null
 }
 
 export type ExamPaperDto = {
@@ -96,6 +100,7 @@ export type ExamPaperDto = {
   id: string
   sections: ExamPaperSectionDto[]
   status: ExamPaperStatus
+  timeDurationSeconds?: number | null
   updatedAt?: string | null
   variant: number
 }
@@ -227,11 +232,34 @@ export type ExamSecurePoolDto = {
   status: ExamSecurePoolStatus
 }
 
+export type ExamScheduleOtpDto = {
+  expiresSeconds: number
+  otp: string
+}
+
+export type ExamAttemptSummaryDto = {
+  flagged: boolean
+  flagReason?: string | null
+  resultStatus?: string | null
+  rubricResultBandCode?: string | null
+  rubricResultBandName?: string | null
+  sessionId: string
+  startedAt?: string | null
+  status: string
+  submittedAt?: string | null
+  totalScore?: number | null
+}
+
 export type ExamCandidateDto = {
   assignedAt?: string | null
   assignedPaperId?: string | null
+  attempts: ExamAttemptSummaryDto[]
+  blockedAt?: string | null
   examId: string
   id: string
+  latestSessionId?: string | null
+  officialAttempt?: ExamAttemptSummaryDto | null
+  officialScore?: number | null
   scheduleId?: string | null
   status: ExamCandidateStatus
   student?: {
@@ -240,6 +268,29 @@ export type ExamCandidateDto = {
     id: string
   } | null
   studentId: string
+}
+
+export type ProctorScheduleSummaryDto = {
+  endDate?: string | null
+  examId: string
+  examName?: string | null
+  roomName?: string | null
+  scheduleId: string
+  schoolRoomId?: string | null
+  startDate?: string | null
+  status?: string | null
+}
+
+export type ProctorCandidateSummaryDto = {
+  blockedAt?: string | null
+  candidateId: string
+  sessionFlagged: boolean
+  sessionId?: string | null
+  sessionStatus?: string | null
+  status: ExamCandidateStatus | string
+  studentEmail?: string | null
+  studentId: string
+  studentName?: string | null
 }
 
 export function getScheduleLabel(schedule: Pick<ExamScheduleDto, 'room'>) {
@@ -268,6 +319,7 @@ export type ExamDto = {
   openAt?: string | null
   papers: ExamPaperDto[]
   papersLocked?: boolean | null
+  requiresOtp: boolean
   resultDecisionMethod?: ResultDecisionMethod | null
   schoolClassId?: string | null
   schoolId: string
@@ -282,6 +334,7 @@ export type UpdateExamRequest = {
   maxAttempt?: number | null
   name?: string
   openAt?: string | null
+  requiresOtp?: boolean | null
   resultDecisionMethod?: ResultDecisionMethod | null
 }
 
@@ -370,6 +423,18 @@ export function toDateTimeLocalValue(value?: string | null): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+export function formatDurationSeconds(value?: number | null): string {
+  if (value == null) {
+    return '-'
+  }
+  if (value < 60) {
+    return `${value} giây`
+  }
+  const minutes = Math.floor(value / 60)
+  const seconds = value % 60
+  return seconds === 0 ? `${minutes} phút` : `${minutes} phút ${seconds} giây`
+}
+
 export function formatDate(value?: string | null) {
   if (!value) {
     return '-'
@@ -437,12 +502,15 @@ export function getAssessmentPolicyStrictnessLabel(strictness?: AssessmentPolicy
 export function getCandidateStatusDisplay(status?: string | null): { tone: StatusTone; label: string } {
   switch (status) {
     case 'ASSIGNED':
-      return { tone: 'success', label: 'Đã vào phòng' }
+      return { tone: 'warning', label: 'Chưa điểm danh' }
+    case 'ATTENDED':
+      return { tone: 'success', label: 'Đã có mặt' }
     case 'ABSENT':
       return { tone: 'danger', label: 'Vắng thi' }
     case 'COMPLETED':
       return { tone: 'info', label: 'Đã hoàn thành' }
     case 'EXEMPTED':
+    case 'CANCELLED':
       return { tone: 'neutral', label: 'Miễn thi' }
     default:
       return { tone: 'warning', label: 'Chưa xếp ca' }
@@ -459,6 +527,8 @@ export function getResultDecisionMethodDisplay(method?: ResultDecisionMethod | s
       return 'Điểm trung bình'
     case 'FIRST':
       return 'Lượt đầu tiên'
+    case 'LOWEST':
+      return 'Điểm thấp nhất'
     default:
       return '-'
   }

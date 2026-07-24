@@ -305,7 +305,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
     try {
       await downloadQuestionImportTemplate()
     } catch (submitError) {
-      setError(getErrorMessage(submitError) ?? 'Khong the tai file mau.')
+      setError(getErrorMessage(submitError) ?? 'Không thể tải file mẫu.')
     }
   }
 
@@ -314,7 +314,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-0 text-slate-950">
-            Nhap cau hoi tu Excel
+            Nhập câu hỏi từ Excel
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-slate-600">
             Chọn ngân hàng và chủ đề, rồi tải file lên. Hệ thống tự nhận diện cột theo
@@ -328,14 +328,14 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
             onClick={handleDownloadTemplate}
             type="button"
           >
-            Tai file mau
+            Tải file mẫu
           </button>
           <button
             className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
             onClick={() => navigate(`${basePath}/questions/all`)}
             type="button"
           >
-            Quay lai
+            Quay lại
           </button>
         </div>
       </div>
@@ -424,11 +424,10 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
 
           {preview ? (
             <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <SummaryCard label="Tên file" value={preview.fileName} />
                 <SummaryCard label="Tổng số dòng" value={preview.totalRows} />
                 <SummaryCard label="Số cột" value={preview.originalHeaders.length} />
-                <SummaryCard label="Hết hạn" value={preview.expiresAt ?? '-'} />
               </div>
 
               <SampleRowsTable preview={preview} />

@@ -97,6 +97,10 @@ function getPostLoginPath(roles: string[]) {
     return '/teacher/dashboard'
   }
 
+  if (roles.includes('STUDENT')) {
+    return '/student/exams'
+  }
+
   return null
 }
 

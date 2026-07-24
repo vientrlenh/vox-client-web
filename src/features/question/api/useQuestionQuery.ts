@@ -54,6 +54,8 @@ const QUESTION_DETAIL_QUERY = `
         url
         transcript
         description
+        transcriptManuallyEdited
+        descriptionManuallyEdited
         order
       }
       evaluationGuide {
@@ -95,10 +97,18 @@ export async function fetchQuestion(id: string) {
   return data.question
 }
 
-export function useQuestionQuery(id: string | null) {
+type UseQuestionQueryOptions = {
+  refetchInterval?: number | false
+}
+
+export function useQuestionQuery(
+  id: string | null,
+  options?: UseQuestionQueryOptions,
+) {
   return useQuery({
     enabled: Boolean(id),
     queryFn: () => fetchQuestion(id!),
     queryKey: questionQueryKeys.question(id),
+    refetchInterval: options?.refetchInterval,
   })
 }

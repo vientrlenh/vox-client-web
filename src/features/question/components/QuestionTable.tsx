@@ -111,11 +111,11 @@ export function QuestionTable({
                     />
                   </th>
                 ) : null}
-                <th className="px-6 py-4">âu hỏi</th>
+                <th className="px-6 py-4">Câu hỏi</th>
                 <th className="px-4 py-4">Mã</th>
                 <th className="px-4 py-4">Loại</th>
                 <th className="px-4 py-4">Chia sẻ</th>
-                <th className="px-4 py-4">ảo mật</th>
+                <th className="px-4 py-4">Bảo mật</th>
                 <th className="px-4 py-4">Thời lượng</th>
                 <th className="px-4 py-4">Trạng thái</th>
                 <th className="px-4 py-4">Cập nhật</th>

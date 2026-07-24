@@ -10,7 +10,7 @@ function getPostLoginPath(roles: string[]) {
     if (roles.includes('SYSTEM_ADMIN')) return '/system-admin/dashboard'
     if (roles.includes('SCHOOL_ADMIN')) return '/school-admin/dashboard'
     if (roles.includes('TEACHER')) return '/teacher/dashboard'
-    if (roles.includes('STUDENT')) return '/student/dashboard'
+    if (roles.includes('STUDENT')) return '/student/exams'
     return null
 }
 

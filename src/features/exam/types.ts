@@ -13,6 +13,7 @@ export type CreateExamRequest = {
   maxAttempt?: number | null
   name: string
   openAt?: string | null
+  requiresOtp?: boolean | null
   resultDecisionMethod?: ResultDecisionMethod | null
 }
 

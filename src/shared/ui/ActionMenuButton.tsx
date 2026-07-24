@@ -3,7 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Ellipsis } from 'lucide-react'
 
-export type ActionMenuItemTone = 'danger' | 'default' | 'primary' | 'success'
+export type ActionMenuItemTone = 'danger' | 'default' | 'primary' | 'success' | 'warning'
 
 export type ActionMenuItem = {
   disabled?: boolean
@@ -34,6 +34,7 @@ const menuItemToneClassNames: Record<ActionMenuItemTone, string> = {
   default: 'text-slate-700 hover:bg-slate-50',
   primary: 'text-indigo-700 hover:bg-indigo-50',
   success: 'text-emerald-700 hover:bg-emerald-50',
+  warning: 'text-amber-700 hover:bg-amber-50',
 }
 
 function getMenuPosition(

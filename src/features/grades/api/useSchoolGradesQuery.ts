@@ -29,8 +29,8 @@ const SCHOOL_GRADES_QUERY = `
 `
 
 const SCHOOL_GRADE_QUERY = `
-  query SchoolGrade($id: ID!) {
-    schoolGrade(id: $id) {
+  query SchoolGrade($schoolId: ID!, $id: ID!) {
+    schoolGrade(schoolId: $schoolId, id: $id) {
       ${SCHOOL_GRADE_FIELDS}
     }
   }
@@ -64,7 +64,8 @@ export async function fetchSchoolGrades(page: number, size: number, schoolGradeL
 }
 
 export async function fetchSchoolGrade(id: string) {
-  const data = await graphQLRequest<SchoolGradeQueryData>(SCHOOL_GRADE_QUERY, { id })
+  const schoolId = requireSchoolId()
+  const data = await graphQLRequest<SchoolGradeQueryData>(SCHOOL_GRADE_QUERY, { id, schoolId })
   return data.schoolGrade
 }
 
