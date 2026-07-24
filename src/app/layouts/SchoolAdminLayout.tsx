@@ -4,6 +4,7 @@ import {
   BookOpen,
   ChevronDown,
   ClipboardCheck,
+  CreditCard,
   DoorOpen,
   ClipboardList,
   FileQuestion,
@@ -94,6 +95,11 @@ const navigationItems = [
     icon: Gavel,
     label: 'Quản lý Quy tắc tính điểm',
     to: '/school-admin/scoring-rules',
+  },
+  {
+    icon: CreditCard,
+    label: 'Gói dịch vụ',
+    to: '/school-admin/subscription',
   },
 ]
 

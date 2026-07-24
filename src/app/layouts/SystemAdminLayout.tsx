@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   ClipboardList,
+  CreditCard,
   FileQuestion,
   Gavel,
   Home,
@@ -88,6 +89,11 @@ const navigationItems: NavigationItem[] = [
     icon: Gavel,
     label: 'Quản lý Scoring Rules',
     to: '/system-admin/scoring-rules',
+  },
+  {
+    icon: CreditCard,
+    label: 'Gói dịch vụ',
+    to: '/system-admin/subscription',
   },
   {
     icon: Settings,
