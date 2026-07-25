@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Search, X } from 'lucide-react'
+import { Check, Eye, Search, X } from 'lucide-react'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
 import {
@@ -91,45 +91,63 @@ export function QuestionPicker({
                 const statusDisplay = getQuestionStatusDisplay(question.status)
 
                 return (
-                  <button
+                  <div
                     className={[
-                      'grid gap-1 rounded-xl border p-3.5 text-left transition',
+                      'flex items-stretch gap-2 rounded-xl border p-3.5 transition',
                       isDisabled
-                        ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-60'
+                        ? 'border-slate-200 bg-slate-100'
                         : isSelected
                           ? 'border-indigo-500 bg-indigo-50'
-                          : 'border-slate-200 hover:bg-slate-50',
+                          : 'border-slate-200',
                     ].join(' ')}
-                    disabled={isDisabled}
                     key={question.id}
-                    onClick={() => onSelect(question)}
-                    type="button"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-slate-900">{question.code}</span>
-                      <div className="flex items-center gap-2">
-                        {isUsedElsewhere ? (
-                          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                            Đã dùng ở phần khác
-                          </span>
-                        ) : cannotUseInExam ? (
-                          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                            Chỉ có quyền xem, không thể dùng trong bài kiểm tra
-                          </span>
-                        ) : (
-                          <StatusBadge
-                            label={statusDisplay.label}
-                            tone={statusDisplay.className.includes('emerald') ? 'success' : 'neutral'}
-                          />
-                        )}
-                        {isSelected ? <Check aria-hidden="true" className="size-4 text-indigo-600" /> : null}
+                    <button
+                      className={[
+                        'grid flex-1 gap-1 text-left',
+                        isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                      ].join(' ')}
+                      disabled={isDisabled}
+                      onClick={() => onSelect(question)}
+                      type="button"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-slate-900">{question.code}</span>
+                        <div className="flex items-center gap-2">
+                          {isUsedElsewhere ? (
+                            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                              Đã dùng ở phần khác
+                            </span>
+                          ) : cannotUseInExam ? (
+                            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                              Chỉ có quyền xem, không thể dùng trong bài kiểm tra
+                            </span>
+                          ) : (
+                            <StatusBadge
+                              label={statusDisplay.label}
+                              tone={statusDisplay.className.includes('emerald') ? 'success' : 'neutral'}
+                            />
+                          )}
+                          {isSelected ? <Check aria-hidden="true" className="size-4 text-indigo-600" /> : null}
+                        </div>
                       </div>
-                    </div>
-                    <p className="text-xs text-slate-500">{formatNullableText(question.questionText)}</p>
-                    <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
-                      {getQuestionTypeDisplay(question.type)}
-                    </span>
-                  </button>
+                      <p className="text-xs text-slate-500">{formatNullableText(question.questionText)}</p>
+                      <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
+                        {getQuestionTypeDisplay(question.type)}
+                      </span>
+                    </button>
+                    <a
+                      aria-label={`Xem chi tiết ${question.code}`}
+                      className="inline-flex size-8 shrink-0 items-center justify-center self-start rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      href={`/teacher/questions/${question.id}`}
+                      onClick={(event) => event.stopPropagation()}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                      title="Xem chi tiết câu hỏi"
+                    >
+                      <Eye aria-hidden="true" className="size-3.5" />
+                    </a>
+                  </div>
                 )
               })}
             </div>

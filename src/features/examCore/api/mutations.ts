@@ -15,6 +15,7 @@ import type {
   ExamPaperItemDto,
   ExamPaperSectionDto,
   ExamScheduleDto,
+  ExamScheduleOtpDto,
   ExamSecurePoolDto,
   QuestionSelectionSpec,
   UpdateExamBlueprintVersionStatusRequest,
@@ -498,6 +499,119 @@ export function useRemoveProctorFromScheduleMutation() {
     }) => {
       await apiClient.delete<ApiResponse<unknown>>(`/v1/exams/${examId}/schedules/${scheduleId}/proctors/${proctorId}`)
       return proctorId
+    },
+  })
+}
+
+const FLAG_EXAM_SESSION_MUTATION = `
+  mutation FlagExamSession($sessionId: ID!, $reason: String!) {
+    flagExamSession(sessionId: $sessionId, reason: $reason)
+  }
+`
+
+const FORCE_END_EXAM_SESSION_MUTATION = `
+  mutation ForceEndExamSession($sessionId: ID!, $reason: String!) {
+    forceEndExamSession(sessionId: $sessionId, reason: $reason)
+  }
+`
+
+const UNBLOCK_EXAM_CANDIDATE_MUTATION = `
+  mutation UnblockExamCandidate($candidateId: ID!, $reason: String!) {
+    unblockExamCandidate(candidateId: $candidateId, reason: $reason)
+  }
+`
+
+const UPDATE_EXAM_CANDIDATE_STATUS_MUTATION = `
+  mutation UpdateExamCandidateStatus($candidateId: ID!, $status: ExamCandidateStatus!) {
+    updateExamCandidateStatus(candidateId: $candidateId, status: $status)
+  }
+`
+
+const UPDATE_EXAM_CANDIDATES_ATTENDANCE_MUTATION = `
+  mutation UpdateExamCandidatesAttendance($scheduleId: ID!, $candidateIds: [ID!]!) {
+    updateExamCandidatesAttendance(scheduleId: $scheduleId, candidateIds: $candidateIds) {
+      id
+      examId
+      studentId
+      scheduleId
+      assignedPaperId
+      status
+      assignedAt
+      updatedAt
+      blockedAt
+    }
+  }
+`
+
+export function useFlagExamSessionMutation() {
+  return useMutation({
+    mutationFn: async ({ reason, sessionId }: { reason: string; sessionId: string }) => {
+      const data = await graphQLRequest<{ flagExamSession: string }>(FLAG_EXAM_SESSION_MUTATION, { reason, sessionId })
+      return data.flagExamSession
+    },
+  })
+}
+
+export function useForceEndExamSessionMutation() {
+  return useMutation({
+    mutationFn: async ({ reason, sessionId }: { reason: string; sessionId: string }) => {
+      const data = await graphQLRequest<{ forceEndExamSession: string }>(FORCE_END_EXAM_SESSION_MUTATION, { reason, sessionId })
+      return data.forceEndExamSession
+    },
+  })
+}
+
+export function useUnblockExamCandidateMutation() {
+  return useMutation({
+    mutationFn: async ({ candidateId, reason }: { candidateId: string; reason: string }) => {
+      const data = await graphQLRequest<{ unblockExamCandidate: string }>(UNBLOCK_EXAM_CANDIDATE_MUTATION, { candidateId, reason })
+      return data.unblockExamCandidate
+    },
+  })
+}
+
+export function useUpdateExamCandidateStatusMutation() {
+  return useMutation({
+    mutationFn: async ({
+      candidateId,
+      status,
+    }: {
+      candidateId: string
+      status: 'ABSENT' | 'ASSIGNED' | 'ATTENDED' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
+    }) => {
+      const data = await graphQLRequest<{ updateExamCandidateStatus: string }>(UPDATE_EXAM_CANDIDATE_STATUS_MUTATION, {
+        candidateId,
+        status,
+      })
+      return data.updateExamCandidateStatus
+    },
+  })
+}
+
+export function useUpdateExamCandidatesAttendanceMutation() {
+  return useMutation({
+    mutationFn: async ({ candidateIds, scheduleId }: { candidateIds: string[]; scheduleId: string }) => {
+      const data = await graphQLRequest<{ updateExamCandidatesAttendance: ExamCandidateDto[] }>(
+        UPDATE_EXAM_CANDIDATES_ATTENDANCE_MUTATION,
+        { candidateIds, scheduleId },
+      )
+      return data.updateExamCandidatesAttendance
+    },
+  })
+}
+
+export function useGetExamScheduleOtpMutation() {
+  return useMutation({
+    mutationFn: async ({ examId, scheduleId }: { examId: string; scheduleId: string }) => {
+      const response = await apiClient.get<ApiResponse<{ expiresAt: number; otp: string }>>(
+        `/v1/exams/${examId}/schedules/${scheduleId}/otp`,
+      )
+      const data = unwrap(response)
+      const normalized: ExamScheduleOtpDto = {
+        expiresSeconds: data.expiresAt ?? 0,
+        otp: data.otp,
+      }
+      return normalized
     },
   })
 }

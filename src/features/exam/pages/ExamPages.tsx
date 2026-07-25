@@ -16,10 +16,9 @@ import {
   Plus,
   Rocket,
   Trash2,
-  Users,
   X,
 } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { Pagination } from '@/shared/components/Pagination'
 import { toApiError } from '@/shared/api'
@@ -30,12 +29,14 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
 import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
 import { examQueryKeys, useExamMyRoleQuery, useExamQuery } from '@/features/examCore/api/queries'
+import { useMatchingSchoolAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
 import {
   useCreateExamPaperMutation,
   useReleaseSecurePoolMutation,
@@ -43,8 +44,10 @@ import {
   useUpdateExamPaperStatusMutation,
 } from '@/features/examCore/api/mutations'
 import {
+  formatDate,
   formatDateTime,
   formatNullableText,
+  getAssessmentPolicyStrictnessLabel,
   getExamPaperStatusDisplay,
   getResultDecisionMethodDisplay,
   RESULT_DECISION_METHODS,
@@ -82,7 +85,7 @@ function getExamWorkflowSteps(exam: ExamDto): { completedCount: number; steps: W
   const steps: WorkflowStep[] = [
     {
       icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
-      label: 'Gắn blueprint',
+      label: 'Khung đề',
       state: step1Done ? 'done' : 'current',
       sublabel: step1Done ? 'Hoàn tất' : 'Chưa gắn blueprint',
     },
@@ -94,13 +97,13 @@ function getExamWorkflowSteps(exam: ExamDto): { completedCount: number; steps: W
     },
     {
       icon: step3Done ? <Check size={26} /> : <FilePenLine size={24} />,
-      label: 'Soạn & duyệt đề',
+      label: 'Đề bài',
       state: !step2Done ? 'upcoming' : step3Done ? 'done' : 'current',
       sublabel: totalPapers ? `${lockedPapers} / ${totalPapers} mã đề đã khóa` : undefined,
     },
     {
       icon: step4Done ? <Check size={26} /> : <Rocket size={24} />,
-      label: 'Vận hành thi',
+      label: 'Xếp lịch',
       state: !step3Done ? 'upcoming' : step4Done ? 'done' : 'current',
       sublabel: step4Done ? 'Đã công bố kết quả' : 'Lên lịch → công bố',
     },
@@ -210,18 +213,75 @@ export function SchoolAdminExamsPage() {
   return <ExamListPage allowCreate basePath="/school-admin/exams" title="Kiểm tra tập trung" />
 }
 
+type ExamCreateDraft = {
+  code: string
+  description: string
+  languageId: string
+  maxAttempt: string
+  name: string
+  resultDecisionMethod: ResultDecisionMethod
+}
+
+type SelectedRubricVersion = { code: string; id: string; name: string; version: number }
+
+type ExamCreateLocationState = {
+  draft?: ExamCreateDraft
+  selectedRubricVersion?: SelectedRubricVersion
+} | null
+
 export function SchoolAdminExamCreatePage() {
+  const location = useLocation()
+  // key={location.key} forces a full remount whenever navigate() lands here with a fresh
+  // history entry (e.g. returning from the rubric-version picker), so the useState
+  // initializers below can pick up the new location.state instead of going stale.
+  return <ExamCreateForm key={location.key} locationState={location.state as ExamCreateLocationState} />
+}
+
+function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationState }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createMutation = useCreateExamMutation()
   const languagesQuery = useSupportedLanguagesQuery(1, 100, ACTIVE_LANGUAGE_FILTERS)
-  const [name, setName] = useState('')
-  const [code, setCode] = useState('')
-  const [description, setDescription] = useState('')
-  const [languageId, setLanguageId] = useState('')
-  const [maxAttempt, setMaxAttempt] = useState('1')
-  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>('HIGHEST')
+  const [name, setName] = useState(locationState?.draft?.name ?? '')
+  const [code, setCode] = useState(locationState?.draft?.code ?? '')
+  const [description, setDescription] = useState(locationState?.draft?.description ?? '')
+  const [languageId, setLanguageId] = useState(locationState?.draft?.languageId ?? '')
+  const [maxAttempt] = useState(locationState?.draft?.maxAttempt ?? '1')
+  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
+    locationState?.draft?.resultDecisionMethod ?? 'HIGHEST',
+  )
+  const [selectedRubricVersion, setSelectedRubricVersion] = useState<SelectedRubricVersion | null>(
+    locationState?.selectedRubricVersion ?? null,
+  )
+  const [manualPolicyId, setManualPolicyId] = useState<string | null>(null)
   const { confirm, dialog } = useConfirmationDialog()
+
+  const matchingPoliciesQuery = useMatchingSchoolAssessmentPoliciesQuery({
+    languageId,
+    rubricVersionId: selectedRubricVersion?.id,
+  })
+  const matchingPolicies = matchingPoliciesQuery.data ?? []
+  // Chỉ 1 chính sách khớp -> tự dùng luôn; nhiều chính sách khớp -> chờ người dùng chọn tay.
+  const assessmentPolicyId = matchingPolicies.length === 1 ? matchingPolicies[0].id : manualPolicyId
+  const isResolvingPolicy = Boolean(selectedRubricVersion) && matchingPoliciesQuery.isLoading
+  const hasNoMatchingPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length === 0
+  const hasAmbiguousPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length > 1 && !manualPolicyId
+  const canSubmit = !isResolvingPolicy && !hasAmbiguousPolicy
+
+  function goToSelectRubricVersion() {
+    navigate('/school-admin/rubric-versions/select', {
+      state: {
+        draft: { code, description, languageId, maxAttempt, name, resultDecisionMethod },
+        languageId,
+        returnTo: '/school-admin/exams/create',
+      },
+    })
+  }
+
+  function clearSelectedRubricVersion() {
+    setSelectedRubricVersion(null)
+    setManualPolicyId(null)
+  }
 
   async function handleSubmit() {
     if (!name.trim() || !code.trim() || !languageId) {
@@ -232,11 +292,14 @@ export function SchoolAdminExamCreatePage() {
       return
     }
     await createMutation.mutateAsync({
+      assessmentPolicyId,
       code: code.trim(),
       description: description || null,
       languageId,
-      maxAttempt: Number(maxAttempt) || 1,
+      // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
+      maxAttempt: 1,
       name,
+      requiresOtp: true,
       resultDecisionMethod,
     })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -290,37 +353,181 @@ export function SchoolAdminExamCreatePage() {
             ))}
           </select>
         </label>
-        <div className="grid gap-3.5 sm:grid-cols-2">
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Số lượt thi tối đa
-            <input
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              min={1}
-              onChange={(event) => setMaxAttempt(event.target.value)}
-              type="number"
-              value={maxAttempt}
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Cách chốt điểm
-            <select
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
-              value={resultDecisionMethod}
+        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          Cách chốt điểm
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+            onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+            value={resultDecisionMethod}
+          >
+            {RESULT_DECISION_METHODS.map((method) => (
+              <option key={method} value={method}>
+                {getResultDecisionMethodDisplay(method)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
+          <p className="text-xs text-slate-500">
+            Không bắt buộc — chọn để tự động gắn chính sách đánh giá (Assessment Policy) phù hợp cho kỳ thi.
+          </p>
+
+          {!selectedRubricVersion ? (
+            <button
+              className="mt-1.5 inline-flex h-9.5 w-fit items-center justify-center rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!languageId}
+              onClick={goToSelectRubricVersion}
+              title={!languageId ? 'Chọn ngôn ngữ trước' : undefined}
+              type="button"
             >
-              {RESULT_DECISION_METHODS.map((method) => (
-                <option key={method} value={method}>
-                  {getResultDecisionMethodDisplay(method)}
-                </option>
-              ))}
-            </select>
-          </label>
+              Chọn phiên bản thang đánh giá
+            </button>
+          ) : (
+            <div className="mt-1.5 grid gap-2 rounded-lg border border-indigo-200 bg-white p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[13px] text-slate-700">
+                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b> ({selectedRubricVersion.code} · v
+                  {selectedRubricVersion.version})
+                </p>
+                <button
+                  className="shrink-0 text-xs font-bold text-slate-400 hover:text-red-600"
+                  onClick={clearSelectedRubricVersion}
+                  type="button"
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+
+              {isResolvingPolicy ? <p className="text-xs text-slate-400">Đang tìm chính sách đánh giá phù hợp…</p> : null}
+
+              {hasNoMatchingPolicy ? (
+                <p className="text-xs font-semibold text-amber-700">
+                  Chưa có chính sách đánh giá (Assessment Policy) đã xuất bản cho phiên bản này với ngôn ngữ đã chọn. Vẫn có thể tạo kỳ
+                  thi và gắn chính sách sau, hoặc chọn phiên bản khác.
+                </p>
+              ) : null}
+
+              {matchingPolicies.length > 1 ? (
+                <div className="grid gap-1.5">
+                  <p className="text-xs font-semibold text-slate-600">Có {matchingPolicies.length} chính sách khớp — chọn một:</p>
+                  {matchingPolicies.map((policy) => (
+                    <button
+                      className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-semibold ${
+                        manualPolicyId === policy.id
+                          ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                      key={policy.id}
+                      onClick={() => setManualPolicyId(policy.id)}
+                      type="button"
+                    >
+                      <span>
+                        Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt {policy.passingScore ?? '-'}
+                      </span>
+                      <span>
+                        {formatDate(policy.effectiveFrom)}
+                        {policy.effectiveTo ? ` – ${formatDate(policy.effectiveTo)}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {assessmentPolicyId && matchingPolicies.length === 1 ? (
+                <p className="text-xs font-semibold text-emerald-700">
+                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
+                  {matchingPolicies[0].passingScore ?? '-'}
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
+
+        <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
+          <p className="text-xs text-slate-500">
+            Không bắt buộc — chọn để tự động gắn chính sách đánh giá (Assessment Policy) phù hợp cho kỳ thi.
+          </p>
+
+          {!selectedRubricVersion ? (
+            <button
+              className="mt-1.5 inline-flex h-9.5 w-fit items-center justify-center rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!languageId}
+              onClick={goToSelectRubricVersion}
+              title={!languageId ? 'Chọn ngôn ngữ trước' : undefined}
+              type="button"
+            >
+              Chọn phiên bản thang đánh giá
+            </button>
+          ) : (
+            <div className="mt-1.5 grid gap-2 rounded-lg border border-indigo-200 bg-white p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[13px] text-slate-700">
+                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b> ({selectedRubricVersion.code} · v
+                  {selectedRubricVersion.version})
+                </p>
+                <button
+                  className="shrink-0 text-xs font-bold text-slate-400 hover:text-red-600"
+                  onClick={clearSelectedRubricVersion}
+                  type="button"
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+
+              {isResolvingPolicy ? <p className="text-xs text-slate-400">Đang tìm chính sách đánh giá phù hợp…</p> : null}
+
+              {hasNoMatchingPolicy ? (
+                <p className="text-xs font-semibold text-amber-700">
+                  Chưa có chính sách đánh giá (Assessment Policy) đã xuất bản cho phiên bản này với ngôn ngữ đã chọn. Vẫn có thể tạo kỳ
+                  thi và gắn chính sách sau, hoặc chọn phiên bản khác.
+                </p>
+              ) : null}
+
+              {matchingPolicies.length > 1 ? (
+                <div className="grid gap-1.5">
+                  <p className="text-xs font-semibold text-slate-600">Có {matchingPolicies.length} chính sách khớp — chọn một:</p>
+                  {matchingPolicies.map((policy) => (
+                    <button
+                      className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-semibold ${
+                        manualPolicyId === policy.id
+                          ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                      key={policy.id}
+                      onClick={() => setManualPolicyId(policy.id)}
+                      type="button"
+                    >
+                      <span>
+                        Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt {policy.passingScore ?? '-'}
+                      </span>
+                      <span>
+                        {formatDate(policy.effectiveFrom)}
+                        {policy.effectiveTo ? ` – ${formatDate(policy.effectiveTo)}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {assessmentPolicyId && matchingPolicies.length === 1 ? (
+                <p className="text-xs font-semibold text-emerald-700">
+                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
+                  {matchingPolicies[0].passingScore ?? '-'}
+                </p>
+              ) : null}
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-end">
           <button
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
-            disabled={createMutation.isPending}
+            disabled={createMutation.isPending || !canSubmit}
             onClick={() => void handleSubmit()}
+            title={hasAmbiguousPolicy ? 'Chọn một chính sách đánh giá phù hợp trước khi tạo' : undefined}
             type="button"
           >
             Tạo kỳ thi
@@ -343,7 +550,6 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
   const [description, setDescription] = useState(exam.description ?? '')
   const [openAt, setOpenAt] = useState(toDateTimeLocalValue(exam.openAt))
   const [closeAt, setCloseAt] = useState(toDateTimeLocalValue(exam.closeAt))
-  const [maxAttempt, setMaxAttempt] = useState(String(exam.maxAttempt ?? 1))
   const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
     exam.resultDecisionMethod ?? 'HIGHEST',
   )
@@ -358,9 +564,11 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
       payload: {
         closeAt: toIsoDateTime(closeAt),
         description: description || null,
-        maxAttempt: Number(maxAttempt) || 1,
+        // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
+        maxAttempt: 1,
         name: name.trim(),
         openAt: toIsoDateTime(openAt),
+        requiresOtp: true,
         resultDecisionMethod,
       },
     })
@@ -418,32 +626,20 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
               />
             </label>
           </div>
-          <div className="grid gap-3.5 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              Số lượt thi tối đa
-              <input
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-                min={1}
-                onChange={(event) => setMaxAttempt(event.target.value)}
-                type="number"
-                value={maxAttempt}
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              Cách chốt điểm
-              <select
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-                onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
-                value={resultDecisionMethod}
-              >
-                {RESULT_DECISION_METHODS.map((method) => (
-                  <option key={method} value={method}>
-                    {getResultDecisionMethodDisplay(method)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Cách chốt điểm
+            <select
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
+              value={resultDecisionMethod}
+            >
+              {RESULT_DECISION_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {getResultDecisionMethodDisplay(method)}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="flex justify-end gap-2.5 border-t border-slate-200 px-6 py-4">
           <button
@@ -476,7 +672,7 @@ type ExamDetailPageProps = {
   canReleaseSecurePool: boolean
 }
 
-type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
+type ExamDetailTab = 'assessment' | 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
 
 function ExamDetailPage({
   basePath,
@@ -608,41 +804,51 @@ function ExamDetailPage({
 
       <DetailHeaderCard
         actions={
-          canManageStatus ? (
-            <>
-              <button
-                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
-                onClick={() => {
-                  void (async () => {
-                    if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
-                      return
-                    }
-                    await deleteMutation.mutateAsync(exam.id)
-                    await invalidate()
-                    navigate(basePath)
-                  })()
-                }}
-                type="button"
-              >
-                <Trash2 aria-hidden="true" className="size-4" />
-                Xóa
-              </button>
-              {primaryStatusAction ? (
+          <>
+            <button
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              onClick={() => navigate(`${basePath.replace('/exams', '/exam-results')}?examId=${exam.id}`)}
+              type="button"
+            >
+              <ClipboardList aria-hidden="true" className="size-4" />
+              Xem kết quả
+            </button>
+            {canManageStatus ? (
+              <>
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
-                  onClick={() =>
-                    void updateStatusMutation
-                      .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
-                      .then(() => invalidate())
-                  }
+                  className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                  onClick={() => {
+                    void (async () => {
+                      if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
+                        return
+                      }
+                      await deleteMutation.mutateAsync(exam.id)
+                      await invalidate()
+                      navigate(basePath)
+                    })()
+                  }}
                   type="button"
                 >
-                  {primaryStatusAction.icon}
-                  {primaryStatusAction.label}
+                  <Trash2 aria-hidden="true" className="size-4" />
+                  Xóa
                 </button>
-              ) : null}
-            </>
-          ) : null
+                {primaryStatusAction ? (
+                  <button
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                    onClick={() =>
+                      void updateStatusMutation
+                        .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
+                        .then(() => invalidate())
+                    }
+                    type="button"
+                  >
+                    {primaryStatusAction.icon}
+                    {primaryStatusAction.label}
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+          </>
         }
         metaItems={[
           { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
@@ -663,11 +869,12 @@ function ExamDetailPage({
       <div className="mt-5.5">
         <TabPillGroup
           items={[
-            { label: 'Đề bài', value: 'papers' },
             { label: 'Phân công', value: 'people' },
-            { label: 'Học sinh', value: 'students' },
+            { label: 'Phương thức đánh giá', value: 'assessment' },
             { label: 'Blueprint', value: 'blueprint' },
-            { icon: <Users aria-hidden="true" className="size-4" />, label: 'Phân lịch', value: 'schedule' },
+            { label: 'Đề bài', value: 'papers' },
+            { label: 'Học sinh', value: 'students' },
+            { icon: <Calendar aria-hidden="true" className="size-4" />, label: 'Xếp lịch', value: 'schedule' },
           ]}
           onChange={setTab}
           value={tab}
@@ -806,7 +1013,9 @@ function ExamDetailPage({
 
       {tab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
 
-      {tab === 'students' ? <CandidatesTab canManage={canManageSchedule} examId={exam.id} /> : null}
+      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
+
+      {tab === 'students' ? <CandidatesTab canManage={canManageSchedule} examId={exam.id} papers={exam.papers} /> : null}
 
       {tab === 'blueprint' ? (
         <BlueprintAttachPanel

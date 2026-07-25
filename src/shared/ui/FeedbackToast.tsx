@@ -49,7 +49,7 @@ export function FeedbackToast({ message, onClose, tone }: FeedbackToastProps) {
           </div>
           <div className="flex-1 text-sm font-semibold">{message}</div>
           <button
-            aria-label="Dong thong bao"
+            aria-label="Đóng thông báo"
             className="opacity-70 transition hover:opacity-100"
             onClick={onClose}
             type="button"

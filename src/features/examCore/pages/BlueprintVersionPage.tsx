@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
+import { Eye } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { examQueryKeys, useExamBlueprintQuery } from '../api/queries'
@@ -94,12 +95,29 @@ function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
               {section.slots.length ? (
                 <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
                   {section.slots.map((slot) => (
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600" key={slot.id}>
-                      {slot.slotType === 'FIXED'
-                        ? `Cố định: ${slot.fixedQuestion?.code ?? '-'}`
-                        : `Chọn ngẫu nhiên${slot.selectionSpec?.topicId ? ` · ${slot.selectionSpec.topicId}` : ''}`}
-                      {' · trọng số '}
-                      {slot.weight?.toFixed(2) ?? '-'}
+                    <div
+                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600"
+                      key={slot.id}
+                    >
+                      <span>
+                        {slot.slotType === 'FIXED'
+                          ? `Cố định: ${slot.fixedQuestion?.code ?? (slot.fixedQuestionId ? 'đã chọn — không có quyền xem' : '-')}`
+                          : `Chọn ngẫu nhiên${slot.selectionSpec?.topicId ? ` · ${slot.selectionSpec.topicId}` : ''}`}
+                        {' · trọng số '}
+                        {slot.weight?.toFixed(2) ?? '-'}
+                      </span>
+                      {slot.slotType === 'FIXED' && slot.fixedQuestion ? (
+                        <a
+                          aria-label={`Xem chi tiết ${slot.fixedQuestion.code}`}
+                          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          href={`${basePath.replace(/\/blueprints$/, '/questions')}/${slot.fixedQuestion.id}`}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                          title="Xem chi tiết câu hỏi"
+                        >
+                          <Eye aria-hidden="true" className="size-3.5" />
+                        </a>
+                      ) : null}
                     </div>
                   ))}
                 </div>

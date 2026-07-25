@@ -1,32 +1,34 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   BookOpenCheck,
   Calendar,
   Check,
   CheckCircle2,
+  ClipboardList,
   Clock,
   Eye,
   FilePenLine,
   Hash,
   Languages,
   LayoutList,
+  Lock,
   Megaphone,
   Pencil,
   PlayCircle,
   Plus,
   RefreshCw,
-  Smartphone,
   Trash2,
   Users,
   NotebookPen,
 } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { useMySchoolClassesQuery } from '@/features/classes/api/useMySchoolClassesQuery'
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery'
 import type { QuestionDto } from '@/features/question/types'
 import { toApiError } from '@/shared/api'
+import { autoDistributeWeights } from '@/shared/weightDistribution'
 import { Pagination } from '@/shared/components/Pagination'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -35,6 +37,7 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
@@ -43,9 +46,13 @@ import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab
 import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
 import { examQueryKeys, fetchExamPaper, useExamBlueprintQuery, useExamBlueprintsQuery, useExamQuery } from '@/features/examCore/api/queries'
 import { useSetExamDeliveryModeMutation, useUpdateExamPaperItemMutation } from '@/features/examCore/api/mutations'
+import { useMatchingTeacherAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
 import {
+  formatDate,
   formatDateTime,
+  formatDurationSeconds,
   formatNullableText,
+  getAssessmentPolicyStrictnessLabel,
   getExamChairName,
   getResultDecisionMethodDisplay,
   RESULT_DECISION_METHODS,
@@ -63,6 +70,7 @@ import {
   useChangeClassTestBlueprintMutation,
   useCreateClassTestMutation,
   useDeleteClassTestMutation,
+  useDeleteClassTestSectionMutation,
   useUpdateClassTestMutation,
   useUpdateClassTestQuestionsMutation,
   useUpdateClassTestStatusMutation,
@@ -72,17 +80,28 @@ import { getClassTestStatusDisplay } from '../types'
 const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
   { label: 'Tất cả', value: '' },
   { label: 'Bản nháp', value: 'DRAFT' },
+  { label: 'Đã lên lịch', value: 'SCHEDULED' },
   { label: 'Đang mở', value: 'IN_PROGRESS' },
   { label: 'Đã đóng', value: 'CLOSED' },
   { label: 'Đã trả điểm', value: 'RESULTS_PUBLISHED' },
 ]
+
+function canStartClassTestManually(exam: ExamDto, nowMs: number) {
+  if (exam.status !== 'SCHEDULED') {
+    return false
+  }
+  const closeAtMs = exam.closeAt ? new Date(exam.closeAt).getTime() : Number.POSITIVE_INFINITY
+  return nowMs < closeAtMs
+}
 
 function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; steps: WorkflowStep[] } {
   // exam.blueprintId/blueprintVersionId luôn có giá trị cho bài trên lớp (kể cả khi soạn câu hỏi trực tiếp,
   // hệ thống tự sinh 1 blueprint riêng ẩn) — nên không dùng được để biết đề đã có nội dung thật hay chưa.
   const hasQuestions = exam.papers.some((paper) => paper.sections.some((section) => section.items.length > 0))
   const totalPapers = exam.papers.length
-  const readyPapers = exam.papers.filter((paper) => paper.status === 'LOCKED' || paper.status === 'APPROVED').length
+  // Class test không có luồng duyệt paper riêng như CENTRALIZED (paper chỉ LOCKED khi exam chuyển IN_PROGRESS) —
+  // dùng lại tiêu chí "đã có câu hỏi" thay vì dựa vào paper.status.
+  const readyPapers = exam.papers.filter((paper) => paper.sections.some((section) => section.items.length > 0)).length
   const papersReady = totalPapers > 0 && readyPapers === totalPapers
   const isPublished = exam.status === 'RESULTS_PUBLISHED' || exam.status === 'CLOSED'
 
@@ -93,7 +112,7 @@ function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; ste
   const steps: WorkflowStep[] = [
     {
       icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
-      label: 'Soạn đề bài',
+      label: 'Đề bài',
       state: step1Done ? 'done' : 'current',
       sublabel: step1Done ? 'Đã có câu hỏi trong đề' : 'Chưa gắn blueprint hoặc thêm câu hỏi',
     },
@@ -101,11 +120,11 @@ function getClassTestWorkflowSteps(exam: ExamDto): { completedCount: number; ste
       icon: step2Done ? <Check size={26} /> : <FilePenLine size={24} />,
       label: 'Soạn & giao đề',
       state: !step1Done ? 'upcoming' : step2Done ? 'done' : 'current',
-      sublabel: totalPapers ? `${readyPapers} / ${totalPapers} mã đề đã duyệt` : undefined,
+      sublabel: totalPapers ? `${readyPapers} / ${totalPapers} mã đề đã có câu hỏi` : undefined,
     },
     {
       icon: step3Done ? <Check size={26} /> : <PlayCircle size={24} />,
-      label: 'Mở bài & chấm',
+      label: 'Xếp lịch & chấm',
       state: !step2Done ? 'upcoming' : step3Done ? 'done' : 'current',
       sublabel: step3Done ? 'Đã trả điểm' : 'Chọn thời gian làm bài',
     },
@@ -284,13 +303,13 @@ function ClassPicker({ onChange, value }: { onChange: (id: string, name: string)
   const isTeacher = user?.roles.includes('TEACHER') ?? false
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const teacherClassesQuery = useMySchoolClassesQuery(page, 10, user?.schoolId ?? '', 'ACTIVE')
-  const adminClassesQuery = useSchoolClassesQuery(page, 10, {
-    languageId: '',
-    schoolGradeId: '',
-    search,
-    status: 'ACTIVE',
-  })
+  const teacherClassesQuery = useMySchoolClassesQuery(page, 10, isTeacher ? user?.schoolId ?? '' : '', 'ACTIVE')
+  const adminClassesQuery = useSchoolClassesQuery(
+    page,
+    10,
+    { languageId: '', schoolGradeId: '', search, status: 'ACTIVE' },
+    { enabled: !isTeacher },
+  )
 
   return (
     <ClassPickerTable
@@ -314,42 +333,151 @@ type ClassTestSectionDraft = {
   instruction: string
   key: string
   questions: QuestionDto[]
+  questionWeights: Record<string, string>
   title: string
+  weight: string
 }
 
 function newClassTestSection(order: number): ClassTestSectionDraft {
-  return { instruction: '', key: nextClassTestKey('cts'), questions: [], title: `Phần ${order}` }
+  return { instruction: '', key: nextClassTestKey('cts'), questions: [], questionWeights: {}, title: `Part ${order}`, weight: '' }
 }
 
+const SECTION_WEIGHT_TOLERANCE = 0.01
+
+function parseOptionalSectionWeight(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : Number.NaN
+}
+
+function validateOptionalSectionWeights(weights: Array<number | null>) {
+  const numericWeights = weights.filter((weight): weight is number => weight !== null)
+  if (numericWeights.some(Number.isNaN)) {
+    return 'Trọng số section phải là số hợp lệ.'
+  }
+  if (numericWeights.length === weights.length) {
+    const sum = numericWeights.reduce((total, weight) => total + weight, 0)
+    if (Math.abs(sum - 1) >= SECTION_WEIGHT_TOLERANCE) {
+      return `Tổng trọng số section phải bằng 1.00 (hiện tại ${sum.toFixed(2)}).`
+    }
+  }
+  return null
+}
+
+function sectionWeightInputValue(weight?: number | null) {
+  return weight == null ? '' : String(weight)
+}
+
+type SelectedRubricVersion = { code: string; id: string; languageId: string; name: string; version: number }
+
+type ClassTestCreateDraft = {
+  closeAt: string
+  creationMode: 'questions' | 'blueprint'
+  description: string
+  maxAttempt: string
+  name: string
+  openAt: string
+  resultDecisionMethod: ResultDecisionMethod
+  schoolClassId: string
+  schoolClassName: string
+  sections: ClassTestSectionDraft[]
+  selectedBlueprint: ExamBlueprintDto | null
+  selectedVersion: ExamBlueprintVersionDto | null
+  selectionAssignments: Record<string, QuestionDto>
+}
+
+type ClassTestCreateLocationState = {
+  draft?: ClassTestCreateDraft
+  selectedRubricVersion?: SelectedRubricVersion
+} | null
+
 export function TeacherClassTestCreatePage() {
+  const location = useLocation()
+  // key={location.key} forces a full remount whenever navigate() lands here with a fresh
+  // history entry (e.g. returning from the rubric-version picker), so the useState
+  // initializers below can pick up the new location.state instead of going stale.
+  return <ClassTestCreateForm key={location.key} locationState={location.state as ClassTestCreateLocationState} />
+}
+
+function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreateLocationState }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createMutation = useCreateClassTestMutation()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [schoolClassId, setSchoolClassId] = useState('')
-  const [schoolClassName, setSchoolClassName] = useState('')
-  const [openAt, setOpenAt] = useState('')
-  const [closeAt, setCloseAt] = useState('')
-  const [maxAttempt, setMaxAttempt] = useState('1')
-  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>('HIGHEST')
-  const [sections, setSections] = useState<ClassTestSectionDraft[]>([newClassTestSection(1)])
+  const draft = locationState?.draft
+  const [name, setName] = useState(draft?.name ?? '')
+  const [description, setDescription] = useState(draft?.description ?? '')
+  const [schoolClassId, setSchoolClassId] = useState(draft?.schoolClassId ?? '')
+  const [schoolClassName, setSchoolClassName] = useState(draft?.schoolClassName ?? '')
+  const [openAt, setOpenAt] = useState(draft?.openAt ?? '')
+  const [closeAt, setCloseAt] = useState(draft?.closeAt ?? '')
+  const [maxAttempt, setMaxAttempt] = useState(draft?.maxAttempt ?? '1')
+  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(draft?.resultDecisionMethod ?? 'HIGHEST')
+  const [sections, setSections] = useState<ClassTestSectionDraft[]>(draft?.sections ?? [newClassTestSection(1)])
   const [pickerForSectionKey, setPickerForSectionKey] = useState<string | null>(null)
-  const [creationMode, setCreationMode] = useState<'questions' | 'blueprint'>('questions')
+  const [creationMode, setCreationMode] = useState<'questions' | 'blueprint'>(draft?.creationMode ?? 'questions')
   const [blueprintKeyword, setBlueprintKeyword] = useState('')
   const [blueprintPage, setBlueprintPage] = useState(1)
   const [browsingBlueprint, setBrowsingBlueprint] = useState<ExamBlueprintDto | null>(null)
-  const [selectedBlueprint, setSelectedBlueprint] = useState<ExamBlueprintDto | null>(null)
-  const [selectedVersion, setSelectedVersion] = useState<ExamBlueprintVersionDto | null>(null)
+  const [selectedBlueprint, setSelectedBlueprint] = useState<ExamBlueprintDto | null>(draft?.selectedBlueprint ?? null)
+  const [selectedVersion, setSelectedVersion] = useState<ExamBlueprintVersionDto | null>(draft?.selectedVersion ?? null)
   const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword: blueprintKeyword, page: blueprintPage, size: 8 })
   const { confirm, dialog } = useConfirmationDialog()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [selectionAssignments, setSelectionAssignments] = useState<Record<string, QuestionDto>>({})
+  const [selectionAssignments, setSelectionAssignments] = useState<Record<string, QuestionDto>>(
+    draft?.selectionAssignments ?? {},
+  )
   const [selectionPickerSlotId, setSelectionPickerSlotId] = useState<string | null>(null)
   const updateItemMutation = useUpdateExamPaperItemMutation()
   const hasSelectionSlot = selectedVersion?.sections.some((section) =>
     section.slots.some((slot) => slot.slotType === 'SELECTION'),
   )
+
+  const [selectedRubricVersion, setSelectedRubricVersion] = useState<SelectedRubricVersion | null>(
+    locationState?.selectedRubricVersion ?? null,
+  )
+  const [manualPolicyId, setManualPolicyId] = useState<string | null>(null)
+  const matchingPoliciesQuery = useMatchingTeacherAssessmentPoliciesQuery({
+    languageId: selectedRubricVersion?.languageId,
+    rubricVersionId: selectedRubricVersion?.id,
+  })
+  const matchingPolicies = matchingPoliciesQuery.data ?? []
+  // Chỉ 1 chính sách khớp -> tự dùng luôn; nhiều chính sách khớp -> chờ người dùng chọn tay.
+  const assessmentPolicyId = matchingPolicies.length === 1 ? matchingPolicies[0].id : manualPolicyId
+  const isResolvingPolicy = Boolean(selectedRubricVersion) && matchingPoliciesQuery.isLoading
+  const hasNoMatchingPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length === 0
+  const hasAmbiguousPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length > 1 && !manualPolicyId
+  const canSubmitPolicy = !isResolvingPolicy && !hasAmbiguousPolicy
+
+  function goToSelectRubricVersion() {
+    navigate('/teacher/rubric-versions/select', {
+      state: {
+        draft: {
+          closeAt,
+          creationMode,
+          description,
+          maxAttempt,
+          name,
+          openAt,
+          resultDecisionMethod,
+          schoolClassId,
+          schoolClassName,
+          sections,
+          selectedBlueprint,
+          selectedVersion,
+          selectionAssignments,
+        } satisfies ClassTestCreateDraft,
+        returnTo: '/teacher/class-tests/create',
+      },
+    })
+  }
+
+  function clearSelectedRubricVersion() {
+    setSelectedRubricVersion(null)
+    setManualPolicyId(null)
+  }
 
   function addSection() {
     setSections((current) => [...current, newClassTestSection(current.length + 1)])
@@ -369,6 +497,10 @@ export function TeacherClassTestCreatePage() {
     )
   }
 
+  function updateSectionWeight(sectionKey: string, weight: string) {
+    setSections((current) => current.map((section) => (section.key === sectionKey ? { ...section, weight } : section)))
+  }
+
   function addQuestionToSection(sectionKey: string, question: QuestionDto) {
     setSections((current) => {
       if (current.some((section) => section.questions.some((existing) => existing.id === question.id))) {
@@ -380,11 +512,41 @@ export function TeacherClassTestCreatePage() {
 
   function removeQuestionFromSection(sectionKey: string, questionId: string) {
     setSections((current) =>
+      current.map((section) => {
+        if (section.key !== sectionKey) {
+          return section
+        }
+        const { [questionId]: _removed, ...restWeights } = section.questionWeights
+        return { ...section, questions: section.questions.filter((question) => question.id !== questionId), questionWeights: restWeights }
+      }),
+    )
+  }
+
+  function updateQuestionWeight(sectionKey: string, questionId: string, weight: string) {
+    setSections((current) =>
       current.map((section) =>
         section.key === sectionKey
-          ? { ...section, questions: section.questions.filter((question) => question.id !== questionId) }
+          ? { ...section, questionWeights: { ...section.questionWeights, [questionId]: weight } }
           : section,
       ),
+    )
+  }
+
+  function autoDistributeQuestionWeights(sectionKey: string) {
+    setSections((current) =>
+      current.map((section) => {
+        if (section.key !== sectionKey) {
+          return section
+        }
+        const resolved = autoDistributeWeights(
+          section.questions.map((question) => (section.questionWeights[question.id]?.trim() ? Number(section.questionWeights[question.id]) : null)),
+        )
+        const questionWeights = { ...section.questionWeights }
+        section.questions.forEach((question, index) => {
+          questionWeights[question.id] = String(resolved[index])
+        })
+        return { ...section, questionWeights }
+      }),
     )
   }
 
@@ -392,6 +554,7 @@ export function TeacherClassTestCreatePage() {
   const pickerSection = pickerForSectionKey ? sections.find((section) => section.key === pickerForSectionKey) : null
 
   async function handleSubmit() {
+    const parsedSectionWeights = creationMode === 'questions' ? sections.map((section) => parseOptionalSectionWeight(section.weight)) : []
     if (!name.trim() || !schoolClassId) {
       window.alert('Vui lòng nhập tên bài và chọn lớp học.')
       return
@@ -416,6 +579,33 @@ export function TeacherClassTestCreatePage() {
           return
         }
       }
+      const sectionWeightError = validateOptionalSectionWeights(parsedSectionWeights)
+      if (sectionWeightError) {
+        window.alert(sectionWeightError)
+        return
+      }
+    }
+    if (hasAmbiguousPolicy) {
+      window.alert('Vui lòng chọn một chính sách đánh giá phù hợp trước khi tạo.')
+      return
+    }
+    if (!openAt || !closeAt) {
+      window.alert('Vui lòng nhập đầy đủ thời gian mở bài và đóng bài.')
+      return
+    }
+    const openAtIso = toIsoDateTime(openAt)
+    const closeAtIso = toIsoDateTime(closeAt)
+    if (!openAtIso || !closeAtIso) {
+      window.alert('Thời gian mở bài hoặc đóng bài không hợp lệ.')
+      return
+    }
+    if (new Date(openAtIso).getTime() >= new Date(closeAtIso).getTime()) {
+      window.alert('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
+      return
+    }
+    if (hasAmbiguousPolicy) {
+      window.alert('Vui lòng chọn một chính sách đánh giá phù hợp trước khi tạo.')
+      return
     }
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo bài trên lớp này không?' }))) {
       return
@@ -423,23 +613,35 @@ export function TeacherClassTestCreatePage() {
     try {
       const created = await createMutation.mutateAsync({
         payload: {
+          assessmentPolicyId,
           closeAt: toIsoDateTime(closeAt),
           description: description || null,
           existingBlueprintId: creationMode === 'blueprint' ? selectedBlueprint?.id : null,
           existingBlueprintVersionId: creationMode === 'blueprint' ? selectedVersion?.id : null,
           maxAttempt: Number(maxAttempt) || 1,
           name,
-          openAt: toIsoDateTime(openAt),
+          openAt: openAtIso,
           resultDecisionMethod,
           schoolClassId,
           sections:
             creationMode === 'blueprint'
               ? null
-              : sections.map((section) => ({
-                  instruction: section.instruction.trim() || null,
-                  questionIds: section.questions.map((question) => question.id),
-                  title: section.title.trim(),
-                })),
+              : sections.map((section, index) => {
+                  const resolvedWeights = autoDistributeWeights(
+                    section.questions.map((question) =>
+                      section.questionWeights[question.id]?.trim() ? Number(section.questionWeights[question.id]) : null,
+                    ),
+                  )
+                  return {
+                    instruction: section.instruction.trim() || null,
+                    questions: section.questions.map((question, questionIndex) => ({
+                      questionId: question.id,
+                      weight: resolvedWeights[questionIndex],
+                    })),
+                    title: section.title.trim(),
+                    weight: parsedSectionWeights[index],
+                  }
+                }),
         },
         schoolClassName,
       })
@@ -499,6 +701,7 @@ export function TeacherClassTestCreatePage() {
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
               onChange={(event) => setOpenAt(event.target.value)}
+              required
               type="datetime-local"
               value={openAt}
             />
@@ -508,6 +711,7 @@ export function TeacherClassTestCreatePage() {
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
               onChange={(event) => setCloseAt(event.target.value)}
+              required
               type="datetime-local"
               value={closeAt}
             />
@@ -536,6 +740,82 @@ export function TeacherClassTestCreatePage() {
               ))}
             </select>
           </label>
+        </div>
+
+        <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
+          <p className="text-xs text-slate-500">
+            Không bắt buộc — chọn để tự động gắn chính sách đánh giá (Assessment Policy) phù hợp cho bài trên lớp.
+          </p>
+
+          {!selectedRubricVersion ? (
+            <button
+              className="mt-1.5 inline-flex h-9.5 w-fit items-center justify-center rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50"
+              onClick={goToSelectRubricVersion}
+              type="button"
+            >
+              Chọn phiên bản thang đánh giá
+            </button>
+          ) : (
+            <div className="mt-1.5 grid gap-2 rounded-lg border border-indigo-200 bg-white p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[13px] text-slate-700">
+                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b> ({selectedRubricVersion.code} · v
+                  {selectedRubricVersion.version})
+                </p>
+                <button
+                  className="shrink-0 text-xs font-bold text-slate-400 hover:text-red-600"
+                  onClick={clearSelectedRubricVersion}
+                  type="button"
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+
+              {isResolvingPolicy ? <p className="text-xs text-slate-400">Đang tìm chính sách đánh giá phù hợp…</p> : null}
+
+              {hasNoMatchingPolicy ? (
+                <p className="text-xs font-semibold text-amber-700">
+                  Chưa có chính sách đánh giá (Assessment Policy) đã xuất bản cho phiên bản này. Vẫn có thể tạo bài và gắn chính sách
+                  sau, hoặc chọn phiên bản khác.
+                </p>
+              ) : null}
+
+              {matchingPolicies.length > 1 ? (
+                <div className="grid gap-1.5">
+                  <p className="text-xs font-semibold text-slate-600">Có {matchingPolicies.length} chính sách khớp — chọn một:</p>
+                  {matchingPolicies.map((policy) => (
+                    <button
+                      className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-semibold ${
+                        manualPolicyId === policy.id
+                          ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                      key={policy.id}
+                      onClick={() => setManualPolicyId(policy.id)}
+                      type="button"
+                    >
+                      <span>
+                        Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt{' '}
+                        {policy.passingScore ?? '-'}
+                      </span>
+                      <span>
+                        {formatDate(policy.effectiveFrom)}
+                        {policy.effectiveTo ? ` – ${formatDate(policy.effectiveTo)}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {assessmentPolicyId && matchingPolicies.length === 1 ? (
+                <p className="text-xs font-semibold text-emerald-700">
+                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
+                  {matchingPolicies[0].passingScore ?? '-'}
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
 
         <div>
@@ -647,10 +927,14 @@ export function TeacherClassTestCreatePage() {
                                   ) : (
                                     <span className="italic text-amber-700">Chọn ngẫu nhiên theo tiêu chí (chưa gán)</span>
                                   )
-                                ) : (
+                                ) : slot.fixedQuestion ? (
                                   <>
-                                    {slot.fixedQuestion?.code ?? '—'} — {formatNullableText(slot.fixedQuestion?.questionText)}
+                                    {slot.fixedQuestion.code} — {formatNullableText(slot.fixedQuestion.questionText)}
                                   </>
+                                ) : slot.fixedQuestionId ? (
+                                  <span className="italic text-slate-500">Đã chọn — bạn không có quyền xem nội dung</span>
+                                ) : (
+                                  '—'
                                 )}
                               </span>
                               {slot.slotType === 'SELECTION' ? (
@@ -661,6 +945,17 @@ export function TeacherClassTestCreatePage() {
                                 >
                                   {assigned ? 'Đổi' : 'Chọn câu hỏi'}
                                 </button>
+                              ) : slot.fixedQuestion ? (
+                                <a
+                                  aria-label={`Xem chi tiết ${slot.fixedQuestion.code}`}
+                                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                  href={`/teacher/questions/${slot.fixedQuestion.id}`}
+                                  rel="noopener noreferrer"
+                                  target="_blank"
+                                  title="Xem chi tiết câu hỏi"
+                                >
+                                  <Eye aria-hidden="true" className="size-3.5" />
+                                </a>
                               ) : null}
                             </div>
                           )
@@ -809,6 +1104,16 @@ export function TeacherClassTestCreatePage() {
                     onChange={(event) => updateSectionTitle(section.key, event.target.value)}
                     value={section.title}
                   />
+                  <input
+                    className="h-9.5 w-28 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
+                    max="1"
+                    min="0"
+                    onChange={(event) => updateSectionWeight(section.key, event.target.value)}
+                    placeholder="Weight"
+                    step="0.01"
+                    type="number"
+                    value={section.weight}
+                  />
                   <button
                     className="inline-flex h-9.5 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
                     onClick={() => setPickerForSectionKey(section.key)}
@@ -838,37 +1143,56 @@ export function TeacherClassTestCreatePage() {
                     Chưa có câu hỏi nào trong phần này.
                   </div>
                 ) : (
-                  <div className="mt-2.5 grid gap-1.5">
-                    {section.questions.map((question, index) => (
-                      <div
-                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm"
-                        key={question.id}
-                      >
-                        <span className="font-semibold text-slate-800">
-                          {index + 1}. {question.code} — {formatNullableText(question.questionText)}
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <a
-                            aria-label={`Xem chi tiết ${question.code}`}
-                            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
-                            href={`/teacher/questions/${question.id}`}
-                            rel="noopener noreferrer"
-                            target="_blank"
-                            title="Xem chi tiết câu hỏi"
-                          >
-                            <Eye aria-hidden="true" className="size-3.5" />
-                          </a>
-                          <button
-                            className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
-                            onClick={() => removeQuestionFromSection(section.key, question.id)}
-                            type="button"
-                          >
-                            Bỏ
-                          </button>
+                  <>
+                    <div className="mt-2.5 grid gap-1.5">
+                      {section.questions.map((question, index) => (
+                        <div
+                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm"
+                          key={question.id}
+                        >
+                          <span className="font-semibold text-slate-800">
+                            {index + 1}. {question.code} — {formatNullableText(question.questionText)}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <label className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                              Trọng số
+                              <input
+                                className="h-7 w-16 rounded-lg border border-slate-200 px-1.5 text-xs font-medium text-slate-900"
+                                onChange={(event) => updateQuestionWeight(section.key, question.id, event.target.value)}
+                                step="0.01"
+                                type="number"
+                                value={section.questionWeights[question.id] ?? ''}
+                              />
+                            </label>
+                            <a
+                              aria-label={`Xem chi tiết ${question.code}`}
+                              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+                              href={`/teacher/questions/${question.id}`}
+                              rel="noopener noreferrer"
+                              target="_blank"
+                              title="Xem chi tiết câu hỏi"
+                            >
+                              <Eye aria-hidden="true" className="size-3.5" />
+                            </a>
+                            <button
+                              className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                              onClick={() => removeQuestionFromSection(section.key, question.id)}
+                              type="button"
+                            >
+                              Bỏ
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                    <button
+                      className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+                      onClick={() => autoDistributeQuestionWeights(section.key)}
+                      type="button"
+                    >
+                      Chia trọng số câu hỏi tự động
+                    </button>
+                  </>
                 )}
               </div>
             ))}
@@ -879,8 +1203,9 @@ export function TeacherClassTestCreatePage() {
         <div className="flex justify-end">
           <button
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
-            disabled={createMutation.isPending}
+            disabled={createMutation.isPending || !canSubmitPolicy}
             onClick={handleSubmit}
+            title={hasAmbiguousPolicy ? 'Chọn một chính sách đánh giá phù hợp trước khi tạo' : undefined}
             type="button"
           >
             Tạo bài trên lớp
@@ -1151,7 +1476,7 @@ type ClassTestDetailPageProps = {
   canManage: boolean
 }
 
-type DetailTab = 'blueprint' | 'papers' | 'schedule' | 'students'
+type DetailTab = 'assessment' | 'blueprint' | 'papers' | 'schedule' | 'students'
 
 function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const navigate = useNavigate()
@@ -1163,6 +1488,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const updateExamMutation = useUpdateClassTestMutation()
   const updateStatusMutation = useUpdateClassTestStatusMutation()
   const deleteMutation = useDeleteClassTestMutation()
+  const deleteSectionMutation = useDeleteClassTestSectionMutation()
   const setDeliveryModeMutation = useSetExamDeliveryModeMutation()
   const [tab, setTab] = useState<DetailTab>('papers')
   const [message, setMessage] = useState<string | null>(null)
@@ -1178,7 +1504,14 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const [editingSectionIndex, setEditingSectionIndex] = useState<number | null>(null)
   const [editSectionTitle, setEditSectionTitle] = useState('')
   const [editSectionInstruction, setEditSectionInstruction] = useState('')
+  const [editSectionWeight, setEditSectionWeight] = useState('')
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const { confirm, dialog } = useConfirmationDialog()
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 30000)
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -1190,8 +1523,27 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     return paperSections.map((section) => ({
       instruction: section.instruction ?? null,
       questionIds: (section.items.map((item) => item.questionId).filter(Boolean) as string[]),
-      title: section.title?.trim() || 'Phần',
+      questionWeights: Object.fromEntries(
+        section.items.filter((item) => item.questionId).map((item) => [item.questionId as string, item.weight ?? null]),
+      ) as Record<string, number | null>,
+      weight: section.weight ?? null,
+      title: section.title?.trim() || 'Part',
     }))
+  }
+
+  // Không có UI nhập weight riêng ở khu vực quản lý nhanh này (khác wizard tạo mới) - mỗi khi
+  // danh sách câu hỏi trong section đổi, chia lại đều theo đúng thuật toán H.6 (0.5-đầu khi
+  // trống hết), giữ nguyên weight của câu đã có nếu chỉ thêm/bớt 1 câu.
+  function toApiSections(sections: Array<ReturnType<typeof currentSectionsPayload>[number]>) {
+    return sections.map(({ instruction, questionIds, questionWeights, title, weight }) => {
+      const resolved = autoDistributeWeights(questionIds.map((id) => questionWeights[id] ?? null))
+      return {
+        instruction,
+        questions: questionIds.map((id, index) => ({ questionId: id, weight: resolved[index] })),
+        title,
+        weight,
+      }
+    })
   }
 
   function openEditInfo() {
@@ -1211,15 +1563,29 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     if (!exam) {
       return
     }
+    if (!editOpenAt || !editCloseAt) {
+      window.alert('Vui lòng nhập đầy đủ thời gian mở bài và đóng bài.')
+      return
+    }
+    const openAtIso = toIsoDateTime(editOpenAt)
+    const closeAtIso = toIsoDateTime(editCloseAt)
+    if (!openAtIso || !closeAtIso) {
+      window.alert('Thời gian mở bài hoặc đóng bài không hợp lệ.')
+      return
+    }
+    if (new Date(openAtIso).getTime() >= new Date(closeAtIso).getTime()) {
+      window.alert('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
+      return
+    }
     try {
       await updateExamMutation.mutateAsync({
         examId: exam.id,
         payload: {
-          closeAt: toIsoDateTime(editCloseAt),
+          closeAt: closeAtIso,
           description: editDescription.trim() || null,
           maxAttempt: Number(editMaxAttempt) || 1,
           name: editName.trim(),
-          openAt: toIsoDateTime(editOpenAt),
+          openAt: openAtIso,
           resultDecisionMethod: editResultDecisionMethod,
         },
       })
@@ -1235,19 +1601,33 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     setEditingSectionIndex(sectionIndex)
     setEditSectionTitle(section?.title ?? '')
     setEditSectionInstruction(section?.instruction ?? '')
+    setEditSectionWeight(sectionWeightInputValue(section?.weight))
   }
 
   async function handleSaveSectionMeta(sectionIndex: number) {
     if (!exam) {
       return
     }
+    const nextWeight = parseOptionalSectionWeight(editSectionWeight)
+    if (Number.isNaN(nextWeight)) {
+      window.alert('Trọng số section phải là số hợp lệ.')
+      return
+    }
     const next = currentSectionsPayload().map((section, index) =>
       index === sectionIndex
-        ? { ...section, instruction: editSectionInstruction.trim() || null, title: editSectionTitle.trim() || section.title }
+        ? { ...section, instruction: editSectionInstruction.trim() || null, title: editSectionTitle.trim() || section.title, weight: nextWeight }
         : section,
     )
+    const sectionWeightError = validateOptionalSectionWeights(next.map((section) => section.weight ?? null))
+    if (sectionWeightError) {
+      window.alert(sectionWeightError)
+      return
+    }
     try {
-      await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+      await updateQuestionsMutation.mutateAsync({
+        examId: exam.id,
+        payload: { sections: toApiSections(next) },
+      })
       await invalidate()
       setEditingSectionIndex(null)
     } catch (error) {
@@ -1256,7 +1636,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   }
 
   function handleOpenAddSection() {
-    setPickerMode({ kind: 'new', title: `Phần ${paperSections.length + 1}` })
+    setPickerMode({ kind: 'new', title: `Part ${paperSections.length + 1}` })
   }
 
   async function handlePickQuestion(question: QuestionDto) {
@@ -1266,14 +1646,17 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     const current = currentSectionsPayload()
     const next =
       pickerMode.kind === 'new'
-        ? [...current, { instruction: null, questionIds: [question.id], title: pickerMode.title }]
+        ? [...current, { instruction: null, questionIds: [question.id], questionWeights: {}, title: pickerMode.title, weight: null }]
         : current.map((section, index) =>
             index === pickerMode.sectionIndex && !section.questionIds.includes(question.id)
               ? { ...section, questionIds: [...section.questionIds, question.id] }
               : section,
           )
     try {
-      await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+      await updateQuestionsMutation.mutateAsync({
+        examId: exam.id,
+        payload: { sections: toApiSections(next) },
+      })
       await invalidate()
       setPickerMode(null)
       setMessage('Đã cập nhật câu hỏi.')
@@ -1291,7 +1674,10 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       index === sectionIndex ? { ...section, questionIds: section.questionIds.filter((id) => id !== questionId) } : section,
     )
     try {
-      await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+      await updateQuestionsMutation.mutateAsync({
+        examId: exam.id,
+        payload: { sections: toApiSections(next) },
+      })
       await invalidate()
     } catch (error) {
       setErrorMessage(toApiError(error).message)
@@ -1310,10 +1696,38 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     if (!(await confirm({ message: 'Xóa phần này? Toàn bộ câu hỏi trong phần cũng sẽ bị xóa.' }))) {
       return
     }
-    const next = current.filter((_, index) => index !== sectionIndex)
     try {
-      await updateQuestionsMutation.mutateAsync({ examId: exam.id, payload: { sections: next } })
+      await deleteSectionMutation.mutateAsync({ examId: exam.id, sectionId: paperSections[sectionIndex].id })
       await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handlePrimaryStatusAction(action: 'CANCEL' | 'CLOSE' | 'PUBLISH_RESULTS' | 'SCHEDULE' | 'START') {
+    if (!exam) {
+      return
+    }
+    if (
+      action === 'START' &&
+      !(await confirm({
+        message: 'Mở bài ngay sẽ chuyển bài sang trạng thái đang mở, khóa đề và học sinh có thể bắt đầu làm bài. Bạn có chắc muốn tiếp tục?',
+      }))
+    ) {
+      return
+    }
+    try {
+      await updateStatusMutation.mutateAsync({ examId: exam.id, payload: { action } })
+      await invalidate()
+      setMessage(
+        {
+          CANCEL: 'Đã hủy bài kiểm tra.',
+          CLOSE: 'Đã đóng bài kiểm tra.',
+          PUBLISH_RESULTS: 'Đã trả điểm cho bài trên lớp.',
+          SCHEDULE: 'Đã lên lịch bài kiểm tra. Bài sẽ tự mở khi tới giờ bắt đầu.',
+          START: 'Đã mở bài kiểm tra.',
+        }[action],
+      )
     } catch (error) {
       setErrorMessage(toApiError(error).message)
     }
@@ -1330,10 +1744,22 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const statusDisplay = getClassTestStatusDisplay(exam.status)
   const { completedCount, steps } = getClassTestWorkflowSteps(exam)
   const unlockedSchedule = completedCount >= 2
-  // Khớp rule backend: chỉ sửa được câu hỏi/section/blueprint khi bài còn ở trạng thái đã lên lịch (chưa mở cho học sinh làm bài).
-  const canEditContent = canManage && exam.status === 'SCHEDULED'
+  const resultBasePath = canManage ? '/teacher/exam-results' : '/school-admin/exam-results'
+  // Khớp rule backend: nội dung/ngày giờ chỉ khóa khi bài đã bắt đầu.
+  const canEditContent = canManage && (exam.status === 'DRAFT' || exam.status === 'SCHEDULED')
   // Chỉ soạn câu hỏi trực tiếp được khi KHÔNG có blueprint dùng chung nào đang gắn (dùng "Đổi blueprint khác" nếu có).
   const canEditFreeQuestions = canEditContent && !exam.blueprintId
+  const canManualStart = canManage && canStartClassTestManually(exam, nowMs)
+  const primaryStatusAction =
+    exam.status === 'DRAFT' && completedCount >= 2
+      ? { action: 'SCHEDULE' as const, icon: <Calendar aria-hidden="true" className="size-4.5" />, label: 'Lên lịch bài kiểm tra' }
+      : canManualStart
+        ? { action: 'START' as const, icon: <PlayCircle aria-hidden="true" className="size-4.5" />, label: 'Mở bài ngay' }
+      : exam.status === 'IN_PROGRESS'
+          ? { action: 'CLOSE' as const, icon: <Lock aria-hidden="true" className="size-4.5" />, label: 'Đóng bài kiểm tra' }
+          : exam.status === 'CLOSED'
+            ? { action: 'PUBLISH_RESULTS' as const, icon: <Megaphone aria-hidden="true" className="size-4.5" />, label: 'Trả điểm' }
+            : null
 
   const nextAction =
     completedCount === 0
@@ -1370,8 +1796,17 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       <DetailHeaderCard
         actions={
-          canManage ? (
-            <>
+          <>
+            <button
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              onClick={() => navigate(`${resultBasePath}?examId=${exam.id}`)}
+              type="button"
+            >
+              <ClipboardList aria-hidden="true" className="size-4" />
+              Xem kết quả
+            </button>
+            {canManage ? (
+              <>
               <button
                 aria-label="Làm mới"
                 className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
@@ -1398,23 +1833,19 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                 <Trash2 aria-hidden="true" className="size-4" />
                 Xóa
               </button>
-              {exam.status !== 'RESULTS_PUBLISHED' ? (
+              {primaryStatusAction ? (
                 <button
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
-                  onClick={() =>
-                    void updateStatusMutation
-                      .mutateAsync({ examId: exam.id, payload: { action: 'PUBLISH_RESULTS' } })
-                      .then(() => invalidate())
-                      .then(() => setMessage('Đã trả điểm cho bài trên lớp.'))
-                  }
+                  onClick={() => void handlePrimaryStatusAction(primaryStatusAction.action)}
                   type="button"
                 >
-                  <Megaphone aria-hidden="true" className="size-4.5" />
-                  Trả điểm
+                  {primaryStatusAction.icon}
+                  {primaryStatusAction.label}
                 </button>
               ) : null}
-            </>
-          ) : null
+              </>
+            ) : null}
+          </>
         }
         metaItems={[
           { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
@@ -1425,7 +1856,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           { icon: <Clock aria-hidden="true" className="size-3.5" />, label: `Số lượt thi tối đa: ${exam.maxAttempt ?? 1}` },
           { icon: <CheckCircle2 aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
         ]}
-        onEdit={canManage ? openEditInfo : undefined}
+        onEdit={canEditContent ? openEditInfo : undefined}
         statusLabel={statusDisplay.label}
         statusTone={statusDisplay.tone}
         title={exam.name}
@@ -1465,6 +1896,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               <input
                 className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
                 onChange={(event) => setEditOpenAt(event.target.value)}
+                required
                 type="datetime-local"
                 value={editOpenAt}
               />
@@ -1474,6 +1906,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               <input
                 className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
                 onChange={(event) => setEditCloseAt(event.target.value)}
+                required
                 type="datetime-local"
                 value={editCloseAt}
               />
@@ -1527,10 +1960,11 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       <div className="mt-5.5">
         <TabPillGroup
           items={[
+            { label: 'Phương thức đánh giá', value: 'assessment' },
+            { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
             { label: 'Đề bài', value: 'papers' },
             { label: 'Học sinh', value: 'students' },
-            { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
-            { icon: <Smartphone aria-hidden="true" className="size-4" />, label: 'Phân lịch', value: 'schedule' },
+            { icon: <Calendar aria-hidden="true" className="size-4" />, label: 'Xếp lịch', value: 'schedule' },
           ]}
           onChange={setTab}
           value={tab}
@@ -1583,6 +2017,16 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                           placeholder="Hướng dẫn phần (không bắt buộc)"
                           value={editSectionInstruction}
                         />
+                        <input
+                          className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
+                          max="1"
+                          min="0"
+                          onChange={(event) => setEditSectionWeight(event.target.value)}
+                          placeholder="Trọng số (bỏ trống để chia đều)"
+                          step="0.01"
+                          type="number"
+                          value={editSectionWeight}
+                        />
                         <div className="flex gap-2">
                           <button
                             className="inline-flex h-8 items-center justify-center rounded-full bg-indigo-600 px-3.5 text-xs font-bold text-white"
@@ -1603,7 +2047,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                     ) : (
                       <div className="flex items-center justify-between gap-2.5">
                         <div>
-                          <span className="text-sm font-bold text-slate-900">{section.title || `Phần ${sectionIndex + 1}`}</span>
+                          <span className="text-sm font-bold text-slate-900">{section.title || `Part ${sectionIndex + 1}`}</span>
+                          {section.weight != null ? <p className="mt-0.5 text-xs font-semibold text-slate-500">Weight: {section.weight.toFixed(2)}</p> : null}
                           {section.instruction ? <p className="mt-0.5 text-xs text-slate-500">{section.instruction}</p> : null}
                         </div>
                         {canEditFreeQuestions ? (
@@ -1649,9 +2094,24 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                             className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm"
                             key={item.id}
                           >
-                            <span className="font-semibold text-slate-800">
-                              {index + 1}. {item.question?.code} — {formatNullableText(item.question?.questionText)}
-                            </span>
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold text-slate-800">
+                                {index + 1}. {item.question?.code} — {formatNullableText(item.question?.questionText)}
+                              </div>
+                              {item.question ? (
+                                <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-500">
+                                  <span className="rounded-full bg-slate-50 px-2 py-0.5 ring-1 ring-slate-200">
+                                    Chuẩn bị: {formatDurationSeconds(item.question.preparationTimeSeconds)}
+                                  </span>
+                                  <span className="rounded-full bg-slate-50 px-2 py-0.5 ring-1 ring-slate-200">
+                                    Tối thiểu: {formatDurationSeconds(item.question.minResponseSeconds)}
+                                  </span>
+                                  <span className="rounded-full bg-slate-50 px-2 py-0.5 ring-1 ring-slate-200">
+                                    Tối đa: {formatDurationSeconds(item.question.maxResponseSeconds)}
+                                  </span>
+                                </div>
+                              ) : null}
+                            </div>
                             <div className="flex items-center gap-1.5">
                               {item.question ? (
                                 <a
@@ -1719,7 +2179,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} /> : null}
+      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
+
+      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} papers={exam.papers} /> : null}
 
       {tab === 'blueprint' ? (
         <ClassTestBlueprintTab
@@ -1734,13 +2196,13 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       {tab === 'schedule' ? (
         <ScheduleTab
-          canManage={canManage}
+          canManage={canEditContent}
           deliveryMode={exam.deliveryMode}
           examId={exam.id}
           isClassTest
           onGoToPapers={() => setTab('papers')}
           onSetDeliveryMode={
-            canManage
+            canEditContent
               ? (mode: ExamDeliveryMode) =>
                   void setDeliveryModeMutation.mutateAsync({ deliveryMode: mode, examId: exam.id }).then(invalidate)
               : undefined

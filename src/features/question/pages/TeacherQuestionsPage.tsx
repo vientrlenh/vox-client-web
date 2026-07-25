@@ -6,7 +6,7 @@ import { useAppSelector } from '@/app/store/hooks'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { exportQuestions } from '../api/useQuestionExport'
-import { useReviewQuestionMutation } from '../api/useQuestionReviewMutation'
+import { useBulkReviewQuestionMutation } from '../api/useQuestionReviewMutation'
 import { useQuestionsQuery, type QuestionQueryFilters } from '../api/useQuestionsQuery'
 import { QuestionPageHeader } from '../components/QuestionPageHeader'
 import { QuestionPagination } from '../components/QuestionPagination'
@@ -16,6 +16,8 @@ import {
   canEditQuestion,
   getQuestionActorRole,
   getTeacherQuestionContext,
+  type QuestionActorRole,
+  type QuestionWorkflowAction,
 } from '../permissions'
 import type {
   QuestionScope,
@@ -38,6 +40,14 @@ const EMPTY_FILTERS: QuestionQueryFilters = {
   status: '',
   topicName: '',
   type: '',
+}
+
+type BulkActionOption = {
+  action: QuestionWorkflowAction
+  buttonLabel: string
+  confirmVerb: string
+  label: string
+  successVerb: string
 }
 
 const QUESTION_STATUS_OPTIONS: Array<{ label: string; value: '' | QuestionStatus }> = [
@@ -65,6 +75,82 @@ const QUESTION_SHARING_OPTIONS: Array<{ label: string; value: '' | QuestionShari
   { label: 'Private', value: 'PRIVATE' },
   { label: 'School shared', value: 'SCHOOL_SHARED' },
 ]
+
+const BULK_ACTION_OPTIONS_BY_ROLE: Record<
+  Exclude<QuestionActorRole, null>,
+  BulkActionOption[]
+> = {
+  SCHOOL_ADMIN: [
+    {
+      action: 'APPROVE',
+      buttonLabel: 'Duyệt hàng loạt',
+      confirmVerb: 'duyệt',
+      label: 'Duyệt',
+      successVerb: 'duyệt',
+    },
+    {
+      action: 'PUBLISH',
+      buttonLabel: 'Xuất bản hàng loạt',
+      confirmVerb: 'xuất bản',
+      label: 'Xuất bản',
+      successVerb: 'xuất bản',
+    },
+  ],
+  SYSTEM_ADMIN: [
+    {
+      action: 'SUBMIT',
+      buttonLabel: 'Gửi duyệt hàng loạt',
+      confirmVerb: 'gửi duyệt',
+      label: 'Gửi duyệt',
+      successVerb: 'gửi duyệt',
+    },
+    {
+      action: 'APPROVE',
+      buttonLabel: 'Duyệt hàng loạt',
+      confirmVerb: 'duyệt',
+      label: 'Duyệt',
+      successVerb: 'duyệt',
+    },
+    {
+      action: 'PUBLISH',
+      buttonLabel: 'Xuất bản hàng loạt',
+      confirmVerb: 'xuất bản',
+      label: 'Xuất bản',
+      successVerb: 'xuất bản',
+    },
+  ],
+  TEACHER: [
+    {
+      action: 'SUBMIT',
+      buttonLabel: 'Gửi duyệt hàng loạt',
+      confirmVerb: 'gửi duyệt',
+      label: 'Gửi duyệt',
+      successVerb: 'gửi duyệt',
+    },
+    {
+      action: 'APPROVE',
+      buttonLabel: 'Duyệt hàng loạt',
+      confirmVerb: 'duyệt',
+      label: 'Duyệt',
+      successVerb: 'duyệt',
+    },
+    {
+      action: 'PUBLISH',
+      buttonLabel: 'Xuất bản hàng loạt',
+      confirmVerb: 'xuất bản',
+      label: 'Xuất bản',
+      successVerb: 'xuất bản',
+    },
+  ],
+}
+
+function getBulkActionOptions(role: QuestionActorRole) {
+  if (!role) {
+    return []
+  }
+
+  return BULK_ACTION_OPTIONS_BY_ROLE[role]
+}
 
 function getErrorMessage(error: unknown) {
   if (
@@ -139,16 +225,19 @@ function QuestionsPage({
   const location = useLocation()
   const user = useAppSelector((state) => state.auth.user)
   const [searchParams] = useSearchParams()
-  const reviewMutation = useReviewQuestionMutation()
+  const bulkReviewMutation = useBulkReviewQuestionMutation()
   const { confirm, dialog } = useConfirmationDialog()
   const initialStatus: '' | QuestionStatus =
     view === 'review' ? 'SUBMITTED_FOR_REVIEW' : ''
+  const initialBulkAction: QuestionWorkflowAction =
+    view === 'review' ? 'APPROVE' : 'SUBMIT'
   const [page, setPage] = useState(DEFAULT_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [isExporting, setIsExporting] = useState(false)
-  const [isBulkApproving, setIsBulkApproving] = useState(false)
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [bulkSelection, setBulkSelection] = useState<string[]>([])
+  const [bulkAction, setBulkAction] = useState<QuestionWorkflowAction>(initialBulkAction)
   const [draftFilters, setDraftFilters] = useState<QuestionQueryFilters>({
     ...EMPTY_FILTERS,
     questionBankId: searchParams.get('bankId') ?? '',
@@ -186,6 +275,9 @@ function QuestionsPage({
 
   const actorRole = getQuestionActorRole(user?.roles)
   const teacherContext = getTeacherQuestionContext(view)
+  const bulkActionOptions = useMemo(() => getBulkActionOptions(actorRole), [actorRole])
+  const selectedBulkAction =
+    bulkActionOptions.find((option) => option.action === bulkAction) ?? bulkActionOptions[0] ?? null
 
   const effectiveFilters: QuestionQueryFilters = {
     ...filters,
@@ -209,6 +301,12 @@ function QuestionsPage({
 
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
   }, [flashMessage, location.pathname, location.search, navigate])
+
+  useEffect(() => {
+    if (!selectedBulkAction && bulkActionOptions.length > 0) {
+      setBulkAction(bulkActionOptions[0].action)
+    }
+  }, [bulkActionOptions, selectedBulkAction])
 
   const validBulkSelection = bulkSelection.filter((id) =>
     questionsQuery.data?.content.some((question) => question.id === id),
@@ -245,55 +343,63 @@ function QuestionsPage({
     setFilters(next)
   }
 
-  async function handleBulkApprove() {
+  async function handleBulkAction() {
     const selectedQuestions = (questionsQuery.data?.content ?? []).filter((question) =>
       validBulkSelection.includes(question.id),
     )
 
     if (!selectedQuestions.length) {
-      setExportError('Hãy chọn ít nhất một câu hỏi để duyệt hàng loạt.')
+      setExportError('Hãy chọn ít nhất một câu hỏi để xử lý hàng loạt.')
+      return
+    }
+
+    if (!selectedBulkAction) {
+      setExportError('Không có thao tác hàng loạt phù hợp cho vai trò hiện tại.')
       return
     }
 
     if (
       !(await confirm({
-        message: `Bạn có chắc muốn duyệt ${selectedQuestions.length} câu hỏi đã chọn không?`,
+        message: `Bạn có chắc muốn ${selectedBulkAction.confirmVerb} ${selectedQuestions.length} câu hỏi đã chọn không? Các câu không đúng quyền hoặc không đúng trạng thái sẽ bị backend bỏ qua.`,
       }))
     ) {
       return
     }
 
-    setIsBulkApproving(true)
+    setIsBulkProcessing(true)
     setExportError(null)
 
-    let successCount = 0
-    const failedCodes: string[] = []
-
     try {
-      for (const question of selectedQuestions) {
-        try {
-          await reviewMutation.mutateAsync({
-            payload: { action: 'APPROVE', note: null },
-            questionId: question.id,
-          })
-          successCount += 1
-        } catch {
-          failedCodes.push(question.code)
-        }
-      }
+      const result = await bulkReviewMutation.mutateAsync({
+        payload: {
+          action: selectedBulkAction.action,
+          note: null,
+          questionIds: selectedQuestions.map((question) => question.id),
+        },
+      })
+
+      const failedById = new Map(result.failed.map((item) => [item.questionId, item.reason]))
+      const failedQuestions = selectedQuestions.filter((question) => failedById.has(question.id))
 
       await queryClient.invalidateQueries({ queryKey: questionQueryKeys.all })
-      setBulkSelection([])
+      setBulkSelection(failedQuestions.map((question) => question.id))
 
-      if (failedCodes.length) {
+      if (result.updated.length > 0) {
+        setToastMessage(`Đã ${selectedBulkAction.successVerb} ${result.updated.length} câu hỏi.`)
+      }
+
+      if (failedQuestions.length > 0) {
         setExportError(
-          `Đã duyệt ${successCount}/${selectedQuestions.length} câu hỏi. Thất bại: ${failedCodes.join(', ')}`,
+          failedQuestions
+            .map((question) => {
+              const label = question.code?.trim() || question.questionText.trim()
+              return `${label}: ${failedById.get(question.id)}`
+            })
+            .join(' | '),
         )
-      } else {
-        setToastMessage(`Đã duyệt hàng loạt ${successCount} câu hỏi.`)
       }
     } finally {
-      setIsBulkApproving(false)
+      setIsBulkProcessing(false)
     }
   }
 
@@ -472,7 +578,7 @@ function QuestionsPage({
             onClick={handleFilterReset}
             type="button"
           >
-            Dat lai
+            Đặt lại
           </button>
           <button
             className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
@@ -483,29 +589,50 @@ function QuestionsPage({
         </div>
       </form>
 
-      {view === 'review' ? (
+      {bulkActionOptions.length > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
-          <div className="text-sm font-semibold text-indigo-900">
-            Đang chọn {validBulkSelection.length} câu hỏi trên trang hiện tại để duyệt hàng loạt.
+          <div className="grid gap-1 text-sm text-indigo-900">
+            <span className="font-semibold">
+              Đang chọn {validBulkSelection.length} câu hỏi trên trang hiện tại để xử lý hàng loạt.
+            </span>
+            <span className="text-indigo-800/80">
+              Backend sẽ tự kiểm tra quyền và trạng thái của từng câu, câu nào không hợp lệ sẽ bị bỏ qua.
+            </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-sm font-bold text-indigo-950">
+              <span>Thao tác</span>
+              <select
+                className="h-10 rounded-lg border border-indigo-200 bg-white px-3 text-sm font-semibold text-indigo-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                onChange={(event) => setBulkAction(event.target.value as QuestionWorkflowAction)}
+                value={selectedBulkAction?.action ?? bulkAction}
+              >
+                {bulkActionOptions.map((option) => (
+                  <option key={option.action} value={option.action}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               className="inline-flex h-10 items-center justify-center rounded-lg border border-indigo-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
               disabled={!validBulkSelection.length}
               onClick={() => setBulkSelection([])}
               type="button"
             >
-              Bo chon
+              Bỏ chọn
             </button>
             <button
               className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:bg-slate-300"
-              disabled={!validBulkSelection.length || isBulkApproving}
+              disabled={!validBulkSelection.length || isBulkProcessing || !selectedBulkAction}
               onClick={() => {
-                void handleBulkApprove()
+                void handleBulkAction()
               }}
               type="button"
             >
-              {isBulkApproving ? 'Dang approve...' : 'Bulk approve'}
+              {isBulkProcessing
+                ? 'Đang xử lý...'
+                : (selectedBulkAction?.buttonLabel ?? 'Xử lý hàng loạt')}
             </button>
           </div>
         </div>
@@ -532,7 +659,7 @@ function QuestionsPage({
             totalPages={questionsQuery.data?.totalPages ?? 0}
           />
         }
-        isBulkSelectable={view === 'review'}
+        isBulkSelectable={bulkActionOptions.length > 0}
         isError={questionsQuery.isError}
         isLoading={questionsQuery.isLoading}
         onEdit={(question) => {

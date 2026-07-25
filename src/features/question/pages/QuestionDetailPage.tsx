@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { useSchoolUsersForRequesterQuery } from '@/features/classes/api/useSchoolUsersForRequesterQuery'
+import { QuestionAssetPreview } from '@/features/question/components/QuestionAssetPreview'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import {
@@ -25,6 +26,7 @@ import {
   formatDuration,
   formatNullableText,
   formatQuestionDate,
+  getQuestionAssetTypeDisplay,
   getQuestionCollaboratorPermissionDisplay,
   getQuestionConfidentialityDisplay,
   getQuestionSharingDisplay,
@@ -45,7 +47,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Khong the tai chi tiet cau hoi.'
+  return 'không thể tải chi tiết câu hỏi.'
 }
 
 type QuestionDetailPageProps = {
@@ -88,7 +90,7 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
   if (questionQuery.isLoading) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">
-        Dang tai chi tiet cau hoi...
+        Đang tải chi tiết câu hỏi...
       </section>
     )
   }
@@ -102,7 +104,7 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
           onClick={() => navigate(-1)}
           type="button"
         >
-          Quay lai
+          Quay lại
         </button>
       </section>
     )
@@ -122,7 +124,7 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
             <ArrowLeft aria-hidden="true" className="size-4" />
             Quay lại
           </button>
-          <h1 className="text-3xl font-black text-blue-950">Chi tiet cau hoi</h1>
+          <h1 className="text-3xl font-black text-blue-950">Chi tiết câu hỏi</h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
             Xem thông tin, tài liệu đính kèm, hướng dẫn chấm và chia sẻ.
           </p>
@@ -139,7 +141,7 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
             type="button"
           >
             <Pencil aria-hidden="true" className="size-4" />
-            Quan ly question
+            Quản lý câu hỏi
           </button>
         ) : null}
       </div>
@@ -229,24 +231,32 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
                 <div className="grid gap-4 rounded-lg border border-slate-200 p-4" key={asset.id}>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
-                      {formatNullableText(asset.type)}
+                      {getQuestionAssetTypeDisplay(asset.type)}
                     </span>
                     <span className="text-sm font-bold text-slate-950">
                       {formatNullableText(asset.title)}
                     </span>
                   </div>
 
+                  <QuestionAssetPreview
+                    altText={asset.altText}
+                    title={asset.title}
+                    transcript={asset.transcript}
+                    type={asset.type}
+                    url={asset.url}
+                  />
+
                   <div className="grid gap-4 md:grid-cols-2">
-                    <DetailItem label="URL" value={formatNullableText(asset.url)} />
                     <DetailItem
-                      label="Thời lượng"
-                      value={formatDuration(asset.durationSeconds)}
+                      label="Văn bản thay thế"
+                      value={formatNullableText(asset.altText)}
                     />
-                    <DetailItem label="Alt text" value={formatNullableText(asset.altText)} />
-                    <DetailItem label="Thứ tự" value={String(asset.order)} />
                   </div>
                   <DetailBlock label="Mô tả" value={asset.description} />
-                  <DetailBlock label="Transcript" value={asset.transcript} />
+                  <DetailBlock
+                    label={asset.type === 'TEXT_PASSAGE' ? 'Đoạn văn' : 'Bản chép lời'}
+                    value={asset.transcript}
+                  />
                 </div>
               ))
             ) : (

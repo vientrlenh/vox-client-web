@@ -4,17 +4,20 @@ import {
   BookOpen,
   ChevronDown,
   ClipboardCheck,
+  CreditCard,
   DoorOpen,
   ClipboardList,
   FileQuestion,
+  FileSearch,
   FileSpreadsheet,
-  GraduationCap,
   Gavel,
+  GraduationCap,
   Home,
   Layers,
   LogOut,
   Menu,
   MonitorPlay,
+  PenLine,
   Search,
   ShieldCheck,
   UserRound,
@@ -51,6 +54,11 @@ const navigationItems = [
     to: '/school-admin/monitoring',
   },
   {
+    icon: ClipboardCheck,
+    label: 'Điểm danh ca thi',
+    to: '/school-admin/proctor-attendance',
+  },
+  {
     icon: BookOpen,
     label: 'Quản lý lớp học',
     to: '/school-admin/classes',
@@ -81,6 +89,16 @@ const navigationItems = [
     to: '/school-admin/teachers',
   },
   {
+    icon: PenLine,
+    label: 'Phân công chấm bài',
+    to: '/school-admin/grading',
+  },
+  {
+    icon: FileSearch,
+    label: 'Phúc khảo',
+    to: '/school-admin/reevaluation',
+  },
+  {
     icon: ClipboardList,
     label: 'Quản lý tiêu chí đánh giá',
     to: '/school-admin/rubrics',
@@ -94,6 +112,11 @@ const navigationItems = [
     icon: Gavel,
     label: 'Quản lý Quy tắc tính điểm',
     to: '/school-admin/scoring-rules',
+  },
+  {
+    icon: CreditCard,
+    label: 'Gói dịch vụ',
+    to: '/school-admin/subscription',
   },
 ]
 
