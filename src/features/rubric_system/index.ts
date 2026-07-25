@@ -5,5 +5,4 @@ export { SystemAdminRubricVersionDetailPage } from './pages/SystemAdminRubricVer
 export { SystemAdminRubricCriterionDetailPage } from './pages/SystemAdminRubricCriterionDetailPage';
 export { SystemAdminRubricVersionImportPage } from './pages/SystemAdminRubricVersionImportPage';
 export { SystemAdminRubricCriterionImportPage } from './pages/SystemAdminRubricCriterionImportPage';
-export { SystemAdminRubricCriterionBandImportPage } from './pages/SystemAdminRubricCriterionBandImportPage';
 export * from './types';

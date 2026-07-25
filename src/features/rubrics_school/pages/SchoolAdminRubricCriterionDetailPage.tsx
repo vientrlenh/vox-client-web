@@ -1,28 +1,16 @@
 // src/features/rubrics/pages/SchoolAdminRubricCriterionDetailPage.tsx
 
 import { useParams, useNavigate } from 'react-router';
-import { useState, useEffect } from 'react';
-import { ChevronLeft, ListChecks, RefreshCw, AlertTriangle, Edit, Plus, Trash2, Search, FileSpreadsheet } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronLeft, ListChecks, RefreshCw, AlertTriangle, Edit, Trash2 } from 'lucide-react';
 import { useAppSelector } from '@/app/store/hooks';
 
 import { useSchoolRubricCriterionQuery } from '../api/useSchoolRubricCriterionQuery';
+import { useSchoolRubricVersionQuery } from '../api/useSchoolRubricVersionQuery';
 import { useUpdateSchoolRubricCriterionMutation, type UpdateRubricCriterionPayload } from '../api/useUpdateSchoolRubricCriterionMutation';
 import { useDeleteSchoolRubricCriterionMutation } from '../api/useDeleteSchoolRubricCriterionMutation';
-import {
-  useSearchSchoolRubricCriterionBandsQuery,
-  type SearchRubricCriterionBandFilter,
-} from '../api/useSearchSchoolRubricCriterionBandsQuery';
-import { useAddSchoolRubricCriterionBandsMutation, type AddRubricCriterionBandsPayload } from '../api/useAddSchoolRubricCriterionBandsMutation';
-import { useUpdateSchoolRubricCriterionBandMutation, type UpdateRubricCriterionBandPayload } from '../api/useUpdateSchoolRubricCriterionBandMutation';
-import { useDeleteSchoolRubricCriterionBandMutation } from '../api/useDeleteSchoolRubricCriterionBandMutation';
 
 import { UpdateRubricCriterionDialog } from '../components/UpdateRubricCriterionDialog';
-import { RubricCriterionBandTable } from '../components/RubricCriterionBandTable';
-import { AddRubricCriterionBandDialog } from '../components/AddRubricCriterionBandDialog';
-import { UpdateRubricCriterionBandDialog } from '../components/UpdateRubricCriterionBandDialog';
-import { ViewRubricCriterionBandDialog } from '../components/ViewRubricCriterionBandDialog';
-import { Pagination } from '@/shared/components/Pagination';
-import type { RubricCriterionBand } from '../types';
 
 type ExampleItem = { transcript: string; explanation: string; expectedScore: number };
 
@@ -60,26 +48,6 @@ export function SchoolAdminRubricCriterionDetailPage() {
   const schoolId = user?.schoolId;
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isAddBandModalOpen, setIsAddBandModalOpen] = useState(false);
-  const [editingBand, setEditingBand] = useState<RubricCriterionBand | null>(null);
-  const [viewingBandId, setViewingBandId] = useState<string | null>(null);
-
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
-  const [keyword, setKeyword] = useState('');
-  const [debouncedKeyword, setDebouncedKeyword] = useState('');
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedKeyword(keyword);
-      setPage(1);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [keyword]);
-
-  const bandFilter: SearchRubricCriterionBandFilter = {
-    keyword: debouncedKeyword.trim() ? debouncedKeyword : null,
-  };
 
   const {
     data: criterion,
@@ -88,23 +56,10 @@ export function SchoolAdminRubricCriterionDetailPage() {
     refetch: refetchCriterion,
   } = useSchoolRubricCriterionQuery(schoolId, criterionId);
 
-  const {
-    data: bandsData,
-    isLoading: isBandsLoading,
-    isError: isBandsError,
-    refetch: refetchBands,
-  } = useSearchSchoolRubricCriterionBandsQuery(schoolId, criterionId, bandFilter, page, pageSize);
-
-  const bands = bandsData?.content ?? [];
-  const totalPages = bandsData?.totalPages ?? 0;
-  const totalElements = bandsData?.totalElements ?? 0;
+  const { data: version } = useSchoolRubricVersionQuery(schoolId, versionId);
 
   const { mutateAsync: updateCriterion, isPending: isUpdatingCriterion } = useUpdateSchoolRubricCriterionMutation(schoolId, criterionId);
   const { mutateAsync: deleteCriterion, isPending: isDeletingCriterion } = useDeleteSchoolRubricCriterionMutation(schoolId, versionId);
-  const { mutateAsync: addBands, isPending: isAddingBand } = useAddSchoolRubricCriterionBandsMutation(schoolId, versionId, criterionId);
-  const { mutateAsync: updateBand, isPending: isUpdatingBand } = useUpdateSchoolRubricCriterionBandMutation(schoolId, editingBand?.id);
-  const { mutateAsync: deleteBand, isPending: isDeletingBand } = useDeleteSchoolRubricCriterionBandMutation(schoolId, versionId, criterionId);
-  const isBandActionPending = isUpdatingBand || isDeletingBand;
 
   const handleUpdateCriterion = async (payload: UpdateRubricCriterionPayload) => {
     try {
@@ -127,38 +82,6 @@ export function SchoolAdminRubricCriterionDetailPage() {
     } catch (error) {
       const err = error as Error;
       alert(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
-    }
-  };
-
-  const handleAddBand = async (payload: AddRubricCriterionBandsPayload) => {
-    try {
-      await addBands(payload);
-      setIsAddBandModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi thêm mức điểm.');
-    }
-  };
-
-  const handleUpdateBand = async (payload: UpdateRubricCriterionBandPayload) => {
-    try {
-      await updateBand(payload);
-      setEditingBand(null);
-    } catch (error) {
-      const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật mức điểm.');
-    }
-  };
-
-  const handleDeleteBand = async (band: RubricCriterionBand) => {
-    const isConfirm = window.confirm(`Bạn có chắc chắn muốn xóa mức điểm "${band.code}"?`);
-    if (!isConfirm) return;
-
-    try {
-      await deleteBand(band.id);
-    } catch (error) {
-      const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa mức điểm.');
     }
   };
 
@@ -294,65 +217,6 @@ export function SchoolAdminRubricCriterionDetailPage() {
         </div>
       </div>
 
-      {/* DANH SÁCH MỨC ĐIỂM (CRITERION BANDS) */}
-      <div className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:px-6">
-          <h2 className="text-lg font-medium text-slate-950">Danh sách Mức điểm (Bands)</h2>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate(`/school-admin/rubrics/${rubricId}/versions/${versionId}/criteria/${criterionId}/bands/import`)}
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
-            >
-              <FileSpreadsheet className="size-4" /> Nhập từ Excel/CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsAddBandModalOpen(true)}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 px-4 text-sm font-medium text-white transition hover:opacity-90"
-            >
-              <Plus className="size-4" /> Thêm Mức điểm
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:px-6">
-          <div className="relative flex-1">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-              <Search className="size-4 text-slate-400" />
-            </div>
-            <input
-              type="text"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Tìm theo mã mức điểm..."
-              className="w-full rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-            />
-          </div>
-        </div>
-
-        <RubricCriterionBandTable
-          bands={bands}
-          isLoading={isBandsLoading}
-          isError={isBandsError}
-          onRetry={() => refetchBands()}
-          onView={(item) => setViewingBandId(item.id)}
-          onEdit={(item) => setEditingBand(item)}
-          onDelete={handleDeleteBand}
-          isActionPending={isBandActionPending}
-        />
-
-        {!isBandsLoading && !isBandsError && bands.length > 0 && (
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            totalElements={totalElements}
-            itemName="mức điểm"
-            onPageChange={setPage}
-          />
-        )}
-      </div>
-
       {isEditModalOpen && (
         <UpdateRubricCriterionDialog
           isOpen={isEditModalOpen}
@@ -360,34 +224,10 @@ export function SchoolAdminRubricCriterionDetailPage() {
           onSubmit={handleUpdateCriterion}
           isPending={isUpdatingCriterion}
           initialData={criterion}
+          scoringScaleMin={version?.scoringScaleMin ?? 0}
+          scoringScaleMax={version?.scoringScaleMax ?? 0}
         />
       )}
-
-      {isAddBandModalOpen && (
-        <AddRubricCriterionBandDialog
-          isOpen={isAddBandModalOpen}
-          onClose={() => setIsAddBandModalOpen(false)}
-          onSubmit={handleAddBand}
-          isPending={isAddingBand}
-        />
-      )}
-
-      {editingBand && (
-        <UpdateRubricCriterionBandDialog
-          isOpen={Boolean(editingBand)}
-          onClose={() => setEditingBand(null)}
-          onSubmit={handleUpdateBand}
-          isPending={isUpdatingBand}
-          initialData={editingBand}
-        />
-      )}
-
-      <ViewRubricCriterionBandDialog
-        isOpen={Boolean(viewingBandId)}
-        onClose={() => setViewingBandId(null)}
-        schoolId={schoolId}
-        bandId={viewingBandId ?? undefined}
-      />
     </section>
   );
 }

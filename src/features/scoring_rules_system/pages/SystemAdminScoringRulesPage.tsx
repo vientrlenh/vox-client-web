@@ -23,7 +23,7 @@ export function SystemAdminScoringRulesPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate(`/system-admin/assessment-policies/${policyId}`)}
+            onClick={() => navigate(-1)}
             aria-label="Quay lại"
             className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-950 transition hover:bg-slate-50"
           >

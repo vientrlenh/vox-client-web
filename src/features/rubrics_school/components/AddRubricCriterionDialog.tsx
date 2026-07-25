@@ -11,6 +11,8 @@ type Props = {
   onSubmit: (data: AddRubricCriteriaPayload) => Promise<void>;
   isPending: boolean;
   frameworkId?: string;
+  scoringScaleMin: number;
+  scoringScaleMax: number;
 };
 
 // Cấu trúc thật của examplesJson trả về từ Backend: { "values": [{ transcript, explanation, expectedScore }] }
@@ -22,15 +24,15 @@ type ExampleItem = {
 
 const EMPTY_EXAMPLE: ExampleItem = { transcript: '', explanation: '', expectedScore: 0 };
 
-export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, frameworkId }: Props) {
+export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, frameworkId, scoringScaleMin, scoringScaleMax }: Props) {
   const [formData, setFormData] = useState({
     frameworkCriterionId: '',
     code: '',
     name: '',
     description: '',
     weight: 0,
-    minScore: 0,
-    maxScore: 10,
+    minScore: scoringScaleMin,
+    maxScore: scoringScaleMax,
     order: 1,
     isRequired: false,
   });
@@ -67,6 +69,10 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
     const max = Number(formData.maxScore);
     if (min >= max) {
       alert('Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!');
+      return;
+    }
+    if (min < scoringScaleMin || max > scoringScaleMax) {
+      alert(`Lỗi: Điểm tiêu chí phải nằm trong thang điểm tổng của Rubric Version (${scoringScaleMin} – ${scoringScaleMax})!`);
       return;
     }
 
@@ -223,12 +229,8 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Trọng số (Weight)</label>
-              <input type="number" step="0.1" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-bold text-slate-700">Thứ tự (Order)</label>
-              <input type="number" min="1" value={formData.order} onChange={(e) => setFormData({ ...formData, order: e.target.value === '' ? 1 : parseInt(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <input type="number" step="0.01" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <p className="mt-1 text-xs text-slate-400">Trọng số tương đối khi tính điểm trung bình có trọng số giữa các tiêu chí</p>
             </div>
 
             <div>
@@ -239,6 +241,12 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối đa (Max)</label>
               <input type="number" step="0.1" value={formData.maxScore} onChange={(e) => setFormData({ ...formData, maxScore: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <p className="mt-1 text-xs text-slate-400">Phải nằm trong thang điểm tổng: {scoringScaleMin} – {scoringScaleMax}</p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-bold text-slate-700">Thứ tự (Order)</label>
+              <input type="number" min="1" value={formData.order} onChange={(e) => setFormData({ ...formData, order: e.target.value === '' ? 1 : parseInt(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
             </div>
 
             <div className="sm:col-span-2 flex items-center gap-2">

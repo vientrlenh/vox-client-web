@@ -13,7 +13,6 @@ import {
   Pencil,
   RefreshCw,
   Rocket,
-  ShieldCheck,
   Target,
   Trash2,
   type LucideIcon,
@@ -54,7 +53,7 @@ function InfoField({ label, children }: InfoFieldProps) {
   );
 }
 
-type TabId = 'framework' | 'target' | 'minimum' | 'rubric';
+type TabId = 'framework' | 'target' | 'rubric';
 
 export function SystemAdminAssessmentPolicyDetailPage() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -162,14 +161,6 @@ export function SystemAdminAssessmentPolicyDetailPage() {
       title: 'Target Band',
       summary: policy.targetFrameworkBand
         ? `${policy.targetFrameworkBand.code} - ${policy.targetFrameworkBand.label}`
-        : 'Chưa có dữ liệu',
-    },
-    {
-      id: 'minimum',
-      icon: ShieldCheck,
-      title: 'Minimum Band',
-      summary: policy.minimumFrameworkBand
-        ? `${policy.minimumFrameworkBand.code} - ${policy.minimumFrameworkBand.label}`
         : 'Chưa có dữ liệu',
     },
     {
@@ -338,17 +329,6 @@ export function SystemAdminAssessmentPolicyDetailPage() {
               </span>
               {policy.targetFrameworkBand?.description ? (
                 <p className="mt-3.5 text-sm leading-7 text-slate-500">{policy.targetFrameworkBand.description}</p>
-              ) : null}
-            </div>
-          )}
-
-          {activeTab === 'minimum' && (
-            <div>
-              <span className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-0.5 text-sm font-medium text-violet-500">
-                {policy.minimumFrameworkBand ? `${policy.minimumFrameworkBand.code} - ${policy.minimumFrameworkBand.label}` : '—'}
-              </span>
-              {policy.minimumFrameworkBand?.description ? (
-                <p className="mt-3.5 text-sm leading-7 text-slate-500">{policy.minimumFrameworkBand.description}</p>
               ) : null}
             </div>
           )}

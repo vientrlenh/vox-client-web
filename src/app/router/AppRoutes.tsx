@@ -487,12 +487,6 @@ const SchoolAdminRubricResultBandImportPage = lazy(() =>
   })),
 );
 
-const SchoolAdminRubricCriterionBandImportPage = lazy(() =>
-  import("@/features/rubrics_school").then((module) => ({
-    default: module.SchoolAdminRubricCriterionBandImportPage,
-  })),
-);
-
 const SystemAdminRubricsPage = lazy(() =>
   import("@/features/rubric_system").then((module) => ({
     default: module.SystemAdminRubricsPage,
@@ -544,12 +538,6 @@ const SystemAdminRubricVersionImportPage = lazy(() =>
 const SystemAdminRubricCriterionImportPage = lazy(() =>
   import("@/features/rubric_system").then((module) => ({
     default: module.SystemAdminRubricCriterionImportPage,
-  })),
-);
-
-const SystemAdminRubricCriterionBandImportPage = lazy(() =>
-  import("@/features/rubric_system").then((module) => ({
-    default: module.SystemAdminRubricCriterionBandImportPage,
   })),
 );
 
@@ -690,10 +678,6 @@ export function AppRoutes() {
             <Route
               path="system-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId"
               element={<SystemAdminRubricCriterionDetailPage />}
-            />
-            <Route
-              path="system-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId/bands/import"
-              element={<SystemAdminRubricCriterionBandImportPage />}
             />
             <Route
               path="system-admin/assessment-policies"
@@ -874,10 +858,6 @@ export function AppRoutes() {
             <Route
               path="school-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId"
               element={<SchoolAdminRubricCriterionDetailPage />}
-            />
-            <Route
-              path="school-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId/bands/import"
-              element={<SchoolAdminRubricCriterionBandImportPage />}
             />
             <Route
               path="school-admin/assessment-policies"

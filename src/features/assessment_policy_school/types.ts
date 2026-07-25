@@ -11,7 +11,6 @@ export type AssessmentPolicy = {
   frameworkVersionId: string;
   rubricVersionId: string;
   targetFrameworkBandId: string;
-  minimumFrameworkBandId: string;
   passingScore?: number | null;
   strictness: AssessmentPolicyStrictness;
   version: number;
@@ -38,7 +37,6 @@ export type AssessmentPolicy = {
     effectiveTo?: string | null;
   } | null;
   targetFrameworkBand?: { code: string; label: string } | null;
-  minimumFrameworkBand?: { code: string; label: string } | null;
   school?: { id: string; code?: string | null; name?: string | null } | null;
   // Chỉ School Admin mới có phạm vi áp dụng hẹp hơn (tất cả null = áp dụng toàn trường).
   schoolGradeLevel?: { id: string; code?: string | null; name?: string | null } | null;
@@ -93,7 +91,7 @@ export type FrameworkResultBandDetail = {
 
 export type AssessmentPolicyDetail = Omit<
   AssessmentPolicy,
-  'language' | 'frameworkVersion' | 'rubricVersion' | 'targetFrameworkBand' | 'minimumFrameworkBand' | 'school' | 'schoolGradeLevel' | 'schoolGrade' | 'schoolClass'
+  'language' | 'frameworkVersion' | 'rubricVersion' | 'targetFrameworkBand' | 'school' | 'schoolGradeLevel' | 'schoolGrade' | 'schoolClass'
 > & {
   schoolId?: string | null;
   school?: AssessmentPolicyRelatedEntity | null;
@@ -104,7 +102,6 @@ export type AssessmentPolicyDetail = Omit<
   frameworkVersion?: FrameworkVersionDetail | null;
   rubricVersion?: RubricVersionDetail | null;
   targetFrameworkBand?: FrameworkResultBandDetail | null;
-  minimumFrameworkBand?: FrameworkResultBandDetail | null;
 };
 
 // ==========================================
@@ -159,7 +156,6 @@ export type CreateAssessmentPolicyPayload = {
   rubricVersionIds: string[];
   languageId: string;
   targetFrameworkBandId: string;
-  minimumFrameworkBandId: string;
   passingScore?: number;
   strictness?: AssessmentPolicyStrictness;
   effectiveFrom: string;
@@ -173,7 +169,6 @@ export type CreateAssessmentPolicyPayload = {
 
 export type UpdateAssessmentPolicyPayload = {
   targetFrameworkBandId: string;
-  minimumFrameworkBandId: string;
   passingScore?: number;
   strictness?: AssessmentPolicyStrictness;
   effectiveFrom: string;

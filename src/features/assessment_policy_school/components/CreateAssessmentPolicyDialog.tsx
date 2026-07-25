@@ -31,7 +31,6 @@ type PolicyFormState = {
   frameworkId: string;
   frameworkVersionId: string;
   targetFrameworkBandId: string;
-  minimumFrameworkBandId: string;
   rubricVersionIds: string[];
   passingScore: string;
   strictness: AssessmentPolicyStrictness | '';
@@ -49,7 +48,6 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
     frameworkId: '',
     frameworkVersionId: '',
     targetFrameworkBandId: '',
-    minimumFrameworkBandId: '',
     rubricVersionIds: [],
     passingScore: '',
     strictness: '',
@@ -131,11 +129,11 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
   }
 
   function handleFrameworkChange(frameworkId: string) {
-    onChange({ frameworkId, frameworkVersionId: '', targetFrameworkBandId: '', minimumFrameworkBandId: '' });
+    onChange({ frameworkId, frameworkVersionId: '', targetFrameworkBandId: '' });
   }
 
   function handleFrameworkVersionChange(frameworkVersionId: string) {
-    onChange({ frameworkVersionId, targetFrameworkBandId: '', minimumFrameworkBandId: '' });
+    onChange({ frameworkVersionId, targetFrameworkBandId: '' });
   }
 
   function handleToggleRubricVersion(rubricVersionId: string) {
@@ -219,29 +217,16 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-bold text-slate-700">Target Band <span className="text-red-500">*</span></label>
-            <select
-              value={form.targetFrameworkBandId} onChange={(e) => onChange({ targetFrameworkBandId: e.target.value })}
-              disabled={isPending || !form.frameworkVersionId}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">-- Chọn target band --</option>
-              {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-bold text-slate-700">Minimum Band <span className="text-red-500">*</span></label>
-            <select
-              value={form.minimumFrameworkBandId} onChange={(e) => onChange({ minimumFrameworkBandId: e.target.value })}
-              disabled={isPending || !form.frameworkVersionId}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">-- Chọn minimum band --</option>
-              {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
-            </select>
-          </div>
+        <div>
+          <label className="mb-1 block text-sm font-bold text-slate-700">Target Band <span className="text-red-500">*</span></label>
+          <select
+            value={form.targetFrameworkBandId} onChange={(e) => onChange({ targetFrameworkBandId: e.target.value })}
+            disabled={isPending || !form.frameworkVersionId}
+            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+          >
+            <option value="">-- Chọn target band --</option>
+            {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
+          </select>
         </div>
 
         <div>
@@ -388,7 +373,6 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
       !form.frameworkVersionId ||
       form.rubricVersionIds.length === 0 ||
       !form.targetFrameworkBandId ||
-      !form.minimumFrameworkBandId ||
       !form.effectiveFrom
     );
   }
@@ -425,7 +409,6 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
         rubricVersionIds: form.rubricVersionIds,
         languageId: form.languageId,
         targetFrameworkBandId: form.targetFrameworkBandId,
-        minimumFrameworkBandId: form.minimumFrameworkBandId,
         effectiveFrom: form.effectiveFrom,
         effectiveTo: form.effectiveTo || undefined,
         passingScore: form.passingScore ? Number(form.passingScore) : undefined,

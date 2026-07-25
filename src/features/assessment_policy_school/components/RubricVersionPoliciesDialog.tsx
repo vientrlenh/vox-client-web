@@ -171,7 +171,6 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
                   <tr>
                     <th className="px-4 py-3">Ngôn ngữ</th>
                     <th className="px-4 py-3">Target Band</th>
-                    <th className="px-4 py-3">Minimum Band</th>
                     <th className="px-4 py-3">Điểm đạt</th>
                     <th className="px-4 py-3">Độ nghiêm ngặt</th>
                     <th className="px-4 py-3">Trạng thái</th>
@@ -182,7 +181,6 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
                     <tr key={policy.id}>
                       <td className="px-4 py-3 font-medium text-slate-900">{policy.language?.name || '—'}</td>
                       <td className="px-4 py-3">{policy.targetFrameworkBand?.label || '—'}</td>
-                      <td className="px-4 py-3">{policy.minimumFrameworkBand?.label || '—'}</td>
                       <td className="px-4 py-3">{policy.passingScore ?? '—'}</td>
                       <td className="px-4 py-3">{strictnessLabels[policy.strictness] || policy.strictness}</td>
                       <td className="px-4 py-3">

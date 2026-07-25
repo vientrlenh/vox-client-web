@@ -50,7 +50,6 @@ const IMPORT_FIELDS: ImportField[] = [
   { isRequired: true, label: 'Phiên bản khung', value: 'frameworkVersion' },
   { isRequired: true, label: 'Phiên bản rubric', value: 'rubricVersion' },
   { isRequired: true, label: 'Band mục tiêu', value: 'targetFrameworkBand' },
-  { isRequired: true, label: 'Band tối thiểu', value: 'minimumFrameworkBand' },
   { isRequired: false, label: 'Điểm đạt', value: 'passingScore' },
   { isRequired: false, label: 'Mức độ nghiêm ngặt', value: 'strictness' },
   { isRequired: true, label: 'Ngày bắt đầu', value: 'effectiveFrom' },

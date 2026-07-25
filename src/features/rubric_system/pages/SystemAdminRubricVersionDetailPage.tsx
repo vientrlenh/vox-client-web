@@ -537,6 +537,8 @@ export function SystemAdminRubricVersionDetailPage() {
           onSubmit={handleAddCriterion}
           isPending={isAddingCriterion}
           frameworkId={rubric?.frameworkId}
+          scoringScaleMin={version.scoringScaleMin}
+          scoringScaleMax={version.scoringScaleMax}
         />
       )}
 
@@ -547,6 +549,8 @@ export function SystemAdminRubricVersionDetailPage() {
           onSubmit={handleUpdateCriterion}
           isPending={isUpdatingCriterion}
           initialData={editingCriterion}
+          scoringScaleMin={version.scoringScaleMin}
+          scoringScaleMax={version.scoringScaleMax}
         />
       )}
 

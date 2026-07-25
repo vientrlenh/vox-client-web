@@ -11,6 +11,8 @@ type Props = {
   onSubmit: (data: UpdateRubricCriterionPayload) => Promise<void>;
   isPending: boolean;
   initialData: RubricCriterion;
+  scoringScaleMin: number;
+  scoringScaleMax: number;
 };
 
 // Cấu trúc thật của examplesJson trả về từ Backend: { "values": [{ transcript, explanation, expectedScore }] }
@@ -51,7 +53,7 @@ function parseExamples(examplesJson?: string | null): ExampleItem[] {
   return [EMPTY_EXAMPLE];
 }
 
-export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, initialData }: Props) {
+export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, initialData, scoringScaleMin, scoringScaleMax }: Props) {
   const [formData, setFormData] = useState(() => ({
     name: initialData.name,
     description: initialData.description ?? '',
@@ -80,6 +82,10 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
     const max = Number(formData.maxScore);
     if (min >= max) {
       alert('Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!');
+      return;
+    }
+    if (min < scoringScaleMin || max > scoringScaleMax) {
+      alert(`Lỗi: Điểm tiêu chí phải nằm trong thang điểm tổng của Rubric Version (${scoringScaleMin} – ${scoringScaleMax})!`);
       return;
     }
 
@@ -197,12 +203,8 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Trọng số (Weight)</label>
-              <input type="number" step="0.1" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-bold text-slate-700">Thứ tự (Order)</label>
-              <input type="number" min="1" value={formData.order} onChange={(e) => setFormData({ ...formData, order: e.target.value === '' ? 1 : parseInt(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <input type="number" step="0.01" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <p className="mt-1 text-xs text-slate-400">Trọng số tương đối khi tính điểm trung bình có trọng số giữa các tiêu chí</p>
             </div>
 
             <div>
@@ -213,6 +215,12 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối đa (Max)</label>
               <input type="number" step="0.1" value={formData.maxScore} onChange={(e) => setFormData({ ...formData, maxScore: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <p className="mt-1 text-xs text-slate-400">Phải nằm trong thang điểm tổng: {scoringScaleMin} – {scoringScaleMax}</p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-bold text-slate-700">Thứ tự (Order)</label>
+              <input type="number" min="1" value={formData.order} onChange={(e) => setFormData({ ...formData, order: e.target.value === '' ? 1 : parseInt(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
             </div>
 
             <div className="sm:col-span-2 flex items-center gap-2">
