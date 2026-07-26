@@ -312,13 +312,15 @@ const ROUND_TYPE_DISPLAY: Record<
     tone: 'danger',
   },
   INITIAL: {
-    hint: 'Chấm lần đầu bài đang chờ chấm.',
-    label: 'Chấm lần đầu',
+    // Nhãn "thủ công" không tự nó phân biệt được với ba vòng kia (vòng nào cũng do
+    // người chấm), nên hint phải gánh phần nêu lý do bài rơi vào vòng này.
+    hint: 'AI chấm không đủ tự tin nên chuyển bài sang cho giáo viên chấm.',
+    label: 'Chấm thủ công',
     tone: 'info',
   },
   REMEDIATION: {
-    hint: 'Soi lại bài đang bị vô hiệu để giữ nguyên hoặc gỡ vô hiệu.',
-    label: 'Soi bài vô hiệu',
+    hint: 'Xét lại bài đang bị vô hiệu để giữ nguyên hoặc gỡ vô hiệu.',
+    label: 'Xét vô hiệu',
     tone: 'warning',
   },
   SPOT_CHECK: {
@@ -356,8 +358,8 @@ const SOURCE_DISPLAY: Record<ResultStatusChangeSource, string> = {
   EXAM_PUBLISH: 'Công bố kết quả kỳ thi',
   SYSTEM: 'Hệ thống',
   TEACHER_APPEAL: 'Giáo viên chấm phúc khảo',
-  TEACHER_INITIAL: 'Giáo viên chấm lần đầu',
-  TEACHER_REMEDIATION: 'Giáo viên soi bài vô hiệu',
+  TEACHER_INITIAL: 'Giáo viên chấm thủ công',
+  TEACHER_REMEDIATION: 'Giáo viên xét vô hiệu',
   TEACHER_SPOT_CHECK: 'Giáo viên hậu kiểm',
 }
 

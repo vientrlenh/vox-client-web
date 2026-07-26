@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Bot,
   CalendarClock,
+  ChevronRight,
   CircleCheck,
   ClipboardList,
   Download,
@@ -29,12 +30,11 @@ import {
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import { toApiError } from '@/shared/api'
+import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
-import { FilterChips } from '@/shared/ui/FilterChips'
 import { PageLoader } from '@/shared/ui/PageLoader'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { TabPillGroup, type TabPillItem } from '@/shared/ui/TabPill'
 import {
   useExportExamScoresMutation,
   useFinalizeExamResultsMutation,
@@ -72,6 +72,7 @@ import { GradingTurnList } from '../components/GradingTurnList'
 import { ReclaimOverdueDialog } from '../components/ReclaimOverdueDialog'
 import { RemoveAssignmentDialog } from '../components/RemoveAssignmentDialog'
 import { ResultHistoryDialog } from '../components/ResultHistoryDialog'
+import { SegmentedControl, type SegmentItem } from '../components/SegmentedControl'
 import { SetDeadlineDialog } from '../components/SetDeadlineDialog'
 import { SubmitGradingDialog } from '../components/SubmitGradingDialog'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
@@ -96,17 +97,21 @@ import {
 const PAGE_SIZE = 20
 const PREVIEW_DEBOUNCE_MS = 500
 
-const ASSIGNMENT_STATUS_FILTERS: Array<{ label: string; value: '' | GradingAssignmentStatus }> = [
+const ASSIGNMENT_STATUS_FILTERS: SegmentItem<'' | GradingAssignmentStatus>[] = [
   { label: 'Tất cả', value: '' },
   { label: 'Đang chấm', value: 'ASSIGNED' },
   { label: 'Đã chấm xong', value: 'COMPLETED' },
 ]
 
+/** Ô chọn/tìm dùng chung trong toolbar — cùng chiều cao, cùng tông nền. */
+const FIELD_CLASS =
+  'h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-cyan-400'
+
 const ROUND_FILTERS: Array<{ label: string; value: '' | GradingRoundType }> = [
   { label: 'Tất cả vòng chấm', value: '' },
-  { label: 'Chấm lần đầu', value: 'INITIAL' },
+  { label: 'Chấm thủ công', value: 'INITIAL' },
   { label: 'Hậu kiểm', value: 'SPOT_CHECK' },
-  { label: 'Soi bài vô hiệu', value: 'REMEDIATION' },
+  { label: 'Xét vô hiệu', value: 'REMEDIATION' },
   { label: 'Phúc khảo', value: 'APPEAL' },
 ]
 
@@ -120,16 +125,53 @@ const RESULT_STATUS_FILTERS: Array<{ label: string; value: '' | ExamCandidateRes
   { label: 'Đã chốt', value: 'FINAL' },
 ]
 
-const ADMIN_TABS: TabPillItem[] = [
+const ADMIN_TABS: SegmentItem[] = [
   { label: 'Điều phối chấm bài', value: 'board' },
   { label: 'Chất lượng AI', value: 'ai' },
 ]
 
 function ResultCode({ code }: { code: string }) {
   return (
-    <span className="inline-flex h-7 items-center rounded-lg bg-slate-100 px-2.5 font-mono text-[12.5px] font-bold tracking-wide text-slate-700">
+    <span className="inline-flex h-5.5 items-center rounded-md border border-slate-200 bg-slate-50 px-2 font-mono text-xs font-bold tracking-wide text-slate-900">
       #{code}
     </span>
+  )
+}
+
+/** Tiêu đề trang: eyebrow + h1 + mô tả, dùng chung một thang chữ cho cả ba trang. */
+function PageHeading({
+  children,
+  eyebrow,
+  title,
+}: {
+  children?: React.ReactNode
+  eyebrow: string
+  title: string
+}) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-700">{eyebrow}</p>
+      <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-slate-900">{title}</h1>
+      {children ? <p className="mt-1.5 max-w-2xl text-[13px] text-slate-500">{children}</p> : null}
+    </div>
+  )
+}
+
+/** Cột "Thao tác": nút chính + menu ⋯ cho các hành động phụ. */
+function RowActions({
+  children,
+  menu,
+  resultCode,
+}: {
+  children?: React.ReactNode
+  menu: ActionMenuItem[]
+  resultCode: string
+}) {
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      {children}
+      <ActionMenuButton ariaLabel={`Thao tác khác cho bài ${resultCode}`} items={menu} />
+    </div>
   )
 }
 
@@ -141,15 +183,16 @@ function RoundBadge({ roundType }: { roundType: GradingRoundType | null | undefi
 /** Nhãn hạn chấm; quá hạn thì đỏ. `overdue` do BE tính, FE không tự so giờ. */
 function DeadlineLabel({ deadlineAt, overdue }: { deadlineAt?: string | null; overdue: boolean }) {
   if (!deadlineAt) {
-    return <span className="text-[12px] font-semibold text-slate-300">Chưa đặt hạn</span>
+    return <span className="text-[11px] font-medium text-slate-400">Chưa đặt hạn</span>
   }
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[12px] font-bold ${
-        overdue ? 'text-red-600' : 'text-slate-500'
+      className={`inline-flex items-center gap-1 text-[11px] tabular-nums ${
+        overdue ? 'font-bold text-red-600' : 'font-semibold text-slate-500'
       }`}
     >
-      {overdue ? <AlarmClock className="size-3.5" /> : <CalendarClock className="size-3.5" />}
+      {overdue ? <AlarmClock className="size-3" /> : <CalendarClock className="size-3" />}
+      {overdue ? 'Quá hạn ' : 'Hạn '}
       {formatIsoDateTime(deadlineAt)}
     </span>
   )
@@ -158,18 +201,18 @@ function DeadlineLabel({ deadlineAt, overdue }: { deadlineAt?: string | null; ov
 function BackButton({ onClick }: { onClick: () => void }) {
   return (
     <button
-      className="mb-4.5 inline-flex items-center gap-1.5 text-[13.5px] font-bold text-slate-500 transition hover:text-slate-700"
+      className="mb-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 transition hover:text-slate-700"
       onClick={onClick}
       type="button"
     >
-      <ArrowLeft className="size-4.5" />
+      <ArrowLeft className="size-4" />
       Quay lại danh sách
     </button>
   )
 }
 
 /** Tab theo từng phần thi: value là paperItemId, nhãn lấy partLabel (thiếu thì "Phần N"). */
-function itemTabItems(items: GradingTaskItem[]): TabPillItem[] {
+function itemTabItems(items: GradingTaskItem[]): SegmentItem[] {
   return items.map((item, index) => ({
     label: item.partLabel ?? `Phần ${index + 1}`,
     value: item.paperItemId,
@@ -424,162 +467,182 @@ export function SchoolAdminGradingPage() {
 
   const assignPending = assignMutation.isPending || reassignMutation.isPending
 
+  // Chỉ `Phân công tự động` ở lại làm nút chính; ba hành động còn lại vào menu ⋯ để
+  // header không còn là một hàng bốn nút cạnh nhau tranh nhau sự chú ý.
+  const headerMenuItems: ActionMenuItem[] = [
+    { icon: RefreshCw, id: 'refresh', label: 'Làm mới', onSelect: () => rowsQuery.refetch() },
+    {
+      disabled: exportMutation.isPending,
+      icon: Download,
+      id: 'export',
+      label: 'Xuất bảng điểm',
+      onSelect: () =>
+        exportMutation.mutate(
+          { examId: examId || undefined, examName: selectedExamName },
+          { onError: errorToast, onSuccess: () => setMessage('Đã tải bảng điểm CSV.') },
+        ),
+    },
+    {
+      disabled: !examId,
+      disabledReason: 'Chọn kỳ thi trước khi chốt sổ',
+      icon: Lock,
+      id: 'finalize',
+      label: 'Chốt sổ kỳ thi',
+      onSelect: () => setFinalizeOpen(true),
+      tone: 'warning',
+    },
+  ]
+
   return (
-    <section className="mx-auto max-w-320">
+    <section className="mx-auto grid max-w-320 gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">Chấm điểm</p>
-          <h1 className="mt-1.5 text-[30px] font-extrabold tracking-tight text-slate-900">
-            Điều phối chấm bài
-          </h1>
-          <p className="mt-1.5 max-w-2xl text-[15px] text-slate-500">
-            Giao bài cho giáo viên ở bốn vòng chấm: <b>chấm lần đầu</b>, <b>hậu kiểm</b> bài đã công
-            bố, <b>soi lại</b> bài bị vô hiệu và <b>phúc khảo</b> theo đơn học sinh.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2.5">
+        <PageHeading eyebrow="Chấm điểm" title="Điều phối chấm bài">
+          Giao bài cho giáo viên ở bốn vòng chấm:{' '}
+          <b className="font-semibold text-slate-700">chấm thủ công</b> bài AI không đủ tự tin,{' '}
+          <b className="font-semibold text-slate-700">hậu kiểm</b> bài đã công bố,{' '}
+          <b className="font-semibold text-slate-700">xét lại</b> bài bị vô hiệu và{' '}
+          <b className="font-semibold text-slate-700">phúc khảo</b> theo đơn học sinh.
+        </PageHeading>
+        <div className="flex items-center gap-2">
           <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-[13.5px] font-bold text-slate-600 transition hover:bg-slate-50"
-            onClick={() => rowsQuery.refetch()}
-            type="button"
-          >
-            <RefreshCw className="size-4" />
-            Làm mới
-          </button>
-          <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-[13.5px] font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={exportMutation.isPending}
-            onClick={() =>
-              exportMutation.mutate(
-                { examId: examId || undefined, examName: selectedExamName },
-                { onError: errorToast, onSuccess: () => setMessage('Đã tải bảng điểm CSV.') },
-              )
-            }
-            type="button"
-          >
-            <Download className="size-4" />
-            Xuất bảng điểm
-          </button>
-          <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-violet-200 bg-white px-4 text-[13.5px] font-bold text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
-            disabled={!examId}
-            onClick={() => setFinalizeOpen(true)}
-            title={examId ? undefined : 'Chọn kỳ thi trước khi chốt sổ'}
-            type="button"
-          >
-            <Lock className="size-4" />
-            Chốt sổ kỳ thi
-          </button>
-          <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-cyan-600 px-4.5 text-[13.5px] font-bold text-white shadow-lg shadow-cyan-600/25 transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-cyan-600 px-4 text-[13px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             // BE bắt buộc phạm vi: phân công tự động luôn chạy trong một kỳ thi hoặc ca thi.
             disabled={!examId}
             onClick={() => setAutoAssignOpen(true)}
             title={examId ? undefined : 'Chọn kỳ thi trước khi phân công tự động'}
             type="button"
           >
-            <UsersRound className="size-4.5" />
+            <UsersRound className="size-4" />
             Phân công tự động
           </button>
+          <ActionMenuButton ariaLabel="Thao tác khác cho kỳ thi" items={headerMenuItems} />
         </div>
       </div>
 
-      <div className="mt-6">
-        <TabPillGroup items={ADMIN_TABS} onChange={setTab} value={tab} />
-      </div>
+      <SegmentedControl ariaLabel="Khu vực" items={ADMIN_TABS} onChange={setTab} value={tab} />
 
       {tab === 'ai' ? (
-        <div className="mt-6">
-          <AiQualityPanel examId={examId || undefined} />
-        </div>
+        <AiQualityPanel examId={examId || undefined} />
       ) : (
         <>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
+              hint="trong phạm vi đang xem"
               icon={<Inbox size={19} />}
-              iconTone="indigo"
+              iconTone="slate"
               label="Tổng số bài"
               value={stats?.total ?? '-'}
             />
+            {/* Hai thẻ dưới đây kiêm luôn bộ lọc — thay cho hàng chip riêng trước đây. */}
             <StatCard
+              active={unassignedOnly}
+              hint={unassignedOnly ? 'Đang lọc theo nhóm này' : 'Bấm để chỉ xem nhóm này'}
               icon={<UserPlus size={19} />}
               iconTone="amber"
               label="Chưa phân công"
+              onClick={() => resetToFirstPage(setUnassignedOnly)(!unassignedOnly)}
               value={stats?.unassigned ?? '-'}
             />
             <StatCard
+              hint="đã giao, chờ giáo viên nộp"
               icon={<ClipboardList size={19} />}
               iconTone="violet"
               label="Đang chấm"
               value={stats?.assigned ?? '-'}
             />
             <StatCard
+              active={overdueOnly}
+              hint={overdueOnly ? 'Đang lọc theo nhóm này' : 'Bấm để chỉ xem nhóm này'}
               icon={<AlarmClock size={19} />}
-              iconTone="emerald"
+              iconTone="red"
               label="Quá hạn"
+              onClick={() => resetToFirstPage(setOverdueOnly)(!overdueOnly)}
               value={stats?.overdue ?? '-'}
             />
           </div>
 
-          {stats && stats.byResultStatus.length > 0 ? (
-            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3.5">
-              <span className="text-[12px] font-extrabold uppercase text-slate-400">
-                Theo trạng thái bài
-              </span>
-              {stats.byResultStatus.map((entry) => {
-                const display = getResultStatusDisplay(entry.status)
-                return (
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-bold text-slate-600"
-                    key={entry.status}
-                  >
-                    {display.label}
-                    <b className="text-slate-900">{entry.count}</b>
-                  </span>
-                )
-              })}
-            </div>
-          ) : null}
+          {/* Dải đếm theo trạng thái + tiến độ giáo viên gập lại: hữu ích nhưng không phải
+              thứ cần xem mỗi lần vào trang, và mở sẵn thì đẩy bảng xuống dưới màn hình đầu. */}
+          {stats && (stats.byResultStatus.length > 0 || stats.teacherProgress.length > 0) ? (
+            <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3 text-[13px] font-bold text-slate-700">
+                <ChevronRight className="size-4 text-slate-400 transition group-open:rotate-90" />
+                <span className="flex-1">Chi tiết tiến độ</span>
+                <span className="text-[11px] font-medium text-slate-400">
+                  {stats.byResultStatus.length} trạng thái bài · {stats.teacherProgress.length} giáo
+                  viên
+                </span>
+              </summary>
 
-          {stats && stats.teacherProgress.length > 0 ? (
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-              <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-5 py-3 text-[12.5px] font-extrabold text-slate-700">
-                <Scale className="size-4 text-slate-500" />
-                Tiến độ theo giáo viên
-              </div>
-              <div className="flex flex-wrap gap-3 px-5 py-4">
-                {stats.teacherProgress.map((teacher) => {
-                  const name = teacher.teacherName ?? 'Không rõ'
-                  return (
-                    <div
-                      className="flex items-center gap-2.5 rounded-xl border border-slate-200 px-3.5 py-2.5"
-                      key={teacher.teacherId}
-                    >
-                      <span
-                        className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold ${avatarClasses(name)}`}
-                      >
-                        {initials(name)}
-                      </span>
-                      <div className="leading-tight">
-                        <div className="text-[13px] font-bold text-slate-800">{name}</div>
-                        <div className="text-[11.5px] font-semibold text-slate-400">
-                          {teacher.assigned} đang chấm · {teacher.completed} xong
-                          {teacher.overdue > 0 ? (
-                            <span className="text-red-600"> · {teacher.overdue} quá hạn</span>
-                          ) : null}
-                        </div>
-                      </div>
+              <div className="grid gap-4 px-5 pb-5">
+                {stats.byResultStatus.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Theo trạng thái bài
+                    </span>
+                    {stats.byResultStatus.map((entry) => {
+                      const display = getResultStatusDisplay(entry.status)
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600"
+                          key={entry.status}
+                        >
+                          {display.label}
+                          <b className="font-extrabold tabular-nums text-slate-900">{entry.count}</b>
+                        </span>
+                      )
+                    })}
+                  </div>
+                ) : null}
+
+                {stats.teacherProgress.length > 0 ? (
+                  <div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      <Scale className="size-3.5" />
+                      Tiến độ theo giáo viên
                     </div>
-                  )
-                })}
+                    <div className="mt-2.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {stats.teacherProgress.map((teacher) => {
+                        const name = teacher.teacherName ?? 'Không rõ'
+                        return (
+                          <div
+                            className="flex items-center gap-2.5 rounded-xl border border-slate-200 px-3 py-2.5"
+                            key={teacher.teacherId}
+                          >
+                            <span
+                              className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${avatarClasses(name)}`}
+                            >
+                              {initials(name)}
+                            </span>
+                            <div className="min-w-0 leading-tight">
+                              <div className="truncate text-[13px] font-bold text-slate-800">
+                                {name}
+                              </div>
+                              <div className="text-[11px] font-medium tabular-nums text-slate-400">
+                                {teacher.assigned} đang chấm · {teacher.completed} xong
+                                {teacher.overdue > 0 ? (
+                                  <span className="font-bold text-red-600">
+                                    {' '}
+                                    · {teacher.overdue} quá hạn
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            </div>
+            </details>
           ) : null}
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          {/* Toàn bộ bộ lọc trong MỘT thanh: trước đây trải ra ba hàng với ba kiểu chip khác nhau. */}
+          <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-3">
             <select
               aria-label="Lọc theo kỳ thi"
-              className="h-11 min-w-56 rounded-lg border border-slate-200 bg-white px-3.5 text-[13.5px] font-semibold text-slate-700 outline-none focus:border-cyan-400"
+              className={`${FIELD_CLASS} min-w-48`}
               onChange={(event) => resetToFirstPage(setExamId)(event.target.value)}
               value={examId}
             >
@@ -592,7 +655,7 @@ export function SchoolAdminGradingPage() {
             </select>
             <select
               aria-label="Lọc theo vòng chấm"
-              className="h-11 min-w-44 rounded-lg border border-slate-200 bg-white px-3.5 text-[13.5px] font-semibold text-slate-700 outline-none focus:border-cyan-400"
+              className={`${FIELD_CLASS} min-w-40`}
               onChange={(event) =>
                 resetToFirstPage(setRoundType)(event.target.value as '' | GradingRoundType)
               }
@@ -606,7 +669,7 @@ export function SchoolAdminGradingPage() {
             </select>
             <select
               aria-label="Lọc theo trạng thái bài"
-              className="h-11 min-w-44 rounded-lg border border-slate-200 bg-white px-3.5 text-[13.5px] font-semibold text-slate-700 outline-none focus:border-cyan-400"
+              className={`${FIELD_CLASS} min-w-40`}
               onChange={(event) =>
                 resetToFirstPage(setResultStatus)(
                   event.target.value as '' | ExamCandidateResultStatus,
@@ -620,10 +683,28 @@ export function SchoolAdminGradingPage() {
                 </option>
               ))}
             </select>
-            <div className="relative min-w-60 flex-1">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+
+            <span aria-hidden="true" className="hidden h-6 w-px bg-slate-200 sm:block" />
+
+            <button
+              aria-pressed={openAppealOnly}
+              className={[
+                'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition',
+                openAppealOnly
+                  ? 'bg-cyan-600 text-white'
+                  : 'border border-slate-200 text-slate-600 hover:bg-slate-50',
+              ].join(' ')}
+              onClick={() => resetToFirstPage(setOpenAppealOnly)(!openAppealOnly)}
+              type="button"
+            >
+              <Gavel className="size-3.5" />
+              Có đơn phúc khảo đang mở
+            </button>
+
+            <div className="relative min-w-52 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
-                className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3.5 text-[13.5px] font-medium text-slate-700 outline-none focus:border-cyan-400"
+                className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-medium text-slate-700 outline-none focus:border-cyan-400"
                 onChange={(event) => resetToFirstPage(setSearch)(event.target.value)}
                 placeholder="Tìm theo mã bài, tên học sinh hoặc giáo viên…"
                 type="search"
@@ -632,53 +713,13 @@ export function SchoolAdminGradingPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {[
-              {
-                active: unassignedOnly,
-                label: 'Chưa phân công',
-                toggle: () => resetToFirstPage(setUnassignedOnly)(!unassignedOnly),
-              },
-              {
-                active: overdueOnly,
-                label: 'Quá hạn',
-                toggle: () => resetToFirstPage(setOverdueOnly)(!overdueOnly),
-              },
-              {
-                active: openAppealOnly,
-                label: 'Có đơn phúc khảo đang mở',
-                toggle: () => resetToFirstPage(setOpenAppealOnly)(!openAppealOnly),
-              },
-            ].map((chip) => (
-              <button
-                className={[
-                  'rounded-full px-4 py-2 text-[13px] font-semibold transition',
-                  chip.active
-                    ? 'bg-slate-900 text-white'
-                    : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-                ].join(' ')}
-                key={chip.label}
-                onClick={chip.toggle}
-                type="button"
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-
-          <FilterChips
-            items={ASSIGNMENT_STATUS_FILTERS}
-            onChange={resetToFirstPage(setStatus)}
-            value={status}
-          />
-
           {selectedRows.length > 0 ? (
-            <div className="mt-5 flex flex-wrap items-center gap-2.5 rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-3.5">
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
               <span className="text-[13px] font-bold text-cyan-800">
                 Đã chọn {selectedRows.length} bài
               </span>
               <button
-                className="inline-flex h-9.5 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-[12.5px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                 disabled={!canBulkAssign}
                 onClick={() => setBulkAssignOpen(true)}
                 title={canBulkAssign ? undefined : 'Chỉ gán được các bài chưa có phân công đang mở'}
@@ -688,7 +729,7 @@ export function SchoolAdminGradingPage() {
                 Phân công {selectableUnassigned.length} bài
               </button>
               <button
-                className="inline-flex h-9.5 items-center gap-1.5 rounded-lg border border-cyan-300 bg-white px-3.5 text-[12.5px] font-bold text-cyan-700 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-cyan-300 bg-white px-3.5 text-xs font-bold text-cyan-700 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
                 disabled={!canSetDeadline}
                 onClick={() => setDeadlineOpen(true)}
                 title={canSetDeadline ? undefined : 'Chỉ đặt hạn được cho bài đã có phân công'}
@@ -698,7 +739,7 @@ export function SchoolAdminGradingPage() {
                 Đặt hạn chấm
               </button>
               <button
-                className="inline-flex h-9.5 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3.5 text-[12.5px] font-bold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3.5 text-xs font-bold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
                 disabled={selectedAssignmentIds.length === 0}
                 onClick={() => setReclaimOpen(true)}
                 type="button"
@@ -707,7 +748,7 @@ export function SchoolAdminGradingPage() {
                 Thu hồi
               </button>
               <button
-                className="ml-auto text-[12.5px] font-bold text-slate-500 transition hover:text-slate-700"
+                className="ml-auto text-xs font-bold text-slate-500 underline underline-offset-2 transition hover:text-slate-700"
                 onClick={() => setSelectedIds([])}
                 type="button"
               >
@@ -715,13 +756,14 @@ export function SchoolAdminGradingPage() {
               </button>
             </div>
           ) : (stats?.overdue ?? 0) > 0 ? (
-            <div className="mt-5 flex flex-wrap items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3.5">
-              <AlarmClock className="size-4.5 text-amber-600" />
-              <span className="flex-1 text-[13px] font-semibold text-amber-800">
-                Có <b>{stats?.overdue}</b> phân công quá hạn trong phạm vi đang xem.
+            <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlarmClock className="size-4 text-amber-600" />
+              <span className="flex-1 text-[13px] font-medium text-amber-800">
+                Có <b className="font-extrabold tabular-nums">{stats?.overdue}</b> phân công quá hạn
+                trong phạm vi đang xem.
               </span>
               <button
-                className="inline-flex h-9.5 items-center gap-1.5 rounded-lg bg-amber-600 px-3.5 text-[12.5px] font-bold text-white transition hover:bg-amber-700"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3.5 text-xs font-bold text-amber-700 transition hover:bg-amber-100"
                 onClick={() => setReclaimOpen(true)}
                 type="button"
               >
@@ -731,12 +773,25 @@ export function SchoolAdminGradingPage() {
             </div>
           ) : null}
 
-          <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-3.5 py-2.5">
+              <SegmentedControl
+                ariaLabel="Trạng thái phân công"
+                items={ASSIGNMENT_STATUS_FILTERS}
+                onChange={resetToFirstPage(setStatus)}
+                value={status}
+              />
+              <span className="ml-auto text-xs font-medium text-slate-500">
+                <b className="font-extrabold tabular-nums text-slate-900">{totalElements}</b> bài
+                khớp bộ lọc
+              </span>
+            </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full min-w-280 border-collapse text-left">
+              <table className="w-full min-w-200 border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50">
-                    <th className="w-10 px-4 py-3.5">
+                  <tr className="border-b border-slate-200">
+                    <th className="w-9 py-2.5 pl-4">
                       <input
                         aria-label="Chọn tất cả bài trong trang"
                         checked={rows.length > 0 && rows.every((row) => selectedIds.includes(row.candidateResultId))}
@@ -745,25 +800,19 @@ export function SchoolAdminGradingPage() {
                         type="checkbox"
                       />
                     </th>
-                    <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                      Mã bài
+                    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Bài thi
                     </th>
-                    <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                      Học sinh
+                    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Trạng thái &amp; vòng chấm
                     </th>
-                    <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                      Trạng thái bài
+                    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Người chấm &amp; hạn
                     </th>
-                    <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                      Vòng chấm
+                    <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Điểm
                     </th>
-                    <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                      Giáo viên chấm
-                    </th>
-                    <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                      Hạn chấm
-                    </th>
-                    <th className="px-5 py-3.5 text-right text-[11px] font-extrabold uppercase text-slate-500">
+                    <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
                       Thao tác
                     </th>
                   </tr>
@@ -771,13 +820,13 @@ export function SchoolAdminGradingPage() {
                 <tbody>
                   {rowsQuery.isLoading ? (
                     <tr>
-                      <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={8}>
+                      <td className="px-5 py-12 text-center text-[13px] text-slate-400" colSpan={6}>
                         Đang tải…
                       </td>
                     </tr>
                   ) : rows.length === 0 ? (
                     <tr>
-                      <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={8}>
+                      <td className="px-5 py-12 text-center text-[13px] text-slate-400" colSpan={6}>
                         Không có bài nào khớp bộ lọc.
                       </td>
                     </tr>
@@ -787,9 +836,33 @@ export function SchoolAdminGradingPage() {
                       const result = getResultStatusDisplay(row.resultStatus)
                       const outcome = getOutcomeDisplay(row.outcome)
                       const completed = row.assignmentStatus === 'COMPLETED'
+                      // Lịch sử điểm + gỡ phân công chuyển vào menu ⋯ để mỗi dòng chỉ còn
+                      // MỘT nút nổi bật — trước đây ba nút cạnh nhau trên mọi dòng.
+                      const rowMenu: ActionMenuItem[] = [
+                        {
+                          icon: History,
+                          id: 'history',
+                          label: 'Lịch sử điểm',
+                          onSelect: () => setHistoryTarget(row),
+                        },
+                        ...(row.assignmentId && !completed
+                          ? [
+                              {
+                                icon: Trash2,
+                                id: 'remove',
+                                label: 'Gỡ phân công',
+                                onSelect: () => setRemoveTarget(row),
+                                tone: 'danger' as const,
+                              },
+                            ]
+                          : []),
+                      ]
                       return (
-                        <tr className="border-b border-slate-100" key={row.candidateResultId}>
-                          <td className="px-4 py-3.5">
+                        <tr
+                          className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70"
+                          key={row.candidateResultId}
+                        >
+                          <td className="py-3 pl-4">
                             <input
                               aria-label={`Chọn bài ${row.resultCode}`}
                               checked={selectedIds.includes(row.candidateResultId)}
@@ -798,131 +871,120 @@ export function SchoolAdminGradingPage() {
                               type="checkbox"
                             />
                           </td>
-                          <td className="px-4 py-3.5">
-                            <ResultCode code={row.resultCode} />
-                            <div className="mt-1 flex items-center gap-1.5">
-                              {row.flagged ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600">
-                                  <Flag className="size-3" />
-                                  Nghi vấn
-                                </span>
-                              ) : null}
-                              {row.hasOpenAppeal ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600">
-                                  <Gavel className="size-3" />
-                                  Có đơn
-                                </span>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5">
+
+                          {/* Mã bài + cờ + học sinh + lớp + kỳ thi — trước đây là hai cột riêng. */}
+                          <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5">
                               <span
-                                className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold ${avatarClasses(row.studentName ?? '?')}`}
+                                className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${avatarClasses(row.studentName ?? '?')}`}
                               >
                                 {initials(row.studentName ?? '?')}
                               </span>
-                              <div className="leading-tight">
-                                <div className="text-[13.5px] font-bold text-slate-900">
+                              <div className="min-w-0 leading-tight">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <ResultCode code={row.resultCode} />
+                                  {row.flagged ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                                      <Flag className="size-3" />
+                                      Nghi vấn
+                                    </span>
+                                  ) : null}
+                                  {row.hasOpenAppeal ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
+                                      <Gavel className="size-3" />
+                                      Có đơn
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="mt-1 truncate text-[13px] font-semibold text-slate-900">
                                   {row.studentName ?? '—'}
                                 </div>
-                                <div className="text-[11.5px] font-semibold text-slate-400">
+                                <div className="truncate text-[11px] font-medium text-slate-400">
                                   {row.className ? `Lớp ${row.className}` : 'Chưa xếp lớp'}
                                   {row.examName ? ` · ${row.examName}` : ''}
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3.5">
-                            <StatusBadge label={result.label} tone={result.tone} />
-                            <div className="mt-1 text-[12px] font-bold text-slate-500">
-                              Điểm {formatScore(row.totalScore)}
+
+                          {/* Trạng thái bài + vòng chấm + kết quả vòng, xếp ngang một hàng. */}
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <StatusBadge label={result.label} tone={result.tone} />
+                              {row.roundType ? (
+                                <>
+                                  <RoundBadge roundType={row.roundType} />
+                                  {outcome ? (
+                                    <StatusBadge label={outcome.label} tone={outcome.tone} />
+                                  ) : (
+                                    <StatusBadge label={assignment.label} tone={assignment.tone} />
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-[11px] font-medium text-slate-400">
+                                  Chưa mở vòng nào
+                                </span>
+                              )}
                             </div>
                           </td>
-                          <td className="px-4 py-3.5">
-                            {row.roundType ? (
-                              <div className="flex flex-col items-start gap-1">
-                                <RoundBadge roundType={row.roundType} />
-                                {outcome ? (
-                                  <StatusBadge label={outcome.label} tone={outcome.tone} />
-                                ) : (
-                                  <StatusBadge label={assignment.label} tone={assignment.tone} />
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-[12.5px] font-semibold text-slate-400">
-                                Chưa mở vòng nào
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5">
+
+                          {/* Giáo viên + hạn chấm — trước đây là hai cột riêng. */}
+                          <td className="px-4 py-3">
                             {row.teacherName ? (
-                              <>
-                                <div className="text-[13px] font-bold text-slate-700">
+                              <div className="grid gap-0.5 leading-tight">
+                                <div className="text-[13px] font-semibold text-slate-900">
                                   {row.teacherName}
                                 </div>
-                                <div className="text-[11px] font-medium text-slate-400">
+                                {row.assignmentId && !completed ? (
+                                  <DeadlineLabel deadlineAt={row.deadlineAt} overdue={row.overdue} />
+                                ) : null}
+                                <div className="text-[11px] font-medium tabular-nums text-slate-400">
                                   {completed
                                     ? `Xong ${formatIsoDateTime(row.completedAt)}`
                                     : `Giao ${formatIsoDateTime(row.assignedAt)}`}
                                 </div>
-                              </>
+                              </div>
                             ) : (
-                              <span className="text-[13px] font-semibold text-slate-400">
+                              <span className="text-[13px] font-medium text-slate-400">
                                 Chưa phân công
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3.5">
-                            {row.assignmentId && !completed ? (
-                              <DeadlineLabel deadlineAt={row.deadlineAt} overdue={row.overdue} />
-                            ) : (
-                              <span className="text-[12px] font-semibold text-slate-300">—</span>
-                            )}
+
+                          <td className="px-4 py-3 text-right">
+                            <span
+                              className={
+                                row.totalScore == null
+                                  ? 'text-sm font-medium text-slate-400'
+                                  : 'text-sm font-extrabold tabular-nums text-slate-900'
+                              }
+                            >
+                              {formatScore(row.totalScore)}
+                            </span>
                           </td>
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                aria-label={`Lịch sử điểm bài ${row.resultCode}`}
-                                className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:border-slate-300 hover:text-slate-600"
-                                onClick={() => setHistoryTarget(row)}
-                                title="Lịch sử điểm"
-                                type="button"
-                              >
-                                <History className="size-4" />
-                              </button>
+
+                          <td className="px-4 py-3">
+                            <RowActions menu={rowMenu} resultCode={row.resultCode}>
                               {completed ? null : (
-                                <>
-                                  <button
-                                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-[12.5px] font-bold text-white transition hover:bg-cyan-700"
-                                    onClick={() => setAssignTarget(row)}
-                                    type="button"
-                                  >
-                                    {row.assignmentId ? (
-                                      <>
-                                        <UserRoundCog className="size-4" />
-                                        Đổi giáo viên
-                                      </>
-                                    ) : (
-                                      <>
-                                        <UserPlus className="size-4" />
-                                        Phân công
-                                      </>
-                                    )}
-                                  </button>
+                                <button
+                                  className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700"
+                                  onClick={() => setAssignTarget(row)}
+                                  type="button"
+                                >
                                   {row.assignmentId ? (
-                                    <button
-                                      aria-label={`Gỡ phân công bài ${row.resultCode}`}
-                                      className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-                                      onClick={() => setRemoveTarget(row)}
-                                      type="button"
-                                    >
-                                      <Trash2 className="size-4" />
-                                    </button>
-                                  ) : null}
-                                </>
+                                    <>
+                                      <UserRoundCog className="size-4" />
+                                      Đổi giáo viên
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserPlus className="size-4" />
+                                      Phân công
+                                    </>
+                                  )}
+                                </button>
                               )}
-                            </div>
+                            </RowActions>
                           </td>
                         </tr>
                       )
@@ -931,14 +993,14 @@ export function SchoolAdminGradingPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-3.5">
-              <span className="text-[12.5px] font-semibold text-slate-500">
-                <b className="text-slate-900">{totalElements}</b> bài · trang {totalPages ? page : 0}/
-                {totalPages}
+            <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-2.5">
+              <span className="text-xs font-medium text-slate-500">
+                <b className="font-extrabold tabular-nums text-slate-900">{totalElements}</b> bài ·
+                trang {totalPages ? page : 0}/{totalPages}
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+                  className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                   disabled={rowsQuery.isFetching || page <= 1}
                   onClick={() => setPage((current) => current - 1)}
                   type="button"
@@ -946,7 +1008,7 @@ export function SchoolAdminGradingPage() {
                   Trước
                 </button>
                 <button
-                  className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+                  className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                   disabled={rowsQuery.isFetching || page >= totalPages}
                   onClick={() => setPage((current) => current + 1)}
                   type="button"
@@ -1070,85 +1132,86 @@ export function TeacherGradingPage() {
   const overdueOnPage = tasks.filter((task) => task.overdue).length
 
   return (
-    <section className="mx-auto max-w-300">
-      <div>
-        <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">Chấm điểm</p>
-        <h1 className="mt-1.5 text-[30px] font-extrabold tracking-tight text-slate-900">
-          Bài cần chấm
-        </h1>
-        <p className="mt-1.5 max-w-2xl text-[15px] text-slate-500">
-          Một hàng đợi cho cả bốn vòng chấm. Bạn chấm ẩn danh — hệ thống không hiển thị thông tin
-          học sinh.
-        </p>
-      </div>
+    <section className="mx-auto grid max-w-300 gap-5">
+      <PageHeading eyebrow="Chấm điểm" title="Bài cần chấm">
+        Một hàng đợi cho cả bốn vòng chấm. Bạn chấm ẩn danh — hệ thống không hiển thị thông tin học
+        sinh.
+      </PageHeading>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <StatCard icon={<Headphones size={19} />} iconTone="amber" label="Cần chấm" value={pending} />
+      <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
+          hint="tổng, không phụ thuộc bộ lọc"
+          icon={<Headphones size={19} />}
+          iconTone="amber"
+          label="Cần chấm"
+          value={pending}
+        />
+        <StatCard
+          hint="tổng, không phụ thuộc bộ lọc"
           icon={<CircleCheck size={19} />}
           iconTone="emerald"
           label="Đã chấm xong"
           value={done}
         />
         <StatCard
+          hint="chỉ đếm trên trang đang xem"
           icon={<AlarmClock size={19} />}
-          iconTone="violet"
+          iconTone="red"
           label="Quá hạn (trang này)"
           value={overdueOnPage}
         />
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <select
-          aria-label="Lọc theo vòng chấm"
-          className="h-11 min-w-44 rounded-lg border border-slate-200 bg-white px-3.5 text-[13.5px] font-semibold text-slate-700 outline-none focus:border-cyan-400"
-          onChange={(event) => {
-            setRoundType(event.target.value as '' | GradingRoundType)
-            setPage(1)
-          }}
-          value={roundType}
-        >
-          {ROUND_FILTERS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {/* Hai bộ lọc gộp vào đầu bảng thay vì hai hàng rời phía trên. */}
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-3.5 py-2.5">
+          <SegmentedControl
+            ariaLabel="Trạng thái phân công"
+            items={ASSIGNMENT_STATUS_FILTERS}
+            onChange={(next) => {
+              setStatus(next)
+              setPage(1)
+            }}
+            value={status}
+          />
+          <select
+            aria-label="Lọc theo vòng chấm"
+            className={`${FIELD_CLASS} min-w-40`}
+            onChange={(event) => {
+              setRoundType(event.target.value as '' | GradingRoundType)
+              setPage(1)
+            }}
+            value={roundType}
+          >
+            {ROUND_FILTERS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="ml-auto text-xs font-medium text-slate-500">
+            <b className="font-extrabold tabular-nums text-slate-900">{totalElements}</b> bài khớp bộ
+            lọc
+          </span>
+        </div>
 
-      <FilterChips
-        items={ASSIGNMENT_STATUS_FILTERS}
-        onChange={(next) => {
-          setStatus(next)
-          setPage(1)
-        }}
-        value={status}
-      />
-
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-220 border-collapse text-left">
+          <table className="w-full min-w-180 border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-5 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Mã bài
+              <tr className="border-b border-slate-200">
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Bài thi
                 </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Kỳ thi
-                </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Vòng chấm
                 </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
+                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Điểm hiện tại
                 </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Hạn chấm
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Hạn &amp; trạng thái
                 </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Trạng thái
-                </th>
-                <th className="px-5 py-3.5 text-right text-[11px] font-extrabold uppercase text-slate-500">
+                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Thao tác
                 </th>
               </tr>
@@ -1156,13 +1219,13 @@ export function TeacherGradingPage() {
             <tbody>
               {tasksQuery.isLoading ? (
                 <tr>
-                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={7}>
+                  <td className="px-5 py-12 text-center text-[13px] text-slate-400" colSpan={5}>
                     Đang tải…
                   </td>
                 </tr>
               ) : tasks.length === 0 ? (
                 <tr>
-                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={7}>
+                  <td className="px-5 py-12 text-center text-[13px] text-slate-400" colSpan={5}>
                     Chưa có bài nào được giao cho bạn.
                   </td>
                 </tr>
@@ -1171,44 +1234,59 @@ export function TeacherGradingPage() {
                   const completed = task.status === 'COMPLETED'
                   const display = getAssignmentStatusDisplay(task.status)
                   return (
-                    <tr className="border-b border-slate-100" key={task.assignmentId}>
-                      <td className="px-5 py-3.5">
-                        <ResultCode code={task.resultCode} />
-                        {task.flagged ? (
-                          <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-amber-600">
-                            <Flag className="size-3" />
-                            Nghi vấn
+                    <tr
+                      className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70"
+                      key={task.assignmentId}
+                    >
+                      {/* Mã bài + cờ + kỳ thi + số phần + mốc giao — trước đây là hai cột. */}
+                      <td className="px-4 py-3">
+                        <div className="grid gap-1 leading-tight">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <ResultCode code={task.resultCode} />
+                            {task.flagged ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                                <Flag className="size-3" />
+                                Nghi vấn
+                              </span>
+                            ) : null}
                           </div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="text-[13.5px] font-semibold text-slate-700">
-                          {task.examName ?? '—'}
-                        </div>
-                        <div className="mt-0.5 text-xs font-medium text-slate-400">
-                          {task.partCount} phần · giao {formatIsoDateTime(task.assignedAt)}
+                          <div className="text-[13px] font-semibold text-slate-900">
+                            {task.examName ?? '—'}
+                          </div>
+                          <div className="text-[11px] font-medium tabular-nums text-slate-400">
+                            {task.partCount} phần · giao {formatIsoDateTime(task.assignedAt)}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-3">
                         <RoundBadge roundType={task.roundType} />
                       </td>
-                      <td className="px-4 py-3.5 text-[13px] font-bold text-slate-600">
-                        {formatScore(task.currentScore)}
+                      <td className="px-4 py-3 text-right">
+                        <span
+                          className={
+                            task.currentScore == null
+                              ? 'text-sm font-medium text-slate-400'
+                              : 'text-sm font-extrabold tabular-nums text-slate-900'
+                          }
+                        >
+                          {formatScore(task.currentScore)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3.5">
-                        {completed ? (
-                          <span className="text-[12px] font-semibold text-slate-300">—</span>
-                        ) : (
-                          <DeadlineLabel deadlineAt={task.deadlineAt} overdue={task.overdue} />
-                        )}
+                      {/* Hạn chấm + trạng thái phân công — trước đây là hai cột. */}
+                      <td className="px-4 py-3">
+                        <div className="grid justify-items-start gap-1">
+                          {completed ? (
+                            <span className="text-[11px] font-medium text-slate-400">—</span>
+                          ) : (
+                            <DeadlineLabel deadlineAt={task.deadlineAt} overdue={task.overdue} />
+                          )}
+                          <StatusBadge label={display.label} tone={display.tone} />
+                        </div>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <StatusBadge label={display.label} tone={display.tone} />
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
+                      <td className="px-4 py-3 text-right">
                         <button
                           className={[
-                            'inline-flex h-9.5 items-center gap-1.5 rounded-lg px-4 text-[13px] font-bold transition',
+                            'inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold transition',
                             completed
                               ? 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                               : 'bg-cyan-600 text-white hover:bg-cyan-700',
@@ -1227,14 +1305,15 @@ export function TeacherGradingPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-3.5">
-          <span className="text-[12.5px] font-semibold text-slate-500">
-            <b className="text-slate-900">{totalElements}</b> bài · trang {totalPages ? page : 0}/
-            {totalPages}
+
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-2.5">
+          <span className="text-xs font-medium text-slate-500">
+            <b className="font-extrabold tabular-nums text-slate-900">{totalElements}</b> bài · trang{' '}
+            {totalPages ? page : 0}/{totalPages}
           </span>
           <div className="flex items-center gap-2">
             <button
-              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+              className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               disabled={tasksQuery.isFetching || page <= 1}
               onClick={() => setPage((current) => current - 1)}
               type="button"
@@ -1242,7 +1321,7 @@ export function TeacherGradingPage() {
               Trước
             </button>
             <button
-              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+              className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               disabled={tasksQuery.isFetching || page >= totalPages}
               onClick={() => setPage((current) => current + 1)}
               type="button"
@@ -1333,7 +1412,7 @@ export function TeacherGradingTaskPage() {
   }, [detail, scores])
 
   const debouncedPreviewItems = useDebouncedValue(previewItems, PREVIEW_DEBOUNCE_MS)
-  // Chỉ tính thử khi vòng này thật sự cho chấm lại — vòng soi bài vô hiệu không có
+  // Chỉ tính thử khi vòng này thật sự cho chấm lại — vòng xét vô hiệu không có
   // REGRADED nên gọi preview ở đó chỉ tạo lỗi đỏ.
   const canRegrade = detail?.allowedOutcomes.includes('REGRADED') === true
   const previewQuery = useGradingPreviewQuery(assignmentId, debouncedPreviewItems, {
@@ -1442,7 +1521,7 @@ export function TeacherGradingTaskPage() {
           {
             onError: onActionError,
             onSuccess: (result) => {
-              done('Đã gỡ vô hiệu. Lượt chấm lần đầu đã được mở cho bạn.')
+              done('Đã gỡ vô hiệu. Lượt chấm thủ công đã được mở cho bạn.')
               // BE mở luôn vòng INITIAL cho chính giáo viên này — đi thẳng sang đó
               // thay vì bắt họ tìm lại bài trong hàng đợi.
               if (result.nextAssignmentId) {
@@ -1483,39 +1562,41 @@ export function TeacherGradingTaskPage() {
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3.5">
         <div>
-          <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-700">
             {roundDisplay.label}
           </p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
-            <h1 className="text-[25px] font-extrabold tracking-tight text-slate-900">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
               Bài #{detail.resultCode}
             </h1>
             <RoundBadge roundType={detail.roundType} />
             <StatusBadge label={resultDisplay.label} tone={resultDisplay.tone} />
           </div>
-          <p className="mt-1 text-[13.5px] font-medium text-slate-500">
+          <p className="mt-1.5 text-xs font-medium text-slate-500">
             {detail.examName ?? 'Kỳ thi'} · {detail.items.length} phần thi ·{' '}
             {detail.criteria.length} tiêu chí
             {detail.scoreBefore != null ? (
               <>
                 {' '}
                 · Điểm khi được giao{' '}
-                <b className="text-slate-700">{formatScore(detail.scoreBefore)}</b>
+                <b className="font-bold tabular-nums text-slate-900">
+                  {formatScore(detail.scoreBefore)}
+                </b>
               </>
             ) : null}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-1.5">
           {readOnly ? (
-            <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600">
-              <CircleCheck className="size-4" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+              <CircleCheck className="size-3.5" />
               Chỉ xem — phân công đã đóng
-            </div>
+            </span>
           ) : (
-            <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700">
-              <ShieldCheck className="size-4" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
+              <ShieldCheck className="size-3.5" />
               Chấm ẩn danh
-            </div>
+            </span>
           )}
           {detail.deadlineAt && !readOnly ? (
             <DeadlineLabel deadlineAt={detail.deadlineAt} overdue={detail.overdue} />
@@ -1523,62 +1604,62 @@ export function TeacherGradingTaskPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
-        <Info className="mt-0.5 size-4.5 shrink-0 text-slate-400" />
-        <div className="text-[12.5px] font-medium leading-relaxed text-slate-600">
-          {roundDisplay.hint}
-          {readOnly ? ' Bạn đang xem lại phân công đã hoàn thành.' : ''}
-          {detail.currentTotalScore != null ? (
-            <>
-              {' '}
-              Điểm đang có: <b className="text-slate-900">{formatScore(detail.currentTotalScore)}</b>
-              .
-            </>
-          ) : null}
-        </div>
-      </div>
-
-      {detail.appealReason ? (
-        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
-          <div className="flex items-start gap-2.5">
-            <Gavel className="mt-0.5 size-5 shrink-0 text-red-600" />
-            <div>
-              <div className="text-[13.5px] font-extrabold text-red-900">
-                Lý do học sinh nêu trong đơn phúc khảo
-              </div>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-red-800">
-                {detail.appealReason}
-              </p>
-            </div>
+      {/* Một thẻ ngữ cảnh thay cho tối đa ba banner full-width xếp dọc: hint vòng chấm là
+          dòng chính, lý do phúc khảo và cờ nghi vấn thành các dòng nền màu bên trong. */}
+      <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="flex items-start gap-2.5 px-4 py-3">
+          <Info className="mt-0.5 size-4 shrink-0 text-slate-400" />
+          <div className="text-[13px] leading-relaxed text-slate-600">
+            {roundDisplay.hint}
+            {readOnly ? ' Bạn đang xem lại phân công đã hoàn thành.' : ''}
+            {detail.currentTotalScore != null ? (
+              <>
+                {' '}
+                Điểm đang có:{' '}
+                <b className="font-bold tabular-nums text-slate-900">
+                  {formatScore(detail.currentTotalScore)}
+                </b>
+                .
+              </>
+            ) : null}
           </div>
         </div>
-      ) : null}
 
-      {detail.flagged ? (
-        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
-          <div className="flex items-start gap-2.5">
-            <Flag className="mt-0.5 size-5 shrink-0 text-amber-600" />
+        {detail.appealReason ? (
+          <div className="flex items-start gap-2.5 border-t border-red-200 bg-red-50 px-4 py-3">
+            <Gavel className="mt-0.5 size-4 shrink-0 text-red-600" />
             <div>
-              <div className="text-[13.5px] font-extrabold text-amber-900">
+              <div className="text-[13px] font-bold text-red-900">
+                Lý do học sinh nêu trong đơn phúc khảo
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-red-800">{detail.appealReason}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {detail.flagged ? (
+          <div className="flex items-start gap-2.5 border-t border-amber-200 bg-amber-50 px-4 py-3">
+            <Flag className="mt-0.5 size-4 shrink-0 text-amber-600" />
+            <div>
+              <div className="text-[13px] font-bold text-amber-900">
                 Bài thi bị đánh dấu nghi vấn
               </div>
               {detail.flagReason ? (
-                <p className="mt-1 text-[12.5px] leading-relaxed text-amber-800">
-                  {detail.flagReason}
-                </p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-800">{detail.flagReason}</p>
               ) : null}
-              <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-amber-700">
+              <p className="mt-1.5 text-xs leading-relaxed text-amber-700">
                 Nghe bài rồi quyết định. Cờ chỉ thực sự được gỡ khi bạn nộp điểm hoặc giữ nguyên
                 điểm — rời trang giữa chừng thì bài vẫn còn cờ.
               </p>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
-      <div className="grid gap-7">
+      <div className="grid gap-4">
         {detail.items.length > 1 ? (
-          <TabPillGroup
+          <SegmentedControl
+            ariaLabel="Phần thi"
             items={itemTabItems(detail.items)}
             onChange={setActiveItemId}
             value={activeItem?.paperItemId ?? ''}
@@ -1587,43 +1668,43 @@ export function TeacherGradingTaskPage() {
 
         {(activeItem ? [activeItem] : []).map((item) => (
           <div
-            className={canRegrade ? 'grid gap-4.5 lg:grid-cols-[1.15fr_1fr]' : 'grid gap-4.5'}
+            className={canRegrade ? 'grid items-start gap-4 lg:grid-cols-[1.15fr_1fr]' : 'grid gap-4'}
             key={item.paperItemId}
           >
-            <div className="grid gap-4.5">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
-                    <Mic className="size-4.5 text-cyan-700" />
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <Mic className="size-4 text-cyan-700" />
                     Bản ghi bài nói · {item.partLabel ?? 'Phần thi'}
                   </div>
-                  <span className="text-xs font-semibold text-slate-400">
+                  <span className="text-[11px] font-semibold text-slate-400">
                     {item.turns.length} lượt
                   </span>
                 </div>
-                <div className="mt-4">
+                <div className="mt-3.5">
                   <GradingTurnList turns={item.turns} />
                 </div>
-                <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-violet-50 px-3.5 py-3">
-                  <Bot className="size-4.5 text-violet-600" />
-                  <span className="flex-1 text-[12.5px] font-semibold text-violet-700">
+                <div className="mt-3.5 flex items-center gap-2.5 rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2.5">
+                  <Bot className="size-4 text-violet-600" />
+                  <span className="flex-1 text-xs font-semibold text-violet-700">
                     Điểm của bản chấm hiện tại
                   </span>
-                  <span className="text-[12.5px] font-bold text-violet-700">
+                  <span className="text-[13px] font-extrabold tabular-nums text-violet-700">
                     {formatScore(item.currentItemScore)}
                   </span>
                 </div>
               </div>
 
               {canRegrade ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
-                  <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
-                    <ClipboardList className="size-4.5 text-cyan-700" />
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <ClipboardList className="size-4 text-cyan-700" />
                     Nhận xét · {item.partLabel ?? 'Phần thi'}
                   </div>
                   <textarea
                     aria-label={`Nhận xét cho ${item.partLabel ?? 'phần thi'}`}
-                    className="mt-3 min-h-30 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[13.5px] leading-relaxed text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="mt-3 min-h-24 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[13px] leading-relaxed text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
                     disabled={readOnly}
                     maxLength={2048}
                     onChange={(event) =>
@@ -1640,17 +1721,19 @@ export function TeacherGradingTaskPage() {
             </div>
 
             {canRegrade ? (
-              <div className="grid gap-3.5">
-                <div className="flex items-center justify-between rounded-2xl border-2 border-cyan-500 bg-linear-to-r from-cyan-50 to-white px-5 py-4">
+              <div className="grid gap-3">
+                {/* Viền thường + số lớn, không còn viền cyan đậm + gradient: điểm phần
+                    không nên tranh sự chú ý với tổng điểm ở thanh dưới. */}
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
                   <div>
-                    <div className="text-[12.5px] font-bold text-cyan-700">
+                    <div className="text-[13px] font-bold text-cyan-700">
                       Điểm phần · {item.partLabel ?? 'Phần thi'}
                     </div>
-                    <div className="text-[11.5px] font-medium text-slate-400">
+                    <div className="text-[11px] font-medium text-slate-400">
                       Hệ thống tính theo trọng số tiêu chí
                     </div>
                   </div>
-                  <div className="text-[38px] font-extrabold leading-none text-cyan-600">
+                  <div className="text-[30px] font-extrabold leading-none tabular-nums text-cyan-700">
                     {readOnly
                       ? formatScore(item.currentItemScore)
                       : formatScore(previewItemScore(item.paperItemId))}
@@ -1674,103 +1757,105 @@ export function TeacherGradingTaskPage() {
             ) : null}
           </div>
         ))}
+      </div>
 
-        {readOnly ? (
-          <div className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 text-[15px] font-bold text-slate-500">
-            <CircleCheck className="size-5" />
-            Phân công đã đóng — không thao tác được nữa
-          </div>
-        ) : (
-          <div className="grid gap-3">
-            {canRegrade ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-                <div>
-                  <div className="text-[12.5px] font-bold text-emerald-700">
-                    Tổng điểm cả bài (tạm tính)
-                  </div>
-                  <div className="text-[11.5px] font-medium text-emerald-700/70">
-                    {previewQuery.isFetching
-                      ? 'Đang tính lại…'
-                      : allFilled
-                        ? 'Hệ thống tính từ điểm tiêu chí bạn nhập'
-                        : 'Phần chưa chấm đang dùng điểm hiện tại'}
-                  </div>
+      {readOnly ? (
+        <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 py-3.5 text-[13px] font-bold text-slate-500">
+          <CircleCheck className="size-4" />
+          Phân công đã đóng — không thao tác được nữa
+        </div>
+      ) : (
+        /* Thanh dính đáy: tổng điểm tạm tính + đúng các nút BE cho phép, để giáo viên
+           không phải cuộn xuống hết trang mới thao tác được. */
+        <div className="sticky bottom-0 z-20 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_-6px_20px_rgb(15_23_42/0.07)]">
+          {canRegrade ? (
+            <div className="flex items-center gap-3 border-slate-200 pr-3.5 sm:border-r">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Tổng điểm cả bài (tạm tính)
                 </div>
-                <div className="text-right">
-                  <div className="text-[34px] font-extrabold leading-none text-emerald-600">
-                    {formatScore(preview?.totalScore)}
-                  </div>
-                  {preview?.resultBandName ? (
-                    <div className="text-[11.5px] font-bold text-emerald-700/80">
-                      {preview.resultBandName}
-                    </div>
-                  ) : null}
+                <div className="text-[11px] font-medium text-slate-400">
+                  {previewQuery.isFetching
+                    ? 'Đang tính lại…'
+                    : allFilled
+                      ? 'Hệ thống tính từ điểm tiêu chí bạn nhập'
+                      : 'Phần chưa chấm đang dùng điểm hiện tại'}
                 </div>
               </div>
-            ) : null}
+              <div className="text-right">
+                <div className="text-[28px] font-extrabold leading-none tabular-nums text-emerald-600">
+                  {formatScore(preview?.totalScore)}
+                </div>
+                {preview?.resultBandName ? (
+                  <div className="text-[11px] font-bold text-emerald-700">
+                    {preview.resultBandName}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
-            {/* Dựng đúng các nút BE cho phép ở vòng này. DECLINED không nằm trong
-                allowedOutcomes vì nó hợp lệ ở MỌI vòng — luôn hiện khi còn chấm được. */}
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              {canRegrade ? (
-                <button
-                  className="inline-flex h-12.5 items-center justify-center gap-2 rounded-xl bg-cyan-600 text-[15px] font-bold text-white shadow-lg shadow-cyan-600/30 transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none sm:col-span-2"
-                  disabled={!allFilled || regradeMutation.isPending}
-                  onClick={() => setSubmitOpen(true)}
-                  type="button"
-                >
-                  <CircleCheck className="size-5" />
-                  {allFilled
-                    ? `Nộp điểm cho ${detail.items.length} phần thi`
-                    : 'Chấm đủ tiêu chí bắt buộc của mọi phần để nộp'}
-                </button>
-              ) : null}
+          {/* DECLINED không nằm trong allowedOutcomes vì nó hợp lệ ở MỌI vòng — luôn hiện
+              khi còn chấm được. */}
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-bold text-slate-600 transition hover:bg-slate-50"
+              onClick={() => setDecision('DECLINED')}
+              type="button"
+            >
+              <Undo2 className="size-4" />
+              Trả lại phân công
+            </button>
 
-              {allows('UPHELD') ? (
-                <button
-                  className="inline-flex h-11.5 items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-white text-[14px] font-bold text-emerald-700 transition hover:bg-emerald-50"
-                  onClick={() => setDecision('UPHELD')}
-                  type="button"
-                >
-                  <ShieldCheck className="size-4.5" />
-                  Giữ nguyên điểm
-                </button>
-              ) : null}
-
-              {allows('CLEARED_INVALID') ? (
-                <button
-                  className="inline-flex h-11.5 items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-white text-[14px] font-bold text-emerald-700 transition hover:bg-emerald-50"
-                  onClick={() => setDecision('CLEARED_INVALID')}
-                  type="button"
-                >
-                  <ShieldCheck className="size-4.5" />
-                  Gỡ vô hiệu
-                </button>
-              ) : null}
-
-              {allows('INVALIDATED') ? (
-                <button
-                  className="inline-flex h-11.5 items-center justify-center gap-2 rounded-xl border border-red-300 bg-white text-[14px] font-bold text-red-600 transition hover:bg-red-50"
-                  onClick={() => setDecision('INVALIDATED')}
-                  type="button"
-                >
-                  <ShieldAlert className="size-4.5" />
-                  Kết luận vi phạm
-                </button>
-              ) : null}
-
+            {allows('INVALIDATED') ? (
               <button
-                className="inline-flex h-11.5 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-[14px] font-bold text-slate-600 transition hover:bg-slate-50"
-                onClick={() => setDecision('DECLINED')}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3.5 text-[13px] font-bold text-red-600 transition hover:bg-red-50"
+                onClick={() => setDecision('INVALIDATED')}
                 type="button"
               >
-                <Undo2 className="size-4.5" />
-                Trả lại phân công
+                <ShieldAlert className="size-4" />
+                Kết luận vi phạm
               </button>
-            </div>
+            ) : null}
+
+            {allows('CLEARED_INVALID') ? (
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3.5 text-[13px] font-bold text-emerald-700 transition hover:bg-emerald-50"
+                onClick={() => setDecision('CLEARED_INVALID')}
+                type="button"
+              >
+                <ShieldCheck className="size-4" />
+                Gỡ vô hiệu
+              </button>
+            ) : null}
+
+            {allows('UPHELD') ? (
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3.5 text-[13px] font-bold text-emerald-700 transition hover:bg-emerald-50"
+                onClick={() => setDecision('UPHELD')}
+                type="button"
+              >
+                <ShieldCheck className="size-4" />
+                Giữ nguyên điểm
+              </button>
+            ) : null}
+
+            {canRegrade ? (
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-[13px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                disabled={!allFilled || regradeMutation.isPending}
+                onClick={() => setSubmitOpen(true)}
+                type="button"
+              >
+                <CircleCheck className="size-4" />
+                {allFilled
+                  ? `Nộp điểm cho ${detail.items.length} phần thi`
+                  : 'Chấm đủ tiêu chí bắt buộc của mọi phần để nộp'}
+              </button>
+            ) : null}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {decision ? (
         <GradingDecisionDialog

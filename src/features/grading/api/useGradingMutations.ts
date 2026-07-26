@@ -147,7 +147,7 @@ export async function invalidateResult(assignmentId: string, reason: string) {
 }
 
 /**
- * Kết luận KHÔNG vi phạm -> gỡ vô hiệu và mở luôn vòng chấm lần đầu cho chính giáo
+ * Kết luận KHÔNG vi phạm -> gỡ vô hiệu và mở luôn vòng chấm thủ công cho chính giáo
  * viên này (`nextAssignmentId`). Lý do BẮT BUỘC.
  */
 export async function clearInvalidResult(assignmentId: string, reason: string) {

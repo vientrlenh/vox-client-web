@@ -192,7 +192,7 @@ describe('grading REST mutations', () => {
     expect(post).toHaveBeenCalledWith('/v1/grading-assignments/a1/clear-invalid', {
       reason: 'Không có vi phạm',
     })
-    // BE mở luôn vòng chấm lần đầu cho chính giáo viên đó — FE đi thẳng sang bài mới.
+    // BE mở luôn vòng chấm thủ công cho chính giáo viên đó — FE đi thẳng sang bài mới.
     expect(result.nextAssignmentId).toBe('a2')
   })
 

@@ -103,7 +103,7 @@ function copyFor(outcome: DecisionOutcome, roundType: GradingRoundType): Decisio
         body: (
           <>
             Bạn kết luận bài <b>không vi phạm</b>. Hệ thống gỡ vô hiệu, gỡ chặn thí sinh, và mở
-            luôn một lượt <b>chấm lần đầu</b> cho chính bạn để chấm bài này.
+            luôn một lượt <b>chấm thủ công</b> cho chính bạn để chấm bài này.
           </>
         ),
         confirmLabel: 'Gỡ vô hiệu',

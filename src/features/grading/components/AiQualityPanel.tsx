@@ -18,7 +18,7 @@ function Metric({ hint, label, value }: { hint?: string; label: string; value: s
 
 /**
  * "AI chấm lệch bao nhiêu", đo từ chính dữ liệu hậu kiểm. Mẫu số là các vòng hậu
- * kiểm ĐÃ HOÀN THÀNH — vòng chấm lần đầu không tính, vì ở đó điểm AI vốn chưa được
+ * kiểm ĐÃ HOÀN THÀNH — vòng chấm thủ công không tính, vì ở đó điểm AI vốn chưa được
  * coi là chốt.
  */
 export function AiQualityPanel({ examId }: AiQualityPanelProps) {
