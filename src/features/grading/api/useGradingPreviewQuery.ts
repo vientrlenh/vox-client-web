@@ -10,7 +10,8 @@ type ApiResponse<T> = {
 }
 
 /**
- * Tính thử tổng điểm — là POST nhưng CHỈ ĐỌC, không ghi gì.
+ * Tính thử tổng điểm — là POST nhưng CHỈ ĐỌC, không ghi gì. Body giống hệt
+ * `/regrade` nên tổng trả về bằng đúng tổng khi nộp.
  *
  * <p>Tồn tại vì công thức tổng của BE là weighted hai tầng (điểm tiêu chí → điểm
  * phần theo trọng số tiêu chí → điểm phần nhân trọng số câu → tổng theo trọng số
@@ -19,7 +20,7 @@ type ApiResponse<T> = {
  */
 export async function previewGrading(assignmentId: string, items: ItemGradeInput[]) {
   const response = await apiClient.post<ApiResponse<GradingPreview>>(
-    `${GRADING_BASE}/${assignmentId}/grade/preview`,
+    `${GRADING_BASE}/${assignmentId}/regrade/preview`,
     { items },
   )
   return response.data.data
