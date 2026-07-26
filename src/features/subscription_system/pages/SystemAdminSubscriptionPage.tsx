@@ -9,7 +9,7 @@ import { useCreatePlanMutation, useUpdatePlanMutation, useArchivePlanMutation } 
 import { useSchoolSubscriptionsQuery } from '../api/useSchoolSubscriptionsQuery'
 import { useRenewSubscriptionMutation, useCancelSubscriptionMutation } from '../api/useSchoolSubscriptionMutations'
 import { useSubscriptionRequestsQuery } from '../api/useSubscriptionRequestsQuery'
-import { useApproveRequestMutation, useRejectRequestMutation } from '../api/useSubscriptionRequestMutations'
+import { useCreatePaymentLinkForRequestMutation, useRejectRequestMutation } from '../api/useSubscriptionRequestMutations'
 import { useSchoolLookup } from '../api/useSchoolLookup'
 import { SubscriptionOverviewPanel } from '../components/SubscriptionOverviewPanel'
 import { PlanCard } from '../components/PlanCard'
@@ -79,12 +79,12 @@ export function SystemAdminSubscriptionPage() {
   const archivePlanMutation = useArchivePlanMutation()
   const renewMutation = useRenewSubscriptionMutation()
   const cancelMutation = useCancelSubscriptionMutation()
-  const approveMutation = useApproveRequestMutation()
+  const paymentLinkMutation = useCreatePaymentLinkForRequestMutation()
   const rejectMutation = useRejectRequestMutation()
 
   const isSavingPlan = createPlanMutation.isPending || updatePlanMutation.isPending
   const isSchoolActionPending = renewMutation.isPending || cancelMutation.isPending
-  const isRequestActionPending = approveMutation.isPending || rejectMutation.isPending
+  const isRequestActionPending = paymentLinkMutation.isPending || rejectMutation.isPending
 
   function getPlanName(planId: string | null) {
     if (!planId) {
@@ -212,12 +212,12 @@ export function SystemAdminSubscriptionPage() {
     }
   }
 
-  async function handleApprove(request: SubscriptionRequest) {
+  async function handlePay(request: SubscriptionRequest) {
     const school = getSchool(request.schoolId)
     const confirmed = await confirm({
-      confirmLabel: 'Duyệt',
-      message: `Duyệt và kích hoạt gói "${getPlanName(request.requestedPlanId)}" cho trường "${school?.name ?? request.schoolId}" mà không cần thanh toán qua PayOS?`,
-      title: 'Duyệt yêu cầu',
+      confirmLabel: 'Tiếp tục thanh toán',
+      message: `Bạn sẽ được chuyển đến cổng thanh toán PayOS để thanh toán gói "${getPlanName(request.requestedPlanId)}" cho trường "${school?.name ?? request.schoolId}". Gói được kích hoạt tự động ngay sau khi thanh toán thành công.`,
+      title: 'Thanh toán yêu cầu qua PayOS',
     })
 
     if (!confirmed) {
@@ -225,10 +225,10 @@ export function SystemAdminSubscriptionPage() {
     }
 
     try {
-      await approveMutation.mutateAsync(request.id)
-      setToast({ text: 'Đã duyệt yêu cầu', tone: 'success' })
+      const result = await paymentLinkMutation.mutateAsync(request.id)
+      window.location.href = result.data.checkoutUrl
     } catch (error) {
-      setToast({ text: getErrorMessage(error) ?? 'Không thể duyệt yêu cầu.', tone: 'error' })
+      setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán.', tone: 'error' })
     }
   }
 
@@ -355,7 +355,7 @@ export function SystemAdminSubscriptionPage() {
           isActionPending={isRequestActionPending}
           isError={requestsQuery.isError}
           isLoading={requestsQuery.isLoading}
-          onApprove={handleApprove}
+          onPay={handlePay}
           onReject={handleReject}
           onRetry={() => void requestsQuery.refetch()}
           onStatusChange={(status) => {

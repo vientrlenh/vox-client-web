@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
-import { ExternalLink, Inbox } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { ExternalLink, Inbox, ReceiptText } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { formatDate, formatVnd, getInvoiceStatusDisplay, type Invoice } from '../types'
+import { formatDateTime, formatVnd, getInvoiceStatusDisplay, type Invoice } from '../types'
+import { InvoiceDetailDialog } from './InvoiceDetailDialog'
 
 type InvoicesTableProps = {
   errorMessage?: string
@@ -19,6 +20,8 @@ const SOURCE_LABELS: Record<Invoice['sourceType'], string> = {
 }
 
 export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoading, onRetry }: InvoicesTableProps) {
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="overflow-x-auto">
@@ -31,12 +34,13 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
               <th className="px-4 py-3.5">Số tiền</th>
               <th className="px-4 py-3.5">Trạng thái</th>
               <th className="px-4 py-3.5 text-right">Thanh toán</th>
+              <th className="px-4 py-3.5 text-right">Chi tiết</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td className="px-6 py-10 text-center text-sm font-semibold text-slate-500" colSpan={6}>
+                <td className="px-6 py-10 text-center text-sm font-semibold text-slate-500" colSpan={7}>
                   Đang tải hóa đơn...
                 </td>
               </tr>
@@ -44,7 +48,7 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
 
             {isError ? (
               <tr>
-                <td className="px-6 py-10 text-center" colSpan={6}>
+                <td className="px-6 py-10 text-center" colSpan={7}>
                   <p className="text-sm font-semibold text-red-600">{errorMessage ?? 'Không thể tải hóa đơn.'}</p>
                   <button
                     className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
@@ -59,7 +63,7 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
 
             {!isLoading && !isError && invoices.length === 0 ? (
               <tr>
-                <td className="px-6 py-14 text-center" colSpan={6}>
+                <td className="px-6 py-14 text-center" colSpan={7}>
                   <Inbox aria-hidden="true" className="mx-auto size-9 text-slate-300" />
                   <p className="mt-2 text-sm font-semibold text-slate-500">Chưa có hóa đơn nào</p>
                 </td>
@@ -73,7 +77,7 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
                   return (
                     <tr className="border-b border-slate-100" key={invoice.id}>
                       <td className="px-6 py-4 font-mono text-sm font-bold text-slate-900">{invoice.invoiceNumber}</td>
-                      <td className="px-4 py-4 text-sm text-slate-600">{formatDate(invoice.paidAt)}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600">{formatDateTime(invoice.paidAt)}</td>
                       <td className="px-4 py-4 text-sm font-bold text-indigo-700">{SOURCE_LABELS[invoice.sourceType]}</td>
                       <td className="px-4 py-4 text-sm font-extrabold text-slate-900">{formatVnd(invoice.amount)}</td>
                       <td className="px-4 py-4">
@@ -94,6 +98,16 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
                           <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
+                      <td className="px-4 py-4 text-right">
+                        <button
+                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50"
+                          onClick={() => setSelectedInvoice(invoice)}
+                          type="button"
+                        >
+                          <ReceiptText aria-hidden="true" className="size-3.5" />
+                          Xem chi tiết
+                        </button>
+                      </td>
                     </tr>
                   )
                 })
@@ -103,6 +117,8 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
       </div>
 
       {footer}
+
+      <InvoiceDetailDialog invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
     </div>
   )
 }

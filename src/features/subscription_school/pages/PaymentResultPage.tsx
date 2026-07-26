@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { CircleCheck, CircleX, Clock, Loader2 } from 'lucide-react'
@@ -85,7 +85,15 @@ const OUTCOME_DISPLAY: Record<Outcome, { icon: typeof CircleCheck; iconClass: st
   },
 }
 
-export function PaymentResultPage() {
+type PaymentResultPageProps = {
+  // Trang này dùng chung cho cả School Admin và System Admin (System Admin cũng thanh toán qua PayOS khi
+  // duyệt request) — mỗi route truyền đúng đường quay về theo layout/role của mình.
+  backTo?: string
+}
+
+const DEFAULT_BACK_TO = '/school-admin/subscription'
+
+export function PaymentResultPage({ backTo = DEFAULT_BACK_TO }: PaymentResultPageProps) {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -95,11 +103,17 @@ export function PaymentResultPage() {
     orderCode && !Number.isNaN(Number(orderCode)) ? 'checking' : resolveOutcomeFromUrl(searchParams),
   )
   const [secondsLeft, setSecondsLeft] = useState(AUTO_REDIRECT_SECONDS)
+  // Chặn gọi sync-status 2 lần khi React.StrictMode mount/unmount/mount lại effect ở dev mode.
+  const syncedOrderCodeRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!orderCode || Number.isNaN(Number(orderCode))) {
       return
     }
+    if (syncedOrderCodeRef.current === orderCode) {
+      return
+    }
+    syncedOrderCodeRef.current = orderCode
 
     syncMutation
       .mutateAsync(Number(orderCode))
@@ -126,9 +140,9 @@ export function PaymentResultPage() {
 
   useEffect(() => {
     if (secondsLeft <= 0) {
-      navigate('/school-admin/subscription')
+      navigate(backTo)
     }
-  }, [navigate, secondsLeft])
+  }, [backTo, navigate, secondsLeft])
 
   const display = OUTCOME_DISPLAY[outcome]
   const Icon = display.icon
@@ -143,7 +157,7 @@ export function PaymentResultPage() {
         <p className="mt-2 text-sm leading-6 text-slate-500">{display.message}</p>
         <button
           className="mt-6 inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-black text-white transition hover:bg-indigo-700"
-          onClick={() => navigate('/school-admin/subscription')}
+          onClick={() => navigate(backTo)}
           type="button"
         >
           Quay lại Gói dịch vụ

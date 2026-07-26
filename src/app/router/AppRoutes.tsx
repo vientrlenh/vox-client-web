@@ -589,6 +589,12 @@ const SystemAdminSubscriptionPage = lazy(() =>
   })),
 );
 
+const SystemAdminSubscriptionPaymentResultPage = lazy(() =>
+  import("@/features/subscription_school").then((module) => ({
+    default: module.PaymentResultPage,
+  })),
+);
+
 const SchoolAdminSubscriptionPage = lazy(() =>
   import("@/features/subscription_school").then((module) => ({
     default: module.SchoolAdminSubscriptionPage,
@@ -702,6 +708,10 @@ export function AppRoutes() {
             <Route
               path="system-admin/subscription"
               element={<SystemAdminSubscriptionPage />}
+            />
+            <Route
+              path="system-admin/subscription/payment-result"
+              element={<SystemAdminSubscriptionPaymentResultPage backTo="/system-admin/subscription" />}
             />
           </Route>
         </Route>
