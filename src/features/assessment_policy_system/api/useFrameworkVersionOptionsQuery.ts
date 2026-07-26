@@ -6,10 +6,10 @@ import type { FrameworkResultBandOption, FrameworkVersionOption } from '../types
 
 const PUBLISHED_STATUS = 'PUBLISHED';
 
-// 1. Danh sách Framework Version (đã lọc PUBLISHED) theo Framework đã chọn
+// 1. Danh sách Framework Version (đã lọc PUBLISHED ngay server-side qua tham số "status") theo Framework đã chọn
 const GET_FRAMEWORK_VERSIONS = `
-  query GetFrameworkVersions($frameworkId: ID!, $page: Int, $size: Int) {
-    frameworkVersions(frameworkId: $frameworkId, page: $page, size: $size) {
+  query GetFrameworkVersions($frameworkId: ID!, $status: String, $page: Int, $size: Int) {
+    frameworkVersions(frameworkId: $frameworkId, status: $status, page: $page, size: $size) {
       content {
         id
         code
@@ -27,9 +27,9 @@ export function useFrameworkVersionsQuery(frameworkId?: string) {
     queryFn: async () => {
       const data = await graphQLRequest<{ frameworkVersions: { content: FrameworkVersionOption[] } }>(
         GET_FRAMEWORK_VERSIONS,
-        { frameworkId, page: 1, size: 100 }
+        { frameworkId, status: PUBLISHED_STATUS, page: 1, size: 100 }
       );
-      return data.frameworkVersions.content.filter((version) => version.status === PUBLISHED_STATUS);
+      return data.frameworkVersions.content;
     },
     enabled: Boolean(frameworkId),
   });

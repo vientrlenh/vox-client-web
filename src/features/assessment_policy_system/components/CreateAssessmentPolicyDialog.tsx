@@ -138,7 +138,7 @@ function PolicyFormFields({ index, form, onChange, onRemove, isPending }: Policy
       {isSecondaryPolicy ? (
         <div className="mb-4 flex items-center justify-between">
           <p className="text-xs font-extrabold uppercase tracking-wide text-cyan-700">
-            Assessment Policy #{index + 1}
+            Chính Sách Đánh Giá #{index + 1}
           </p>
           {onRemove ? (
             <button
@@ -206,9 +206,6 @@ function PolicyFormFields({ index, form, onChange, onRemove, isPending }: Policy
         <div>
           <label className="mb-1 block text-sm font-bold text-slate-700">
             Rubric Version <span className="text-red-500">*</span>
-            <span className="ml-1 font-normal text-slate-400">
-              (có thể chọn version từ nhiều Rubric khác nhau — mỗi version sẽ tạo 1 Assessment Policy riêng)
-            </span>
           </label>
           {!form.languageId ? (
             <p className="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500">
@@ -322,7 +319,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, onSubmit, isPend
     e.preventDefault();
 
     if (forms.some(validateForm)) {
-      alert('Vui lòng nhập đầy đủ các trường bắt buộc cho tất cả Assessment Policy!');
+      alert('Vui lòng nhập đầy đủ các trường bắt buộc cho tất cả Chính Sách Đánh Giá!');
       return;
     }
 
@@ -354,7 +351,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, onSubmit, isPend
 
       <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-2xl">
         <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">Thêm mới Assessment Policy</h2>
+          <h2 className="text-lg font-bold text-slate-900">Thêm mới Chính Sách Đánh Giá</h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
             <X className="size-5" />
           </button>
@@ -380,7 +377,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, onSubmit, isPend
               className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-400 bg-slate-50 py-3 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
             >
               <Plus className="size-4.5" />
-              {forms.length < 2 ? 'Tạo Assessment Policy thứ 2' : `Thêm Assessment Policy thứ ${forms.length + 1}`}
+              {forms.length < 2 ? 'Tạo Chính Sách Đánh Giá thứ 2' : `Thêm Chính Sách Đánh Giá thứ ${forms.length + 1}`}
             </button>
           </div>
 

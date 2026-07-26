@@ -52,7 +52,7 @@ export function AssessmentPolicyTable({
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3">
         <RefreshCw className="size-6 animate-spin text-cyan-600" />
-        <p className="text-sm text-slate-500">Đang tải danh sách Assessment Policy...</p>
+        <p className="text-sm text-slate-500">Đang tải danh sách Chính Sách Đánh Giá...</p>
       </div>
     );
   }
@@ -70,7 +70,7 @@ export function AssessmentPolicyTable({
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3 text-slate-500">
         <LayoutList className="size-8 text-slate-300" />
-        <p className="text-sm">Không tìm thấy Assessment Policy nào.</p>
+        <p className="text-sm">Không tìm thấy Chính Sách Đánh Giá nào.</p>
       </div>
     );
   }
@@ -155,7 +155,7 @@ export function AssessmentPolicyTable({
                   <button
                     type="button"
                     onClick={() => onViewRubricVersion(policy)}
-                    aria-label={`Xem Rubric Version và các Assessment Policy liên kết của policy ${policy.id}`}
+                    aria-label={`Xem Rubric Version và các Chính Sách Đánh Giá liên kết của policy ${policy.id}`}
                     className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10 transition hover:bg-purple-100"
                   >
                     {policy.rubricVersion.code} (v{policy.rubricVersion.version})

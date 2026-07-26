@@ -371,7 +371,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
           <p className="text-xs text-slate-500">
-            Không bắt buộc — chọn để tự động gắn chính sách đánh giá (Assessment Policy) phù hợp cho kỳ thi.
+            Không bắt buộc — chọn để tự động gắn chính sách đánh giá phù hợp cho kỳ thi.
           </p>
 
           {!selectedRubricVersion ? (
@@ -404,7 +404,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
 
               {hasNoMatchingPolicy ? (
                 <p className="text-xs font-semibold text-amber-700">
-                  Chưa có chính sách đánh giá (Assessment Policy) đã xuất bản cho phiên bản này với ngôn ngữ đã chọn. Vẫn có thể tạo kỳ
+                  Chưa có chính sách đánh giá đã xuất bản cho phiên bản này với ngôn ngữ đã chọn. Vẫn có thể tạo kỳ
                   thi và gắn chính sách sau, hoặc chọn phiên bản khác.
                 </p>
               ) : null}
@@ -448,7 +448,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
           <p className="text-xs text-slate-500">
-            Không bắt buộc — chọn để tự động gắn chính sách đánh giá (Assessment Policy) phù hợp cho kỳ thi.
+            Không bắt buộc — chọn để tự động gắn chính sách đánh giá phù hợp cho kỳ thi.
           </p>
 
           {!selectedRubricVersion ? (
@@ -481,7 +481,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
 
               {hasNoMatchingPolicy ? (
                 <p className="text-xs font-semibold text-amber-700">
-                  Chưa có chính sách đánh giá (Assessment Policy) đã xuất bản cho phiên bản này với ngôn ngữ đã chọn. Vẫn có thể tạo kỳ
+                  Chưa có chính sách đánh giá đã xuất bản cho phiên bản này với ngôn ngữ đã chọn. Vẫn có thể tạo kỳ
                   thi và gắn chính sách sau, hoặc chọn phiên bản khác.
                 </p>
               ) : null}

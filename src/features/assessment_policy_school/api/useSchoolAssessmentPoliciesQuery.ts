@@ -46,6 +46,12 @@ const GET_SCHOOL_ASSESSMENT_POLICIES = `
           status
           effectiveFrom
           effectiveTo
+          resultBands {
+            id
+            code
+            label
+            order
+          }
         }
         rubricVersion {
           code

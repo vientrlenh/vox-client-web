@@ -33,7 +33,7 @@ export function SchoolAdminScoringRulesPage() {
             <ChevronLeft className="size-5" />
           </button>
           <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
-            <Gavel className="size-[26px] text-indigo-600" /> Scoring Rules
+            <Gavel className="size-[26px] text-indigo-600" /> Quản lý quy tắc tính điểm
           </h1>
         </div>
       </div>

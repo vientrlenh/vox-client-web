@@ -27,6 +27,7 @@ export type AssessmentPolicy = {
     status?: string;
     effectiveFrom?: string | null;
     effectiveTo?: string | null;
+    resultBands?: { id: string; code: string; label: string; order: number }[];
   } | null;
   rubricVersion?: {
     code: string;
@@ -69,6 +70,7 @@ export type FrameworkVersionDetail = {
   status: string;
   effectiveFrom: string;
   effectiveTo?: string | null;
+  resultBands?: { id: string; code: string; label: string; order: number }[];
 };
 
 export type RubricVersionDetail = {
@@ -117,18 +119,27 @@ export type LanguageOption = {
   name: string;
 };
 
+export type FrameworkResultBandOption = {
+  id: string;
+  code: string;
+  label: string;
+  order: number;
+};
+
 export type FrameworkVersionOption = {
   id: string;
   code: string;
   name: string;
   version: number;
   status: string;
+  resultBands?: FrameworkResultBandOption[];
 };
 
-export type FrameworkResultBandOption = {
+export type FrameworkCriterionOption = {
   id: string;
   code: string;
-  label: string;
+  name: string;
+  description?: string | null;
   order: number;
 };
 

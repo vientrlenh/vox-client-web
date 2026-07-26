@@ -44,7 +44,7 @@ export type SearchScoringRuleFilter = {
   isActive?: boolean | null;
 };
 
-async function searchSystemScoringRules(
+export async function searchSystemScoringRules(
   policyId: string,
   filter: SearchScoringRuleFilter,
   page: number,

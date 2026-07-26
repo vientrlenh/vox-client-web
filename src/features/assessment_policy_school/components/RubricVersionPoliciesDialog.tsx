@@ -60,16 +60,16 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
     if (!rubricVersionId) return;
 
     const isConfirm = window.confirm(
-      `Xuất bản hàng loạt ${draftCount} Assessment Policy đang DRAFT liên kết với Rubric Version này? Sau khi xuất bản, các Policy sẽ có hiệu lực áp dụng.`
+      `Xuất bản hàng loạt ${draftCount} Chính Sách Đánh Giá đang DRAFT liên kết với Rubric Version này? Sau khi xuất bản, các Chính Sách Đánh Giá sẽ có hiệu lực áp dụng.`
     );
     if (!isConfirm) return;
 
     try {
       const publishedIds = await publishAll(rubricVersionId);
-      alert(`Đã xuất bản thành công ${publishedIds.length} Assessment Policy.`);
+      alert(`Đã xuất bản thành công ${publishedIds.length} Chính Sách Đánh Giá.`);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xuất bản hàng loạt Assessment Policy.');
+      alert(err.message || 'Có lỗi xảy ra khi xuất bản hàng loạt Chính Sách Đánh Giá.');
     }
   };
 
@@ -129,8 +129,8 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
                   <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
                     {!canPublishRubricVersion && <Lock className="size-3.5 shrink-0" />}
                     {canPublishRubricVersion
-                      ? 'Đã sẵn sàng — không còn Assessment Policy nào ở trạng thái DRAFT.'
-                      : `Bị khóa cho đến khi xuất bản hết ${draftCount} Assessment Policy DRAFT bên dưới.`}
+                      ? 'Đã sẵn sàng — không còn Chính Sách Đánh Giá nào ở trạng thái DRAFT.'
+                      : `Bị khóa cho đến khi xuất bản hết ${draftCount} Chính Sách Đánh Giá DRAFT bên dưới.`}
                   </p>
                   <button
                     type="button"
@@ -147,14 +147,14 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
           )}
 
           <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-slate-500">
-            Assessment Policy liên kết ({data?.totalElements ?? 0})
+            Chính Sách Đánh Giá liên kết ({data?.totalElements ?? 0})
           </h3>
 
           <div className="mt-3 overflow-hidden rounded-[10px] border border-slate-200">
             {isLoading ? (
               <div className="flex h-32 flex-col items-center justify-center gap-2">
                 <Loader2 className="size-6 animate-spin text-cyan-600" />
-                <p className="text-sm text-slate-500">Đang tải danh sách Assessment Policy...</p>
+                <p className="text-sm text-slate-500">Đang tải danh sách Chính Sách Đánh Giá...</p>
               </div>
             ) : isError ? (
               <div className="flex h-32 flex-col items-center justify-center gap-2 text-center">
@@ -163,7 +163,7 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
               </div>
             ) : policies.length === 0 ? (
               <div className="flex h-32 items-center justify-center text-sm text-slate-500">
-                Chưa có Assessment Policy nào liên kết với Rubric Version này.
+                Chưa có Chính Sách Đánh Giá nào liên kết với Rubric Version này.
               </div>
             ) : (
               <table className="w-full text-left text-sm text-slate-700">

@@ -277,7 +277,7 @@ export function SchoolAdminAssessmentPolicyImportPage() {
     } catch (error) {
       setIsWaitingForResult(false);
       setMessage({
-        text: getErrorMessage(error) ?? 'Không thể xác nhận import Assessment Policy. Vui lòng thử lại.',
+        text: getErrorMessage(error) ?? 'Không thể xác nhận import Chính Sách Đánh Giá. Vui lòng thử lại.',
         tone: 'error',
       });
     }
@@ -296,16 +296,16 @@ export function SchoolAdminAssessmentPolicyImportPage() {
         <div>
           <nav aria-label="Đường dẫn" className="flex items-center gap-2 text-sm font-bold text-slate-500">
             <Link className="transition hover:text-indigo-600" to={backToListUrl}>
-              Quản lý Assessment Policy
+              Quản lý Chính Sách Đánh Giá
             </Link>
             <span aria-hidden="true" className="text-slate-300">/</span>
             <span className="text-slate-950">Import hàng loạt</span>
           </nav>
           <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-950" id="school-assessment-policy-import-title">
-            Import Assessment Policy hàng loạt
+            Import Chính Sách Đánh Giá hàng loạt
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-500">
-            Tải lên file CSV hoặc Excel, kiểm tra mapping cột và xác nhận import các Assessment Policy mới cho trường.
+            Tải lên file CSV hoặc Excel, kiểm tra mapping cột và xác nhận import các Chính Sách Đánh Giá mới cho trường.
           </p>
         </div>
         <Link

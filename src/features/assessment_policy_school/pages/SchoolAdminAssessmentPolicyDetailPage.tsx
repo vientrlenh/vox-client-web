@@ -74,28 +74,28 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   const handlePublishPolicy = async () => {
     if (!policyId) return;
 
-    const isConfirm = window.confirm('Xuất bản Assessment Policy này? Sau khi xuất bản, Policy sẽ có hiệu lực áp dụng.');
+    const isConfirm = window.confirm('Xuất bản Chính Sách Đánh Giá này? Sau khi xuất bản, Chính Sách Đánh Giá sẽ có hiệu lực áp dụng.');
     if (!isConfirm) return;
 
     try {
       await publishPolicy(policyId);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xuất bản Assessment Policy.');
+      alert(err.message || 'Có lỗi xảy ra khi xuất bản Chính Sách Đánh Giá.');
     }
   };
 
   const handleArchivePolicy = async () => {
     if (!policyId) return;
 
-    const isConfirm = window.confirm('Bạn có chắc chắn muốn Lưu trữ (ARCHIVE) Assessment Policy này? Sau khi lưu trữ sẽ không thể chỉnh sửa hoặc sử dụng nữa.');
+    const isConfirm = window.confirm('Bạn có chắc chắn muốn Lưu trữ (ARCHIVE) Chính Sách Đánh Giá này? Sau khi lưu trữ sẽ không thể chỉnh sửa hoặc sử dụng nữa.');
     if (!isConfirm) return;
 
     try {
       await archivePolicy(policyId);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi lưu trữ Assessment Policy.');
+      alert(err.message || 'Có lỗi xảy ra khi lưu trữ Chính Sách Đánh Giá.');
     }
   };
 
@@ -107,13 +107,13 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
       setIsEditModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật Assessment Policy.');
+      alert(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
     }
   };
 
   const handleDeletePolicy = async () => {
     const isConfirm = window.confirm(
-      'Bạn có chắc chắn muốn xóa vĩnh viễn Assessment Policy DRAFT này? Hành động này không thể hoàn tác!'
+      'Bạn có chắc chắn muốn xóa vĩnh viễn Chính Sách Đánh Giá DRAFT này? Hành động này không thể hoàn tác!'
     );
     if (!isConfirm || !policyId) return;
 
@@ -122,7 +122,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
       navigate('/school-admin/assessment-policies');
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa Assessment Policy.');
+      alert(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
     }
   };
 
@@ -139,7 +139,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
         <AlertTriangle className="size-12 text-red-500" />
-        <p className="text-slate-600">Không tìm thấy Assessment Policy hoặc có lỗi xảy ra.</p>
+        <p className="text-slate-600">Không tìm thấy Chính Sách Đánh Giá hoặc có lỗi xảy ra.</p>
         <button onClick={() => refetch()} className="rounded-lg bg-cyan-600 px-4 py-2 font-bold text-white hover:bg-cyan-700">
           Thử lại
         </button>
@@ -197,7 +197,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
             <ChevronLeft className="size-5" />
           </button>
           <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
-            <ClipboardCheck className="size-[26px] text-indigo-600" /> Chi tiết Assessment Policy
+            <ClipboardCheck className="size-[26px] text-indigo-600" /> Chi tiết Chính sách Đánh giá
           </h1>
         </div>
         <button

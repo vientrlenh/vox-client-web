@@ -50,7 +50,7 @@ export function AssessmentPolicyTable({
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3">
         <RefreshCw className="size-6 animate-spin text-cyan-600" />
-        <p className="text-sm text-slate-500">Đang tải danh sách Assessment Policy...</p>
+        <p className="text-sm text-slate-500">Đang tải danh sách Chính Sách Đánh Giá...</p>
       </div>
     );
   }
@@ -68,7 +68,7 @@ export function AssessmentPolicyTable({
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3 text-slate-500">
         <LayoutList className="size-8 text-slate-300" />
-        <p className="text-sm">Không tìm thấy Assessment Policy nào.</p>
+        <p className="text-sm">Không tìm thấy Chính Sách Đánh Giá nào.</p>
       </div>
     );
   }

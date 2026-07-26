@@ -44,7 +44,7 @@ export type SearchScoringRuleFilter = {
   isActive?: boolean | null;
 };
 
-async function searchSchoolScoringRules(
+export async function searchSchoolScoringRules(
   schoolId: string,
   policyId: string,
   filter: SearchScoringRuleFilter,

@@ -565,9 +565,9 @@ const SchoolAdminScoringRulesPage = lazy(() =>
   })),
 );
 
-const SchoolAdminScoringRulePoliciesPage = lazy(() =>
+const SchoolAdminAllScoringRulesPage = lazy(() =>
   import("@/features/scoring_rules_school").then((module) => ({
-    default: module.SchoolAdminScoringRulePoliciesPage,
+    default: module.SchoolAdminAllScoringRulesPage,
   })),
 );
 
@@ -577,9 +577,9 @@ const SystemAdminScoringRulesPage = lazy(() =>
   })),
 );
 
-const SystemAdminScoringRulePoliciesPage = lazy(() =>
+const SystemAdminAllScoringRulesPage = lazy(() =>
   import("@/features/scoring_rules_system").then((module) => ({
-    default: module.SystemAdminScoringRulePoliciesPage,
+    default: module.SystemAdminAllScoringRulesPage,
   })),
 );
 
@@ -697,7 +697,7 @@ export function AppRoutes() {
             />
             <Route
               path="system-admin/scoring-rules"
-              element={<SystemAdminScoringRulePoliciesPage />}
+              element={<SystemAdminAllScoringRulesPage />}
             />
             <Route
               path="system-admin/subscription"
@@ -877,7 +877,7 @@ export function AppRoutes() {
             />
             <Route
               path="school-admin/scoring-rules"
-              element={<SchoolAdminScoringRulePoliciesPage />}
+              element={<SchoolAdminAllScoringRulesPage />}
             />
             <Route
               path="school-admin/subscription"

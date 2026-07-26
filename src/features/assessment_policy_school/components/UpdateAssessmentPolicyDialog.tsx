@@ -2,14 +2,16 @@
 
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { useFrameworkVersionBandsQuery } from '../api/useFrameworkVersionOptionsQuery';
 import type { AssessmentPolicy, AssessmentPolicyStrictness, UpdateAssessmentPolicyPayload } from '../types';
 
 // Chỉ cần các field sẽ sửa được, để dialog dùng chung được cho cả AssessmentPolicy (list)
 // lẫn AssessmentPolicyDetail (trang chi tiết) mà không quan tâm shape của các quan hệ nested.
+// "frameworkVersion" (kèm resultBands) được lấy trực tiếp từ 2 query trên thay vì gọi thêm
+// query "schoolFrameworkVersion(id)" vì BE đã bỏ query đó (School Admin không còn quyền
+// gọi query đơn lẻ theo id — chỉ SYSTEM_ADMIN dùng được "frameworkVersion(id)").
 export type EditableAssessmentPolicy = Pick<
   AssessmentPolicy,
-  'id' | 'frameworkVersionId' | 'targetFrameworkBandId' | 'passingScore' | 'strictness' | 'effectiveFrom' | 'effectiveTo'
+  'id' | 'frameworkVersionId' | 'targetFrameworkBandId' | 'passingScore' | 'strictness' | 'effectiveFrom' | 'effectiveTo' | 'frameworkVersion'
 >;
 
 type UpdateAssessmentPolicyDialogProps = {
@@ -33,7 +35,7 @@ function toDateInputValue(value?: string | null) {
 }
 
 export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPending }: UpdateAssessmentPolicyDialogProps) {
-  const { data: resultBands } = useFrameworkVersionBandsQuery(policy?.frameworkVersionId);
+  const resultBands = policy?.frameworkVersion?.resultBands ?? [];
 
   const [form, setForm] = useState(() => ({
     targetFrameworkBandId: policy?.targetFrameworkBandId ?? '',
@@ -89,7 +91,7 @@ export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPend
 
       <div className="relative w-full max-w-lg rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">Chỉnh sửa Assessment Policy</h2>
+          <h2 className="text-lg font-bold text-slate-900">Chỉnh sửa Chính Sách Đánh Giá</h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
             <X className="size-5" />
           </button>

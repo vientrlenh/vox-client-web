@@ -38,6 +38,12 @@ const GET_SCHOOL_ASSESSMENT_POLICY_DETAIL = `
         status
         effectiveFrom
         effectiveTo
+        resultBands {
+          id
+          code
+          label
+          order
+        }
       }
       rubricVersion {
         id
