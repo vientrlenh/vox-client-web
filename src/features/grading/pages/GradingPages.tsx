@@ -117,9 +117,9 @@ const ROUND_FILTERS: Array<{ label: string; value: '' | GradingRoundType }> = [
 
 const RESULT_STATUS_FILTERS: Array<{ label: string; value: '' | ExamCandidateResultStatus }> = [
   { label: 'Mọi trạng thái bài', value: '' },
-  { label: 'Chờ chấm', value: 'PENDING_REVIEW' },
+  { label: 'Chờ soát điểm AI', value: 'PENDING_REVIEW' },
   { label: 'Đã công bố', value: 'RELEASED' },
-  { label: 'Đang phúc khảo', value: 'APPEALED' },
+  { label: 'Chờ xử lý phúc khảo', value: 'APPEALED' },
   { label: 'Đang chấm phúc khảo', value: 'RE_GRADING' },
   { label: 'Đã vô hiệu', value: 'INVALID' },
   { label: 'Đã chốt', value: 'FINAL' },

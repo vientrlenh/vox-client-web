@@ -284,12 +284,17 @@ export function getAssignmentStatusDisplay(status: GradingAssignmentStatus | nul
 const RESULT_STATUS_DISPLAY: Partial<
   Record<ExamCandidateResultStatus, { label: string; tone: StatusTone }>
 > = {
-  APPEALED: { label: 'Đang phúc khảo', tone: 'info' },
+  // "Chờ xử lý" vs "Đang chấm" ở RE_GRADING: hai trạng thái này chỉ khác nhau ở chỗ
+  // đã có giám khảo bắt tay vào chấm chưa, nên nhãn phải khác nhau ngay từ chữ đầu.
+  APPEALED: { label: 'Chờ xử lý phúc khảo', tone: 'info' },
   FAILED: { label: 'Không đạt', tone: 'danger' },
   FINAL: { label: 'Đã chốt', tone: 'success' },
   INVALID: { label: 'Đã vô hiệu', tone: 'danger' },
   PASSED: { label: 'Đạt', tone: 'success' },
-  PENDING_REVIEW: { label: 'Chờ chấm', tone: 'warning' },
+  // KHÔNG phải "chưa ai chấm": AI đã chấm xong, bài đang chờ người soát lại điểm đó
+  // trước khi công bố. Giải quyết bằng một trong hai đường — duyệt thẳng ở màn Kết quả
+  // kỳ thi, hoặc giao giáo viên chấm thủ công ở màn Điều phối.
+  PENDING_REVIEW: { label: 'Chờ soát điểm AI', tone: 'warning' },
   RELEASED: { label: 'Đã công bố', tone: 'success' },
   RETAKE_REQUIRED: { label: 'Phải thi lại', tone: 'warning' },
   RE_GRADING: { label: 'Đang chấm phúc khảo', tone: 'violet' },

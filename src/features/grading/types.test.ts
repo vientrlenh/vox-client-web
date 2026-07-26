@@ -113,7 +113,7 @@ describe('grading helpers', () => {
 
   describe('getResultStatusDisplay', () => {
     it('maps known statuses and falls back for unknown ones', () => {
-      expect(getResultStatusDisplay('PENDING_REVIEW').label).toBe('Chờ chấm')
+      expect(getResultStatusDisplay('PENDING_REVIEW').label).toBe('Chờ soát điểm AI')
       expect(getResultStatusDisplay('INVALID').tone).toBe('danger')
       expect(getResultStatusDisplay(null).label).toBe('—')
     })
