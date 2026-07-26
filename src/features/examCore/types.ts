@@ -109,6 +109,9 @@ export type ExamBlueprintSlotDto = {
   fixedQuestion?: {
     code?: string | null
     id: string
+    maxResponseSeconds?: number | null
+    minResponseSeconds?: number | null
+    preparationTimeSeconds?: number | null
     questionText?: string | null
     status?: string | null
   } | null
@@ -134,6 +137,7 @@ export type ExamBlueprintSectionDto = {
 }
 
 export type ExamBlueprintVersionDto = {
+  blueprintId: string
   code: string
   description?: string | null
   effectiveFrom?: string | null
@@ -303,6 +307,7 @@ export function getCandidateName(candidate: Pick<ExamCandidateDto, 'student' | '
 
 export type ExamDto = {
   assessmentPolicyId?: string | null
+  blueprint?: ExamBlueprintDto | null
   blueprintId?: string | null
   blueprintVersionId?: string | null
   closeAt?: string | null

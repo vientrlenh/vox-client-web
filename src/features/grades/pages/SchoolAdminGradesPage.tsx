@@ -254,7 +254,7 @@ function GradeLevelTable({
                         {
                           id: 'view',
                           label: 'Xem chi tiết',
-                          onSelect: () => undefined,
+                          onSelect: () => navigate(`/school-admin/grades/${gradeLevel.id}`),
                           tone: 'primary',
                         },
                         {

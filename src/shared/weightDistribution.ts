@@ -65,6 +65,10 @@ export function autoDistributeWeights(provided: Array<number | null | undefined>
   return result
 }
 
+export function distributeEvenlyWeights(count: number, total = 1): number[] {
+  return splitEvenly(total, count)
+}
+
 export function sumWeights(weights: Array<number | null | undefined>): number {
   return round2(weights.reduce((sum: number, value) => sum + (value ?? 0), 0))
 }

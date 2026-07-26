@@ -80,12 +80,12 @@ export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối thiểu (Min)</label>
-              <input type="number" step="0.1" value={formData.scoreMin} onChange={(e) => setFormData({ ...formData, scoreMin: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <input type="number" step="0.01" value={formData.scoreMin} onChange={(e) => setFormData({ ...formData, scoreMin: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối đa (Max)</label>
-              <input type="number" step="0.1" value={formData.scoreMax} onChange={(e) => setFormData({ ...formData, scoreMax: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <input type="number" step="0.01" value={formData.scoreMax} onChange={(e) => setFormData({ ...formData, scoreMax: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
             </div>
 
             <div>

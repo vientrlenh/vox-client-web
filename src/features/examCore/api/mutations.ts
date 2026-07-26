@@ -504,8 +504,8 @@ export function useRemoveProctorFromScheduleMutation() {
 }
 
 const FLAG_EXAM_SESSION_MUTATION = `
-  mutation FlagExamSession($sessionId: ID!, $reason: String!) {
-    flagExamSession(sessionId: $sessionId, reason: $reason)
+  mutation FlagExamSession($sessionId: ID!, $flagged: Boolean!, $reason: String) {
+    flagExamSession(sessionId: $sessionId, flagged: $flagged, reason: $reason)
   }
 `
 
@@ -545,8 +545,16 @@ const UPDATE_EXAM_CANDIDATES_ATTENDANCE_MUTATION = `
 
 export function useFlagExamSessionMutation() {
   return useMutation({
-    mutationFn: async ({ reason, sessionId }: { reason: string; sessionId: string }) => {
-      const data = await graphQLRequest<{ flagExamSession: string }>(FLAG_EXAM_SESSION_MUTATION, { reason, sessionId })
+    mutationFn: async ({
+      flagged,
+      reason,
+      sessionId,
+    }: {
+      flagged: boolean
+      reason?: string
+      sessionId: string
+    }) => {
+      const data = await graphQLRequest<{ flagExamSession: string }>(FLAG_EXAM_SESSION_MUTATION, { flagged, reason, sessionId })
       return data.flagExamSession
     },
   })

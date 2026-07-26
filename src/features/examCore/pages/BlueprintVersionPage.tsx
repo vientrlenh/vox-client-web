@@ -1,29 +1,58 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
+import { toApiError } from '@/shared/api'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { examQueryKeys, useExamBlueprintQuery } from '../api/queries'
+import { examQueryKeys, useExamBlueprintSummaryQuery, useExamBlueprintVersionQuery } from '../api/queries'
 import { useDuplicateBlueprintVersionMutation } from '../api/mutations'
-import { getBlueprintVersionStatusDisplay } from '../types'
+import { formatDurationSeconds, getBlueprintVersionStatusDisplay, type ExamBlueprintSectionDto } from '../types'
+import { getQuestionAttemptSeconds } from '../utils/timeQuota'
 
 type BlueprintVersionPageProps = {
   basePath: string
+}
+
+function sectionDurationSeconds(section: ExamBlueprintSectionDto): number {
+  return section.slots.reduce(
+    (sum, slot) => sum + (slot.slotType === 'FIXED' && slot.fixedQuestion ? getQuestionAttemptSeconds(slot.fixedQuestion) : 0),
+    0,
+  )
 }
 
 function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { blueprintId, versionId } = useParams()
-  const blueprintQuery = useExamBlueprintQuery(blueprintId ?? null)
+  const blueprintQuery = useExamBlueprintSummaryQuery(blueprintId ?? null)
+  const versionQuery = useExamBlueprintVersionQuery(versionId ?? null)
   const blueprint = blueprintQuery.data
-  const version = blueprint?.versions.find((candidate) => candidate.id === versionId) ?? null
+  const version = versionQuery.data
   const duplicateVersionMutation = useDuplicateBlueprintVersionMutation()
 
-  if (blueprintQuery.isLoading) {
+  if (blueprintQuery.isLoading || versionQuery.isLoading) {
     return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
   }
 
-  if (!blueprint || !version) {
+  if (blueprintQuery.isError || versionQuery.isError) {
+    const error = blueprintQuery.error ?? versionQuery.error
+    return (
+      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        Không tải được phiên bản blueprint: {toApiError(error).message}
+        <button
+          className="ml-2 font-bold underline"
+          onClick={() => {
+            void blueprintQuery.refetch()
+            void versionQuery.refetch()
+          }}
+          type="button"
+        >
+          Thử lại
+        </button>
+      </section>
+    )
+  }
+
+  if (!blueprint || !version || version.blueprintId !== blueprint.id) {
     return (
       <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy phiên bản blueprint.</section>
     )
@@ -59,8 +88,7 @@ function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
             </div>
             <p className="mt-1 text-[13px] text-slate-500">
               {version.sectionCount ?? version.sections.length} phần · {version.slotCount ?? 0} ô câu hỏi · tổng trọng số{' '}
-              {(version.weightSum ?? 0).toFixed(2)}
-              {version.totalTimeLimitSeconds ? ` · ${Math.round(version.totalTimeLimitSeconds / 60)} phút` : ' · chưa đặt thời lượng'}
+              {(version.weightSum ?? 0).toFixed(2)} · thời lượng {formatDurationSeconds(version.totalTimeLimitSeconds)}
             </p>
             {version.description ? <p className="mt-1 text-[13px] text-slate-500">{version.description}</p> : null}
           </div>
@@ -90,7 +118,7 @@ function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
               <div className="text-sm font-bold text-slate-900">{section.title}</div>
               <div className="text-xs text-slate-500">
                 {section.slots.length} ô · trọng số {section.sectionWeight?.toFixed(2) ?? '-'}
-                {section.sectionTimeLimitSeconds ? ` · ${Math.round(section.sectionTimeLimitSeconds / 60)} phút` : ''}
+                {` · thời lượng ${formatDurationSeconds(sectionDurationSeconds(section))}`}
               </div>
               {section.slots.length ? (
                 <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
@@ -105,6 +133,9 @@ function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
                           : `Chọn ngẫu nhiên${slot.selectionSpec?.topicId ? ` · ${slot.selectionSpec.topicId}` : ''}`}
                         {' · trọng số '}
                         {slot.weight?.toFixed(2) ?? '-'}
+                        {slot.slotType === 'FIXED' && slot.fixedQuestion
+                          ? ` · chuẩn bị ${formatDurationSeconds(slot.fixedQuestion.preparationTimeSeconds)} · tối đa ${formatDurationSeconds(slot.fixedQuestion.maxResponseSeconds)}`
+                          : ''}
                       </span>
                       {slot.slotType === 'FIXED' && slot.fixedQuestion ? (
                         <a
