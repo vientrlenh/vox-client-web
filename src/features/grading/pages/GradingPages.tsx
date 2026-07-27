@@ -80,6 +80,7 @@ import { SetDeadlineDialog } from '../components/SetDeadlineDialog'
 import { SubmitGradingDialog } from '../components/SubmitGradingDialog'
 import {
   avatarClasses,
+  describeReclaimResult,
   formatIsoDateTime,
   formatScore,
   getAssignmentStatusDisplay,
@@ -445,14 +446,10 @@ export function SchoolAdminGradingPage() {
       },
       {
         onError: errorToast,
-        onSuccess: (ids) => {
+        onSuccess: (result) => {
           setReclaimOpen(false)
           setSelectedIds([])
-          setMessage(
-            ids.length > 0
-              ? `Đã thu hồi ${ids.length} phân công quá hạn.`
-              : 'Không có phân công quá hạn nào để thu hồi.',
-          )
+          setMessage(describeReclaimResult(result))
         },
       },
     )
@@ -478,7 +475,10 @@ export function SchoolAdminGradingPage() {
   const headerMenuItems: ActionMenuItem[] = [
     { icon: RefreshCw, id: 'refresh', label: 'Làm mới', onSelect: () => rowsQuery.refetch() },
     {
-      disabled: exportMutation.isPending,
+      // BE bắt buộc phạm vi (examId hoặc scheduleId) — không chặn ở đây thì bấm vào
+      // chỉ nhận về lỗi 400, cùng lý do với `finalize` ngay dưới.
+      disabled: !examId || exportMutation.isPending,
+      disabledReason: 'Chọn kỳ thi trước khi xuất bảng điểm',
       icon: Download,
       id: 'export',
       label: 'Xuất bảng điểm',

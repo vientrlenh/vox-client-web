@@ -18,6 +18,7 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
+  Timer,
   Trash2,
   Users,
   NotebookPen,
@@ -1854,6 +1855,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           { icon: <Calendar aria-hidden="true" className="size-3.5" />, label: `${formatDateTime(exam.openAt)} – ${formatDateTime(exam.closeAt)}` },
           { icon: <Users aria-hidden="true" className="size-3.5" />, label: `GV: ${getExamChairName(exam.members)}` },
           { icon: <Clock aria-hidden="true" className="size-3.5" />, label: `Số lượt thi tối đa: ${exam.maxAttempt ?? 1}` },
+          // Hệ thống tự tính từ đề bài. Khung mở/đóng của bài trên lớp phải đủ dài cho con số này.
+          { icon: <Timer aria-hidden="true" className="size-3.5" />, label: `Thời gian làm bài: ${formatDurationSeconds(exam.examTimeDurationSecond)}` },
           { icon: <CheckCircle2 aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
         ]}
         onEdit={canEditContent ? openEditInfo : undefined}
@@ -2198,7 +2201,10 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         <ScheduleTab
           canManage={canEditContent}
           deliveryMode={exam.deliveryMode}
+          examCloseAt={exam.closeAt}
           examId={exam.id}
+          examOpenAt={exam.openAt}
+          examTimeDurationSecond={exam.examTimeDurationSecond}
           isClassTest
           onGoToPapers={() => setTab('papers')}
           onSetDeliveryMode={

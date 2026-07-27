@@ -1,6 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
-import type { GradingActionResult, GradingRoundType, GradingSampleSelectionMode } from '../types'
+import type {
+  GradingActionResult,
+  GradingRoundType,
+  GradingSampleSelectionMode,
+  ReclaimOverdueResult,
+} from '../types'
 import { gradingKeys } from './useGradingQueries'
 
 type ApiResponse<T> = {
@@ -101,16 +106,25 @@ export async function setGradingDeadline(assignmentIds: string[], deadlineAt: st
   return response.data.data
 }
 
-/** Bỏ trống `assignmentIds` = thu hồi MỌI phân công quá hạn trong phạm vi kỳ thi. */
+/**
+ * Bỏ trống `assignmentIds` = thu hồi MỌI phân công quá hạn trong phạm vi kỳ thi.
+ *
+ * BE trả về một OBJECT ba trường, không phải mảng id: một mảng duy nhất không phân biệt
+ * được "phân công cũ vừa đóng" với "phân công mới vừa mở", và cũng không chở được cờ
+ * `hasMore` của lượt bị cắt ở trần 500.
+ */
 export async function reclaimOverdueAssignments(input: ReclaimOverdueInput) {
-  const response = await apiClient.post<ApiResponse<string[]>>(`${GRADING_BASE}/reclaim-overdue`, {
-    assignmentIds: input.assignmentIds?.length ? input.assignmentIds : undefined,
-    examId: input.examId,
-    newDeadlineAt: input.newDeadlineAt ?? undefined,
-    reassignToTeacherIds: input.reassignToTeacherIds?.length
-      ? input.reassignToTeacherIds
-      : undefined,
-  })
+  const response = await apiClient.post<ApiResponse<ReclaimOverdueResult>>(
+    `${GRADING_BASE}/reclaim-overdue`,
+    {
+      assignmentIds: input.assignmentIds?.length ? input.assignmentIds : undefined,
+      examId: input.examId,
+      newDeadlineAt: input.newDeadlineAt ?? undefined,
+      reassignToTeacherIds: input.reassignToTeacherIds?.length
+        ? input.reassignToTeacherIds
+        : undefined,
+    },
+  )
   return response.data.data
 }
 

@@ -115,7 +115,13 @@ describe('grading REST mutations', () => {
   })
 
   it('reclaims every overdue assignment of an exam when no ids are given', async () => {
-    post.mockResolvedValue(okResponse('Thu hồi phân công quá hạn thành công!', ['a1']))
+    post.mockResolvedValue(
+      okResponse('Thu hồi phân công quá hạn thành công!', {
+        hasMore: false,
+        reassignedAssignmentIds: [],
+        reclaimedAssignmentIds: ['a1'],
+      }),
+    )
 
     await reclaimOverdueAssignments({ assignmentIds: [], examId: 'e1', reassignToTeacherIds: [] })
     // Mảng rỗng phải thành `undefined`: BE hiểu "bỏ trống" là toàn bộ kỳ thi, còn
@@ -126,6 +132,23 @@ describe('grading REST mutations', () => {
       newDeadlineAt: undefined,
       reassignToTeacherIds: undefined,
     })
+  })
+
+  it('returns the three-field reclaim payload, not a flat id array', async () => {
+    // BE đổi từ `List<UUID>` sang object ba trường: một mảng duy nhất không phân biệt
+    // được phân công vừa đóng với phân công vừa mở, và không chở được cờ `hasMore`.
+    post.mockResolvedValue(
+      okResponse('Thu hồi phân công quá hạn thành công!', {
+        hasMore: true,
+        reassignedAssignmentIds: ['a9'],
+        reclaimedAssignmentIds: ['a1', 'a2'],
+      }),
+    )
+
+    const result = await reclaimOverdueAssignments({ examId: 'e1' })
+    expect(result.reclaimedAssignmentIds).toEqual(['a1', 'a2'])
+    expect(result.reassignedAssignmentIds).toEqual(['a9'])
+    expect(result.hasMore).toBe(true)
   })
 
   it('submits criterion scores per item and returns the recalculated total', async () => {

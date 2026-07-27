@@ -36,15 +36,39 @@ export async function finalizeExamResults(examId: string, releasePendingWithAiSc
 }
 
 /**
+ * `responseType: 'blob'` áp cho MỌI response, kể cả response lỗi — nên khi BE trả JSON
+ * lỗi thì `error.response.data` là một Blob và `toApiError` không đọc được `message`
+ * trong đó, người dùng chỉ thấy "Request failed with status code 400" của axios.
+ * Đọc blob ra text rồi vá lại `response.data` để lớp trên xử lý như mọi lỗi khác.
+ */
+async function rethrowWithParsedBlobError(error: unknown): Promise<never> {
+  const data = (error as { response?: { data?: unknown } })?.response?.data
+  if (data instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await data.text()) as unknown
+      ;(error as { response: { data: unknown } }).response.data = parsed
+    } catch {
+      // Body không phải JSON (BE lỗi 5xx trả HTML chẳng hạn) — để nguyên cho
+      // `toApiError` rơi về message mặc định của axios.
+    }
+  }
+  throw error
+}
+
+/**
  * Tải bảng điểm CSV. BE trả UTF-8 có BOM để Excel đọc đúng tiếng Việt, nên giữ
  * nguyên bytes: đọc blob thẳng thay vì để axios parse thành chuỗi.
  */
 export async function exportExamScores(input: { examId?: string; scheduleId?: string }) {
-  const response = await apiClient.get<Blob>(`${EXAM_RESULT_BASE}/export`, {
-    params: { examId: input.examId || undefined, scheduleId: input.scheduleId || undefined },
-    responseType: 'blob',
-  })
-  return response.data
+  try {
+    const response = await apiClient.get<Blob>(`${EXAM_RESULT_BASE}/export`, {
+      params: { examId: input.examId || undefined, scheduleId: input.scheduleId || undefined },
+      responseType: 'blob',
+    })
+    return response.data
+  } catch (error) {
+    return rethrowWithParsedBlobError(error)
+  }
 }
 
 /** Kích hoạt tải file trong trình duyệt từ blob CSV. */

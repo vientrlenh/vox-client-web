@@ -1,5 +1,6 @@
 import {
   clampToCriterion,
+  describeReclaimResult,
   formatScore,
   formatScoreDelta,
   getResultStatusDisplay,
@@ -140,6 +141,49 @@ describe('grading helpers', () => {
       // Bài đã chốt sổ không nhận vòng chấm nào nữa.
       expect(suggestedRoundFor('FINAL')).toBeNull()
       expect(suggestedRoundFor(null)).toBeNull()
+    })
+  })
+
+  describe('describeReclaimResult', () => {
+    it('reports the reclaimed count — không phải câu "không có gì để thu hồi"', () => {
+      // Hồi quy: FE từng đọc response như một mảng nên `.length` là undefined và mọi
+      // lượt thu hồi thành công đều báo là không có gì.
+      const message = describeReclaimResult({
+        hasMore: false,
+        reassignedAssignmentIds: [],
+        reclaimedAssignmentIds: ['a1', 'a2'],
+      })
+      expect(message).toContain('2 phân công quá hạn')
+      expect(message).toContain('hàng chưa giao')
+    })
+
+    it('separates reclaimed from reassigned', () => {
+      const message = describeReclaimResult({
+        hasMore: false,
+        reassignedAssignmentIds: ['a9'],
+        reclaimedAssignmentIds: ['a1', 'a2'],
+      })
+      expect(message).toContain('thu hồi 2')
+      expect(message).toContain('giao lại 1')
+    })
+
+    it('tells the admin to run again when the batch was capped', () => {
+      const message = describeReclaimResult({
+        hasMore: true,
+        reassignedAssignmentIds: [],
+        reclaimedAssignmentIds: ['a1'],
+      })
+      expect(message).toContain('bấm thu hồi lần nữa')
+    })
+
+    it('falls back to the empty message only when nothing was reclaimed', () => {
+      expect(
+        describeReclaimResult({
+          hasMore: false,
+          reassignedAssignmentIds: [],
+          reclaimedAssignmentIds: [],
+        }),
+      ).toBe('Không có phân công quá hạn nào để thu hồi.')
     })
   })
 

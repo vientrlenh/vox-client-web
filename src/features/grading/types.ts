@@ -261,6 +261,41 @@ export type GradingActionResult = {
   nextAssignmentId?: string | null
 }
 
+/**
+ * Kết quả một lượt thu hồi phân công quá hạn. HAI danh sách tách bạch, không phải một
+ * mảng mang hai nghĩa: `reclaimed` là phân công cũ vừa đóng, `reassigned` là phân công
+ * mới vừa mở cho nhóm thay thế (rỗng khi admin chỉ thu hồi mà không chọn ai).
+ */
+export type ReclaimOverdueResult = {
+  reclaimedAssignmentIds: string[]
+  reassignedAssignmentIds: string[]
+  // BE xử lý tối đa 500 phân công một lượt. true = còn dòng quá hạn chưa xử lý, bấm
+  // lại là chạy lượt sau — không có cờ này thì lượt bị cắt trông y hệt lượt đã xong.
+  hasMore: boolean
+}
+
+/**
+ * Câu tường thuật cho một lượt thu hồi. Gộp ở đây vì cả ba trường đều phải xuất hiện:
+ * chỉ đọc `reclaimedAssignmentIds` thì admin không biết bài đã được giao lại hay đang
+ * nằm ở hàng chưa giao, và bỏ `hasMore` thì lượt bị cắt ở trần 500 trông như đã xong.
+ */
+export function describeReclaimResult(result: ReclaimOverdueResult): string {
+  const reclaimed = result.reclaimedAssignmentIds.length
+  if (reclaimed === 0) {
+    return 'Không có phân công quá hạn nào để thu hồi.'
+  }
+  const reassigned = result.reassignedAssignmentIds.length
+  const parts = [
+    reassigned > 0
+      ? `Đã thu hồi ${reclaimed} phân công quá hạn và giao lại ${reassigned} phân công mới.`
+      : `Đã thu hồi ${reclaimed} phân công quá hạn, bài quay về hàng chưa giao.`,
+  ]
+  if (result.hasMore) {
+    parts.push('Vẫn còn phân công quá hạn chưa xử lý — bấm thu hồi lần nữa để chạy tiếp.')
+  }
+  return parts.join(' ')
+}
+
 const ASSIGNMENT_STATUS_DISPLAY: Record<
   GradingAssignmentStatus,
   { label: string; tone: StatusTone }
@@ -287,8 +322,9 @@ const RESULT_STATUS_DISPLAY: Partial<
   INVALID: { label: 'Đã vô hiệu', tone: 'danger' },
   PASSED: { label: 'Đạt', tone: 'success' },
   // KHÔNG phải "chưa ai chấm": AI đã chấm xong, bài đang chờ người soát lại điểm đó
-  // trước khi công bố. Giải quyết bằng một trong hai đường — duyệt thẳng ở màn Kết quả
-  // kỳ thi, hoặc giao giáo viên chấm thủ công ở màn Điều phối.
+  // trước khi công bố. Ra khỏi hàng chờ bằng một trong hai đường — giao giáo viên một
+  // vòng chấm (họ uphold/regrade), hoặc admin chốt sổ hàng loạt ở màn Điều phối. Không
+  // còn nút duyệt lẻ từng bài ở màn Kết quả kỳ thi.
   PENDING_REVIEW: { label: 'Chờ soát điểm AI', tone: 'warning' },
   RELEASED: { label: 'Đã công bố', tone: 'success' },
   RETAKE_REQUIRED: { label: 'Phải thi lại', tone: 'warning' },
@@ -460,7 +496,10 @@ export function formatScoreDelta(
   return `${delta > 0 ? '+' : '−'}${formatScore(Math.abs(delta))}`
 }
 
-/** Phần trăm gọn: 0.42 -> "42%" khi BE trả tỉ lệ 0–100 thì truyền thẳng số đó. */
+/**
+ * Phần trăm gọn: BE trả thang 0–100 (`regradeRate` đã nhân 100 ở query repository),
+ * nên truyền thẳng số đó — 42 -> "42%", 42.5 -> "42.5%". ĐỪNG nhân thêm 100 ở đây.
+ */
 export function formatPercent(n: number | null | undefined): string {
   if (n == null) {
     return '—'

@@ -325,6 +325,10 @@ export type ExamDto = {
   createdAt?: string | null
   deliveryMode?: ExamDeliveryMode
   description?: string | null
+  // Thời gian làm bài của kỳ thi, tính bằng GIÂY. BE tự tính = MAX(thời lượng) trên các
+  // mã đề, nên đây là field CHỈ ĐỌC — FE không gửi lên ở create/update. Dùng nó để dựng
+  // ràng buộc "ca thi phải dài tối thiểu bằng thời gian làm bài" (xem CreateScheduleModal).
+  examTimeDurationSecond?: number | null
   id: string
   kind: ExamKind
   languageId: string

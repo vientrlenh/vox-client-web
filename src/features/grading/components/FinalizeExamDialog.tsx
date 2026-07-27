@@ -28,8 +28,15 @@ function Row({ danger, label, value }: { danger?: boolean; label: string; value:
 }
 
 /**
- * Chốt sổ cả kỳ thi. Preview cho biết còn bao nhiêu bài dở — nếu còn thì admin phải
- * tick xác nhận công bố theo điểm AI, đúng luật của BE (mặc định an toàn là từ chối).
+ * Chốt sổ cả kỳ thi. Preview cho biết còn bao nhiêu bài dở, và BE có HAI luật khác
+ * hẳn nhau cho hai loại "dở":
+ *
+ * - Đơn phúc khảo chưa xong: BE từ chối vô điều kiện — `releasePendingWithAiScores`
+ *   KHÔNG bỏ qua được. Nên đây là rào cứng, không dựng checkbox.
+ * - Bài còn chờ chấm: admin tick xác nhận là công bố theo điểm AI đang có.
+ *
+ * Gộp hai loại vào một cờ như trước làm checkbox hứa một điều nó không làm được:
+ * tick xong nút bật lên, bấm vào thì BE trả 400.
  */
 export function FinalizeExamDialog({
   examName,
@@ -40,13 +47,15 @@ export function FinalizeExamDialog({
   preview,
 }: FinalizeExamDialogProps) {
   const [acceptAiScores, setAcceptAiScores] = useState(false)
-  const blocked =
-    preview != null &&
-    (preview.pendingUnassigned > 0 || preview.pendingAssigned > 0 || preview.openAppeals > 0)
+  const hardBlocked = preview != null && preview.openAppeals > 0
+  const needsAiConfirm =
+    preview != null && (preview.pendingUnassigned > 0 || preview.pendingAssigned > 0)
 
   return (
     <ActionDialog
-      confirmDisabled={isLoading || preview == null || (blocked && !acceptAiScores)}
+      confirmDisabled={
+        isLoading || preview == null || hardBlocked || (needsAiConfirm && !acceptAiScores)
+      }
       confirmLabel="Chốt sổ kỳ thi"
       icon={<Lock className="size-6" />}
       isPending={isPending}
@@ -54,7 +63,8 @@ export function FinalizeExamDialog({
       onConfirm={() => onConfirm(acceptAiScores)}
       subtitle={
         <>
-          Đưa toàn bộ kết quả{examName ? ` của ${examName}` : ''} về trạng thái đã chốt.
+          Công bố các bài còn chờ người chấm{examName ? ` của ${examName}` : ''} theo điểm AI đang
+          có, để kỳ thi công bố kết quả được.
         </>
       }
       title="Chốt sổ kỳ thi"
@@ -76,11 +86,17 @@ export function FinalizeExamDialog({
 
           {preview.invalid > 0 ? (
             <p className="mt-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[12.5px] font-medium leading-relaxed text-slate-600">
-              {preview.invalid} bài đang bị vô hiệu sẽ được chốt là <b>không đạt</b>.
+              Chốt sổ <b>không đụng tới</b> {preview.invalid} bài đang bị vô hiệu. Các bài đó thành{' '}
+              <b>không đạt</b> với điểm 0 khi kỳ thi công bố kết quả.
             </p>
           ) : null}
 
-          {blocked ? (
+          {hardBlocked ? (
+            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 text-[12.5px] font-medium leading-relaxed text-red-800">
+              Kỳ thi còn <b>{preview.openAppeals} đơn phúc khảo chưa xong</b>. Phải xử lý hết các đơn
+              này trước — chốt sổ không bỏ qua được, kể cả khi chấp nhận điểm AI.
+            </p>
+          ) : needsAiConfirm ? (
             <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
               <input
                 checked={acceptAiScores}

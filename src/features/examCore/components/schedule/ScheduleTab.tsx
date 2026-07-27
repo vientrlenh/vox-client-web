@@ -32,7 +32,12 @@ type ScheduleSubTab = 'assign' | 'rooms' | 'sessions'
 type ScheduleTabProps = {
   canManage: boolean
   deliveryMode?: ExamDeliveryMode
+  // Ba trường dưới đây chỉ để dựng ràng buộc khung giờ trong modal tạo/sửa ca thi —
+  // xem CreateScheduleModal. Đều là dữ liệu chỉ đọc của kỳ thi.
+  examCloseAt?: string | null
   examId: string
+  examOpenAt?: string | null
+  examTimeDurationSecond?: number | null
   isClassTest: boolean
   onGoToPapers: () => void
   onSetDeliveryMode?: (mode: ExamDeliveryMode) => void
@@ -43,7 +48,10 @@ type ScheduleTabProps = {
 export function ScheduleTab({
   canManage,
   deliveryMode,
+  examCloseAt,
   examId,
+  examOpenAt,
+  examTimeDurationSecond,
   isClassTest,
   onGoToPapers,
   onSetDeliveryMode,
@@ -574,6 +582,10 @@ export function ScheduleTab({
 
       {showCreateModal ? (
         <CreateScheduleModal
+          examCloseAt={examCloseAt}
+          examOpenAt={examOpenAt}
+          examTimeDurationSecond={examTimeDurationSecond}
+          isClassTest={isClassTest}
           onClose={() => setShowCreateModal(false)}
           onSubmit={(input) => void handleCreateSchedule(input)}
           submitting={createScheduleMutation.isPending}
@@ -582,11 +594,15 @@ export function ScheduleTab({
 
       {editingSchedule ? (
         <CreateScheduleModal
+          examCloseAt={examCloseAt}
+          examOpenAt={examOpenAt}
+          examTimeDurationSecond={examTimeDurationSecond}
           initial={{
             endDate: editingSchedule.endDate,
             room: editingSchedule.room,
             startDate: editingSchedule.startDate,
           }}
+          isClassTest={isClassTest}
           onClose={() => setEditingSchedule(null)}
           onSubmit={(input) => void handleUpdateSchedule(input)}
           submitLabel="Lưu thay đổi"

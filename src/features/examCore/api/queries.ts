@@ -103,6 +103,7 @@ const EXAM_DETAIL_FIELDS = `
   deliveryMode
   papersLocked
   maxAttempt
+  examTimeDurationSecond
   resultDecisionMethod
   securePool {
     id
