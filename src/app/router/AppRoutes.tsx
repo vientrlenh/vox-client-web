@@ -383,12 +383,8 @@ const SchoolAdminReevaluationPage = lazy(() =>
 const SchoolAdminReevaluationDetailPage = lazy(() =>
   import("@/features/reevaluation").then((m) => ({ default: m.SchoolAdminReevaluationDetailPage })),
 );
-const TeacherReevaluationPage = lazy(() =>
-  import("@/features/reevaluation").then((m) => ({ default: m.TeacherReevaluationPage })),
-);
-const TeacherReevaluationRescorePage = lazy(() =>
-  import("@/features/reevaluation").then((m) => ({ default: m.TeacherReevaluationRescorePage })),
-);
+// Giáo viên chấm phúc khảo ở màn `teacher/grading` (vòng chấm APPEAL) — bản rework gộp
+// bốn vòng chấm vào một chỗ nên không còn màn chấm lại riêng.
 
 // grading: chấm điểm thủ công (admin phân công -> giáo viên chấm bài chờ chấm)
 const SchoolAdminGradingPage = lazy(() =>
@@ -947,8 +943,8 @@ export function AppRoutes() {
             <Route path="teacher/exams" element={<TeacherExamsPage />} />
             <Route path="teacher/exam-results" element={<TeacherExamResultsListPage />} />
             <Route path="teacher/exam-results/:sessionId" element={<TeacherExamResultDetailPage />} />
-            <Route path="teacher/reevaluation/:requestId" element={<TeacherReevaluationRescorePage />} />
-            <Route path="teacher/reevaluation" element={<TeacherReevaluationPage />} />
+            {/* Đường dẫn cũ của màn chấm phúc khảo — giữ redirect cho bookmark đã lưu. */}
+            <Route path="teacher/reevaluation/*" element={<Navigate replace to="/teacher/grading" />} />
             <Route path="teacher/grading/:assignmentId" element={<TeacherGradingTaskPage />} />
             <Route path="teacher/grading" element={<TeacherGradingPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/new" element={<TeacherCreateBlueprintVersionPage />} />

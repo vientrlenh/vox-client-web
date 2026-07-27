@@ -6,7 +6,6 @@ import type {
   ExamCandidateResultStatus,
   GradingAssignmentRow,
   GradingAssignmentStatus,
-  GradingExamOption,
   GradingPage,
   GradingRoundType,
   GradingStats,
@@ -235,19 +234,6 @@ const AI_QUALITY_REPORT_QUERY = `
   }
 `
 
-// Chỉ id + name: đây là nguồn cho một dropdown lọc, không cần kéo cả papers/sections
-// như EXAM_LIST_FIELDS của feature exam.
-const GRADING_EXAM_OPTIONS_QUERY = `
-  query GradingExamOptions($page: Int!, $size: Int!) {
-    exams(page: $page, size: $size) {
-      content {
-        id
-        name
-      }
-    }
-  }
-`
-
 export type FetchGradingAssignmentsInput = {
   examId?: string
   hasOpenAppeal?: boolean
@@ -280,7 +266,6 @@ export const gradingKeys = {
   all: ['grading'] as const,
   assignments: (input: FetchGradingAssignmentsInput) =>
     [...gradingKeys.all, 'assignments', input] as const,
-  examOptions: () => [...gradingKeys.all, 'exam-options'] as const,
   finalizePreview: (examId: string | null) =>
     [...gradingKeys.all, 'finalize-preview', examId] as const,
   history: (candidateResultId: string | null) =>
@@ -368,16 +353,6 @@ export async function fetchAiQualityReport(examId?: string) {
   return data.aiQualityReport
 }
 
-export async function fetchGradingExamOptions() {
-  // Cap mềm: đủ cho gần như mọi trường. Vượt trần này thì bộ lọc mới cần chuyển
-  // sang combobox tìm kiếm server-side thay vì kéo toàn bộ về một lần.
-  const data = await graphQLRequest<{ exams: { content: GradingExamOption[] } }>(
-    GRADING_EXAM_OPTIONS_QUERY,
-    { page: 0, size: 500 },
-  )
-  return data.exams.content
-}
-
 // Phân trang 0-based ở server, UI 1-based: -1 khi query, +1 ở `select`.
 export function useGradingAssignmentsQuery(
   page: number,
@@ -447,12 +422,5 @@ export function useAiQualityReportQuery(examId?: string, options?: { enabled?: b
     enabled: options?.enabled !== false,
     queryFn: () => fetchAiQualityReport(examId),
     queryKey: gradingKeys.aiQuality(examId),
-  })
-}
-
-export function useGradingExamOptionsQuery() {
-  return useQuery({
-    queryFn: fetchGradingExamOptions,
-    queryKey: gradingKeys.examOptions(),
   })
 }

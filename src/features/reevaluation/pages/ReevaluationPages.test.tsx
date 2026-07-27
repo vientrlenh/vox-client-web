@@ -3,12 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
-import {
-  SchoolAdminReevaluationDetailPage,
-  SchoolAdminReevaluationPage,
-  TeacherReevaluationPage,
-  TeacherReevaluationRescorePage,
-} from './ReevaluationPages'
+import { SchoolAdminReevaluationDetailPage, SchoolAdminReevaluationPage } from './ReevaluationPages'
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
 
@@ -19,14 +14,14 @@ const appealsPage = {
     {
       className: '12A1',
       deadline: '2026-07-22T17:00:00+07:00',
-      doneCount: 0,
       examName: 'Kỳ thi giữa kỳ',
       id: 'appeal-1',
       originalScore: 6.5,
       overdue: false,
       partLabels: ['Speaking Part 2'],
       requestedAt: '2026-07-15T09:00:00+07:00',
-      reviewerCount: 0,
+      reviewerName: null,
+      reviewerStatus: null,
       status: 'PENDING',
       studentName: 'Nguyễn Minh An',
     },
@@ -37,24 +32,7 @@ const appealsPage = {
   totalPages: 1,
 }
 
-const appealStats = { pending: 1, processing: 0, published: 0, rejected: 0 }
-
-const tasksPage = {
-  content: [
-    {
-      appealId: 'appeal-1',
-      deadline: '2026-07-22T17:00:00+07:00',
-      examName: 'Kỳ thi giữa kỳ',
-      myStatus: 'ASSIGNED',
-      overdue: false,
-      partLabels: ['Speaking Part 2'],
-    },
-  ],
-  page: 0,
-  size: 20,
-  totalElements: 1,
-  totalPages: 1,
-}
+const appealStats = { pending: 1, processing: 0, published: 0, rejected: 0, withdrawn: 2 }
 
 // Định tuyến mock theo tên query để một trang bắn nhiều query cùng lúc vẫn resolve đúng.
 function routeGraphql(data: Record<string, unknown>) {
@@ -76,33 +54,30 @@ describe('SchoolAdminReevaluationPage', () => {
     expect(screen.getByRole('heading', { name: 'Yêu cầu phúc khảo' })).toBeInTheDocument()
     expect(await screen.findByText('Nguyễn Minh An')).toBeInTheDocument()
     expect(screen.getByText('Lớp 12A1')).toBeInTheDocument()
+    // Đơn chưa giao ai — cột giám khảo phải nói rõ thay vì để trống.
+    expect(screen.getByText('Chưa phân công')).toBeInTheDocument()
+  })
+
+  it('có thẻ thống kê và bộ lọc cho đơn học sinh đã rút', async () => {
+    routeGraphql({ appealStats, appeals: appealsPage })
+
+    renderWithProviders(<SchoolAdminReevaluationPage />)
+
+    expect(await screen.findByText('Học sinh đã rút')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Đã rút' })).toBeInTheDocument()
+    // COMPARING đã bị BE xoá khỏi enum — bộ lọc không được còn giá trị này.
+    expect(screen.queryByRole('button', { name: 'Chờ đối chiếu' })).not.toBeInTheDocument()
   })
 })
 
-describe('TeacherReevaluationPage', () => {
-  beforeEach(() => mockedPost.mockReset())
-
-  it('hiển thị việc được phân công cho giáo viên hiện tại', async () => {
-    routeGraphql({ myAppealTasks: tasksPage })
-
-    renderWithProviders(<TeacherReevaluationPage />)
-
-    expect(
-      screen.getByRole('heading', { name: 'Bài được phân công chấm lại' }),
-    ).toBeInTheDocument()
-    expect(await screen.findByText('Speaking Part 2')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Chấm ngay/ })).toBeInTheDocument()
-  })
-})
-
-describe('SchoolAdminReevaluationDetailPage — màn so sánh & công bố', () => {
+describe('SchoolAdminReevaluationDetailPage', () => {
   beforeEach(() => mockedPost.mockReset())
 
   const baselineScores = [
     { criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 6.5 },
   ]
 
-  const comparingAppeal = {
+  const gradingAppeal = {
     approvedAt: '2026-07-16T09:00:00+07:00',
     className: '12A1',
     deadline: '2026-07-22T17:00:00+07:00',
@@ -110,7 +85,6 @@ describe('SchoolAdminReevaluationDetailPage — màn so sánh & công bố', () 
     examName: 'Kỳ thi giữa kỳ',
     finalScore: null,
     id: 'appeal-1',
-    notes: null,
     items: [
       {
         appealItemId: 'i1',
@@ -120,81 +94,33 @@ describe('SchoolAdminReevaluationDetailPage — màn so sánh & công bố', () 
         partLabel: 'Speaking Part 2',
         turns: [],
       },
-      {
-        appealItemId: 'i2',
-        baselineScores,
-        finalScore: null,
-        paperItemId: 'p2',
-        partLabel: 'Speaking Part 3',
-        turns: [],
-      },
     ],
+    notes: null,
     originalScore: 6.5,
     overdue: false,
     reason: 'Xin chấm lại phần nói',
     requestedAt: '2026-07-15T09:00:00+07:00',
     resolvedAt: null,
-    reviewers: [
-      {
-        assignedAt: '2026-07-16T09:00:00+07:00',
-        done: true,
-        items: [
-          {
-            appealItemId: 'i1',
-            note: 'Phát âm tốt.',
-            partLabel: 'Speaking Part 2',
-            scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 7 }],
-            suggestedScore: 7,
-          },
-          {
-            appealItemId: 'i2',
-            note: null,
-            partLabel: 'Speaking Part 3',
-            scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 6 }],
-            suggestedScore: 6,
-          },
-        ],
-        reviewerId: 't1',
-        reviewerName: 'Trần Thu Hà',
-        status: 'SUBMITTED',
-        submittedAt: '2026-07-16T10:00:00+07:00',
-        suggestedScore: 6.5,
-      },
-      {
-        assignedAt: '2026-07-16T09:00:00+07:00',
-        done: true,
-        items: [
-          {
-            appealItemId: 'i1',
-            note: null,
-            partLabel: 'Speaking Part 2',
-            scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 7.5 }],
-            suggestedScore: 7.5,
-          },
-          {
-            appealItemId: 'i2',
-            note: null,
-            partLabel: 'Speaking Part 3',
-            scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 6.5 }],
-            suggestedScore: 6.5,
-          },
-        ],
-        reviewerId: 't2',
-        reviewerName: 'Nguyễn Văn Minh',
-        status: 'SUBMITTED',
-        submittedAt: '2026-07-16T10:30:00+07:00',
-        suggestedScore: 7,
-      },
-    ],
+    reviewer: {
+      assignedAt: '2026-07-16T09:00:00+07:00',
+      assignmentId: 'asg-1',
+      completedAt: null,
+      deadlineAt: '2026-07-22T17:00:00+07:00',
+      outcome: null,
+      overdue: false,
+      reviewerId: 't1',
+      reviewerName: 'Trần Thu Hà',
+      status: 'ASSIGNED',
+    },
+    reviewerOverrideReason: 'Chỉ còn một giáo viên đủ chuyên môn',
     scoringScaleMax: 9,
     scoringScaleMin: 0,
-    status: 'COMPARING',
+    status: 'GRADING',
     studentName: 'Nguyễn Minh An',
+    withdrawnAt: null,
   }
 
-  it('hiển thị tên giám khảo (không còn ẩn danh) ở bảng đối chiếu và thẻ nhận xét', async () => {
-    routeGraphql({ appeal: comparingAppeal })
-
+  function renderDetail() {
     renderWithProviders(
       <Routes>
         <Route
@@ -204,92 +130,44 @@ describe('SchoolAdminReevaluationDetailPage — màn so sánh & công bố', () 
       </Routes>,
       { route: '/school-admin/reevaluation/appeal-1' },
     )
+  }
 
-    // Tên xuất hiện ở cả header bảng lẫn thẻ nhận xét.
-    expect((await screen.findAllByText('Trần Thu Hà')).length).toBeGreaterThan(1)
-    expect(screen.getAllByText('Nguyễn Văn Minh').length).toBeGreaterThan(1)
+  it('hiển thị một giám khảo kèm lý do bỏ qua xung đột lợi ích', async () => {
+    routeGraphql({ appeal: gradingAppeal })
 
-    // Chỉ hiện khối nhận xét của phần đang chọn (tab đầu tiên).
-    expect(screen.getAllByText(/^Nhận xét của giám khảo ·/)).toHaveLength(1)
-    expect(screen.queryByText(/Người chấm 1/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/^Chấm 1$/)).not.toBeInTheDocument()
+    renderDetail()
+
+    expect(await screen.findByText('Trần Thu Hà')).toBeInTheDocument()
+    expect(screen.getByText('Đang chờ chấm')).toBeInTheDocument()
+    expect(screen.getByText(/Chỉ còn một giáo viên đủ chuyên môn/)).toBeInTheDocument()
+    // Bước admin công bố đã bị BE xoá — giám khảo nộp là công bố luôn.
+    expect(screen.queryByRole('button', { name: /Công bố/ })).not.toBeInTheDocument()
   })
 
-  it('chia tab bảng đối chiếu theo phần thi; điểm công bố vẫn hiện đủ phần', async () => {
+  it('cho đổi giám khảo khi vòng chấm chưa xong, thay cho thao tác gỡ đã bị bỏ', async () => {
     const user = userEvent.setup()
-    routeGraphql({ appeal: comparingAppeal })
+    routeGraphql({ appeal: gradingAppeal, appealReviewers: [] })
 
-    renderWithProviders(
-      <Routes>
-        <Route
-          element={<SchoolAdminReevaluationDetailPage />}
-          path="/school-admin/reevaluation/:requestId"
-        />
-      </Routes>,
-      { route: '/school-admin/reevaluation/appeal-1' },
-    )
+    renderDetail()
 
-    // Mặc định chỉ hiện bảng đối chiếu của phần đang chọn (tab đầu tiên).
-    expect(await screen.findAllByText(/Bảng đối chiếu điểm theo tiêu chí/)).toHaveLength(1)
-
-    // Thẻ "Quyết định cuối cùng" không chia tab — vẫn có ô nhập điểm cho ĐỦ mọi phần.
-    const inputs = screen.getAllByRole('spinbutton')
-    expect(inputs).toHaveLength(2)
-    // Part 2: TB(7, 7.5) = 7.25 -> bandRound -> 7.5 ; Part 3: TB(6, 6.5) = 6.25 -> 6.5
-    expect(inputs[0]).toHaveValue(7.5)
-    expect(inputs[1]).toHaveValue(6.5)
-
-    // Chuyển sang tab phần thi thứ hai vẫn chỉ hiện một bảng đối chiếu.
-    await user.click(screen.getByRole('button', { name: 'Speaking Part 3' }))
-    expect(screen.getAllByText(/Bảng đối chiếu điểm theo tiêu chí/)).toHaveLength(1)
-  })
-})
-
-describe('TeacherReevaluationRescorePage', () => {
-  beforeEach(() => mockedPost.mockReset())
-
-  const submittedTaskDetail = {
-    appealId: 'appeal-1',
-    criteria: [
-      { code: 'FLU', description: null, id: 'c1', label: 'Độ trôi chảy', maxScore: 9, minScore: 0 },
-    ],
-    items: [
-      {
-        appealItemId: 'i1',
-        baselineScores: [
-          { criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 7 },
-        ],
-        finalScore: null,
-        paperItemId: 'p1',
-        partLabel: 'Speaking Part 2',
-        turns: [],
-      },
-    ],
-    myReport: [
-      {
-        appealItemId: 'i1',
-        note: 'Đã chấm',
-        partLabel: 'Speaking Part 2',
-        scores: [{ criterionCode: 'FLU', criterionId: 'c1', label: 'Độ trôi chảy', score: 8 }],
-        suggestedScore: 8,
-      },
-    ],
-  }
-
-  it('khoá màn chấm lại (chỉ-đọc) khi giám khảo đã nộp', async () => {
-    routeGraphql({ appealTaskDetail: submittedTaskDetail })
-
-    renderWithProviders(
-      <Routes>
-        <Route element={<TeacherReevaluationRescorePage />} path="/teacher/reevaluation/:requestId" />
-      </Routes>,
-      { route: '/teacher/reevaluation/appeal-1' },
-    )
-
-    expect(await screen.findByText('Đã nộp — không thể chỉnh sửa')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Gỡ giám khảo/ })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Đổi giám khảo/ }))
     expect(
-      screen.queryByRole('button', { name: 'Nộp báo cáo chấm lại' }),
-    ).not.toBeInTheDocument()
-    expect(screen.getByRole('spinbutton')).toBeDisabled()
+      await screen.findByRole('button', { name: /Xác nhận đổi giám khảo/ }),
+    ).toBeInTheDocument()
+  })
+
+  it('nêu rõ đơn đã bị học sinh rút', async () => {
+    routeGraphql({
+      appeal: {
+        ...gradingAppeal,
+        status: 'WITHDRAWN',
+        withdrawnAt: '2026-07-18T08:00:00+07:00',
+      },
+    })
+
+    renderDetail()
+
+    expect(await screen.findByText(/Học sinh đã rút đơn lúc/)).toBeInTheDocument()
   })
 })

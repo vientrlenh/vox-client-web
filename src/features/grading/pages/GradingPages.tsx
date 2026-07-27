@@ -27,9 +27,13 @@ import {
   UserPlus,
   UserRoundCog,
   UsersRound,
+  X,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
+import { ExamPickerModal } from '@/features/examCore/components/ExamPickerModal'
+import type { ExamPickerOption } from '@/features/examCore/types'
 import { toApiError } from '@/shared/api'
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
 import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { PageLoader } from '@/shared/ui/PageLoader'
@@ -57,7 +61,6 @@ import {
 import { useGradingPreviewQuery } from '../api/useGradingPreviewQuery'
 import {
   useGradingAssignmentsQuery,
-  useGradingExamOptionsQuery,
   useGradingStatsQuery,
   useGradingTaskDetailQuery,
   useMyGradingTasksQuery,
@@ -75,7 +78,6 @@ import { ResultHistoryDialog } from '../components/ResultHistoryDialog'
 import { SegmentedControl, type SegmentItem } from '../components/SegmentedControl'
 import { SetDeadlineDialog } from '../components/SetDeadlineDialog'
 import { SubmitGradingDialog } from '../components/SubmitGradingDialog'
-import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import {
   avatarClasses,
   formatIsoDateTime,
@@ -223,7 +225,10 @@ function itemTabItems(items: GradingTaskItem[]): SegmentItem[] {
 
 export function SchoolAdminGradingPage() {
   const [tab, setTab] = useState('board')
-  const [examId, setExamId] = useState('')
+  // Giữ CẢ object thay vì mỗi id: danh sách kỳ thi giờ phân trang phía server nên không còn
+  // mảng đầy đủ để tra ngược ra tên — mà tên thì cần cho tên file CSV và 3 dialog bên dưới.
+  const [selectedExam, setSelectedExam] = useState<ExamPickerOption | null>(null)
+  const [examPickerOpen, setExamPickerOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'' | GradingAssignmentStatus>('')
@@ -243,6 +248,9 @@ export function SchoolAdminGradingPage() {
   const [finalizeOpen, setFinalizeOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
+  const examId = selectedExam?.id ?? ''
+  const selectedExamName = selectedExam?.name
+
   const debouncedSearch = useDebouncedValue(search, 350)
   const rowsQuery = useGradingAssignmentsQuery(page, PAGE_SIZE, {
     examId,
@@ -255,7 +263,6 @@ export function SchoolAdminGradingPage() {
     unassignedOnly,
   })
   const statsQuery = useGradingStatsQuery({ examId })
-  const examOptionsQuery = useGradingExamOptionsQuery()
   const finalizePreviewQuery = useFinalizePreviewQuery(finalizeOpen && examId ? examId : null)
 
   const assignMutation = useAssignGradingMutation()
@@ -272,7 +279,6 @@ export function SchoolAdminGradingPage() {
   const totalPages = pageData?.totalPages ?? 0
   const totalElements = pageData?.totalElements ?? 0
   const stats = statsQuery.data
-  const selectedExamName = examOptionsQuery.data?.find((exam) => exam.id === examId)?.name
 
   // Chỉ tick được các dòng trong TRANG hiện tại — chọn xong sang trang khác thì tick
   // cũ không còn dòng tương ứng, nên lọc lại theo `rows` mỗi lần render.
@@ -640,19 +646,27 @@ export function SchoolAdminGradingPage() {
 
           {/* Toàn bộ bộ lọc trong MỘT thanh: trước đây trải ra ba hàng với ba kiểu chip khác nhau. */}
           <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-3">
-            <select
-              aria-label="Lọc theo kỳ thi"
-              className={`${FIELD_CLASS} min-w-48`}
-              onChange={(event) => resetToFirstPage(setExamId)(event.target.value)}
-              value={examId}
-            >
-              <option value="">Tất cả kỳ thi</option>
-              {(examOptionsQuery.data ?? []).map((exam) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1">
+              <button
+                aria-label="Chọn kỳ thi"
+                className={`${FIELD_CLASS} inline-flex min-w-48 max-w-64 items-center gap-1.5 text-left`}
+                onClick={() => setExamPickerOpen(true)}
+                type="button"
+              >
+                <Search aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
+                <span className="truncate">{selectedExamName ?? 'Tất cả kỳ thi'}</span>
+              </button>
+              {selectedExam ? (
+                <button
+                  aria-label="Bỏ lọc kỳ thi"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+                  onClick={() => resetToFirstPage(setSelectedExam)(null)}
+                  type="button"
+                >
+                  <X aria-hidden="true" className="size-3.5" />
+                </button>
+              ) : null}
+            </div>
             <select
               aria-label="Lọc theo vòng chấm"
               className={`${FIELD_CLASS} min-w-40`}
@@ -1100,6 +1114,17 @@ export function SchoolAdminGradingPage() {
           onCancel={() => setFinalizeOpen(false)}
           onConfirm={confirmFinalize}
           preview={finalizePreviewQuery.data}
+        />
+      ) : null}
+
+      {examPickerOpen ? (
+        <ExamPickerModal
+          onClear={() => resetToFirstPage(setSelectedExam)(null)}
+          onClose={() => setExamPickerOpen(false)}
+          // Qua `resetToFirstPage` chứ không set thẳng: đổi kỳ thi phải kéo bảng về trang 1
+          // và bỏ các dòng đang tick, nếu không sẽ thao tác hàng loạt lên bài của kỳ thi cũ.
+          onSelect={(exam) => resetToFirstPage(setSelectedExam)(exam)}
+          selectedExamId={selectedExam?.id ?? null}
         />
       ) : null}
 

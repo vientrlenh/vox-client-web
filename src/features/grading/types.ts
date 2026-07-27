@@ -231,11 +231,6 @@ export type AssignableTeacher = {
   load: number
 }
 
-export type GradingExamOption = {
-  id: string
-  name: string
-}
-
 export type GradingPage<T> = {
   content: T[]
   page: number

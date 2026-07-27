@@ -59,7 +59,8 @@ export async function assignGrading(input: AssignGradingInput) {
     deadlineAt: input.deadlineAt ?? undefined,
     roundType: input.roundType,
   })
-  return response.data.message
+  // BE trả danh sách id phân công vừa tạo — trả đúng kiểu đó như `autoAssignGrading`.
+  return response.data.data
 }
 
 export async function autoAssignGrading(input: AutoAssignGradingInput) {

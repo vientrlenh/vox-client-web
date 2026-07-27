@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ClipboardCheck,
   FileQuestion,
-  FileSearch,
   LogOut,
   Menu,
   MonitorPlay,
@@ -44,14 +43,10 @@ const navigationItems = [
     to: '/teacher/proctor-attendance',
   },
   {
+    // Một cửa cho cả bốn vòng chấm, kể cả phúc khảo — lọc theo vòng ngay trong màn.
     icon: PenLine,
     label: 'Chấm bài',
     to: '/teacher/grading',
-  },
-  {
-    icon: FileSearch,
-    label: 'Chấm phúc khảo',
-    to: '/teacher/reevaluation',
   },
 ]
 

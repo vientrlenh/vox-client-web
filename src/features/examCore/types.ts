@@ -203,6 +203,21 @@ export type SchoolRoomLite = {
   name: string
 }
 
+/**
+ * Bản rút gọn của kỳ thi, dành cho các màn CHỌN kỳ thi.
+ *
+ * <p>Cố ý không dùng `ExamDto`: query danh sách kỳ thi đầy đủ kéo cả
+ * `papers → sections → items` qua DataLoader — quá nặng cho một ô lọc.
+ */
+export type ExamPickerOption = {
+  closeAt?: string | null
+  code: string
+  id: string
+  name: string
+  openAt?: string | null
+  status: ExamStatus
+}
+
 export type ExamScheduleProctorDto = {
   id: string
   scheduleId: string
@@ -451,6 +466,25 @@ export function formatDate(value?: string | null) {
     month: '2-digit',
     year: 'numeric',
   }).format(date)
+}
+
+export function getExamStatusDisplay(status?: ExamStatus | string | null): { tone: StatusTone; label: string } {
+  switch (status) {
+    case 'DRAFT':
+      return { tone: 'warning', label: 'Bản nháp' }
+    case 'SCHEDULED':
+      return { tone: 'info', label: 'Đã lên lịch' }
+    case 'IN_PROGRESS':
+      return { tone: 'violet', label: 'Đang diễn ra' }
+    case 'CLOSED':
+      return { tone: 'neutral', label: 'Đã đóng' }
+    case 'RESULTS_PUBLISHED':
+      return { tone: 'success', label: 'Đã công bố kết quả' }
+    case 'CANCELLED':
+      return { tone: 'danger', label: 'Đã hủy' }
+    default:
+      return { tone: 'neutral', label: String(status ?? '-') }
+  }
 }
 
 export function getExamPaperStatusDisplay(status?: string | null, examKind?: ExamKind): { tone: StatusTone; label: string } {

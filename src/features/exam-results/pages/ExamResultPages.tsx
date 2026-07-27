@@ -16,7 +16,7 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react'
-import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useForceEndExamSessionMutation } from '@/features/examCore/api/mutations'
 import { examQueryKeys, useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
 import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
@@ -38,7 +38,6 @@ import {
   useRetryGradingExamSessionMutation,
   useRegradeExamSessionForTestMutation,
   useDecideExamCandidateResultOutcomeMutation,
-  useReleasePendingExamResultMutation,
 } from '../api/useExamResultQueries'
 import {
   formatScore,
@@ -852,7 +851,7 @@ function QuestionEvaluationCard({
   )
 }
 
-function ExamResultDetailPage() {
+function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   const { sessionId } = useParams()
   const [activeTab, setActiveTab] = useState<string>('overview')
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
@@ -862,7 +861,6 @@ function ExamResultDetailPage() {
   const { confirm, confirmWithReason, dialog } = useConfirmationDialog()
   const sessionQuery = useExamSessionStatusQuery(sessionId ?? null)
   const resultQuery = useExamSessionResultQuery(sessionId ?? null)
-  const releasePendingResultMutation = useReleasePendingExamResultMutation()
   const decideOutcomeMutation = useDecideExamCandidateResultOutcomeMutation()
   const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const retryGradingMutation = useRetryGradingExamSessionMutation()
@@ -955,20 +953,6 @@ function ExamResultDetailPage() {
     await queryClient.invalidateQueries({ queryKey: examResultQueryKeys.all })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.candidates(examId) })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.exam(examId) })
-  }
-
-  async function handleReleasePendingResult() {
-    if (!(await confirm({ message: 'Duyệt kết quả này để tính điểm chính thức cho học sinh?', title: 'Xác nhận duyệt kết quả' }))) {
-      return
-    }
-
-    try {
-      await releasePendingResultMutation.mutateAsync({ sessionId: currentSessionId })
-      await invalidateDetail()
-      setMessage('Đã duyệt kết quả.')
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể duyệt kết quả.')
-    }
   }
 
   // FINAL: kỳ thi đã RESULTS_PUBLISHED nhưng assessmentPolicy không có passingScore nên
@@ -1068,13 +1052,12 @@ function ExamResultDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             {result?.status === 'PENDING_REVIEW' ? (
               <>
-                <button
+                <Link
                   className="inline-flex h-10 items-center justify-center rounded-full bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700"
-                  onClick={() => void handleReleasePendingResult()}
-                  type="button"
+                  to={gradingPath}
                 >
-                  Duyệt
-                </button>
+                  Phân công chấm bài
+                </Link>
                 <button
                   className="inline-flex h-10 items-center justify-center rounded-full border border-red-200 px-4 text-sm font-bold text-red-600 transition hover:bg-red-50"
                   onClick={() => void handleInvalidatePendingResult()}
@@ -1140,6 +1123,16 @@ function ExamResultDetailPage() {
             description="Điểm số đang được tạm ẩn cho người dùng hiện tại cho tới khi giáo viên đưa ra kết luận cuối cùng."
             title="Đang chờ giáo viên xem xét"
             tone="warning"
+          />
+        </div>
+      ) : null}
+
+      {result?.status === 'PENDING_REVIEW' ? (
+        <div className="mt-5">
+          <StatePanel
+            description="Không còn duyệt lẻ từng bài. Bài ra khỏi hàng chờ theo một trong hai đường: phân công một vòng chấm cho giáo viên (giữ nguyên hoặc chấm lại điểm AI), hoặc chốt sổ hàng loạt cả kỳ thi. Cả hai đều nằm ở màn phân công chấm bài."
+            title="Cách xử lý bài chờ soát điểm AI"
+            tone="info"
           />
         </div>
       ) : null}
@@ -1269,9 +1262,9 @@ export function TeacherExamResultsListPage() {
 }
 
 export function SchoolAdminExamResultDetailPage() {
-  return <ExamResultDetailPage />
+  return <ExamResultDetailPage gradingPath="/school-admin/grading" />
 }
 
 export function TeacherExamResultDetailPage() {
-  return <ExamResultDetailPage />
+  return <ExamResultDetailPage gradingPath="/teacher/grading" />
 }

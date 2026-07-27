@@ -3,7 +3,6 @@ import {
   fetchAiQualityReport,
   fetchAssignableTeachers,
   fetchGradingAssignments,
-  fetchGradingExamOptions,
   fetchGradingStats,
   fetchGradingTaskDetail,
   fetchMyGradingTasks,
@@ -160,13 +159,4 @@ describe('grading GraphQL queries', () => {
     expect(body.variables).toEqual({ examId: undefined })
   })
 
-  it('fetches exam options for the filter dropdown', async () => {
-    mockedPost.mockResolvedValue({ data: { data: { exams: { content: [] } } } })
-
-    await fetchGradingExamOptions()
-
-    const body = bodyOf()
-    expect(body.query).toContain('exams(')
-    expect(body.variables).toEqual({ page: 0, size: 500 })
-  })
 })

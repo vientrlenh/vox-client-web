@@ -244,17 +244,9 @@ export function useDeleteExamSessionMutation() {
   })
 }
 
-const REVIEW_FLAGGED_EXAM_RESULT_MUTATION = `
-  mutation ReviewFlaggedExamResult($candidateResultId: ID!, $decision: ExamCandidateResultStatus!) {
-    reviewFlaggedExamResult(candidateResultId: $candidateResultId, decision: $decision)
-  }
-`
-
-const RELEASE_PENDING_EXAM_RESULT_MUTATION = `
-  mutation ReleasePendingExamResult($sessionId: ID!) {
-    releasePendingExamResult(sessionId: $sessionId)
-  }
-`
+// Bản rework chấm bài đã xoá `reviewFlaggedExamResult` và `releasePendingExamResult`: không còn
+// duyệt lẻ từng bài. PENDING_REVIEW ra khỏi hàng chờ bằng một vòng chấm (giáo viên uphold/regrade)
+// hoặc bằng chốt sổ hàng loạt ở màn phân công chấm bài.
 
 const RETRY_GRADING_EXAM_SESSION_MUTATION = `
   mutation RetryGradingExamSession($sessionId: ID!) {
@@ -267,36 +259,6 @@ const DECIDE_EXAM_CANDIDATE_RESULT_OUTCOME_MUTATION = `
     decideExamCandidateResultOutcome(candidateResultId: $candidateResultId, decision: $decision)
   }
 `
-
-export function useReviewFlaggedExamResultMutation() {
-  return useMutation({
-    mutationFn: async ({
-      candidateResultId,
-      decision,
-    }: {
-      candidateResultId: string
-      decision: 'FINAL' | 'INVALID' | 'RETAKE_REQUIRED'
-    }) => {
-      const data = await graphQLRequest<{ reviewFlaggedExamResult: string }>(REVIEW_FLAGGED_EXAM_RESULT_MUTATION, {
-        candidateResultId,
-        decision,
-      })
-      return data.reviewFlaggedExamResult
-    },
-  })
-}
-
-// State diagram: PENDING_REVIEW chỉ có 1 lối ra là RELEASED - giáo viên xác nhận điểm AI ổn.
-export function useReleasePendingExamResultMutation() {
-  return useMutation({
-    mutationFn: async ({ sessionId }: { sessionId: string }) => {
-      const data = await graphQLRequest<{ releasePendingExamResult: string }>(RELEASE_PENDING_EXAM_RESULT_MUTATION, {
-        sessionId,
-      })
-      return data.releasePendingExamResult
-    },
-  })
-}
 
 // Chỉ áp dụng khi result đang FINAL (kỳ thi đã RESULTS_PUBLISHED nhưng assessmentPolicy không
 // có passingScore) - nhà trường tự chốt PASSED/FAILED thủ công.

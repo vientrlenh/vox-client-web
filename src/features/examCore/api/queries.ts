@@ -5,7 +5,9 @@ import type {
   ExamBlueprintDto,
   ExamDto,
   ExamPaperDto,
+  ExamPickerOption,
   ExamScheduleDto,
+  ExamStatus,
   Paged,
   ProctorCandidateSummaryDto,
   ProctorScheduleSummaryDto,
@@ -400,6 +402,7 @@ export const examQueryKeys = {
   classTestStats: () => [...examQueryKeys.all, 'class-test-stats'] as const,
   exam: (id: string | null) => [...examQueryKeys.all, 'exam', id] as const,
   examPaper: (paperId: string | null) => [...examQueryKeys.all, 'exam-paper', paperId] as const,
+  examPicker: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'exam-picker', filters] as const,
   examStats: () => [...examQueryKeys.all, 'exam-stats'] as const,
   exams: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'exams', filters] as const,
   proctorCandidates: (scheduleId: string | null) => [...examQueryKeys.all, 'proctor-candidates', scheduleId] as const,
@@ -581,5 +584,55 @@ export function useSchoolRoomsQuery(page: number, size: number, search: string) 
   return useQuery({
     queryFn: () => fetchSchoolRooms(page, size, search),
     queryKey: examQueryKeys.schoolRooms(page, size, search),
+  })
+}
+
+// Chỉ những trường một danh sách chọn cần. Đừng thêm `papers`/`members`/`candidateCount`:
+// chúng chạy qua DataLoader nên mỗi field là thêm một loạt query cho mỗi dòng.
+const EXAM_PICKER_QUERY = `
+  query ExamPickerOptions($keyword: String, $status: ExamStatus, $page: Int!, $size: Int!) {
+    exams(keyword: $keyword, status: $status, page: $page, size: $size) {
+      content {
+        id
+        code
+        name
+        status
+        openAt
+        closeAt
+      }
+      page
+      size
+      totalElements
+      totalPages
+    }
+  }
+`
+
+export type FetchExamPickerOptionsInput = {
+  keyword?: string
+  page: number
+  size: number
+  status?: ExamStatus | ''
+}
+
+/** BE lọc `keyword` theo cả `code` lẫn `name` nên không cần lọc thêm ở client. */
+export async function fetchExamPickerOptions(input: FetchExamPickerOptionsInput) {
+  const data = await graphQLRequest<{ exams: Paged<ExamPickerOption> }>(EXAM_PICKER_QUERY, {
+    keyword: input.keyword?.trim() || null,
+    page: input.page - 1,
+    size: input.size,
+    status: input.status || null,
+  })
+  return data.exams
+}
+
+// Phân trang 0-based ở server, UI 1-based: -1 khi query, +1 ở `select`.
+export function useExamPickerOptionsQuery(input: FetchExamPickerOptionsInput) {
+  return useQuery({
+    // Giữ trang cũ trong lúc nạp trang/từ khoá mới, nếu không danh sách chớp trắng mỗi lần gõ.
+    placeholderData: (previousData) => previousData,
+    queryFn: () => fetchExamPickerOptions(input),
+    queryKey: examQueryKeys.examPicker(input),
+    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
