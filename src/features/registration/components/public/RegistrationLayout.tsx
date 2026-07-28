@@ -122,7 +122,7 @@ export function RegistrationLayout({
             />
           </div>
 
-          <div className="flex min-h-screen flex-col lg:min-h-0">
+          <div className="flex min-h-screen min-w-0 flex-col lg:min-h-0">
             <header className="relative z-10 px-4 pt-3 lg:hidden">
               <div className="flex h-12 items-center justify-between rounded-2xl border border-white/15 bg-white/10 px-3 shadow-[0_12px_30px_rgba(2,6,23,0.24)] backdrop-blur-md">
                 <Link
@@ -157,7 +157,7 @@ export function RegistrationLayout({
               </p>
             </div>
 
-            <div className="relative w-full flex-1 px-4 pb-5 sm:px-6 lg:mx-auto lg:flex lg:max-w-197.5 lg:items-center lg:px-0 lg:pb-0">
+            <div className="relative w-full min-w-0 flex-1 px-4 pb-5 sm:px-6 lg:mx-auto lg:flex lg:max-w-197.5 lg:items-center lg:px-0 lg:pb-0">
               <div className="absolute right-0 -top-12.5 hidden text-xs font-semibold text-blue-100 lg:block">
                 Đã có tài khoản?{' '}
                 <Link className="text-cyan-300 hover:text-cyan-200" to="/login">
@@ -179,7 +179,7 @@ export function RegistrationLayout({
 /** Thẻ trắng bao quanh nội dung từng bước. */
 export function RegistrationCard({ children }: { children: ReactNode }) {
   return (
-    <div className="w-full rounded-[18px] bg-white px-4 pb-5 pt-4 text-slate-950 shadow-2xl shadow-blue-950/35 ring-1 ring-white/50 sm:px-6 lg:rounded-[22px] lg:px-16 lg:py-8">
+    <div className="w-full min-w-0 rounded-[18px] bg-white px-4 pb-5 pt-4 text-slate-950 shadow-2xl shadow-blue-950/35 ring-1 ring-white/50 sm:px-6 lg:rounded-[22px] lg:px-16 lg:py-8">
       {children}
     </div>
   )
