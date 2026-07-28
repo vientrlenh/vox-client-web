@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Eye, RefreshCw, Upload } from 'lucide-react'
+import { ChevronDown, Eye, RefreshCw, Upload, X } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import { useImportSessionsQuery } from '../api/useImportSessionsQuery'
+import {
+  IMPORT_STATUS_DISPLAY,
+  IMPORT_STATUS_VALUES,
+  IMPORT_TYPE_GROUPS,
+  IMPORT_TYPE_LABELS,
+} from '../importTypes'
 import type { ImportSessionFilters, ImportSessionSummary } from '../types'
 import {
   formatImportDate,
@@ -239,10 +245,36 @@ type ImportTypeOption = {
   to: string
 }
 
-const IMPORT_TYPE_OPTIONS: ImportTypeOption[] = [
-  { label: 'Lớp học', to: '/school-admin/classes/import' },
-  { label: 'Học viên trong lớp', to: '/school-admin/classes/users/import' },
-  { label: 'Người dùng', to: '/school-admin/students/import' },
+type ImportTypeOptionGroup = {
+  label: string
+  options: ImportTypeOption[]
+}
+
+// Chỉ liệt kê được các trang import không cần tham số đường dẫn. Import năm học
+// cần gradeLevelId và mọi import rubric cần rubricId/versionId, nên hai mục đó
+// dẫn về trang danh sách để người dùng chọn ngữ cảnh trước.
+const IMPORT_TYPE_OPTION_GROUPS: ImportTypeOptionGroup[] = [
+  {
+    label: 'Trường học',
+    options: [
+      { label: 'Lớp học', to: '/school-admin/classes/import' },
+      { label: 'Học viên trong lớp', to: '/school-admin/classes/users/import' },
+      { label: 'Người dùng', to: '/school-admin/students/import' },
+      { label: 'Khối', to: '/school-admin/grades/import' },
+      { label: 'Năm học (chọn khối)', to: '/school-admin/grades' },
+      { label: 'Phòng học', to: '/school-admin/rooms/import' },
+    ],
+  },
+  {
+    label: 'Đánh giá',
+    options: [
+      { label: 'Rubric (chọn rubric)', to: '/school-admin/rubrics' },
+      {
+        label: 'Chính sách đánh giá',
+        to: '/school-admin/assessment-policies/import',
+      },
+    ],
+  },
 ]
 
 type ImportTypeMenuProps = {
@@ -301,19 +333,26 @@ function ImportTypeMenu({ onSelect }: ImportTypeMenuProps) {
           className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-950/10"
           role="menu"
         >
-          {IMPORT_TYPE_OPTIONS.map((option) => (
-            <button
-              className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-              key={option.to}
-              onClick={() => {
-                setIsOpen(false)
-                onSelect(option.to)
-              }}
-              role="menuitem"
-              type="button"
-            >
-              {option.label}
-            </button>
+          {IMPORT_TYPE_OPTION_GROUPS.map((group) => (
+            <div className="py-1" key={group.label} role="group">
+              <p className="px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-400">
+                {group.label}
+              </p>
+              {group.options.map((option) => (
+                <button
+                  className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  key={option.to}
+                  onClick={() => {
+                    setIsOpen(false)
+                    onSelect(option.to)
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       ) : null}
@@ -328,12 +367,18 @@ export function SchoolAdminImportSessionsPage() {
   const [filters, setFilters] = useState<ImportSessionFilters>(EMPTY_FILTERS)
   const sessionsQuery = useImportSessionsQuery(page, pageSize, filters)
   const sessions = sessionsQuery.data?.content ?? []
+  const hasActiveFilters = Boolean(filters.status || filters.type)
 
   function handleFilterChange(name: keyof ImportSessionFilters, value: string) {
     setFilters((current) => ({
       ...current,
       [name]: value,
     }))
+    setPage(DEFAULT_PAGE)
+  }
+
+  function handleResetFilters() {
+    setFilters(EMPTY_FILTERS)
     setPage(DEFAULT_PAGE)
   }
 
@@ -376,37 +421,59 @@ export function SchoolAdminImportSessionsPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-2">
-        <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Loại import
-          <select
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            onChange={(event) => handleFilterChange('type', event.target.value)}
-            value={filters.type}
-          >
-            <option value="">Tất cả</option>
-            <option value="SCHOOL_CLASS">Lớp học</option>
-            <option value="SCHOOL_CLASS_USER">Học viên trong lớp</option>
-            <option value="USER">Người dùng</option>
-          </select>
-        </label>
-        <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Trạng thái
-          <select
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            onChange={(event) =>
-              handleFilterChange('status', event.target.value)
-            }
-            value={filters.status}
-          >
-            <option value="">Tất cả</option>
-            <option value="PREVIEWED">Đang preview</option>
-            <option value="COMPLETED">Hoàn tất</option>
-            <option value="FAILED">Thất bại</option>
-            <option value="CANCELLED">Đã hủy</option>
-            <option value="EXPIRED">Hết hạn</option>
-          </select>
-        </label>
+      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="grid gap-2 text-sm font-bold text-slate-700">
+            Loại import
+            <select
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              onChange={(event) =>
+                handleFilterChange('type', event.target.value)
+              }
+              value={filters.type}
+            >
+              <option value="">Tất cả</option>
+              {IMPORT_TYPE_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.types.map((type) => (
+                    <option key={type} value={type}>
+                      {IMPORT_TYPE_LABELS[type]}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700">
+            Trạng thái
+            <select
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              onChange={(event) =>
+                handleFilterChange('status', event.target.value)
+              }
+              value={filters.status}
+            >
+              <option value="">Tất cả</option>
+              {IMPORT_STATUS_VALUES.map((status) => (
+                <option key={status} value={status}>
+                  {IMPORT_STATUS_DISPLAY[status].label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {hasActiveFilters ? (
+          <div className="flex justify-end">
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              onClick={handleResetFilters}
+              type="button"
+            >
+              <X aria-hidden="true" className="size-4" />
+              Xóa lọc
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4">

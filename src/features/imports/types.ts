@@ -1,3 +1,11 @@
+import {
+  IMPORT_STATUS_DISPLAY,
+  IMPORT_TYPE_LABELS,
+  type ImportStatusValue,
+  type ImportTypeValue,
+  normalizeImportKey,
+} from './importTypes'
+
 export type PageResult<T> = {
   content: T[]
   page: number
@@ -28,7 +36,9 @@ export type ImportSessionSummary = {
   id: string
   importedRows: number
   invalidRows: number
-  schoolId: string
+  // Session do System Admin tạo (rubric/chính sách phạm vi hệ thống, danh mục
+  // trường) không gắn schoolId. Giá trị này quyết định URL accept.
+  schoolId: string | null
   skippedRows: number
   status: string
   totalRows: number
@@ -67,13 +77,16 @@ export type ImportSessionFilters = {
   type: string
 }
 
+// Phần lớn endpoint accept chỉ trả message (data = null); riêng nhóm rubric và
+// chính sách đánh giá trả biên nhận hàng đợi. Nên mọi trường payload đều optional.
 export type AcceptImportSessionResponse = {
-  importSessionId: string
-  importedRows: number
-  invalidRows: number
-  skippedRows: number
-  status: string
-  totalRows: number
+  importSessionId?: string
+  importedRows?: number
+  invalidRows?: number
+  sessionId?: string
+  skippedRows?: number
+  status?: string
+  totalRows?: number
 }
 
 export function mappingEntriesToRecord(entries: ImportMappingEntry[]) {
@@ -108,41 +121,11 @@ export function formatNullableText(value?: string | null) {
 }
 
 export function getImportStatusDisplay(status?: string | null) {
-  const normalized = status?.trim().toUpperCase()
+  const normalized = normalizeImportKey(status)
+  const display = IMPORT_STATUS_DISPLAY[normalized as ImportStatusValue]
 
-  if (normalized === 'COMPLETED') {
-    return {
-      className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      label: 'Hoàn tất',
-    }
-  }
-
-  if (normalized === 'PREVIEWED') {
-    return {
-      className: 'border-blue-200 bg-blue-50 text-blue-700',
-      label: 'Đang preview',
-    }
-  }
-
-  if (normalized === 'CANCELLED') {
-    return {
-      className: 'border-slate-200 bg-slate-100 text-slate-600',
-      label: 'Đã hủy',
-    }
-  }
-
-  if (normalized === 'EXPIRED') {
-    return {
-      className: 'border-amber-200 bg-amber-50 text-amber-700',
-      label: 'Hết hạn',
-    }
-  }
-
-  if (normalized === 'FAILED') {
-    return {
-      className: 'border-red-200 bg-red-50 text-red-700',
-      label: 'Thất bại',
-    }
+  if (display) {
+    return display
   }
 
   return {
@@ -152,25 +135,11 @@ export function getImportStatusDisplay(status?: string | null) {
 }
 
 export function getImportTypeDisplay(type?: string | null) {
-  const normalized = type?.trim().toUpperCase()
+  const normalized = normalizeImportKey(type)
 
-  if (normalized === 'SCHOOL_CLASS') {
-    return 'Lớp học'
-  }
-
-  if (normalized === 'SCHOOL_CLASS_USER') {
-    return 'Học viên trong lớp'
-  }
-
-  if (normalized === 'USER') {
-    return 'Người dùng'
-  }
-
-  if (normalized === 'SCHOOL_DIRECTORY') {
-    return 'Danh mục trường'
-  }
-
-  return normalized || '-'
+  return (
+    IMPORT_TYPE_LABELS[normalized as ImportTypeValue] ?? (normalized || '-')
+  )
 }
 
 export function getImportUpdatedRows(session: {

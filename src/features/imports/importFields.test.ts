@@ -1,4 +1,5 @@
 import { getImportFields, getMissingRequiredFields } from './importFields'
+import { IMPORT_TYPE_VALUES } from './importTypes'
 
 describe('import fields config', () => {
   it('returns fields for every supported import type', () => {
@@ -26,6 +27,66 @@ describe('import fields config', () => {
       'domain',
       'address',
       'origin',
+    ])
+  })
+
+  it('covers every backend import type', () => {
+    IMPORT_TYPE_VALUES.forEach((type) => {
+      expect(getImportFields(type).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('requires schoolGradeLevelCode for SCHOOL_GRADE', () => {
+    const fields = getImportFields('SCHOOL_GRADE')
+    const gradeLevelCode = fields.find(
+      (field) => field.value === 'schoolGradeLevelCode',
+    )
+
+    expect(gradeLevelCode?.isRequired).toBe(true)
+    expect(
+      getMissingRequiredFields(fields, {
+        MaNamHoc: 'code',
+        NgayBatDau: 'startDate',
+        NgayKetThuc: 'endDate',
+        TenNamHoc: 'name',
+      }).map((field) => field.value),
+    ).toEqual(['schoolGradeLevelCode'])
+  })
+
+  it('omits the non-existent minimumFrameworkBand field for ASSESSMENT_POLICY', () => {
+    const values = getImportFields('ASSESSMENT_POLICY').map(
+      (field) => field.value,
+    )
+
+    expect(values).not.toContain('minimumFrameworkBand')
+    expect(
+      getImportFields('ASSESSMENT_POLICY')
+        .filter((field) => field.isRequired)
+        .map((field) => field.value),
+    ).toEqual([
+      'language',
+      'frameworkVersion',
+      'rubricVersion',
+      'targetFrameworkBand',
+      'effectiveFrom',
+    ])
+  })
+
+  it('uses the backend system-field keys for QUESTION', () => {
+    const values = getImportFields('QUESTION').map((field) => field.value)
+
+    expect(values).toContain('evaluationExpectedContent')
+    expect(values).not.toContain('expectedContent')
+    expect(
+      getImportFields('QUESTION')
+        .filter((field) => field.isRequired)
+        .map((field) => field.value),
+    ).toEqual([
+      'type',
+      'questionText',
+      'preparationTimeSeconds',
+      'minResponseSeconds',
+      'maxResponseSeconds',
     ])
   })
 

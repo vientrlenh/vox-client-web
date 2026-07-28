@@ -447,6 +447,7 @@ export function SchoolAdminImportSessionDetailPage() {
       setMessage(null)
       const response = await acceptMutation.mutateAsync({
         confirmedMapping: mapping,
+        schoolId: session.schoolId,
         sessionId,
         type: session.type,
       })
