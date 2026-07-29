@@ -41,12 +41,33 @@ export type ClassUser = {
   userId: string
 }
 
+export type Role = {
+  code: string
+  id: string
+  name: string | null
+}
+
 export type UserSummary = {
   email: string
   fullName: string | null
   id: string
   phone: string | null
+  roles?: Role[] | null
 }
+
+/** Người dùng của trường có thể được thêm vào lớp (nguồn cho modal chọn học viên). */
+export type ClassUserCandidate = {
+  id: string
+  user: UserSummary | null
+  userId: string
+}
+
+export type ClassUserCandidateFilters = {
+  roleCode: '' | SchoolUserRoleCode
+  search: string
+}
+
+export type SchoolUserRoleCode = 'STUDENT' | 'TEACHER'
 
 export type CreateSchoolClassRequest = {
   code: string
@@ -73,8 +94,14 @@ export type DeleteSchoolClassResponse = {
   updatedAt: string
 }
 
-export type CreateClassUserResponse = {
-  schoolClassUserId: string
+export type BulkAddClassUserFailure = {
+  reason: string
+  userId: string
+}
+
+export type BulkAddClassUsersResponse = {
+  addedUserIds: string[]
+  failed: BulkAddClassUserFailure[]
 }
 
 export type ClassUserMutationResponse = {
