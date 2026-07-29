@@ -53,6 +53,7 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
   if (!isOpen) return null;
 
   const policies = data?.content ?? [];
+  const liveRubricVersion = policies[0]?.rubricVersion ?? rubricVersion;
   const draftCount = policies.filter((policy) => policy.status === 'DRAFT').length;
   const canPublishRubricVersion = draftCount === 0;
 
@@ -102,29 +103,29 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
         </div>
 
         <div className="max-h-[80vh] overflow-y-auto p-6">
-          {rubricVersion && (
+          {liveRubricVersion && (
             <div className="rounded-[10px] bg-slate-50 p-4 ring-1 ring-inset ring-slate-200">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <InfoField label="Mã">{rubricVersion.code}</InfoField>
-                <InfoField label="Tên">{rubricVersion.name}</InfoField>
-                <InfoField label="Version">v{rubricVersion.version}</InfoField>
+                <InfoField label="Mã">{liveRubricVersion.code}</InfoField>
+                <InfoField label="Tên">{liveRubricVersion.name}</InfoField>
+                <InfoField label="Version">v{liveRubricVersion.version}</InfoField>
                 <InfoField label="Trạng thái">
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      statusStyles[rubricVersion.status || ''] || 'bg-slate-100 text-slate-600'
+                      statusStyles[liveRubricVersion.status || ''] || 'bg-slate-100 text-slate-600'
                     }`}
                   >
-                    {rubricVersion.status || '—'}
+                    {liveRubricVersion.status || '—'}
                   </span>
                 </InfoField>
               </div>
               <div className="mt-4">
                 <InfoField label="Hiệu lực">
-                  {formatAssessmentPolicyDate(rubricVersion.effectiveFrom)} – {formatAssessmentPolicyDate(rubricVersion.effectiveTo)}
+                  {formatAssessmentPolicyDate(liveRubricVersion.effectiveFrom)} – {formatAssessmentPolicyDate(liveRubricVersion.effectiveTo)}
                 </InfoField>
               </div>
 
-              {rubricVersion.status === 'DRAFT' && (
+              {liveRubricVersion.status === 'DRAFT' && (
                 <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
                     {!canPublishRubricVersion && <Lock className="size-3.5 shrink-0" />}
