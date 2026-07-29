@@ -34,7 +34,6 @@ export function ActiveExamsList() {
             </p>
         )
     }
-    console.log(exams.length == 0)
     if (exams.length === 0) {
         return <p className={PLACEHOLDER}>Hiện chưa có kỳ thi nào đang diễn ra.</p>
     }
