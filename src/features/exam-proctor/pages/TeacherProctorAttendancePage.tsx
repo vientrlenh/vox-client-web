@@ -26,7 +26,6 @@ import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 const FLAG_REASON = 'Giám thị đánh dấu bài thi là nghi vấn để chờ xem xét.'
 const FORCE_END_REASON = 'Giám thị yêu cầu tạm dừng bài thi để xem xét.'
 const UNBLOCK_REASON = 'Giám thị dỡ cấm để học sinh tiếp tục bài thi đang dở.'
-const EMPTY_CANDIDATES: ProctorCandidateSummaryDto[] = []
 
 function areIdSetsEqual(a: Set<string>, b: Set<string>) {
   if (a.size !== b.size) {
@@ -96,7 +95,7 @@ export function TeacherProctorAttendancePage() {
   const activeScheduleId = selectedScheduleId ?? schedules[0]?.scheduleId ?? null
   const selectedSchedule = schedules.find((schedule) => schedule.scheduleId === activeScheduleId) ?? null
   const candidatesQuery = useMyProctorScheduleCandidatesQuery(activeScheduleId)
-  const candidates = candidatesQuery.data ?? EMPTY_CANDIDATES
+  const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
 
   useEffect(() => {
     const timerId = window.setInterval(() => setClockNow(Date.now()), 1000)
