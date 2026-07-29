@@ -107,6 +107,31 @@ export type PaymentLink = {
 
 export type TokenTopUpState = Record<QuotaType, number>
 
+export type DistributionMode = 'AUTO' | 'MANUAL'
+
+export type QuotaUserAllocation = {
+  userId: string
+  fullName: string | null
+  quotaType: QuotaType
+  allocatedQuantity: number
+  usedQuantity: number
+}
+
+export type QuotaUserAllocationSummary = {
+  pool: SubscriptionQuota
+  allocations: QuotaUserAllocation[]
+}
+
+export type UserQuotaAmount = {
+  userId: string
+  amount: number
+}
+
+export type AllocateQuotaPayload = {
+  mode: DistributionMode
+  allocations: UserQuotaAmount[]
+}
+
 export type MutationResult<TData> = {
   data: TData
   message: string
