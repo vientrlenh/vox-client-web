@@ -204,6 +204,12 @@ const SchoolAdminMonitoringRoomsPage = lazy(() =>
   })),
 );
 
+const MonitoringExamSchedulesPage = lazy(() =>
+  import("@/features/monitoring").then((module) => ({
+    default: module.MonitoringExamSchedulesPage,
+  })),
+);
+
 const MonitoringRoomPage = lazy(() =>
   import("@/features/monitoring").then((module) => ({
     default: module.MonitoringRoomPage,
@@ -739,6 +745,10 @@ export function AppRoutes() {
               element={<TeacherProctorAttendancePage />}
             />
             <Route
+              path="school-admin/monitoring/exams/:examId"
+              element={<MonitoringExamSchedulesPage />}
+            />
+            <Route
               path="school-admin/monitoring/exams/:examId/schedules/:scheduleId"
               element={<MonitoringRoomPage />}
             />
@@ -926,6 +936,10 @@ export function AppRoutes() {
             <Route
               path="teacher/proctor-attendance"
               element={<TeacherProctorAttendancePage />}
+            />
+            <Route
+              path="teacher/monitoring/exams/:examId"
+              element={<MonitoringExamSchedulesPage />}
             />
             <Route
               path="teacher/monitoring/exams/:examId/schedules/:scheduleId"

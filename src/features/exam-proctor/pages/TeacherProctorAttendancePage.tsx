@@ -26,6 +26,19 @@ import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 const FLAG_REASON = 'Giám thị đánh dấu bài thi là nghi vấn để chờ xem xét.'
 const FORCE_END_REASON = 'Giám thị yêu cầu tạm dừng bài thi để xem xét.'
 const UNBLOCK_REASON = 'Giám thị dỡ cấm để học sinh tiếp tục bài thi đang dở.'
+const EMPTY_CANDIDATES: ProctorCandidateSummaryDto[] = []
+
+function areIdSetsEqual(a: Set<string>, b: Set<string>) {
+  if (a.size !== b.size) {
+    return false
+  }
+  for (const id of a) {
+    if (!b.has(id)) {
+      return false
+    }
+  }
+  return true
+}
 
 function isWithinAttendanceWindow(startDate?: string | null, endDate?: string | null) {
   if (!startDate || !endDate) {
@@ -83,7 +96,7 @@ export function TeacherProctorAttendancePage() {
   const activeScheduleId = selectedScheduleId ?? schedules[0]?.scheduleId ?? null
   const selectedSchedule = schedules.find((schedule) => schedule.scheduleId === activeScheduleId) ?? null
   const candidatesQuery = useMyProctorScheduleCandidatesQuery(activeScheduleId)
-  const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
+  const candidates = candidatesQuery.data ?? EMPTY_CANDIDATES
 
   useEffect(() => {
     const timerId = window.setInterval(() => setClockNow(Date.now()), 1000)
@@ -91,15 +104,10 @@ export function TeacherProctorAttendancePage() {
   }, [])
 
   useEffect(() => {
-    const attendedIds = candidates
-      .filter((candidate) => candidate.status === 'ATTENDED')
-      .map((candidate) => candidate.candidateId)
-    setSelectedAttendedIds((current) => {
-      if (current.size === attendedIds.length && attendedIds.every((candidateId) => current.has(candidateId))) {
-        return current
-      }
-      return new Set(attendedIds)
-    })
+    const attendedIds = new Set(
+      candidates.filter((candidate) => candidate.status === 'ATTENDED').map((candidate) => candidate.candidateId),
+    )
+    setSelectedAttendedIds((previous) => (areIdSetsEqual(previous, attendedIds) ? previous : attendedIds))
   }, [candidates, activeScheduleId])
 
   useEffect(() => {

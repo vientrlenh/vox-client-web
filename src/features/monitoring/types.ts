@@ -20,6 +20,16 @@ export type ParticipantEventType = 'joined' | 'left'
 /** An active stream returned by a monitor snapshot or `/schedules/active`. */
 export type StreamSnapshot = {
   participantId: string
+  /**
+   * Phiên thi mà stream này thuộc về. Đây là khoá để gọi các API phía Java trên phiên thi
+   * (đánh dấu nghi vấn, buộc kết thúc) - `participantId` là id của thí sinh, không dùng được
+   * cho những endpoint đó.
+   *
+   * <p>Optional vì `snapshot` và `/schedules/active` có mang, còn `frame` thì không: một frame về
+   * trước snapshot sẽ tạo ô tạm chưa có trường này, và nó được điền khi snapshot tới. Chỗ nào cần
+   * gọi API theo phiên thi thì phải xử lý trường hợp chưa có.
+   */
+  sessionId?: string
   startedAt: string
   streamId: string
   streamType: StreamType
@@ -51,16 +61,36 @@ export type AlertEvent = {
 }
 
 export type MonitorMessage =
-  | { streams: StreamSnapshot[]; type: 'snapshot' }
+  // streams là optional vì đây là dữ liệu đến từ dây, không phải từ code ta kiểm soát:
+  // một server cũ (hoặc bất kỳ phiên bản nào bỏ sót trường khi rỗng) sẽ gửi thiếu nó.
+  | { streams?: StreamSnapshot[]; type: 'snapshot' }
   | { frame: FrameNotification; type: 'frame' }
   | { event: ParticipantEvent; type: 'participant' }
   | { alert: AlertEvent; type: 'alert' }
 
 
 export type ActiveSchedule = {
+  /**
+   * Số **stream**, không phải số học viên: một học viên bật cả camera lẫn màn hình được đếm 2 lần.
+   * Muốn biết có bao nhiêu người đang lên sóng thì đếm `participantId` không trùng trong `streams`
+   * - xem `countLiveParticipants`.
+   */
   activeCount: number
   scheduleId: string
   streams: StreamSnapshot[]
+}
+
+/**
+ * Số học viên đang thực sự lên sóng trong một ca thi.
+ *
+ * <p>Tách khỏi `activeCount` vì hai con số trả lời hai câu hỏi khác nhau, và câu mà giám thị cần là
+ * "bao nhiêu người", không phải "bao nhiêu luồng".
+ */
+export function countLiveParticipants(schedule?: ActiveSchedule | null): number {
+  if (!schedule) {
+    return 0
+  }
+  return new Set(schedule.streams.map((stream) => stream.participantId)).size
 }
 
 export type MonitorConnectionState =
