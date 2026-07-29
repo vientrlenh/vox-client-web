@@ -108,6 +108,18 @@ const SchoolAdminClassUserImportPage = lazy(() =>
   })),
 );
 
+const TeacherMyClassesPage = lazy(() =>
+  import("@/features/classes").then((module) => ({
+    default: module.TeacherMyClassesPage,
+  })),
+);
+
+const TeacherMyClassDetailPage = lazy(() =>
+  import("@/features/classes").then((module) => ({
+    default: module.TeacherMyClassDetailPage,
+  })),
+);
+
 const SchoolAdminGradesPage = lazy(() =>
   import('@/features/grades').then((module) => ({
     default: module.SchoolAdminGradesPage,
@@ -923,6 +935,8 @@ export function AppRoutes() {
               path="teacher/monitoring/exams/:examId/schedules/:scheduleId"
               element={<MonitoringRoomPage />}
             />
+            <Route path="teacher/classes/:classId" element={<TeacherMyClassDetailPage />} />
+            <Route path="teacher/classes" element={<TeacherMyClassesPage />} />
             <Route path="teacher/question-banks" element={<TeacherQuestionBanksPage />} />
             <Route path="teacher/question-banks/:bankId" element={<TeacherQuestionBankDetailPage />} />
             <Route path="teacher/question-topics" element={<TeacherQuestionTopicsPage />} />

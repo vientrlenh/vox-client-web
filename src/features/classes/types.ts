@@ -30,6 +30,51 @@ export type RelatedClassObject = {
   name?: string | null
 }
 
+/** Lớp giáo viên đang có mặt — chỉ đọc, trả về từ query `myClasses`/`myClass`. */
+export type MyClass = {
+  activeMemberCount: number
+  code: string
+  createdAt: string | null
+  description: string | null
+  id: string
+  language: RelatedClassObject | null
+  languageId: string
+  name: string
+  schoolGrade: RelatedClassObject | null
+  schoolGradeId: string
+  schoolId: string
+  status: SchoolClassStatus | string
+  updatedAt: string | null
+}
+
+export type MyClassMemberUser = {
+  email: string | null
+  fullName: string | null
+  id: string
+  phone: string | null
+  roleCodes: string[]
+}
+
+export type MyClassMember = {
+  id: string
+  isActive: boolean
+  joinedAt: string | null
+  leftAt: string | null
+  schoolClassId: string
+  user: MyClassMemberUser | null
+  userId: string
+}
+
+export type MyClassFilters = {
+  search: string
+  status: '' | SchoolClassStatus
+}
+
+export type MyClassMemberFilters = {
+  roleCode: '' | SchoolUserRoleCode
+  search: string
+}
+
 export type ClassUser = {
   assignedBy: string | null
   id: string

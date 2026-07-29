@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   FileQuestion,
+  GraduationCap,
   LogOut,
   Menu,
   MonitorPlay,
@@ -32,6 +33,11 @@ type NavigationGroup = {
 }
 
 const navigationItems = [
+  {
+    icon: GraduationCap,
+    label: 'Lớp của tôi',
+    to: '/teacher/classes',
+  },
   {
     icon: MonitorPlay,
     label: 'Giám sát thi',
