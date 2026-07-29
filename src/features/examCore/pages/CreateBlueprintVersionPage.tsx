@@ -1,26 +1,56 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import type { QuestionDto } from '@/features/question/types'
 import { toApiError } from '@/shared/api'
-import { autoDistributeWeights } from '@/shared/weightDistribution'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { distributeEvenlyWeights } from '@/shared/weightDistribution'
 import { QuestionPicker } from '../components/QuestionPicker'
 import { examQueryKeys, useExamBlueprintQuery } from '../api/queries'
+import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '../utils/timeQuota'
+import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import {
   useCreateBlueprintVersionMutation,
   type CreateBlueprintVersionSectionInput,
   type CreateBlueprintVersionSlotInput,
 } from '../api/mutations'
-import type { ExamBlueprintSlotType } from '../types'
+import { formatDurationSeconds, type ExamBlueprintSlotType } from '../types'
 
-const QUESTION_TYPE_OPTIONS = ['READ_ALOUD', 'SHORT_ANSWER', 'LONG_ANSWER', 'OPINION', 'DESCRIPTION'] as const
+const QUESTION_TYPE_OPTIONS = ['SHORT_ANSWER', 'LONG_ANSWER', 'OPINION', 'DESCRIPTION'] as const
+const DEFAULT_QUESTION_TYPE = 'SHORT_ANSWER'
 const DIFFICULTY_OPTIONS = ['EASY', 'MEDIUM', 'HARD'] as const
 
 let keySeed = 0
 function nextKey(prefix: string) {
   keySeed += 1
   return `${prefix}-${keySeed}`
+}
+
+function normalizeQuestionType(questionType?: string | null): string {
+  return questionType && (QUESTION_TYPE_OPTIONS as readonly string[]).includes(questionType)
+    ? questionType
+    : DEFAULT_QUESTION_TYPE
+}
+
+function QuestionTimingSummary({
+  question,
+}: {
+  question: Pick<QuestionDto, 'maxResponseSeconds' | 'minResponseSeconds' | 'preparationTimeSeconds'>
+}) {
+  return (
+    <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-500">
+      <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+        Chuẩn bị: {formatDurationSeconds(question.preparationTimeSeconds)}
+      </span>
+      <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+        Tối thiểu: {formatDurationSeconds(question.minResponseSeconds)}
+      </span>
+      <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+        Tối đa: {formatDurationSeconds(question.maxResponseSeconds)}
+      </span>
+    </div>
+  )
 }
 
 type SlotDraft = {
@@ -48,7 +78,7 @@ function newSlot(): SlotDraft {
     difficulty: 'MEDIUM',
     fixedQuestion: null,
     key: nextKey('slot'),
-    questionType: 'SHORT_ANSWER',
+    questionType: DEFAULT_QUESTION_TYPE,
     skillCode: '',
     slotType: 'FIXED',
     targetBandLevel: '',
@@ -81,17 +111,54 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
   const { blueprintId } = useParams()
   const blueprintQuery = useExamBlueprintQuery(blueprintId ?? null)
   const createVersionMutation = useCreateBlueprintVersionMutation()
-  const [totalTimeLimitMinutes, setTotalTimeLimitMinutes] = useState('')
+  const subscriptionQuery = useMySubscriptionQuery()
+  const submitLockedRef = useRef(false)
   const [sections, setSections] = useState<SectionDraft[]>([newSection(1)])
   const [pickerForSlotKey, setPickerForSlotKey] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const blueprint = blueprintQuery.data
   const detailPath = blueprintId ? `${basePath}/${blueprintId}` : basePath
 
   const weightSum = sections.reduce((sum, section) => sum + sectionWeightOf(section), 0)
+  const totalDurationSeconds = sections.reduce((sum, section) => sum + sectionDurationSeconds(section), 0)
+  const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
+  const quotaWarning = buildTimeQuotaWarning('Phiên bản blueprint này', totalDurationSeconds, maxTimePerAttemptMin)
 
   function sectionSlotWeightSum(section: SectionDraft): number {
     return section.slots.reduce((sum, slot) => sum + (slot.weight.trim() ? Number(slot.weight) : 1), 0)
+  }
+
+  function sectionDurationSeconds(section: SectionDraft): number {
+    return section.slots.reduce(
+      (sum, slot) => sum + (slot.slotType === 'FIXED' && slot.fixedQuestion ? getQuestionAttemptSeconds(slot.fixedQuestion) : 0),
+      0,
+    )
+  }
+
+  function totalDurationIfQuestionSelected(slotKey: string, question: QuestionDto): number {
+    return sections.reduce(
+      (sum, section) =>
+        sum +
+        section.slots.reduce((sectionSum, slot) => {
+          if (slot.slotType !== 'FIXED') {
+            return sectionSum
+          }
+          const fixedQuestion = slot.key === slotKey ? question : slot.fixedQuestion
+          return sectionSum + (fixedQuestion ? getQuestionAttemptSeconds(fixedQuestion) : 0)
+        }, 0),
+      0,
+    )
+  }
+
+  function handleSelectFixedQuestion(sectionKey: string, slotKey: string, question: QuestionDto) {
+    const nextDurationSeconds = totalDurationIfQuestionSelected(slotKey, question)
+    const nextQuotaWarning = buildTimeQuotaWarning('Phiên bản blueprint này', nextDurationSeconds, maxTimePerAttemptMin)
+    if (nextQuotaWarning) {
+      setErrorMessage(`${nextQuotaWarning} Bạn vẫn có thể đổi câu, nhưng không thể tạo cho tới khi giảm thời lượng.`)
+    }
+    updateSlot(sectionKey, slotKey, { fixedQuestion: question })
+    setPickerForSlotKey(null)
   }
 
   function updateSection(sectionKey: string, patch: Partial<SectionDraft>) {
@@ -131,9 +198,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
   }
 
   function autoDistributeSectionWeights() {
-    const resolved = autoDistributeWeights(
-      sections.map((section) => (section.sectionWeight.trim() ? Number(section.sectionWeight) : null)),
-    )
+    const resolved = distributeEvenlyWeights(sections.length)
     setSections((current) => current.map((section, index) => ({ ...section, sectionWeight: String(resolved[index]) })))
   }
 
@@ -143,41 +208,50 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
         if (section.key !== sectionKey) {
           return section
         }
-        const resolved = autoDistributeWeights(section.slots.map((slot) => (slot.weight.trim() ? Number(slot.weight) : null)))
+        const resolved = distributeEvenlyWeights(section.slots.length)
         return { ...section, slots: section.slots.map((slot, index) => ({ ...slot, weight: String(resolved[index]) })) }
       }),
     )
   }
 
   async function handleSubmit() {
+    setErrorMessage(null)
     if (sections.length === 0) {
-      window.alert('Phiên bản phải có ít nhất một phần.')
+      setErrorMessage('Phiên bản phải có ít nhất một phần.')
       return
     }
     for (const section of sections) {
       if (!section.title.trim()) {
-        window.alert('Mỗi phần phải có tên.')
+        setErrorMessage('Mỗi phần phải có tên.')
         return
       }
       if (section.slots.length === 0) {
-        window.alert(`Phần "${section.title}" phải có ít nhất một ô câu hỏi.`)
+        setErrorMessage(`Phần "${section.title}" phải có ít nhất một ô câu hỏi.`)
         return
       }
       for (const slot of section.slots) {
         if (slot.slotType === 'FIXED' && !slot.fixedQuestion) {
-          window.alert(`Phần "${section.title}" có ô câu hỏi chưa chọn câu hỏi cố định.`)
+          setErrorMessage(`Phần "${section.title}" có ô câu hỏi chưa chọn câu hỏi cố định.`)
           return
         }
       }
       if (Math.abs(sectionSlotWeightSum(section) - 1) >= 0.01) {
-        window.alert(`Tổng trọng số các ô câu hỏi trong phần "${section.title}" phải bằng 1.00.`)
+        setErrorMessage(`Tổng trọng số các ô câu hỏi trong phần "${section.title}" phải bằng 1.00.`)
         return
       }
     }
     if (Math.abs(weightSum - 1) >= 0.01) {
-      window.alert('Tổng trọng số các phần phải bằng 1.00.')
+      setErrorMessage('Tổng trọng số các phần phải bằng 1.00.')
       return
     }
+    if (quotaWarning) {
+      setErrorMessage(`${quotaWarning} Không thể tạo phiên bản vượt quota của trường.`)
+      return
+    }
+    if (submitLockedRef.current || createVersionMutation.isPending) {
+      return
+    }
+    submitLockedRef.current = true
 
     const sectionsPayload: CreateBlueprintVersionSectionInput[] = sections.map((section, sectionIndex) => ({
       instruction: section.instruction.trim() || null,
@@ -193,7 +267,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
           slot.slotType === 'SELECTION'
             ? {
                 difficulty: slot.difficulty || null,
-                questionType: slot.questionType || null,
+                questionType: normalizeQuestionType(slot.questionType),
                 skillCode: slot.skillCode.trim() || null,
                 targetBandLevel: slot.targetBandLevel.trim() || null,
                 topicId: slot.topicId.trim() || null,
@@ -210,13 +284,14 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
         blueprintId: blueprintId as string,
         payload: {
           sections: sectionsPayload,
-          totalTimeLimitSeconds: totalTimeLimitMinutes.trim() ? Number(totalTimeLimitMinutes) * 60 : null,
+          totalTimeLimitSeconds: totalDurationSeconds,
         },
       })
       await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
       navigate(detailPath, { state: { successMessage: 'Đã tạo phiên bản mới (bản nháp).' } })
     } catch (error) {
-      window.alert(toApiError(error).message)
+      submitLockedRef.current = false
+      setErrorMessage(toApiError(error).message)
     }
   }
 
@@ -247,21 +322,24 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
         ← {blueprint.name}
       </button>
 
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
         <h1 className="text-xl font-extrabold text-slate-900">Tạo phiên bản mới</h1>
         <p className="mt-1 text-sm text-slate-500">Xây cấu trúc đề: các phần và ô câu hỏi. Phiên bản mới luôn ở trạng thái bản nháp.</p>
+        <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3.5 py-2.5 text-sm font-semibold text-cyan-800">
+          Thời lượng blueprint version dự kiến: {formatDurationSeconds(totalDurationSeconds)}.
+          <span className="ml-1 text-xs font-medium text-cyan-700">
+            Tính từ câu cố định đã chọn; ô chọn ngẫu nhiên sẽ cộng thêm khi gán câu vào mã đề.
+          </span>
+        </div>
+        {quotaWarning ? (
+          <div className="mt-2.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-700">
+            {quotaWarning} Không thể tạo phiên bản vượt quota của trường.
+          </div>
+        ) : null}
 
-        <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Tổng thời lượng (phút)
-            <input
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              onChange={(event) => setTotalTimeLimitMinutes(event.target.value)}
-              placeholder="Để trống nếu chưa đặt"
-              type="number"
-              value={totalTimeLimitMinutes}
-            />
-          </label>
+        <div className="mt-4 grid gap-3.5">
           <div className="grid content-end gap-2 text-sm font-semibold text-slate-500">
             <span>
               Tổng trọng số các phần hiện tại: <span className={weightSum === 1 ? 'text-emerald-600' : 'text-amber-600'}>{weightSum.toFixed(2)}</span>{' '}
@@ -359,9 +437,12 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
                   {slot.slotType === 'FIXED' ? (
                     <div className="mt-2.5 flex items-center gap-2.5">
                       {slot.fixedQuestion ? (
-                        <span className="text-xs font-semibold text-slate-700">
-                          {slot.fixedQuestion.code} · {slot.fixedQuestion.questionText}
-                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold text-slate-700">
+                            {slot.fixedQuestion.code} · {slot.fixedQuestion.questionText}
+                          </p>
+                          <QuestionTimingSummary question={slot.fixedQuestion} />
+                        </div>
                       ) : (
                         <span className="text-xs font-semibold text-amber-600">Chưa chọn câu hỏi</span>
                       )}
@@ -448,6 +529,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
               </div>
             </div>
             <p className="mt-2.5 text-xs font-semibold text-slate-500">
+              Thời lượng phần này: <span className="text-cyan-700">{formatDurationSeconds(sectionDurationSeconds(section))}</span> ·{' '}
               Tổng trọng số các ô câu hỏi trong phần này:{' '}
               <span className={sectionSlotWeightSum(section) === 1 ? 'text-emerald-600' : 'text-amber-600'}>
                 {sectionSlotWeightSum(section).toFixed(2)}
@@ -477,11 +559,12 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
         </button>
         <button
           className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
-          disabled={createVersionMutation.isPending}
+          disabled={createVersionMutation.isPending || Boolean(quotaWarning)}
           onClick={() => void handleSubmit()}
+          title={quotaWarning ?? undefined}
           type="button"
         >
-          Tạo phiên bản
+          {createVersionMutation.isPending ? 'Đang tạo…' : 'Tạo phiên bản'}
         </button>
       </div>
 
@@ -489,10 +572,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
         <QuestionPicker
           excludeQuestionIds={pickerExcludeQuestionIds}
           onClose={() => setPickerForSlotKey(null)}
-          onSelect={(question) => {
-            updateSlot(activeSlot.section.key, activeSlot.slot.key, { fixedQuestion: question })
-            setPickerForSlotKey(null)
-          }}
+          onSelect={(question) => handleSelectFixedQuestion(activeSlot.section.key, activeSlot.slot.key, question)}
           publishedOnly
           scope="teacher"
           selectedQuestionIds={activeSlot.slot.fixedQuestion ? [activeSlot.slot.fixedQuestion.id] : []}

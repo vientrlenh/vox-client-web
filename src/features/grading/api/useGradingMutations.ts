@@ -78,6 +78,25 @@ export async function invalidateGrading(assignmentId: string, reason?: string) {
   return response.data.message
 }
 
+// ---- Nhà trường chấm/chỉnh trực tiếp theo candidateResultId, không cần phân công
+// trước -- cùng use case BE với luồng giáo viên ở trên, chỉ khác đường dẫn.
+
+export async function submitGradingByResult(candidateResultId: string, items: ItemGradeInput[]) {
+  const response = await apiClient.post<ApiResponse<SubmitGradingResult>>(
+    `${GRADING_BASE}/by-result/${candidateResultId}/grade`,
+    { items },
+  )
+  return response.data.data
+}
+
+export async function invalidateGradingByResult(candidateResultId: string, reason?: string) {
+  const response = await apiClient.post<ApiResponse<{ candidateResultId: string; resultStatus: string }>>(
+    `${GRADING_BASE}/by-result/${candidateResultId}/invalidate`,
+    { reason },
+  )
+  return response.data.message
+}
+
 function useInvalidateGrading() {
   const queryClient = useQueryClient()
   return () => queryClient.invalidateQueries({ queryKey: gradingKeys.all })
@@ -131,6 +150,24 @@ export function useInvalidateGradingMutation() {
   return useMutation({
     mutationFn: ({ assignmentId, reason }: { assignmentId: string; reason?: string }) =>
       invalidateGrading(assignmentId, reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useSubmitGradingByResultMutation() {
+  const invalidate = useInvalidateGrading()
+  return useMutation({
+    mutationFn: ({ candidateResultId, items }: { candidateResultId: string; items: ItemGradeInput[] }) =>
+      submitGradingByResult(candidateResultId, items),
+    onSuccess: invalidate,
+  })
+}
+
+export function useInvalidateGradingByResultMutation() {
+  const invalidate = useInvalidateGrading()
+  return useMutation({
+    mutationFn: ({ candidateResultId, reason }: { candidateResultId: string; reason?: string }) =>
+      invalidateGradingByResult(candidateResultId, reason),
     onSuccess: invalidate,
   })
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye } from 'lucide-react'
 import { useAppSelector } from '@/app/store/hooks'
@@ -6,8 +6,10 @@ import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupporte
 import { toApiError } from '@/shared/api'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
-import { examQueryKeys, useExamBlueprintQuery, useExamBlueprintsQuery } from '@/features/examCore/api/queries'
-import { getBlueprintVersionStatusDisplay, type ExamMemberDto } from '@/features/examCore/types'
+import { examQueryKeys, useExamBlueprintSummaryQuery, useExamBlueprintsQuery } from '@/features/examCore/api/queries'
+import { formatDurationSeconds, getBlueprintVersionStatusDisplay, type ExamMemberDto } from '@/features/examCore/types'
+import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
+import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useAttachExamBlueprintMutation } from '../api/useExamMutations'
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
@@ -54,40 +56,69 @@ export function BlueprintAttachPanel({
   const [newDescription, setNewDescription] = useState('')
   const [newLanguageId, setNewLanguageId] = useState('')
   const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword, page, size: 10 })
-  const attachedBlueprintQuery = useExamBlueprintQuery(blueprintId ?? null)
+  const attachedBlueprintQuery = useExamBlueprintSummaryQuery(blueprintId ?? null)
   const languagesQuery = useSupportedLanguagesQuery(1, 100, ACTIVE_LANGUAGE_FILTERS)
+  const subscriptionQuery = useMySubscriptionQuery()
   const attachMutation = useAttachExamBlueprintMutation()
+  const attachLockedRef = useRef(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
   }
 
   async function attach(nextBlueprintId: string) {
+    if (attachLockedRef.current || attachMutation.isPending) {
+      return
+    }
+    attachLockedRef.current = true
     try {
       await attachMutation.mutateAsync({ blueprintId: nextBlueprintId, blueprintVersionId: null, examId })
       await invalidate()
       setForceReselect(false)
     } catch (error) {
       setErrorMessage(toApiError(error).message)
+    } finally {
+      attachLockedRef.current = false
     }
   }
 
   async function approveVersion(versionId: string) {
+    if (attachLockedRef.current || attachMutation.isPending) {
+      return
+    }
+    const version = attachedBlueprintQuery.data?.versions.find((candidate) => candidate.id === versionId)
+    const quotaWarning = buildTimeQuotaWarning(
+      `Phiên bản blueprint ${version?.code ?? ''}`.trim(),
+      version?.totalTimeLimitSeconds,
+      maxTimePerAttemptMin,
+    )
+    if (quotaWarning) {
+      setErrorMessage(`${quotaWarning} Không thể chốt phiên bản này.`)
+      return
+    }
+    attachLockedRef.current = true
     try {
       await attachMutation.mutateAsync({ blueprintVersionId: versionId, examId })
       await invalidate()
       setShowVersionPicker(false)
     } catch (error) {
       setErrorMessage(toApiError(error).message)
+    } finally {
+      attachLockedRef.current = false
     }
   }
 
   async function handleCreateAndAttach() {
-    if (!newName.trim() || !newLanguageId) {
-      window.alert('Vui lòng nhập tên và chọn ngôn ngữ cho blueprint mới.')
+    if (attachLockedRef.current || attachMutation.isPending) {
       return
     }
+    if (!newName.trim() || !newLanguageId) {
+      setErrorMessage('Vui lòng nhập tên và chọn ngôn ngữ cho blueprint mới.')
+      return
+    }
+    attachLockedRef.current = true
     try {
       await attachMutation.mutateAsync({
         examId,
@@ -106,6 +137,8 @@ export function BlueprintAttachPanel({
       setNewLanguageId('')
     } catch (error) {
       setErrorMessage(toApiError(error).message)
+    } finally {
+      attachLockedRef.current = false
     }
   }
 
@@ -133,6 +166,14 @@ export function BlueprintAttachPanel({
               : 'Chỉ AUTHOR của kỳ thi (hoặc quản trị trường) mới gắn được blueprint — bạn có thể xem danh sách nhưng không chọn được.'}
           {optional ? ' Bước này không bắt buộc — có thể bỏ qua và thêm câu hỏi trực tiếp ở tab Đề bài.' : ''}
         </p>
+        {blueprintsQuery.isError ? (
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">
+            Không tải được danh sách blueprint: {toApiError(blueprintsQuery.error).message}
+            <button className="ml-2 underline" onClick={() => void blueprintsQuery.refetch()} type="button">
+              Thử lại
+            </button>
+          </div>
+        ) : null}
         <input
           className="mt-3 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
           onChange={(event) => {
@@ -284,7 +325,7 @@ export function BlueprintAttachPanel({
                     onClick={() => void handleCreateAndAttach()}
                     type="button"
                   >
-                    Tạo & gắn blueprint
+                    {attachMutation.isPending ? 'Đang tạo…' : 'Tạo & gắn blueprint'}
                   </button>
                 </div>
               </div>
@@ -304,6 +345,17 @@ export function BlueprintAttachPanel({
   }
 
   const blueprint = attachedBlueprintQuery.data
+
+  if (attachedBlueprintQuery.isError) {
+    return (
+      <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-5.5 text-sm text-red-700">
+        Không tải được blueprint đang gắn: {toApiError(attachedBlueprintQuery.error).message}
+        <button className="ml-2 font-bold underline" onClick={() => void attachedBlueprintQuery.refetch()} type="button">
+          Thử lại
+        </button>
+      </div>
+    )
+  }
 
   if (!blueprint) {
     return (
@@ -414,6 +466,11 @@ export function BlueprintAttachPanel({
               <tbody>
                 {publishedVersions.map((version) => {
                   const isCurrentlyChotted = version.id === blueprintVersionId
+                  const quotaWarning = buildTimeQuotaWarning(
+                    `Phiên bản blueprint ${version.code}`,
+                    version.totalTimeLimitSeconds,
+                    maxTimePerAttemptMin,
+                  )
                   return (
                   <tr className="border-b border-slate-100 last:border-0" key={version.id}>
                     <td className="py-2.5 pr-3 font-bold text-slate-900">
@@ -424,10 +481,11 @@ export function BlueprintAttachPanel({
                         </span>
                       ) : null}
                     </td>
-                    <td className="py-2.5 pr-3 text-slate-600">{version.sectionCount ?? version.sections.length}</td>
+                    <td className="py-2.5 pr-3 text-slate-600">{version.sectionCount ?? version.sections?.length ?? 0}</td>
                     <td className="py-2.5 pr-3 text-slate-600">{(version.weightSum ?? 0).toFixed(2)}</td>
                     <td className="py-2.5 pr-3 text-slate-600">
-                      {version.totalTimeLimitSeconds ? `${Math.round(version.totalTimeLimitSeconds / 60)} phút` : '-'}
+                      <div>{formatDurationSeconds(version.totalTimeLimitSeconds)}</div>
+                      {quotaWarning ? <div className="mt-1 text-[11px] font-bold text-red-600">{quotaWarning}</div> : null}
                     </td>
                     <td className="py-2.5 pr-0">
                       <div className="flex items-center justify-end gap-1.5">
@@ -442,9 +500,9 @@ export function BlueprintAttachPanel({
                         </button>
                         <button
                           className="inline-flex h-8 items-center justify-center rounded-full bg-violet-600 px-3.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={!canChangeVersion || isCurrentlyChotted}
+                          disabled={!canChangeVersion || isCurrentlyChotted || Boolean(quotaWarning)}
                           onClick={() => void approveVersion(version.id)}
-                          title={isCurrentlyChotted ? 'Đây là phiên bản đang được dùng' : hasPapers ? PAPERS_EXIST_MESSAGE : undefined}
+                          title={quotaWarning ?? (isCurrentlyChotted ? 'Đây là phiên bản đang được dùng' : hasPapers ? PAPERS_EXIST_MESSAGE : undefined)}
                           type="button"
                         >
                           Chốt
@@ -491,7 +549,7 @@ export function BlueprintAttachPanel({
           </div>
           <p className="mt-1 text-[13px] text-slate-500">
             {blueprint.code} · phiên bản đã chốt <b className="text-slate-900">{currentVersion.code}</b> ·{' '}
-            {currentVersion.sectionCount ?? currentVersion.sections.length} phần
+            {currentVersion.sectionCount ?? currentVersion.sections?.length ?? 0} phần
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

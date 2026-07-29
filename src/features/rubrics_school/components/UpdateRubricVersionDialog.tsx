@@ -67,7 +67,6 @@ export function UpdateRubricVersionDialog({ isOpen, onClose, onSubmit, isPending
       alert("Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!");
       return;
     }
-
     if (formData.effectiveFrom && formData.effectiveTo) {
       if (new Date(formData.effectiveFrom) > new Date(formData.effectiveTo)) {
         alert("Lỗi: Ngày kết thúc không được nhỏ hơn Ngày áp dụng!");

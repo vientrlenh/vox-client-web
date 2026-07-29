@@ -209,3 +209,29 @@ export type AcceptRubricResultBandImportResponse = {
   status: string;
   totalRows: number;
 };
+
+// ==========================================
+// 9. IMPORT RUBRIC CRITERION BAND (Excel/CSV) - School Admin
+// ==========================================
+export type PreviewRubricCriterionBandImportResponse = {
+  sessionId: string;
+  fileName: string;
+  originalHeaders: string[];
+  sampleRows: Record<string, string | null | undefined>[];
+  suggestedMapping: Record<string, string | null | undefined>;
+  totalRows: number;
+  expiresAt: string | null;
+};
+
+export type AcceptRubricCriterionBandImportRequest = {
+  confirmedMapping: Record<string, string>;
+};
+
+export type AcceptRubricCriterionBandImportResponse = {
+  sessionId: string;
+  importedRows: number;
+  invalidRows: number;
+  skippedRows: number;
+  status: string;
+  totalRows: number;
+};

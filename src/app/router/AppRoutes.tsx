@@ -204,6 +204,12 @@ const SchoolAdminMonitoringRoomsPage = lazy(() =>
   })),
 );
 
+const MonitoringExamSchedulesPage = lazy(() =>
+  import("@/features/monitoring").then((module) => ({
+    default: module.MonitoringExamSchedulesPage,
+  })),
+);
+
 const MonitoringRoomPage = lazy(() =>
   import("@/features/monitoring").then((module) => ({
     default: module.MonitoringRoomPage,
@@ -393,6 +399,9 @@ const TeacherReevaluationRescorePage = lazy(() =>
 // grading: chấm điểm thủ công (admin phân công -> giáo viên chấm bài chờ chấm)
 const SchoolAdminGradingPage = lazy(() =>
   import("@/features/grading").then((m) => ({ default: m.SchoolAdminGradingPage })),
+);
+const SchoolAdminGradingTaskPage = lazy(() =>
+  import("@/features/grading").then((m) => ({ default: m.SchoolAdminGradingTaskPage })),
 );
 const TeacherGradingPage = lazy(() =>
   import("@/features/grading").then((m) => ({ default: m.TeacherGradingPage })),
@@ -730,6 +739,10 @@ export function AppRoutes() {
               element={<TeacherProctorAttendancePage />}
             />
             <Route
+              path="school-admin/monitoring/exams/:examId"
+              element={<MonitoringExamSchedulesPage />}
+            />
+            <Route
               path="school-admin/monitoring/exams/:examId/schedules/:scheduleId"
               element={<MonitoringRoomPage />}
             />
@@ -826,6 +839,7 @@ export function AppRoutes() {
             <Route path="school-admin/reevaluation/:requestId" element={<SchoolAdminReevaluationDetailPage />} />
             <Route path="school-admin/reevaluation" element={<SchoolAdminReevaluationPage />} />
             <Route path="school-admin/grading" element={<SchoolAdminGradingPage />} />
+            <Route path="school-admin/grading/:candidateResultId" element={<SchoolAdminGradingTaskPage />} />
             <Route path="school-admin/blueprints/:blueprintId/versions/new" element={<SchoolAdminCreateBlueprintVersionPage />} />
             <Route
               path="school-admin/blueprints/:blueprintId/versions/:versionId/edit"
@@ -912,6 +926,10 @@ export function AppRoutes() {
             <Route
               path="teacher/proctor-attendance"
               element={<TeacherProctorAttendancePage />}
+            />
+            <Route
+              path="teacher/monitoring/exams/:examId"
+              element={<MonitoringExamSchedulesPage />}
             />
             <Route
               path="teacher/monitoring/exams/:examId/schedules/:scheduleId"

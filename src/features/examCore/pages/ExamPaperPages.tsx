@@ -8,6 +8,8 @@ import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { QuestionPicker } from '../components/QuestionPicker'
 import { examQueryKeys, useExamMyRoleQuery, useExamPaperQuery, useExamQuery } from '../api/queries'
+import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '../utils/timeQuota'
+import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import {
   useDeleteExamPaperMutation,
   useUpdateExamPaperItemMutation,
@@ -62,6 +64,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
   const resolvedPaperId = paperId ?? state.paperId ?? null
   const paperQuery = useExamPaperQuery(resolvedPaperId)
   const paper = paperQuery.data ?? null
+  const subscriptionQuery = useMySubscriptionQuery()
   // state.examId chỉ là fast-path (khởi động song song useExamQuery lúc điều hướng trong app);
   // khi F5/dán thẳng URL thì state rỗng, paper.examId (từ server) tự thay thế — không còn phụ thuộc bắt buộc.
   const examId = paper?.examId ?? state.examId ?? null
@@ -81,6 +84,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
   const [editInstruction, setEditInstruction] = useState('')
 
   const exam = examQuery.data
+  const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -107,6 +111,11 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
   }
 
   async function handleUpdateStatus(paperId: string, action: UpdateExamPaperStatusRequest['action'], note?: string) {
+    const quotaWarning = buildTimeQuotaWarning(`Mã đề ${paper?.code ?? ''}`.trim(), paper?.timeDurationSeconds, maxTimePerAttemptMin)
+    if (['APPROVE', 'LOCK', 'SUBMIT'].includes(action) && quotaWarning) {
+      setErrorMessage(`${quotaWarning} Không thể ${STATUS_ACTION_LABEL[action].toLowerCase()} cho tới khi giảm thời lượng.`)
+      return
+    }
     try {
       await updateStatusMutation.mutateAsync({ paperId, payload: { action, note } })
       await invalidate()
@@ -140,6 +149,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
     (sum, section) => sum + section.items.filter((item) => item.questionId).length,
     0,
   )
+  const paperQuotaWarning = buildTimeQuotaWarning(`Mã đề ${paper.code}`, paper.timeDurationSeconds, maxTimePerAttemptMin)
   const allowedActionsForRole = myRole ? ROLE_ACTIONS[myRole] ?? [] : []
   const nextActions = canManage ? (NEXT_ACTIONS[paper.status] ?? []).filter((action) => allowedActionsForRole.includes(action)) : []
   // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED (không dùng luồng duyệt) nên LOCKED không chặn sửa ở đây.
@@ -153,6 +163,20 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
     .filter((item) => item.id !== pickerItemId)
     .map((item) => item.questionId)
     .filter(Boolean) as string[]
+
+  function calculateDurationAfterSelection(question: { maxResponseSeconds?: number | null; preparationTimeSeconds?: number | null }) {
+    return paper.sections.reduce(
+      (sum, section) =>
+        sum +
+        section.items.reduce((sectionSum, item) => {
+          if (item.id === pickerItemId) {
+            return sectionSum + getQuestionAttemptSeconds(question)
+          }
+          return sectionSum + (item.question ? getQuestionAttemptSeconds(item.question) : 0)
+        }, 0),
+      0,
+    )
+  }
 
   return (
     <section className="mx-auto max-w-220">
@@ -183,6 +207,11 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
         </div>
         <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
       </div>
+      {paperQuotaWarning ? (
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700">
+          {paperQuotaWarning} Không thể nộp duyệt, duyệt hoặc khóa mã đề này cho tới khi giảm thời lượng.
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-3.5">
         {paper.sections.map((section) => (
@@ -316,13 +345,14 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
         <div className="mt-5 flex flex-wrap items-center gap-2.5">
           {nextActions.map((action) => {
             const isIncompleteSubmit = action === 'SUBMIT' && filledItems < totalItems
+            const isBlockedByQuota = ['APPROVE', 'LOCK', 'SUBMIT'].includes(action) && Boolean(paperQuotaWarning)
             return (
               <button
                 className="inline-flex h-10 items-center justify-center rounded-full bg-indigo-600 px-4.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isIncompleteSubmit}
+                disabled={isIncompleteSubmit || isBlockedByQuota}
                 key={action}
                 onClick={() => (action === 'REQUEST_REVISION' ? setRevisionNote('') : void handleUpdateStatus(paper.id, action))}
-                title={isIncompleteSubmit ? 'Còn ô câu hỏi chưa được gán — gán đủ trước khi nộp duyệt' : undefined}
+                title={paperQuotaWarning ?? (isIncompleteSubmit ? 'Còn ô câu hỏi chưa được gán — gán đủ trước khi nộp duyệt' : undefined)}
                 type="button"
               >
                 {STATUS_ACTION_LABEL[action]}
@@ -396,10 +426,20 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
           excludeQuestionIds={pickerExcludeQuestionIds}
           onClose={() => setPickerItemId(null)}
           onSelect={(question) => {
+            const candidateQuotaWarning = buildTimeQuotaWarning(
+              `Mã đề ${paper.code}`,
+              calculateDurationAfterSelection(question),
+              maxTimePerAttemptMin,
+            )
+            if (candidateQuotaWarning) {
+              setErrorMessage(`${candidateQuotaWarning} Không thể gán câu hỏi này.`)
+              return
+            }
             void updateItemMutation
               .mutateAsync({ itemId: pickerItemId, paperId: paper.id, payload: { questionId: question.id } })
               .then(() => invalidate())
               .then(() => setPickerItemId(null))
+              .catch((error) => setErrorMessage(toApiError(error).message))
           }}
           publishedOnly={exam?.kind === 'CENTRALIZED'}
           scope="teacher"

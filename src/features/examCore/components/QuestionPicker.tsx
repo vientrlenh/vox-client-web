@@ -3,6 +3,7 @@ import { Check, Eye, Search, X } from 'lucide-react'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
 import {
+  formatDuration,
   formatNullableText,
   getQuestionStatusDisplay,
   getQuestionTypeDisplay,
@@ -132,9 +133,20 @@ export function QuestionPicker({
                         </div>
                       </div>
                       <p className="text-xs text-slate-500">{formatNullableText(question.questionText)}</p>
-                      <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
-                        {getQuestionTypeDisplay(question.type)}
-                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
+                          {getQuestionTypeDisplay(question.type)}
+                        </span>
+                        <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
+                          Chuẩn bị: {formatDuration(question.preparationTimeSeconds)}
+                        </span>
+                        <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
+                          Tối thiểu: {formatDuration(question.minResponseSeconds)}
+                        </span>
+                        <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
+                          Tối đa: {formatDuration(question.maxResponseSeconds)}
+                        </span>
+                      </div>
                     </button>
                     <a
                       aria-label={`Xem chi tiết ${question.code}`}

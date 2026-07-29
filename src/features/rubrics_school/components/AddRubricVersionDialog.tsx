@@ -25,8 +25,8 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
     version: 1, // Khởi tạo mặc định version = 1
     name: '',
     scoringScaleMin: 0,
-    scoringScaleMax: 10,
-    totalScoreMethod: 'SUM',
+    scoringScaleMax: 100,
+    totalScoreMethod: 'WEIGHTED_AVERAGE',
     effectiveFrom: '',
     effectiveTo: '',
   });
@@ -53,7 +53,6 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
       alert("Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!");
       return;
     }
-
     if (formData.effectiveFrom && formData.effectiveTo) {
       if (new Date(formData.effectiveFrom) > new Date(formData.effectiveTo)) {
         alert("Lỗi: Ngày kết thúc không được nhỏ hơn Ngày áp dụng!");
