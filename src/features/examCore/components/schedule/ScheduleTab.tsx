@@ -6,7 +6,7 @@ import type { ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { TabPillGroup } from '@/shared/ui/TabPill'
-import type { SchoolUser } from '@/features/school-users/types'
+import type { ExamDirectoryUser } from '../../api/examDirectoryQueries'
 import {
   useAddProctorToScheduleMutation,
   useAssignCandidateScheduleMutation,
@@ -201,10 +201,7 @@ export function ScheduleTab({
     }
   }
 
-  async function handleAddProctor(schedule: ExamScheduleDto, teacher: SchoolUser) {
-    if (!teacher.userId) {
-      return
-    }
+  async function handleAddProctor(schedule: ExamScheduleDto, teacher: ExamDirectoryUser) {
     try {
       await addProctorMutation.mutateAsync({ examId, payload: { teacherId: teacher.userId }, scheduleId: schedule.id })
       await invalidate()
@@ -613,6 +610,7 @@ export function ScheduleTab({
 
       {managingProctorsFor ? (
         <ManageProctorsModal
+          examId={examId}
           onAdd={(teacher) => void handleAddProctor(managingProctorsFor, teacher)}
           onClose={() => setManagingProctorsFor(null)}
           onRemove={(proctorId) => void handleRemoveProctor(managingProctorsFor, proctorId)}

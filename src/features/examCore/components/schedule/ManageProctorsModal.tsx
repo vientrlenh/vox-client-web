@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { Plus, UserRound, X } from 'lucide-react'
-import type { SchoolUser } from '@/features/school-users/types'
+import type { ExamDirectoryUser } from '../../api/examDirectoryQueries'
 import { getScheduleLabel, type ExamScheduleDto } from '../../types'
 import { ProctorPickerModal } from './ProctorPickerModal'
 
 type ManageProctorsModalProps = {
-  onAdd: (teacher: SchoolUser) => void
+  examId: string
+  onAdd: (teacher: ExamDirectoryUser) => void
   onClose: () => void
   onRemove: (proctorId: string) => void
   schedule: ExamScheduleDto
 }
 
-export function ManageProctorsModal({ onAdd, onClose, onRemove, schedule }: ManageProctorsModalProps) {
+export function ManageProctorsModal({ examId, onAdd, onClose, onRemove, schedule }: ManageProctorsModalProps) {
   const [showPicker, setShowPicker] = useState(false)
 
   return (
@@ -88,6 +89,7 @@ export function ManageProctorsModal({ onAdd, onClose, onRemove, schedule }: Mana
 
       {showPicker ? (
         <ProctorPickerModal
+          examId={examId}
           excludeUserIds={schedule.proctors.map((proctor) => proctor.teacher?.id).filter(Boolean) as string[]}
           onClose={() => setShowPicker(false)}
           onSelect={(teacher) => {

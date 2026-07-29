@@ -1037,7 +1037,9 @@ function ExamDetailPage({
 
       {tab === 'assessment' ? <AssessmentMethodTab /> : null}
 
-      {tab === 'students' ? <CandidatesTab canManage={canManageSchedule} examId={exam.id} papers={exam.papers} /> : null}
+      {tab === 'students' ? (
+        <CandidatesTab canManage={canManageSchedule} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
+      ) : null}
 
       {tab === 'blueprint' ? (
         <BlueprintAttachPanel

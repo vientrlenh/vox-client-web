@@ -1,9 +1,16 @@
 import { useState } from 'react'
 import { Search, X } from 'lucide-react'
-import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery'
-import { useSchoolGradesQuery } from '@/features/grades/api/useSchoolGradesQuery'
+import { toApiError } from '@/shared/api'
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
+import {
+  useExamDirectoryClassesQuery,
+  useExamDirectoryGradesQuery,
+} from '../api/examDirectoryQueries'
+import type { ExamKind } from '../types'
 
 type ImportCandidatesModalProps = {
+  examId: string
+  examKind: ExamKind
   onClose: () => void
   onImportClass: (schoolClassId: string) => void
   onImportGrade: (schoolGradeId: string) => void
@@ -11,24 +18,32 @@ type ImportCandidatesModalProps = {
 }
 
 const PAGE_SIZE = 8
+const SEARCH_DEBOUNCE_MS = 300
 
-export function ImportCandidatesModal({ onClose, onImportClass, onImportGrade, submitting = false }: ImportCandidatesModalProps) {
+export function ImportCandidatesModal({
+  examId,
+  examKind,
+  onClose,
+  onImportClass,
+  onImportGrade,
+  submitting = false,
+}: ImportCandidatesModalProps) {
+  // Nhập theo niên khóa gom mọi lớp của niên khóa đó, vượt phạm vi của người tạo bài
+  // trên lớp — BE từ chối thẳng, nên ở đây ẩn hẳn lối vào thay vì để người dùng đâm vào lỗi.
+  const allowGradeImport = examKind !== 'CLASS_TEST'
   const [source, setSource] = useState<'class' | 'grade'>('class')
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
+  const debouncedKeyword = useDebouncedValue(keyword, SEARCH_DEBOUNCE_MS)
 
-  const classesQuery = useSchoolClassesQuery(page, PAGE_SIZE, {
-    languageId: '',
-    schoolGradeId: '',
-    search: keyword,
-    status: '',
+  const classesQuery = useExamDirectoryClassesQuery(examId, page, PAGE_SIZE, debouncedKeyword)
+  const gradesQuery = useExamDirectoryGradesQuery(examId, page, PAGE_SIZE, debouncedKeyword, {
+    enabled: allowGradeImport,
   })
-  const gradesQuery = useSchoolGradesQuery(page, PAGE_SIZE)
 
+  const activeQuery = source === 'class' ? classesQuery : gradesQuery
   const classes = classesQuery.data?.content ?? []
-  const grades = (gradesQuery.data?.content ?? []).filter((grade) =>
-    keyword.trim() ? grade.name.toLowerCase().includes(keyword.trim().toLowerCase()) : true,
-  )
+  const grades = gradesQuery.data?.content ?? []
 
   function handleTabChange(next: 'class' | 'grade') {
     setSource(next)
@@ -58,28 +73,30 @@ export function ImportCandidatesModal({ onClose, onImportClass, onImportGrade, s
           </button>
         </div>
 
-        <div className="flex gap-2 border-b border-slate-200 px-6 py-3.5">
-          <button
-            className={[
-              'h-9 flex-1 rounded-full text-xs font-bold transition',
-              source === 'class' ? 'bg-indigo-600 text-white' : 'border border-slate-200 text-slate-700 hover:bg-slate-50',
-            ].join(' ')}
-            onClick={() => handleTabChange('class')}
-            type="button"
-          >
-            Theo lớp
-          </button>
-          <button
-            className={[
-              'h-9 flex-1 rounded-full text-xs font-bold transition',
-              source === 'grade' ? 'bg-indigo-600 text-white' : 'border border-slate-200 text-slate-700 hover:bg-slate-50',
-            ].join(' ')}
-            onClick={() => handleTabChange('grade')}
-            type="button"
-          >
-            Theo khối
-          </button>
-        </div>
+        {allowGradeImport ? (
+          <div className="flex gap-2 border-b border-slate-200 px-6 py-3.5">
+            <button
+              className={[
+                'h-9 flex-1 rounded-full text-xs font-bold transition',
+                source === 'class' ? 'bg-indigo-600 text-white' : 'border border-slate-200 text-slate-700 hover:bg-slate-50',
+              ].join(' ')}
+              onClick={() => handleTabChange('class')}
+              type="button"
+            >
+              Theo lớp
+            </button>
+            <button
+              className={[
+                'h-9 flex-1 rounded-full text-xs font-bold transition',
+                source === 'grade' ? 'bg-indigo-600 text-white' : 'border border-slate-200 text-slate-700 hover:bg-slate-50',
+              ].join(' ')}
+              onClick={() => handleTabChange('grade')}
+              type="button"
+            >
+              Theo niên khóa
+            </button>
+          </div>
+        ) : null}
 
         <div className="border-b border-slate-200 px-6 py-3.5">
           <div className="relative">
@@ -90,14 +107,20 @@ export function ImportCandidatesModal({ onClose, onImportClass, onImportGrade, s
                 setKeyword(event.target.value)
                 setPage(1)
               }}
-              placeholder={source === 'class' ? 'Tìm lớp theo tên hoặc mã…' : 'Tìm khối theo tên…'}
+              placeholder={source === 'class' ? 'Tìm lớp theo tên hoặc mã…' : 'Tìm niên khóa theo tên hoặc mã…'}
               value={keyword}
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-3">
-          {source === 'class' ? (
+          {activeQuery.isError ? (
+            // Không gộp lỗi vào nhánh "không tìm thấy": 403 hiện ra dưới dạng danh sách
+            // rỗng đúng là cách bug phân quyền này ẩn mình suốt.
+            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-6 text-center text-sm font-semibold text-red-700">
+              {toApiError(activeQuery.error).message}
+            </p>
+          ) : source === 'class' ? (
             classesQuery.isLoading ? (
               <p className="py-8 text-center text-sm text-slate-400">Đang tải danh sách lớp…</p>
             ) : classes.length ? (
@@ -121,7 +144,7 @@ export function ImportCandidatesModal({ onClose, onImportClass, onImportGrade, s
               <p className="py-8 text-center text-sm text-slate-400">Không tìm thấy lớp phù hợp.</p>
             )
           ) : gradesQuery.isLoading ? (
-            <p className="py-8 text-center text-sm text-slate-400">Đang tải danh sách khối…</p>
+            <p className="py-8 text-center text-sm text-slate-400">Đang tải danh sách niên khóa…</p>
           ) : grades.length ? (
             <div className="grid gap-2.5 py-2">
               {grades.map((grade) => (
@@ -140,14 +163,13 @@ export function ImportCandidatesModal({ onClose, onImportClass, onImportGrade, s
               ))}
             </div>
           ) : (
-            <p className="py-8 text-center text-sm text-slate-400">Không tìm thấy khối phù hợp.</p>
+            <p className="py-8 text-center text-sm text-slate-400">Không tìm thấy niên khóa phù hợp.</p>
           )}
         </div>
 
         <div className="flex items-center justify-between border-t border-slate-200 px-6 py-3.5 text-xs font-semibold text-slate-500">
           <span>
-            {source === 'class' ? classesQuery.data?.totalElements ?? 0 : gradesQuery.data?.totalElements ?? 0}{' '}
-            {source === 'class' ? 'lớp' : 'khối'}
+            {activeQuery.data?.totalElements ?? 0} {source === 'class' ? 'lớp' : 'niên khóa'}
           </span>
           <div className="flex gap-2">
             <button
@@ -160,10 +182,7 @@ export function ImportCandidatesModal({ onClose, onImportClass, onImportGrade, s
             </button>
             <button
               className="h-8 rounded-lg border border-slate-200 px-3 disabled:opacity-40"
-              disabled={
-                page >=
-                (source === 'class' ? classesQuery.data?.totalPages ?? 1 : gradesQuery.data?.totalPages ?? 1)
-              }
+              disabled={page >= (activeQuery.data?.totalPages ?? 1)}
               onClick={() => setPage((current) => current + 1)}
               type="button"
             >

@@ -2184,7 +2184,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       {tab === 'assessment' ? <AssessmentMethodTab /> : null}
 
-      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} papers={exam.papers} /> : null}
+      {tab === 'students' ? (
+        <CandidatesTab canManage={canManage} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
+      ) : null}
 
       {tab === 'blueprint' ? (
         <ClassTestBlueprintTab
