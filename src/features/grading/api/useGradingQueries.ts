@@ -185,6 +185,42 @@ const GRADING_TASK_DETAIL_QUERY = `
   }
 `
 
+const GRADING_TASK_DETAIL_BY_SCHOOL_QUERY = `
+  query GradingTaskDetailBySchool($candidateResultId: ID!) {
+    gradingTaskDetailBySchool(candidateResultId: $candidateResultId) {
+      assignmentId
+      candidateResultId
+      resultCode
+      examName
+      assignmentStatus
+      resultStatus
+      flagged
+      flagReason
+      currentTotalScore
+      editable
+      items {
+        paperItemId
+        responseId
+        partLabel
+        currentItemScore
+        currentFeedbackSummary
+        currentScores { ${CRITERION_SCORE_FIELDS} }
+        turns { ${TURN_FIELDS} }
+      }
+      criteria {
+        id
+        code
+        label
+        description
+        minScore
+        maxScore
+        weight
+        required
+      }
+    }
+  }
+`
+
 const ASSIGNABLE_TEACHERS_QUERY = `
   query AssignableTeachers($search: String) {
     assignableTeachers(search: $search) {
@@ -276,6 +312,8 @@ export const gradingKeys = {
   stats: (input: FetchGradingStatsInput) => [...gradingKeys.all, 'stats', input] as const,
   taskDetail: (assignmentId: string | null) =>
     [...gradingKeys.all, 'task-detail', assignmentId] as const,
+  taskDetailBySchool: (candidateResultId: string | null) =>
+    [...gradingKeys.all, 'task-detail-by-school', candidateResultId] as const,
   teachers: (search?: string) => [...gradingKeys.all, 'teachers', search] as const,
 }
 
@@ -328,6 +366,14 @@ export async function fetchGradingTaskDetail(assignmentId: string) {
     { assignmentId },
   )
   return data.gradingTaskDetail
+}
+
+export async function fetchGradingTaskDetailBySchool(candidateResultId: string) {
+  const data = await graphQLRequest<{ gradingTaskDetailBySchool: GradingTaskDetail }>(
+    GRADING_TASK_DETAIL_BY_SCHOOL_QUERY,
+    { candidateResultId },
+  )
+  return data.gradingTaskDetailBySchool
 }
 
 export async function fetchAssignableTeachers(search?: string) {
@@ -398,6 +444,16 @@ export function useGradingTaskDetailQuery(assignmentId: string | null) {
     queryKey: gradingKeys.taskDetail(assignmentId),
     // Điểm giáo viên đang nhập nằm ở state cục bộ; refetch khi focus lại chỉ tốn
     // request mà không đổi gì trên màn — tắt cho nhất quán với preview.
+    refetchOnWindowFocus: false,
+  })
+}
+
+// Nhà trường xem/chấm trực tiếp theo candidateResultId, không cần phân công.
+export function useGradingTaskDetailBySchoolQuery(candidateResultId: string | null) {
+  return useQuery({
+    enabled: candidateResultId != null,
+    queryFn: () => fetchGradingTaskDetailBySchool(candidateResultId as string),
+    queryKey: gradingKeys.taskDetailBySchool(candidateResultId),
     refetchOnWindowFocus: false,
   })
 }

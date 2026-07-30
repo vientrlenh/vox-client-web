@@ -10,6 +10,7 @@ import {
   type StudentExamSessionSummaryDto,
 } from '@/features/exam-results/types'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
+import { formatPublishedResult } from '@/shared/lib/resultScore'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 
@@ -254,7 +255,7 @@ export function StudentExamResultPage() {
           { icon: <BookOpenCheck aria-hidden="true" className="size-3.5" />, label: `Phiên thi ${session.id}` },
           {
             icon: <Target aria-hidden="true" className="size-3.5" />,
-            label: result?.rubricResultBandName ?? result?.rubricResultBandCode ?? 'Chưa có band',
+            label: formatPublishedResult(result),
           },
         ]}
         statusLabel={headerStatus.label}
@@ -289,8 +290,8 @@ export function StudentExamResultPage() {
             <StatCard
               icon={<BookOpenCheck size={19} />}
               iconTone="violet"
-              label="Band đạt"
-              value={result.rubricResultBandName ?? result.rubricResultBandCode ?? '-'}
+              label="Xếp loại"
+              value={formatPublishedResult(result)}
             />
             <StatCard icon={<Clock3 size={19} />} iconTone="amber" label="Số phần đã chấm" value={result.sections.length} />
           </div>

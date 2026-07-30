@@ -84,6 +84,11 @@ const navigationItems = [
     to: '/school-admin/students',
   },
   {
+    icon: GraduationCap,
+    label: 'Khung năng lực',
+    to: '/school-admin/frameworks',
+  },
+  {
     icon: Presentation,
     label: 'Quản lý Giáo viên',
     to: '/school-admin/teachers',

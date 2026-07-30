@@ -21,6 +21,7 @@ import { useForceEndExamSessionMutation } from '@/features/examCore/api/mutation
 import { examQueryKeys, useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
 import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
 import { Pagination } from '@/shared/components/Pagination'
+import { formatPublishedResult } from '@/shared/lib/resultScore'
 import { AudioReplayButton } from '@/shared/ui/AudioReplayButton'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -100,6 +101,22 @@ function getResultScoreTone(value?: number | null) {
     return 'warning' as const
   }
   return 'danger' as const
+}
+
+function criterionScorePercentage(
+  value?: number | null,
+  minScore?: number | null,
+  maxScore?: number | null,
+) {
+  if (
+    typeof value !== 'number'
+    || typeof minScore !== 'number'
+    || typeof maxScore !== 'number'
+    || maxScore <= minScore
+  ) {
+    return value
+  }
+  return ((value - minScore) / (maxScore - minScore)) * 100
 }
 
 function getResultScoreTextClass(value?: number | null) {
@@ -204,7 +221,8 @@ function getReviewReasonLabel(code?: string | null) {
     AUDIO_SNR_TOO_LOW: 'Tỷ lệ tín hiệu trên nhiễu quá thấp',
     AUDIO_TOO_MUCH_SILENCE: 'Audio có quá ít lời nói hữu ích',
     CONDUCT_VIOLATION: 'Có vi phạm trong quá trình làm bài',
-    LLM_UNSTABLE_DISCOURSE: 'Chấm discourse chưa ổn định',
+    LLM_UNSTABLE_DISCOURSE: 'Chấm coherence chưa ổn định',
+    LLM_UNSTABLE_COHERENCE: 'Chấm coherence chưa ổn định',
     LLM_UNSTABLE_GRAMMAR: 'Chấm grammar chưa ổn định',
     LLM_UNSTABLE_VOCABULARY: 'Chấm vocabulary chưa ổn định',
     LOW_CONFIDENCE: 'Độ tin cậy AI thấp',
@@ -299,7 +317,7 @@ function ResultBand({
   return (
     <div>
       <p className={`text-[13px] font-bold ${getResultScoreTextClass(officialScore)}`}>{formatScore(officialScore)}</p>
-      <p className="text-xs text-slate-500">{attempt?.rubricResultBandName ?? attempt?.rubricResultBandCode ?? 'Chưa gán band'}</p>
+      <p className="text-xs text-slate-500">{formatPublishedResult(attempt)}</p>
     </div>
   )
 }
@@ -335,7 +353,7 @@ function AttemptRows({
         <span>Lượt</span>
         <span>Thời gian</span>
         <span>Trạng thái</span>
-        <span>Điểm / band</span>
+        <span>Điểm / xếp loại</span>
         <span>Chi tiết</span>
         {canDelete ? <span>Xóa</span> : null}
       </div>
@@ -362,7 +380,7 @@ function AttemptRows({
             <div>
               <p className={`text-sm font-bold ${getResultScoreTextClass(attempt.totalScore)}`}>{formatScore(attempt.totalScore)}</p>
               <p className="text-xs text-slate-500">
-                {attempt.rubricResultBandName ?? attempt.rubricResultBandCode ?? 'Chưa gán band'}
+                {formatPublishedResult(attempt)}
               </p>
               {isOfficialAttempt ? (
                 <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -553,7 +571,7 @@ function ExamResultsListPage({
         <div className="mt-3.5 overflow-hidden rounded-xl border border-slate-200">
           <div className="grid grid-cols-[1.2fr_0.8fr_160px_120px] gap-3 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
             <span>Thí sinh</span>
-            <span>Điểm / band</span>
+            <span>Điểm / xếp loại</span>
             <span>Trạng thái</span>
             <span>Chi tiết</span>
           </div>
@@ -798,8 +816,16 @@ function QuestionEvaluationCard({
                         {criterion.criterionName ?? criterion.criterionCode ?? 'Tiêu chí'}
                       </p>
                       <StatusBadge
-                        label={`${formatScore(criterion.finalScore)} điểm`}
-                        tone={getResultScoreTone(criterion.finalScore)}
+                        label={
+                          typeof criterion.minScore === 'number' && typeof criterion.maxScore === 'number'
+                            ? `${formatScore(criterion.finalScore)} điểm · thang ${formatScore(criterion.minScore)}–${formatScore(criterion.maxScore)}`
+                            : `${formatScore(criterion.finalScore)} điểm`
+                        }
+                        tone={getResultScoreTone(criterionScorePercentage(
+                          criterion.finalScore,
+                          criterion.minScore,
+                          criterion.maxScore,
+                        ))}
                       />
                     </div>
                     {criterion.rationale ? (
@@ -1109,8 +1135,14 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
         metaItems={[
           { icon: <Hash aria-hidden="true" className="size-3.5" />, label: examQuery.data?.code ?? examId ?? session.id },
           { icon: <UserRound aria-hidden="true" className="size-3.5" />, label: getCandidateName(candidate ?? { studentId: candidateId ?? session.candidateId }) },
-          { icon: <Target aria-hidden="true" className="size-3.5" />, label: result?.rubricResultBandName ?? result?.rubricResultBandCode ?? 'Chưa có band' },
+          { icon: <Target aria-hidden="true" className="size-3.5" />, label: formatPublishedResult(result) },
           { icon: <FileText aria-hidden="true" className="size-3.5" />, label: `Cập nhật ${formatDateTime(examQuery.data?.updatedAt)}` },
+          ...(result?.flagged
+            ? [{
+                icon: <AlertTriangle aria-hidden="true" className="size-3.5 text-amber-600" />,
+                label: `Đã đánh dấu nghi vấn${result.flagReason ? `: ${result.flagReason}` : ''}`,
+              }]
+            : []),
         ]}
         statusLabel={statusDisplay.label}
         statusTone={statusDisplay.tone}
@@ -1146,7 +1178,7 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
               label="Tổng điểm"
               value={<span className={getResultScoreTextClass(result.totalScore)}>{formatScore(result.totalScore)}</span>}
             />
-            <StatCard icon={<Target size={19} />} iconTone="violet" label="Band đạt" value={result.rubricResultBandName ?? result.rubricResultBandCode ?? '-'} />
+            <StatCard icon={<Target size={19} />} iconTone="violet" label="Xếp loại" value={formatPublishedResult(result)} />
             <StatCard icon={<ClipboardList size={19} />} iconTone="amber" label="Band mục tiêu" value={result.targetFrameworkBandLabel ?? result.targetFrameworkBandCode ?? '-'} />
             <StatCard icon={<Mic2 size={19} />} iconTone="emerald" label="Số câu đã chấm" value={result.items.length} />
           </div>

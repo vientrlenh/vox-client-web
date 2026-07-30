@@ -79,9 +79,6 @@ async function refreshAndRetry(
 
     const newTokens = await refreshPromise
     const user = decodeAccessToken(newTokens.accessToken)
-    if (user && !isAccessTokenExpired(user)) {
-      return Promise.reject(error)
-    }
 
     if (!user || isAccessTokenExpired(user)) {
       clearSession(store)

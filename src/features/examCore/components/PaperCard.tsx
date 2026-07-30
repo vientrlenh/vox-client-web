@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { FileText } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { formatDurationSeconds, getExamPaperStatusDisplay, type ExamKind, type ExamPaperDto } from '../types'
+import { buildTimeQuotaWarning } from '../utils/timeQuota'
 
 type PaperCardAction = {
   disabled?: boolean
@@ -15,14 +16,24 @@ type PaperCardAction = {
 type PaperCardProps = {
   actions?: PaperCardAction[]
   examKind?: ExamKind
+  maxTimePerAttemptMin?: number | null
   onOpen: () => void
   openLabel?: string
   paper: ExamPaperDto
   subtitle?: string
 }
 
-export function PaperCard({ actions = [], examKind, onOpen, openLabel = 'Xem đề', paper, subtitle }: PaperCardProps): ReactNode {
+export function PaperCard({
+  actions = [],
+  examKind,
+  maxTimePerAttemptMin,
+  onOpen,
+  openLabel = 'Xem đề',
+  paper,
+  subtitle,
+}: PaperCardProps): ReactNode {
   const statusDisplay = getExamPaperStatusDisplay(paper.status, examKind)
+  const quotaWarning = buildTimeQuotaWarning(`Mã đề ${paper.code}`, paper.timeDurationSeconds, maxTimePerAttemptMin)
   const totalItems = paper.sections.reduce((sum, section) => sum + section.items.length, 0)
   const filledItems = paper.sections.reduce(
     (sum, section) => sum + section.items.filter((item) => item.questionId).length,
@@ -90,6 +101,11 @@ export function PaperCard({ actions = [], examKind, onOpen, openLabel = 'Xem đ�
             />
           </div>
           <span className="text-xs font-semibold text-slate-400">{progressPct}%</span>
+        </div>
+      ) : null}
+      {quotaWarning ? (
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700">
+          {quotaWarning} Không thể nộp duyệt, duyệt hoặc khóa mã đề này cho tới khi giảm thời lượng.
         </div>
       ) : null}
     </div>

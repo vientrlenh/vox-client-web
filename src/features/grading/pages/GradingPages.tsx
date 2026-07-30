@@ -49,19 +49,22 @@ import {
   useAutoAssignGradingMutation,
   useClearInvalidResultMutation,
   useDeclineGradingAssignmentMutation,
+  useInvalidateGradingByResultMutation,
   useInvalidateResultMutation,
   useReassignGradingMutation,
   useReclaimOverdueMutation,
   useRegradeResultMutation,
   useRemoveGradingAssignmentMutation,
   useSetGradingDeadlineMutation,
+  useSubmitGradingByResultMutation,
   useUpholdResultMutation,
   type ItemGradeInput,
 } from '../api/useGradingMutations'
-import { useGradingPreviewQuery } from '../api/useGradingPreviewQuery'
+import { useGradingPreviewByResultQuery, useGradingPreviewQuery } from '../api/useGradingPreviewQuery'
 import {
   useGradingAssignmentsQuery,
   useGradingStatsQuery,
+  useGradingTaskDetailBySchoolQuery,
   useGradingTaskDetailQuery,
   useMyGradingTasksQuery,
 } from '../api/useGradingQueries'
@@ -225,6 +228,7 @@ function itemTabItems(items: GradingTaskItem[]): SegmentItem[] {
 // ============================= School Admin: Coordination board =============================
 
 export function SchoolAdminGradingPage() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('board')
   // Giữ CẢ object thay vì mỗi id: danh sách kỳ thi giờ phân trang phía server nên không còn
   // mảng đầy đủ để tra ngược ra tên — mà tên thì cần cho tên file CSV và 3 dialog bên dưới.
@@ -979,6 +983,16 @@ export function SchoolAdminGradingPage() {
 
                           <td className="px-4 py-3">
                             <RowActions menu={rowMenu} resultCode={row.resultCode}>
+                              {/* Nhà trường luôn xem/chấm trực tiếp được, kể cả bài chưa gán ai
+                                  hoặc đang gán cho giáo viên khác — không phụ thuộc phân công. */}
+                              <button
+                                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                                onClick={() => navigate(`/school-admin/grading/${row.candidateResultId}`)}
+                                type="button"
+                              >
+                                <Mic className="size-4" />
+                                {completed ? 'Xem lại' : 'Xem / Chấm'}
+                              </button>
                               {completed ? null : (
                                 <button
                                   className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700"
@@ -1386,20 +1400,70 @@ function initialFeedback(detail: GradingTaskDetail): Record<string, string> {
   return result
 }
 
-export function TeacherGradingTaskPage() {
-  const navigate = useNavigate()
-  const params = useParams()
-  const assignmentId = params.assignmentId ?? null
+type PreviewResult = {
+  data?: {
+    totalScore?: number | null
+    resultBandName?: string | null
+    itemScores: Array<{ paperItemId: string; itemScore?: number | null }>
+  }
+  isFetching: boolean
+}
 
-  const detailQuery = useGradingTaskDetailQuery(assignmentId)
-  const detail = detailQuery.data
+type DecisionHandlers = {
+  onError: (error: unknown) => void
+  // `nextAssignmentId` chỉ CLEARED_INVALID trả về (vòng INITIAL BE vừa mở cho
+  // chính người thao tác) — các outcome còn lại gọi không kèm gì.
+  onSuccess: (nextAssignmentId?: string | null) => void
+}
 
-  const regradeMutation = useRegradeResultMutation()
-  const upholdMutation = useUpholdResultMutation()
-  const invalidateMutation = useInvalidateResultMutation()
-  const clearInvalidMutation = useClearInvalidResultMutation()
-  const declineMutation = useDeclineGradingAssignmentMutation()
+const DECISION_SUCCESS_MESSAGE: Record<DecisionOutcome, string> = {
+  CLEARED_INVALID: 'Đã gỡ vô hiệu. Lượt chấm thủ công đã được mở cho bạn.',
+  DECLINED: 'Đã trả lại phân công.',
+  INVALIDATED: 'Đã vô hiệu bài thi.',
+  UPHELD: 'Đã giữ nguyên điểm bài thi.',
+}
 
+/**
+ * Màn chấm dùng chung cho cả giáo viên (theo assignmentId) và nhà trường (theo
+ * candidateResultId, có thể chưa có phân công) — cùng UI, chỉ khác cách gọi
+ * API ở phía trên. `detail.assignmentId` null xảy ra đúng ở luồng nhà trường
+ * chấm một bài chưa ai nhận.
+ *
+ * `onDecision` bỏ trống (nhà trường chấm trực tiếp, không qua phân công) thì
+ * màn chỉ còn Nộp điểm và Vô hiệu — ba hành động còn lại (giữ nguyên/gỡ vô
+ * hiệu/trả lại phân công) đều thao tác trên MỘT phân công cụ thể, không áp
+ * dụng khi chưa có ai được giao bài.
+ */
+function GradingTaskDetailView({
+  decisionPending,
+  detail,
+  invalidatePending,
+  onBack,
+  onDecision,
+  onInvalidate,
+  onNavigateToAssignment,
+  onSubmit,
+  submitPending,
+  usePreview,
+}: {
+  decisionPending?: boolean
+  detail: GradingTaskDetail
+  invalidatePending: boolean
+  onBack: () => void
+  onDecision?: (
+    outcome: Exclude<DecisionOutcome, 'INVALIDATED'>,
+    reason: string,
+    handlers: DecisionHandlers,
+  ) => void
+  onInvalidate: (reason: string, handlers: DecisionHandlers) => void
+  onNavigateToAssignment?: (assignmentId: string) => void
+  onSubmit: (
+    items: ItemGradeInput[],
+    handlers: { onError: (error: unknown) => void; onSuccess: (totalScore?: number | null) => void },
+  ) => void
+  submitPending: boolean
+  usePreview: (items: ItemGradeInput[], enabled: boolean) => PreviewResult
+}) {
   const [scores, setScores] = useState<ScoreState>({})
   const [feedback, setFeedback] = useState<Record<string, string>>({})
   const [activeItemId, setActiveItemId] = useState('')
@@ -1408,18 +1472,17 @@ export function TeacherGradingTaskPage() {
   const [submitOpen, setSubmitOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-  // Đồng bộ state khi mở một bài khác (điều hướng trực tiếp giữa các bài).
-  if (detail && detail.assignmentId !== initializedFor) {
+  // Đồng bộ state khi mở một bài khác (điều hướng trực tiếp giữa các bài). Khoá theo
+  // candidateResultId, KHÔNG phải assignmentId: assignmentId có thể null (bài chưa
+  // gán ai) nên không phân biệt được giữa hai bài chưa gán khác nhau.
+  if (detail.candidateResultId !== initializedFor) {
     setScores(initialScores(detail))
     setFeedback(initialFeedback(detail))
     setActiveItemId(detail.items[0]?.paperItemId ?? '')
-    setInitializedFor(detail.assignmentId)
+    setInitializedFor(detail.candidateResultId)
   }
 
   const previewItems = useMemo<ItemGradeInput[]>(() => {
-    if (!detail) {
-      return []
-    }
     const required = detail.criteria.filter((criterion) => criterion.required)
     return detail.items
       .filter((item) =>
@@ -1439,25 +1502,8 @@ export function TeacherGradingTaskPage() {
   const debouncedPreviewItems = useDebouncedValue(previewItems, PREVIEW_DEBOUNCE_MS)
   // Chỉ tính thử khi vòng này thật sự cho chấm lại — vòng xét vô hiệu không có
   // REGRADED nên gọi preview ở đó chỉ tạo lỗi đỏ.
-  const canRegrade = detail?.allowedOutcomes.includes('REGRADED') === true
-  const previewQuery = useGradingPreviewQuery(assignmentId, debouncedPreviewItems, {
-    enabled: canRegrade && detail?.editable === true,
-  })
-
-  if (detailQuery.isLoading) {
-    return <PageLoader />
-  }
-
-  if (!detail) {
-    return (
-      <section className="mx-auto max-w-300">
-        <BackButton onClick={() => navigate('/teacher/grading')} />
-        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-400">
-          Không tìm thấy bài cần chấm.
-        </div>
-      </section>
-    )
-  }
+  const canRegrade = detail.allowedOutcomes.includes('REGRADED')
+  const previewQuery = usePreview(debouncedPreviewItems, canRegrade && detail.editable === true)
 
   const readOnly = !detail.editable
   const roundDisplay = getRoundTypeDisplay(detail.roundType)
@@ -1476,10 +1522,6 @@ export function TeacherGradingTaskPage() {
     }))
   }
 
-  function backToQueue(delayMs = 900) {
-    window.setTimeout(() => navigate('/teacher/grading'), delayMs)
-  }
-
   const onActionError = (error: unknown) => {
     setDecision(null)
     setSubmitOpen(false)
@@ -1487,8 +1529,10 @@ export function TeacherGradingTaskPage() {
   }
 
   function doSubmit() {
-    const items: ItemGradeInput[] = detail!.items.map((item) => ({
-      criterionScores: detail!.criteria
+    // Nộp cả bài: mọi phần, mỗi phần đủ tiêu chí bắt buộc. Nộp thiếu phần sẽ chốt
+    // phân công mà phần còn lại vẫn giữ điểm AI — không cho rơi vào tình huống đó.
+    const items: ItemGradeInput[] = detail.items.map((item) => ({
+      criterionScores: detail.criteria
         .filter((criterion) => scores[item.paperItemId]?.[criterion.id] != null)
         .map((criterion) => ({
           rubricCriterionId: criterion.id,
@@ -1497,93 +1541,47 @@ export function TeacherGradingTaskPage() {
       feedbackSummary: feedback[item.paperItemId] || undefined,
       paperItemId: item.paperItemId,
     }))
-    regradeMutation.mutate(
-      { assignmentId: detail!.assignmentId, items },
-      {
-        onError: onActionError,
-        onSuccess: (result) => {
-          setSubmitOpen(false)
-          setMessage(`Đã nộp điểm. Tổng ${formatScore(result.totalScore)}.`)
-          backToQueue()
-        },
+    onSubmit(items, {
+      onError: (error) => {
+        setSubmitOpen(false)
+        setMessage(toApiError(error).message)
       },
-    )
+      onSuccess: (totalScore) => {
+        setSubmitOpen(false)
+        setMessage(`Đã nộp điểm. Tổng ${formatScore(totalScore)}.`)
+        window.setTimeout(onBack, 900)
+      },
+    })
   }
 
-  function doDecision(outcome: DecisionOutcome, reason: string) {
-    const done = (text: string) => {
-      setDecision(null)
-      setMessage(text)
+  function confirmDecision(reason: string) {
+    if (!decision) {
+      return
     }
-    switch (outcome) {
-      case 'UPHELD':
-        upholdMutation.mutate(
-          { assignmentId: detail!.assignmentId, reason },
-          {
-            onError: onActionError,
-            onSuccess: () => {
-              done('Đã giữ nguyên điểm bài thi.')
-              backToQueue()
-            },
-          },
-        )
-        return
-      case 'INVALIDATED':
-        invalidateMutation.mutate(
-          { assignmentId: detail!.assignmentId, reason },
-          {
-            onError: onActionError,
-            onSuccess: () => {
-              done('Đã vô hiệu bài thi.')
-              backToQueue()
-            },
-          },
-        )
-        return
-      case 'CLEARED_INVALID':
-        clearInvalidMutation.mutate(
-          { assignmentId: detail!.assignmentId, reason },
-          {
-            onError: onActionError,
-            onSuccess: (result) => {
-              done('Đã gỡ vô hiệu. Lượt chấm thủ công đã được mở cho bạn.')
-              // BE mở luôn vòng INITIAL cho chính giáo viên này — đi thẳng sang đó
-              // thay vì bắt họ tìm lại bài trong hàng đợi.
-              if (result.nextAssignmentId) {
-                window.setTimeout(
-                  () => navigate(`/teacher/grading/${result.nextAssignmentId}`),
-                  900,
-                )
-              } else {
-                backToQueue()
-              }
-            },
-          },
-        )
-        return
-      case 'DECLINED':
-        declineMutation.mutate(
-          { assignmentId: detail!.assignmentId, reason },
-          {
-            onError: onActionError,
-            onSuccess: () => {
-              done('Đã trả lại phân công.')
-              backToQueue()
-            },
-          },
-        )
+    const handlers: DecisionHandlers = {
+      onError: onActionError,
+      onSuccess: (nextAssignmentId) => {
+        setDecision(null)
+        setMessage(DECISION_SUCCESS_MESSAGE[decision])
+        if (nextAssignmentId) {
+          // BE mở luôn vòng INITIAL cho chính giáo viên này — đi thẳng sang đó
+          // thay vì bắt họ tìm lại bài trong hàng đợi.
+          window.setTimeout(() => onNavigateToAssignment?.(nextAssignmentId), 900)
+        } else {
+          window.setTimeout(onBack, 900)
+        }
+      },
     }
+    if (decision === 'INVALIDATED') {
+      onInvalidate(reason, handlers)
+      return
+    }
+    onDecision?.(decision, reason, handlers)
   }
-
-  const decisionPending =
-    upholdMutation.isPending ||
-    invalidateMutation.isPending ||
-    clearInvalidMutation.isPending ||
-    declineMutation.isPending
 
   return (
     <section className="mx-auto max-w-300">
-      <BackButton onClick={() => navigate('/teacher/grading')} />
+      <BackButton onClick={onBack} />
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3.5">
         <div>
@@ -1821,16 +1819,19 @@ export function TeacherGradingTaskPage() {
           ) : null}
 
           {/* DECLINED không nằm trong allowedOutcomes vì nó hợp lệ ở MỌI vòng — luôn hiện
-              khi còn chấm được. */}
+              khi còn chấm được, trừ luồng nhà trường chấm trực tiếp (không có phân công
+              nào để trả lại). */}
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-bold text-slate-600 transition hover:bg-slate-50"
-              onClick={() => setDecision('DECLINED')}
-              type="button"
-            >
-              <Undo2 className="size-4" />
-              Trả lại phân công
-            </button>
+            {onDecision ? (
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-bold text-slate-600 transition hover:bg-slate-50"
+                onClick={() => setDecision('DECLINED')}
+                type="button"
+              >
+                <Undo2 className="size-4" />
+                Trả lại phân công
+              </button>
+            ) : null}
 
             {allows('INVALIDATED') ? (
               <button
@@ -1843,7 +1844,7 @@ export function TeacherGradingTaskPage() {
               </button>
             ) : null}
 
-            {allows('CLEARED_INVALID') ? (
+            {onDecision && allows('CLEARED_INVALID') ? (
               <button
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3.5 text-[13px] font-bold text-emerald-700 transition hover:bg-emerald-50"
                 onClick={() => setDecision('CLEARED_INVALID')}
@@ -1854,7 +1855,7 @@ export function TeacherGradingTaskPage() {
               </button>
             ) : null}
 
-            {allows('UPHELD') ? (
+            {onDecision && allows('UPHELD') ? (
               <button
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3.5 text-[13px] font-bold text-emerald-700 transition hover:bg-emerald-50"
                 onClick={() => setDecision('UPHELD')}
@@ -1868,7 +1869,7 @@ export function TeacherGradingTaskPage() {
             {canRegrade ? (
               <button
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-[13px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                disabled={!allFilled || regradeMutation.isPending}
+                disabled={!allFilled || submitPending}
                 onClick={() => setSubmitOpen(true)}
                 type="button"
               >
@@ -1885,9 +1886,9 @@ export function TeacherGradingTaskPage() {
       {decision ? (
         <GradingDecisionDialog
           flagReason={detail.flagReason}
-          isPending={decisionPending}
+          isPending={decision === 'INVALIDATED' ? invalidatePending : decisionPending}
           onCancel={() => setDecision(null)}
-          onConfirm={(reason) => doDecision(decision, reason)}
+          onConfirm={confirmDecision}
           outcome={decision}
           resultCode={detail.resultCode}
           roundType={detail.roundType}
@@ -1897,7 +1898,7 @@ export function TeacherGradingTaskPage() {
       {submitOpen ? (
         <SubmitGradingDialog
           flagged={detail.flagged}
-          isPending={regradeMutation.isPending}
+          isPending={submitPending}
           onCancel={() => setSubmitOpen(false)}
           onConfirm={doSubmit}
           partCount={detail.items.length}
@@ -1911,5 +1912,144 @@ export function TeacherGradingTaskPage() {
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
     </section>
+  )
+}
+
+export function TeacherGradingTaskPage() {
+  const navigate = useNavigate()
+  const { assignmentId } = useParams()
+  const detailQuery = useGradingTaskDetailQuery(assignmentId ?? null)
+  const regradeMutation = useRegradeResultMutation()
+  const upholdMutation = useUpholdResultMutation()
+  const invalidateMutation = useInvalidateResultMutation()
+  const clearInvalidMutation = useClearInvalidResultMutation()
+  const declineMutation = useDeclineGradingAssignmentMutation()
+  const detail = detailQuery.data
+
+  if (detailQuery.isLoading) {
+    return <PageLoader />
+  }
+
+  if (!detail || !detail.assignmentId) {
+    return (
+      <section className="mx-auto max-w-300">
+        <BackButton onClick={() => navigate('/teacher/grading')} />
+        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-400">
+          Không tìm thấy bài cần chấm.
+        </div>
+      </section>
+    )
+  }
+  const currentAssignmentId = detail.assignmentId
+
+  function usePreview(items: ItemGradeInput[], enabled: boolean) {
+    return useGradingPreviewQuery(currentAssignmentId, items, { enabled })
+  }
+
+  return (
+    <GradingTaskDetailView
+      decisionPending={
+        upholdMutation.isPending || clearInvalidMutation.isPending || declineMutation.isPending
+      }
+      detail={detail}
+      invalidatePending={invalidateMutation.isPending}
+      onBack={() => navigate('/teacher/grading')}
+      onDecision={(outcome, reason, handlers) => {
+        switch (outcome) {
+          case 'UPHELD':
+            upholdMutation.mutate(
+              { assignmentId: currentAssignmentId, reason },
+              { onError: handlers.onError, onSuccess: () => handlers.onSuccess() },
+            )
+            return
+          case 'CLEARED_INVALID':
+            clearInvalidMutation.mutate(
+              { assignmentId: currentAssignmentId, reason },
+              {
+                onError: handlers.onError,
+                onSuccess: (result) => handlers.onSuccess(result.nextAssignmentId),
+              },
+            )
+            return
+          case 'DECLINED':
+            declineMutation.mutate(
+              { assignmentId: currentAssignmentId, reason },
+              { onError: handlers.onError, onSuccess: () => handlers.onSuccess() },
+            )
+        }
+      }}
+      onInvalidate={(reason, handlers) =>
+        invalidateMutation.mutate(
+          { assignmentId: currentAssignmentId, reason },
+          { onError: handlers.onError, onSuccess: () => handlers.onSuccess() },
+        )
+      }
+      onNavigateToAssignment={(nextAssignmentId) => navigate(`/teacher/grading/${nextAssignmentId}`)}
+      onSubmit={(items, handlers) =>
+        regradeMutation.mutate(
+          { assignmentId: currentAssignmentId, items },
+          { onError: handlers.onError, onSuccess: (result) => handlers.onSuccess(result.totalScore) },
+        )
+      }
+      submitPending={regradeMutation.isPending}
+      usePreview={usePreview}
+    />
+  )
+}
+
+// ============================= School Admin: Grade one submission directly =============================
+
+/**
+ * Nhà trường xem/chấm trực tiếp theo candidateResultId — không cần phân công
+ * trước, xem được cả bài chưa gán ai hoặc đang gán cho giáo viên khác.
+ */
+export function SchoolAdminGradingTaskPage() {
+  const navigate = useNavigate()
+  const { candidateResultId } = useParams()
+  const detailQuery = useGradingTaskDetailBySchoolQuery(candidateResultId ?? null)
+  const submitMutation = useSubmitGradingByResultMutation()
+  const invalidateMutation = useInvalidateGradingByResultMutation()
+  const detail = detailQuery.data
+
+  if (detailQuery.isLoading) {
+    return <PageLoader />
+  }
+
+  if (!detail) {
+    return (
+      <section className="mx-auto max-w-300">
+        <BackButton onClick={() => navigate('/school-admin/grading')} />
+        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-400">
+          Không tìm thấy bài cần chấm.
+        </div>
+      </section>
+    )
+  }
+  const currentCandidateResultId = detail.candidateResultId
+
+  function usePreview(items: ItemGradeInput[], enabled: boolean) {
+    return useGradingPreviewByResultQuery(currentCandidateResultId, items, { enabled })
+  }
+
+  return (
+    <GradingTaskDetailView
+      detail={detail}
+      invalidatePending={invalidateMutation.isPending}
+      onBack={() => navigate('/school-admin/grading')}
+      onInvalidate={(reason, handlers) =>
+        invalidateMutation.mutate(
+          { candidateResultId: currentCandidateResultId, reason },
+          { onError: handlers.onError, onSuccess: () => handlers.onSuccess() },
+        )
+      }
+      onSubmit={(items, handlers) =>
+        submitMutation.mutate(
+          { candidateResultId: currentCandidateResultId, items },
+          { onError: handlers.onError, onSuccess: (result) => handlers.onSuccess(result.totalScore) },
+        )
+      }
+      submitPending={submitMutation.isPending}
+      usePreview={usePreview}
+    />
   )
 }

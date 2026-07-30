@@ -84,6 +84,42 @@ const SystemAdminSchoolDirectoryImportPage = lazy(() =>
   })),
 )
 
+const SystemAdminFrameworksPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SystemAdminFrameworksPage,
+  })),
+)
+
+const SystemAdminFrameworkDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SystemAdminFrameworkDetailPage,
+  })),
+)
+
+const SystemAdminFrameworkVersionDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SystemAdminFrameworkVersionDetailPage,
+  })),
+)
+
+const SchoolAdminFrameworksPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SchoolAdminFrameworksPage,
+  })),
+)
+
+const SchoolAdminFrameworkDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SchoolAdminFrameworkDetailPage,
+  })),
+)
+
+const SchoolAdminFrameworkVersionDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SchoolAdminFrameworkVersionDetailPage,
+  })),
+)
+
 const SchoolAdminClassesPage = lazy(() =>
   import("@/features/classes").then((module) => ({
     default: module.SchoolAdminClassesPage,
@@ -213,6 +249,12 @@ const TeacherProctorAttendancePage = lazy(() =>
 const SchoolAdminMonitoringRoomsPage = lazy(() =>
   import("@/features/monitoring").then((module) => ({
     default: module.SchoolAdminMonitoringRoomsPage,
+  })),
+);
+
+const MonitoringExamSchedulesPage = lazy(() =>
+  import("@/features/monitoring").then((module) => ({
+    default: module.MonitoringExamSchedulesPage,
   })),
 );
 
@@ -401,6 +443,9 @@ const SchoolAdminReevaluationDetailPage = lazy(() =>
 // grading: chấm điểm thủ công (admin phân công -> giáo viên chấm bài chờ chấm)
 const SchoolAdminGradingPage = lazy(() =>
   import("@/features/grading").then((m) => ({ default: m.SchoolAdminGradingPage })),
+);
+const SchoolAdminGradingTaskPage = lazy(() =>
+  import("@/features/grading").then((m) => ({ default: m.SchoolAdminGradingTaskPage })),
 );
 const TeacherGradingPage = lazy(() =>
   import("@/features/grading").then((m) => ({ default: m.TeacherGradingPage })),
@@ -675,6 +720,18 @@ export function AppRoutes() {
             <Route path="system-admin/questions/create" element={<SystemAdminCreateQuestionPage />} />
             <Route path="system-admin/questions/:questionId/edit" element={<SystemAdminEditQuestionPage />} />
             <Route path="system-admin/questions/:questionId" element={<SystemAdminQuestionDetailPage />} />
+            <Route  
+              path="system-admin/frameworks"
+              element={<SystemAdminFrameworksPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId"
+              element={<SystemAdminFrameworkDetailPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId/versions/:versionId"
+              element={<SystemAdminFrameworkVersionDetailPage />}
+            />
             <Route
               path="system-admin/rubrics"
               element={<SystemAdminRubricsPage />}
@@ -742,6 +799,10 @@ export function AppRoutes() {
             <Route
               path="school-admin/proctor-attendance"
               element={<TeacherProctorAttendancePage />}
+            />
+            <Route
+              path="school-admin/monitoring/exams/:examId"
+              element={<MonitoringExamSchedulesPage />}
             />
             <Route
               path="school-admin/monitoring/exams/:examId/schedules/:scheduleId"
@@ -819,6 +880,9 @@ export function AppRoutes() {
               path="school-admin/classes/:classId"
               element={<SchoolAdminClassDetailPage />}
             />
+            <Route path="school-admin/frameworks" element={<SchoolAdminFrameworksPage />} />
+            <Route path="school-admin/frameworks/:frameworkId" element={<SchoolAdminFrameworkDetailPage />} />
+            <Route path="school-admin/frameworks/:frameworkId/versions/:versionId" element={<SchoolAdminFrameworkVersionDetailPage />} />
             <Route path="school-admin/question-banks" element={<SchoolAdminQuestionBanksPage />} />
             <Route path="school-admin/question-banks/:bankId" element={<SchoolAdminQuestionBankDetailPage />} />
             <Route path="school-admin/question-topics" element={<SchoolAdminQuestionTopicsPage />} />
@@ -840,6 +904,7 @@ export function AppRoutes() {
             <Route path="school-admin/reevaluation/:requestId" element={<SchoolAdminReevaluationDetailPage />} />
             <Route path="school-admin/reevaluation" element={<SchoolAdminReevaluationPage />} />
             <Route path="school-admin/grading" element={<SchoolAdminGradingPage />} />
+            <Route path="school-admin/grading/:candidateResultId" element={<SchoolAdminGradingTaskPage />} />
             <Route path="school-admin/blueprints/:blueprintId/versions/new" element={<SchoolAdminCreateBlueprintVersionPage />} />
             <Route
               path="school-admin/blueprints/:blueprintId/versions/:versionId/edit"
@@ -930,6 +995,10 @@ export function AppRoutes() {
             <Route
               path="teacher/proctor-attendance"
               element={<TeacherProctorAttendancePage />}
+            />
+            <Route
+              path="teacher/monitoring/exams/:examId"
+              element={<MonitoringExamSchedulesPage />}
             />
             <Route
               path="teacher/monitoring/exams/:examId/schedules/:scheduleId"

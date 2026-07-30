@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, LayoutList, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
@@ -8,7 +8,7 @@ import { Pagination } from '@/shared/components/Pagination'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
-import { examQueryKeys, useExamBlueprintQuery, useExamBlueprintsQuery } from '../api/queries'
+import { examQueryKeys, useExamBlueprintSummaryQuery, useExamBlueprintsQuery } from '../api/queries'
 import { useCreateBlueprintMutation, useDeleteBlueprintVersionMutation, useUpdateBlueprintVersionStatusMutation } from '../api/mutations'
 import {
   formatNullableText,
@@ -22,10 +22,10 @@ const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
 function getBlueprintCardStatus(blueprint: ExamBlueprintDto): { label: string; tone: 'neutral' | 'success' | 'warning' } {
   if (!blueprint.isActive) {
-    return { label: 'Luu tru', tone: 'neutral' }
+    return { label: 'Lưu trữ', tone: 'neutral' }
   }
   const hasPublished = blueprint.versions.some((version) => version.status === 'PUBLISHED')
-  return hasPublished ? { label: 'Dang hoat dong', tone: 'success' } : { label: 'Nhap phien ban', tone: 'warning' }
+  return hasPublished ? { label: 'Đang hoạt động', tone: 'success' } : { label: 'Nháp phiên bản', tone: 'warning' }
 }
 
 type CreateBlueprintModalProps = {
@@ -35,31 +35,45 @@ type CreateBlueprintModalProps = {
 
 function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps) {
   const createMutation = useCreateBlueprintMutation()
+  const createLockedRef = useRef(false)
   const languagesQuery = useSupportedLanguagesQuery(1, 100, ACTIVE_LANGUAGE_FILTERS)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [description, setDescription] = useState('')
   const [languageId, setLanguageId] = useState('')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   async function handleSubmit() {
-    if (!name.trim() || !code.trim() || !languageId) {
-      window.alert('Vui long nhap ten va ma blueprint.')
+    if (createLockedRef.current || createMutation.isPending) {
       return
     }
-    const blueprint = await createMutation.mutateAsync({
-      code: code.trim(),
-      description: description || null,
-      languageId,
-      name,
-    })
-    onCreated(blueprint.id)
+    if (!name.trim() || !code.trim() || !languageId) {
+      setErrorMessage('Vui lòng nhập tên, mã blueprint và ngôn ngữ.')
+      return
+    }
+    setErrorMessage(null)
+    createLockedRef.current = true
+    try {
+      const blueprint = await createMutation.mutateAsync({
+        code: code.trim(),
+        description: description || null,
+        languageId,
+        name,
+      })
+      onCreated(blueprint.id)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    } finally {
+      createLockedRef.current = false
+    }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
       <section className="w-full max-w-md rounded-2xl bg-white shadow-2xl" role="dialog">
+        <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-          <h2 className="text-lg font-black text-slate-900">Tao blueprint moi</h2>
+          <h2 className="text-lg font-black text-slate-900">Tạo blueprint mới</h2>
           <button
             aria-label="Dong"
             className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
@@ -125,7 +139,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
             onClick={() => void handleSubmit()}
             type="button"
           >
-            Tao blueprint
+            {createMutation.isPending ? 'Đang tạo…' : 'Tạo blueprint'}
           </button>
         </div>
       </section>
@@ -146,8 +160,8 @@ function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
 
   return (
     <section className="mx-auto max-w-290">
-      <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">Blueprint de thi</h1>
-      <p className="mt-2 text-[15px] text-slate-500">Khuon mau cau truc de: phan, o cau hoi, trong so va thoi luong.</p>
+      <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">Blueprint đề thi</h1>
+      <p className="mt-2 text-[15px] text-slate-500">Khuôn mẫu cấu trúc đề: phần, ô câu hỏi, trọng số và thời lượng.</p>
       {canCreate ? (
         <button
           className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
@@ -155,7 +169,7 @@ function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
           type="button"
         >
           <Plus aria-hidden="true" className="size-4.5" />
-          Tao blueprint
+          Tạo blueprint
         </button>
       ) : (
         <p className="mt-5 text-[13px] text-slate-400">
@@ -186,7 +200,7 @@ function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
                 <div className="text-xs text-slate-500">{blueprint.code}</div>
               </div>
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                <span>{blueprint.sectionCount ?? 0} phan</span>·
+                <span>{blueprint.sectionCount ?? 0} phần</span>·
                 <span>{blueprint.versionCount ?? 0} phien ban</span>
               </div>
               {versionDisplay ? (
@@ -240,7 +254,8 @@ type VersionStatusSelectProps = {
 function VersionStatusSelect({ onArchive, onPublish, pending, version }: VersionStatusSelectProps) {
   const weightSum = version.weightSum ?? 0
   const sectionsWeightOk = Math.abs(weightSum - 1) < 0.01
-  const invalidSlotSection = version.sections.find((section) => {
+  const sections = version.sections ?? []
+  const invalidSlotSection = sections.find((section) => {
     const slotWeightSum = section.slots.reduce((sum, slot) => sum + (slot.weight ?? 0), 0)
     return Math.abs(slotWeightSum - 1) >= 0.01
   })
@@ -293,7 +308,7 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { blueprintId } = useParams()
-  const blueprintQuery = useExamBlueprintQuery(blueprintId ?? null)
+  const blueprintQuery = useExamBlueprintSummaryQuery(blueprintId ?? null)
   const blueprint = blueprintQuery.data
   const updateVersionStatusMutation = useUpdateBlueprintVersionStatusMutation()
   const deleteVersionMutation = useDeleteBlueprintVersionMutation()
@@ -306,11 +321,22 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
   }
 
   if (blueprintQuery.isLoading) {
-    return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Dang tai...</section>
+    return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
+  }
+
+  if (blueprintQuery.isError) {
+    return (
+      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        Không tải được blueprint: {toApiError(blueprintQuery.error).message}
+        <button className="ml-2 font-bold underline" onClick={() => void blueprintQuery.refetch()} type="button">
+          Thử lại
+        </button>
+      </section>
+    )
   }
 
   if (!blueprint) {
-    return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Khong tim thay blueprint.</section>
+    return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy blueprint.</section>
   }
 
   async function handlePublish(version: ExamBlueprintVersionDto) {
@@ -404,7 +430,6 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
                   <th className="py-2 pr-3">Phần</th>
                   <th className="py-2 pr-3">Ô câu hỏi</th>
                   <th className="py-2 pr-3">Trọng số</th>
-                  <th className="py-2 pr-3">Thời lượng</th>
                   <th className="py-2 pr-3 text-right">Hành động</th>
                 </tr>
               </thead>
@@ -424,12 +449,9 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
                         <StatusBadge {...getBlueprintVersionStatusDisplay(version.status)} />
                       )}
                     </td>
-                    <td className="py-2.5 pr-3 text-slate-600">{version.sectionCount ?? version.sections.length}</td>
+                    <td className="py-2.5 pr-3 text-slate-600">{version.sectionCount ?? version.sections?.length ?? 0}</td>
                     <td className="py-2.5 pr-3 text-slate-600">{version.slotCount ?? 0}</td>
                     <td className="py-2.5 pr-3 text-slate-600">{(version.weightSum ?? 0).toFixed(2)}</td>
-                    <td className="py-2.5 pr-3 text-slate-600">
-                      {version.totalTimeLimitSeconds ? `${Math.round(version.totalTimeLimitSeconds / 60)} phút` : '-'}
-                    </td>
                     <td className="py-2.5 pr-0">
                       <div className="flex items-center justify-end gap-1.5">
                         <button

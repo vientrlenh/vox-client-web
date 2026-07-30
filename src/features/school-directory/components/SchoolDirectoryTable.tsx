@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Eye } from 'lucide-react'
+import { CheckCircle2, Eye, RefreshCw } from 'lucide-react'
 import type { SchoolDirectory } from '../types'
 import { formatNullableText } from '../types'
 import { SchoolDirectoryVerifiedBadge } from './SchoolDirectoryVerifiedBadge'
@@ -11,8 +11,10 @@ type SchoolDirectoryTableProps = {
   isError: boolean
   isLoading: boolean
   onRetry: () => void
+  onVerify: (directory: SchoolDirectory) => void
   onView: (directory: SchoolDirectory) => void
   selectedId: string | null
+  verifyingId: string | null
 }
 
 export function SchoolDirectoryTable({
@@ -22,8 +24,10 @@ export function SchoolDirectoryTable({
   isError,
   isLoading,
   onRetry,
+  onVerify,
   onView,
   selectedId,
+  verifyingId,
 }: SchoolDirectoryTableProps) {
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -75,6 +79,7 @@ export function SchoolDirectoryTable({
             <tbody>
               {directories.map((directory) => {
                 const isSelected = directory.id === selectedId
+                const isVerifying = verifyingId === directory.id
 
                 return (
                   <tr
@@ -107,7 +112,7 @@ export function SchoolDirectoryTable({
                       />
                     </td>
                     <td className="px-4 py-4">
-                      <div className="flex justify-center">
+                      <div className="flex justify-center gap-2">
                         <button
                           aria-label={`Xem chi tiết ${formatNullableText(
                             directory.name,
@@ -119,6 +124,27 @@ export function SchoolDirectoryTable({
                           <Eye aria-hidden="true" className="size-4" />
                           Xem
                         </button>
+                        {!directory.verified ? (
+                          <button
+                            aria-label={`Xác minh ${formatNullableText(
+                              directory.name,
+                            )}`}
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-70"
+                            disabled={isVerifying}
+                            onClick={() => onVerify(directory)}
+                            type="button"
+                          >
+                            {isVerifying ? (
+                              <RefreshCw
+                                aria-hidden="true"
+                                className="size-4 animate-spin"
+                              />
+                            ) : (
+                              <CheckCircle2 aria-hidden="true" className="size-4" />
+                            )}
+                            Xác minh
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

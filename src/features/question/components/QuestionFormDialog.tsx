@@ -33,12 +33,19 @@ type FormState = {
 }
 
 const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: QuestionType }> = [
-  { label: 'Đọc to', value: 'READ_ALOUD' },
   { label: 'Trả lời ngắn', value: 'SHORT_ANSWER' },
   { label: 'Trả lời dài', value: 'LONG_ANSWER' },
   { label: 'Ý kiến', value: 'OPINION' },
   { label: 'Mô tả', value: 'DESCRIPTION' },
 ]
+
+const DEFAULT_QUESTION_TYPE: QuestionType = 'SHORT_ANSWER'
+
+function normalizeSelectableQuestionType(type?: QuestionType | string | null): QuestionType {
+  return QUESTION_TYPE_OPTIONS.some((option) => option.value === type)
+    ? (type as QuestionType)
+    : DEFAULT_QUESTION_TYPE
+}
 
 function createFormState(question: QuestionDto | null): FormState {
   return {
@@ -46,7 +53,7 @@ function createFormState(question: QuestionDto | null): FormState {
     durationSeconds:
       question?.durationSeconds != null ? String(question.durationSeconds) : '',
     questionText: question?.questionText ?? '',
-    questionType: question?.questionType ?? 'READ_ALOUD',
+    questionType: normalizeSelectableQuestionType(question?.questionType),
     standardLevelId: question?.standardLevelId ?? '',
     isActive: question?.isActive ?? true,
   }

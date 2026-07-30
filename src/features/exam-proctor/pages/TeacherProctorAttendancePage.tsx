@@ -27,6 +27,18 @@ const FLAG_REASON = 'Giám thị đánh dấu bài thi là nghi vấn để ch�
 const FORCE_END_REASON = 'Giám thị yêu cầu tạm dừng bài thi để xem xét.'
 const UNBLOCK_REASON = 'Giám thị dỡ cấm để học sinh tiếp tục bài thi đang dở.'
 
+function areIdSetsEqual(a: Set<string>, b: Set<string>) {
+  if (a.size !== b.size) {
+    return false
+  }
+  for (const id of a) {
+    if (!b.has(id)) {
+      return false
+    }
+  }
+  return true
+}
+
 function isWithinAttendanceWindow(startDate?: string | null, endDate?: string | null) {
   if (!startDate || !endDate) {
     return false
@@ -65,7 +77,7 @@ export function TeacherProctorAttendancePage() {
   const location = useLocation()
   const isSchoolAdminView = location.pathname.startsWith('/school-admin')
   const schedulesQuery = useMyProctorSchedulesQuery()
-  const schedules = schedulesQuery.data ?? []
+  const schedules = useMemo(() => schedulesQuery.data ?? [], [schedulesQuery.data])
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null)
   const [selectedAttendedIds, setSelectedAttendedIds] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState<string | null>(null)
@@ -83,7 +95,7 @@ export function TeacherProctorAttendancePage() {
   const activeScheduleId = selectedScheduleId ?? schedules[0]?.scheduleId ?? null
   const selectedSchedule = schedules.find((schedule) => schedule.scheduleId === activeScheduleId) ?? null
   const candidatesQuery = useMyProctorScheduleCandidatesQuery(activeScheduleId)
-  const candidates = candidatesQuery.data ?? []
+  const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
 
   useEffect(() => {
     const timerId = window.setInterval(() => setClockNow(Date.now()), 1000)
@@ -91,9 +103,10 @@ export function TeacherProctorAttendancePage() {
   }, [])
 
   useEffect(() => {
-    setSelectedAttendedIds(
-      new Set(candidates.filter((candidate) => candidate.status === 'ATTENDED').map((candidate) => candidate.candidateId)),
+    const attendedIds = new Set(
+      candidates.filter((candidate) => candidate.status === 'ATTENDED').map((candidate) => candidate.candidateId),
     )
+    setSelectedAttendedIds((previous) => (areIdSetsEqual(previous, attendedIds) ? previous : attendedIds))
   }, [candidates, activeScheduleId])
 
   useEffect(() => {
@@ -217,35 +230,67 @@ export function TeacherProctorAttendancePage() {
     }
 
     if (['IN_PROGRESS', 'SUBMITTED', 'INTERRUPTED'].includes(candidate.sessionStatus ?? '')) {
-      items.push({
-        id: `flag-${candidate.candidateId}`,
-        label: 'Đánh dấu nghi vấn',
-        onSelect: () => {
-          void (async () => {
-            const result = await confirmWithReason({
-              message: `Đánh dấu bài thi của ${candidateName} là nghi vấn? Học sinh vẫn tiếp tục thi bình thường, kết quả sẽ được giữ lại chờ giáo viên xem xét sau khi chấm xong.`,
-              reasonLabel: 'Lý do đánh dấu nghi vấn',
-              reasonPlaceholder: 'Nhập lý do nếu cần...',
-              title: 'Xác nhận đánh dấu nghi vấn',
-            })
-            if (!result.confirmed) {
-              return
-            }
+      items.push(
+        candidate.sessionFlagged
+          ? {
+              id: `unflag-${candidate.candidateId}`,
+              label: 'Bỏ đánh dấu nghi vấn',
+              onSelect: () => {
+                void (async () => {
+                  if (
+                    !(await confirm({
+                      message: `Bỏ đánh dấu nghi vấn cho bài thi của ${candidateName}?`,
+                      title: 'Xác nhận bỏ đánh dấu nghi vấn',
+                    }))
+                  ) {
+                    return
+                  }
 
-            try {
-              await flagExamSessionMutation.mutateAsync({
-                reason: result.reason || FLAG_REASON,
-                sessionId: candidate.sessionId ?? '',
-              })
-              await invalidateAttendance()
-              setMessage(`Đã đánh dấu nghi vấn cho ${candidateName}.`)
-            } catch (error) {
-              setErrorMessage(toApiError(error).message)
+                  try {
+                    await flagExamSessionMutation.mutateAsync({
+                      flagged: false,
+                      sessionId: candidate.sessionId ?? '',
+                    })
+                    await invalidateAttendance()
+                    setMessage(`Đã bỏ đánh dấu nghi vấn cho ${candidateName}.`)
+                  } catch (error) {
+                    setErrorMessage(toApiError(error).message)
+                  }
+                })()
+              },
+              tone: 'primary',
             }
-          })()
-        },
-        tone: 'warning',
-      })
+          : {
+              id: `flag-${candidate.candidateId}`,
+              label: 'Đánh dấu nghi vấn',
+              onSelect: () => {
+                void (async () => {
+                  const result = await confirmWithReason({
+                    message: `Đánh dấu bài thi của ${candidateName} là nghi vấn? Học sinh vẫn tiếp tục thi bình thường, kết quả sẽ được giữ lại chờ giáo viên xem xét sau khi chấm xong.`,
+                    reasonLabel: 'Lý do đánh dấu nghi vấn',
+                    reasonPlaceholder: 'Nhập lý do nếu cần...',
+                    title: 'Xác nhận đánh dấu nghi vấn',
+                  })
+                  if (!result.confirmed) {
+                    return
+                  }
+
+                  try {
+                    await flagExamSessionMutation.mutateAsync({
+                      flagged: true,
+                      reason: result.reason || FLAG_REASON,
+                      sessionId: candidate.sessionId ?? '',
+                    })
+                    await invalidateAttendance()
+                    setMessage(`Đã đánh dấu nghi vấn cho ${candidateName}.`)
+                  } catch (error) {
+                    setErrorMessage(toApiError(error).message)
+                  }
+                })()
+              },
+              tone: 'warning',
+            },
+      )
     }
 
     if (['IN_PROGRESS', 'INTERRUPTED'].includes(candidate.sessionStatus ?? '')) {

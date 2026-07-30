@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   Calendar,
@@ -36,8 +36,10 @@ import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
 import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
-import { examQueryKeys, useExamMyRoleQuery, useExamQuery } from '@/features/examCore/api/queries'
+import { examQueryKeys, useExamDetailBundleQuery } from '@/features/examCore/api/queries'
 import { useMatchingSchoolAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
+import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
+import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import {
   useCreateExamPaperMutation,
   useReleaseSecurePoolMutation,
@@ -57,6 +59,7 @@ import {
   toIsoDateTime,
   type ExamDeliveryMode,
   type ExamDto,
+  type ExamPaperDto,
   type ExamStatus,
   type ResultDecisionMethod,
 } from '@/features/examCore/types'
@@ -64,7 +67,12 @@ import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
 import { MembersTab } from '../components/MembersTab'
 import { useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
 import { useCreateExamMutation, useDeleteExamMutation, useUpdateExamMutation, useUpdateExamStatusMutation } from '../api/useExamMutations'
-import { getExamStatusDisplay } from '../types'
+import {
+  EXAM_STREAM_SETUP_PAYLOAD,
+  EXAM_STREAM_SETUPS,
+  getExamStatusDisplay,
+  type ExamStreamSetup,
+} from '../types'
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
@@ -76,11 +84,11 @@ const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
   { label: 'Đã công bố kết quả', value: 'RESULTS_PUBLISHED' },
 ]
 
-function getExamWorkflowSteps(exam: ExamDto): { completedCount: number; steps: WorkflowStep[] } {
+function getExamWorkflowSteps(exam: ExamDto, papers: ExamPaperDto[]): { completedCount: number; steps: WorkflowStep[] } {
   const step1Done = Boolean(exam.blueprintId)
   const step2Done = Boolean(exam.blueprintVersionId)
-  const totalPapers = exam.papers.length
-  const lockedPapers = exam.papers.filter((paper) => paper.status === 'LOCKED').length
+  const totalPapers = papers.length
+  const lockedPapers = papers.filter((paper) => paper.status === 'LOCKED').length
   const step3Done = step2Done && totalPapers > 0 && lockedPapers === totalPapers
   const step4Done = exam.status === 'RESULTS_PUBLISHED' || exam.status === 'CLOSED'
 
@@ -172,7 +180,7 @@ function ExamListPage({ allowCreate, basePath, title }: ExamListPageProps) {
         ) : (
           examsQuery.data?.content.map((exam) => {
             const statusDisplay = getExamStatusDisplay(exam.status)
-            const { steps } = getExamWorkflowSteps(exam)
+            const { steps } = getExamWorkflowSteps(exam, exam.papers)
             const metaItems = [
               { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
               exam.blueprintId
@@ -256,6 +264,10 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
     locationState?.selectedRubricVersion ?? null,
   )
   const [manualPolicyId, setManualPolicyId] = useState<string | null>(null)
+  // Mặc định mức giám sát đầy đủ, không phải "không giám sát": lựa chọn này không sửa được sau khi
+  // tạo kỳ thi, nên mặc định phải là phương án an toàn và việc hạ nó xuống phải là hành động có ý thức.
+  const [streamSetup, setStreamSetup] = useState<ExamStreamSetup>('BOTH_REQUIRED')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { confirm, dialog } = useConfirmationDialog()
 
   const matchingPoliciesQuery = useMatchingSchoolAssessmentPoliciesQuery({
@@ -286,32 +298,41 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   }
 
   async function handleSubmit() {
+    setErrorMessage(null)
     if (!name.trim() || !code.trim() || !languageId) {
-      window.alert('Vui lòng nhập tên và mã kỳ thi.')
+      setErrorMessage('Vui lòng nhập tên, mã kỳ thi và ngôn ngữ.')
       return
     }
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo kỳ thi này không?' }))) {
       return
     }
-    await createMutation.mutateAsync({
-      assessmentPolicyId,
-      code: code.trim(),
-      description: description || null,
-      languageId,
-      // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
-      maxAttempt: 1,
-      name,
-      requiresOtp: true,
-      resultDecisionMethod,
-    })
-    await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
-    navigate('/school-admin/exams')
+    try {
+      await createMutation.mutateAsync({
+        assessmentPolicyId,
+        code: code.trim(),
+        description: description || null,
+        languageId,
+        // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
+        maxAttempt: 1,
+        name,
+        requiresOtp: true,
+        resultDecisionMethod,
+        // Qua bảng map, không gán tay hai trường: server chỉ nhận đúng 5 tổ hợp và mọi tổ hợp khác
+        // trả về 400.
+        ...EXAM_STREAM_SETUP_PAYLOAD[streamSetup],
+      })
+      await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
+      navigate('/school-admin/exams')
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   return (
     <section className="mx-auto max-w-160">
       <h1 className="text-[26px] font-extrabold text-slate-900">Tạo kỳ thi</h1>
       <p className="mt-1.5 text-sm text-slate-500">Nhập thông tin cơ bản, sau đó gắn blueprint và thêm hội đồng đề.</p>
+      <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
       {dialog}
 
       <div className="mt-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-6">
@@ -369,6 +390,52 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             ))}
           </select>
         </label>
+
+        <fieldset className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <legend className="text-sm font-bold text-slate-700">Giám sát thi</legend>
+          <p className="text-xs text-slate-500">
+            Quyết định học viên phải chia sẻ những gì trong lúc thi.{' '}
+            <b className="text-slate-700">Không sửa được sau khi tạo kỳ thi.</b>
+          </p>
+
+          <div className="mt-1.5 grid gap-2">
+            {EXAM_STREAM_SETUPS.map((option) => {
+              const isSelected = streamSetup === option.value
+              const isWarning = option.tone === 'warning'
+              return (
+                <label
+                  className={`grid cursor-pointer grid-cols-[auto_1fr] items-start gap-2.5 rounded-lg border bg-white p-3 transition ${
+                    isSelected
+                      ? isWarning
+                        ? 'border-amber-300 ring-2 ring-amber-100'
+                        : 'border-indigo-300 ring-2 ring-indigo-100'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                  key={option.value}
+                >
+                  <input
+                    checked={isSelected}
+                    className="mt-0.5 accent-indigo-600"
+                    name="streamSetup"
+                    onChange={() => setStreamSetup(option.value)}
+                    type="radio"
+                    value={option.value}
+                  />
+                  <span className="grid gap-0.5">
+                    <span className="text-[13px] font-bold text-slate-900">{option.label}</span>
+                    <span
+                      className={`text-xs ${
+                        isWarning && isSelected ? 'font-semibold text-amber-700' : 'text-slate-500'
+                      }`}
+                    >
+                      {option.hint}
+                    </span>
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
 
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
@@ -555,31 +622,38 @@ function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
   const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
     exam.resultDecisionMethod ?? 'HIGHEST',
   )
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   async function handleSubmit() {
+    setErrorMessage(null)
     if (!name.trim()) {
-      window.alert('Vui lòng nhập tên kỳ thi.')
+      setErrorMessage('Vui lòng nhập tên kỳ thi.')
       return
     }
-    await updateMutation.mutateAsync({
-      examId: exam.id,
-      payload: {
-        closeAt: toIsoDateTime(closeAt),
-        description: description || null,
-        // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
-        maxAttempt: 1,
-        name: name.trim(),
-        openAt: toIsoDateTime(openAt),
-        requiresOtp: true,
-        resultDecisionMethod,
-      },
-    })
-    onSaved()
+    try {
+      await updateMutation.mutateAsync({
+        examId: exam.id,
+        payload: {
+          closeAt: toIsoDateTime(closeAt),
+          description: description || null,
+          // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
+          maxAttempt: 1,
+          name: name.trim(),
+          openAt: toIsoDateTime(openAt),
+          requiresOtp: true,
+          resultDecisionMethod,
+        },
+      })
+      onSaved()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
       <section className="w-full max-w-md rounded-2xl bg-white shadow-2xl" role="dialog">
+        <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <h2 className="text-lg font-black text-slate-900">Sửa thông tin kỳ thi</h2>
           <button
@@ -687,10 +761,12 @@ function ExamDetailPage({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { examId } = useParams()
-  const examQuery = useExamQuery(examId ?? null)
-  const exam = examQuery.data
-  const myRoleQuery = useExamMyRoleQuery(examId ?? null)
-  const myRole = myRoleQuery.data
+  const bundleQuery = useExamDetailBundleQuery(examId ?? null)
+  const exam = bundleQuery.data?.exam
+  const papers = exam?.papers ?? []
+  const attachedBlueprint = exam?.blueprint ?? null
+  const subscriptionQuery = useMySubscriptionQuery()
+  const myRole = bundleQuery.data?.myRole
   const createPaperMutation = useCreateExamPaperMutation()
   const updatePaperStatusMutation = useUpdateExamPaperStatusMutation()
   const updateStatusMutation = useUpdateExamStatusMutation()
@@ -703,6 +779,7 @@ function ExamDetailPage({
   const [showEditModal, setShowEditModal] = useState(false)
   const [showCopyPicker, setShowCopyPicker] = useState(false)
   const [copyFromPaperId, setCopyFromPaperId] = useState('')
+  const createPaperLockedRef = useRef(false)
   const { confirm, dialog } = useConfirmationDialog()
 
   async function invalidate() {
@@ -710,11 +787,28 @@ function ExamDetailPage({
   }
 
   async function handleCreatePaper(forExamId: string, source: 'blueprint' | 'copy', copyFromPaperId: string | null) {
+    const currentBlueprintVersion = attachedBlueprint?.versions.find((version) => version.id === exam?.blueprintVersionId)
+    const sourcePaper = copyFromPaperId ? papers.find((paper) => paper.id === copyFromPaperId) : null
+    const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
+    const quotaWarning =
+      source === 'blueprint'
+        ? buildTimeQuotaWarning('Mã đề tạo từ blueprint', currentBlueprintVersion?.totalTimeLimitSeconds, maxTimePerAttemptMin)
+        : buildTimeQuotaWarning('Mã đề sao chép', sourcePaper?.timeDurationSeconds, maxTimePerAttemptMin)
+    if (quotaWarning) {
+      setErrorMessage(`${quotaWarning} Không thể tạo mã đề vượt quota của trường.`)
+      return
+    }
+    if (createPaperLockedRef.current || createPaperMutation.isPending) {
+      return
+    }
+    createPaperLockedRef.current = true
     try {
       await createPaperMutation.mutateAsync({ examId: forExamId, payload: { copyFromPaperId, source } })
       await invalidate()
     } catch (error) {
       setErrorMessage(toApiError(error).message)
+    } finally {
+      createPaperLockedRef.current = false
     }
   }
 
@@ -779,7 +873,7 @@ function ExamDetailPage({
     }
   }
 
-  if (examQuery.isLoading) {
+  if (bundleQuery.isLoading) {
     return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
   }
 
@@ -788,11 +882,20 @@ function ExamDetailPage({
   }
 
   const statusDisplay = getExamStatusDisplay(exam.status)
-  const { completedCount, steps } = getExamWorkflowSteps(exam)
-  const totalPapers = exam.papers.length
-  const lockedPapers = exam.papers.filter((paper) => paper.status === 'LOCKED').length
+  const { completedCount, steps } = getExamWorkflowSteps(exam, papers)
+  const totalPapers = papers.length
+  const lockedPapers = papers.filter((paper) => paper.status === 'LOCKED').length
   // Backend authorizes schedule/candidate management for SCHOOL_ADMIN (same school) or the exam's CHAIR.
   const canManageSchedule = canManageStatus || myRole === 'CHAIR'
+  const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
+  const currentBlueprintVersion = attachedBlueprint?.versions.find((version) => version.id === exam.blueprintVersionId)
+  const createFromBlueprintQuotaWarning = buildTimeQuotaWarning(
+    'Mã đề tạo từ blueprint',
+    currentBlueprintVersion?.totalTimeLimitSeconds,
+    maxTimePerAttemptMin,
+  )
+  const selectedCopyPaper = copyFromPaperId ? papers.find((paper) => paper.id === copyFromPaperId) : null
+  const copyQuotaWarning = buildTimeQuotaWarning('Mã đề sao chép', selectedCopyPaper?.timeDurationSeconds, maxTimePerAttemptMin)
 
   const primaryStatusAction =
     exam.status === 'DRAFT' && completedCount >= 3
@@ -919,47 +1022,55 @@ function ExamDetailPage({
           {canManagePapers ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {showCopyPicker ? (
-                <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pr-1.5 pl-3.5">
-                  <span className="text-xs font-bold text-slate-500">Sao chép từ</span>
-                  <select
-                    className="h-8 rounded-full border border-slate-200 px-2.5 text-xs font-semibold text-slate-700"
-                    onChange={(event) => setCopyFromPaperId(event.target.value)}
-                    value={copyFromPaperId}
-                  >
-                    <option value="">Chọn mã đề…</option>
-                    {exam.papers.map((paper) => (
-                      <option key={paper.id} value={paper.id}>
-                        {paper.code}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className="inline-flex h-8 items-center justify-center rounded-full bg-indigo-600 px-3.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!copyFromPaperId}
-                    onClick={() => {
-                      void handleCreatePaper(exam.id, 'copy', copyFromPaperId)
-                      setShowCopyPicker(false)
-                      setCopyFromPaperId('')
-                    }}
-                    type="button"
-                  >
-                    Sao chép
-                  </button>
-                  <button
-                    aria-label="Hủy sao chép mã đề"
-                    className="inline-flex size-8 items-center justify-center rounded-full text-slate-400 hover:text-slate-600"
-                    onClick={() => {
-                      setShowCopyPicker(false)
-                      setCopyFromPaperId('')
-                    }}
-                    type="button"
-                  >
-                    <X aria-hidden="true" className="size-3.5" />
-                  </button>
-                </div>
+                <>
+                  <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pr-1.5 pl-3.5">
+                    <span className="text-xs font-bold text-slate-500">Sao chép từ</span>
+                    <select
+                      className="h-8 rounded-full border border-slate-200 px-2.5 text-xs font-semibold text-slate-700"
+                      onChange={(event) => setCopyFromPaperId(event.target.value)}
+                      value={copyFromPaperId}
+                    >
+                      <option value="">Chọn mã đề…</option>
+                      {papers.map((paper) => (
+                        <option key={paper.id} value={paper.id}>
+                          {paper.code}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="inline-flex h-8 items-center justify-center rounded-full bg-indigo-600 px-3.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!copyFromPaperId || createPaperMutation.isPending || Boolean(copyQuotaWarning)}
+                      onClick={() => {
+                        void handleCreatePaper(exam.id, 'copy', copyFromPaperId)
+                        setShowCopyPicker(false)
+                        setCopyFromPaperId('')
+                      }}
+                      title={copyQuotaWarning ?? undefined}
+                      type="button"
+                    >
+                      {createPaperMutation.isPending ? 'Đang tạo…' : 'Sao chép'}
+                    </button>
+                    <button
+                      aria-label="Hủy sao chép mã đề"
+                      className="inline-flex size-8 items-center justify-center rounded-full text-slate-400 hover:text-slate-600"
+                      onClick={() => {
+                        setShowCopyPicker(false)
+                        setCopyFromPaperId('')
+                      }}
+                      type="button"
+                    >
+                      <X aria-hidden="true" className="size-3.5" />
+                    </button>
+                  </div>
+                  {copyQuotaWarning ? (
+                    <div className="basis-full rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700">
+                      {copyQuotaWarning} Không thể sao chép mã đề vượt quota của trường.
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <>
-                  {exam.papers.length > 0 ? (
+                  {papers.length > 0 ? (
                     <button
                       className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
                       onClick={() => setShowCopyPicker(true)}
@@ -969,23 +1080,30 @@ function ExamDetailPage({
                     </button>
                   ) : null}
                   <button
-                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
+                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={createPaperMutation.isPending || Boolean(createFromBlueprintQuotaWarning)}
                     onClick={() => void handleCreatePaper(exam.id, 'blueprint', null)}
+                    title={createFromBlueprintQuotaWarning ?? undefined}
                     type="button"
                   >
                     <Plus aria-hidden="true" className="size-4" />
-                    Tạo mã đề từ blueprint
+                    {createPaperMutation.isPending ? 'Đang tạo…' : 'Tạo mã đề từ blueprint'}
                   </button>
+                  {createFromBlueprintQuotaWarning ? (
+                    <div className="basis-full rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700">
+                      {createFromBlueprintQuotaWarning} Không thể tạo mã đề vượt quota của trường.
+                    </div>
+                  ) : null}
                 </>
               )}
             </div>
           ) : null}
-          {exam.papers.length === 0 ? (
+          {papers.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-400">
               Chưa có mã đề nào.
             </div>
           ) : (
-            exam.papers.map((paper) => {
+            papers.map((paper) => {
               const paperStatusDisplay = getExamPaperStatusDisplay(paper.status)
               const totalItems = paper.sections.reduce((sum, section) => sum + section.items.length, 0)
               const filledItems = paper.sections.reduce(
@@ -993,6 +1111,7 @@ function ExamDetailPage({
                 0,
               )
               const isIncomplete = filledItems < totalItems
+              const paperQuotaWarning = buildTimeQuotaWarning(`Mã đề ${paper.code}`, paper.timeDurationSeconds, maxTimePerAttemptMin)
               // CHAIR có toàn quyền của REVIEWER (approve) ngoài quyền lock riêng — khớp rule backend.
               const canSubmit = canManagePapers && myRole === 'AUTHOR'
               const canApprove = canManagePapers && (myRole === 'CHAIR' || myRole === 'REVIEWER')
@@ -1001,21 +1120,38 @@ function ExamDetailPage({
                 paper.status === 'DRAFT' && canSubmit
                   ? [
                       {
-                        disabled: isIncomplete,
+                        disabled: isIncomplete || Boolean(paperQuotaWarning),
                         label: 'Nộp duyệt',
                         onClick: () => void handleUpdatePaperStatus(paper.id, 'SUBMIT'),
-                        title: isIncomplete ? 'Còn ô câu hỏi chưa được gán — gán đủ trước khi nộp duyệt' : undefined,
+                        title: paperQuotaWarning ?? (isIncomplete ? 'Còn ô câu hỏi chưa được gán — gán đủ trước khi nộp duyệt' : undefined),
                         tone: 'primary' as const,
                       },
                     ]
                   : paper.status === 'IN_REVIEW' && canApprove
-                    ? [{ label: 'Duyệt', onClick: () => void handleUpdatePaperStatus(paper.id, 'APPROVE'), tone: 'primary' as const }]
+                    ? [
+                        {
+                          disabled: Boolean(paperQuotaWarning),
+                          label: 'Duyệt',
+                          onClick: () => void handleUpdatePaperStatus(paper.id, 'APPROVE'),
+                          title: paperQuotaWarning ?? undefined,
+                          tone: 'primary' as const,
+                        },
+                      ]
                     : paper.status === 'APPROVED' && canLock
-                      ? [{ label: 'Khóa mã đề', onClick: () => void handleUpdatePaperStatus(paper.id, 'LOCK'), tone: 'primary' as const }]
+                      ? [
+                          {
+                            disabled: Boolean(paperQuotaWarning),
+                            label: 'Khóa mã đề',
+                            onClick: () => void handleUpdatePaperStatus(paper.id, 'LOCK'),
+                            title: paperQuotaWarning ?? undefined,
+                            tone: 'primary' as const,
+                          },
+                        ]
                       : []
               return (
                 <PaperCard
                   actions={actions}
+                  maxTimePerAttemptMin={maxTimePerAttemptMin}
                   key={paper.id}
                   onOpen={() =>
                     navigate(
@@ -1046,7 +1182,7 @@ function ExamDetailPage({
           blueprintId={exam.blueprintId}
           blueprintVersionId={exam.blueprintVersionId}
           examId={exam.id}
-          hasPapers={exam.papers.length > 0}
+          hasPapers={papers.length > 0}
           members={exam.members}
           onCreateVersion={(blueprintId) =>
             navigate(`${basePath.replace(/\/exams$/, '')}/blueprints/${blueprintId}/versions/new`)
@@ -1069,7 +1205,7 @@ function ExamDetailPage({
           isClassTest={false}
           onGoToPapers={() => setTab('papers')}
           onSetDeliveryMode={canManageSchedule ? (mode) => void handleSetDeliveryMode(exam.id, mode) : undefined}
-          papers={exam.papers}
+          papers={papers}
           unlocked={completedCount >= 3}
         />
       ) : null}

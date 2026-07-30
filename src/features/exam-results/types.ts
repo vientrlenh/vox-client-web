@@ -64,6 +64,8 @@ export type ExamItemCriterionScoreDto = {
   criterionName?: string | null
   finalScore: number
   id: string
+  maxScore?: number | null
+  minScore?: number | null
   rationale?: string | null
   rawScore: number
   rubricCriterionId: string

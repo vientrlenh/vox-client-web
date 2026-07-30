@@ -92,9 +92,13 @@ export type GradingTaskItem = {
   turns: GradingTurn[]
 }
 
-/** Màn chấm. KHÔNG có tên/ID học sinh — giáo viên chấm ẩn danh. */
+/**
+ * Màn chấm. KHÔNG có tên/ID học sinh — giáo viên chấm ẩn danh.
+ * `assignmentId`/`assignmentStatus` null = bài chưa được gán ai (chỉ xảy ra khi
+ * nhà trường xem/chấm trực tiếp theo candidateResultId).
+ */
 export type GradingTaskDetail = {
-  assignmentId: string
+  assignmentId?: string | null
   candidateResultId: string
   resultCode: string
   examName?: string | null

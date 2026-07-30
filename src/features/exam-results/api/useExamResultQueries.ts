@@ -124,6 +124,8 @@ const EXAM_ITEM_RESPONSE_EVALUATION_QUERY = `
         rubricCriterionId
         criterionCode
         criterionName
+        minScore
+        maxScore
         rawScore
         finalScore
         rationale
