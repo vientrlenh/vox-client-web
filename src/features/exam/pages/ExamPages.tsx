@@ -30,7 +30,6 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
-import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
@@ -748,7 +747,7 @@ type ExamDetailPageProps = {
   canReleaseSecurePool: boolean
 }
 
-type ExamDetailTab = 'assessment' | 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
+type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
 
 function ExamDetailPage({
   basePath,
@@ -995,7 +994,6 @@ function ExamDetailPage({
         <TabPillGroup
           items={[
             { label: 'Phân công', value: 'people' },
-            { label: 'Phương thức đánh giá', value: 'assessment' },
             { label: 'Blueprint', value: 'blueprint' },
             { label: 'Đề bài', value: 'papers' },
             { label: 'Học sinh', value: 'students' },
@@ -1170,8 +1168,6 @@ function ExamDetailPage({
       ) : null}
 
       {tab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
-
-      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
 
       {tab === 'students' ? (
         <CandidatesTab canManage={canManageSchedule} examId={exam.id} examKind={exam.kind} papers={exam.papers} />

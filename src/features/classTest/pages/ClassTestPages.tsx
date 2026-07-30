@@ -38,7 +38,6 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
-import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
@@ -1607,7 +1606,7 @@ type ClassTestDetailPageProps = {
   canManage: boolean
 }
 
-type DetailTab = 'assessment' | 'blueprint' | 'papers' | 'schedule' | 'students'
+type DetailTab = 'blueprint' | 'papers' | 'schedule' | 'students'
 
 function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const navigate = useNavigate()
@@ -2101,7 +2100,6 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       <div className="mt-5.5">
         <TabPillGroup
           items={[
-            { label: 'Phương thức đánh giá', value: 'assessment' },
             { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
             { label: 'Đề bài', value: 'papers' },
             { label: 'Học sinh', value: 'students' },
@@ -2320,8 +2318,6 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           }
         />
       ) : null}
-
-      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
 
       {tab === 'students' ? (
         <CandidatesTab canManage={canManage} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
