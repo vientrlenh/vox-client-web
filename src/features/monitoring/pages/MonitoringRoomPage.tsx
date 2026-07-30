@@ -32,7 +32,10 @@ const FILTER_OPTIONS: { label: string; value: StreamFilter }[] = [
 
 export function MonitoringRoomPage() {
     const { examId, scheduleId } = useParams()
-    const { alerts, connectionState, streamToken, streams } = useScheduleMonitor({ examId, scheduleId })
+    const { alerts, connectionState, refreshStreamToken, streamToken, streams } = useScheduleMonitor({
+        examId,
+        scheduleId,
+    })
     const candidatesQuery = useMyProctorScheduleCandidatesQuery(scheduleId ?? null)
     const candidates = candidatesQuery.data ?? EMPTY_CANDIDATES
 
@@ -164,6 +167,7 @@ export function MonitoringRoomPage() {
                     {watchingEntry && watchingStream ? (
                         <LiveRewindPanel
                             availableStreams={watchingEntry.allStreams}
+                            onAuthError={() => void refreshStreamToken()}
                             onClose={() => setWatching(null)}
                             onSelectStreamType={(streamType) =>
                                 setWatching({ candidateId: watchingEntry.candidateId, streamType })

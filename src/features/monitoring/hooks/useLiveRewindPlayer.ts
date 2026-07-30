@@ -39,7 +39,21 @@ export type SeekReadout = {
     playheadOffset: number
 }
 
+/**
+ * Khoảng chờ tối thiểu giữa hai lần xin token mới vì lỗi xác thực.
+ *
+ * <p>hls.js retry rất nhanh sau lỗi mạng, nên nếu không chặn thì một token chết sẽ sinh ra hàng
+ * chục request token mỗi giây.
+ */
+const AUTH_REFRESH_THROTTLE_MS = 10_000
+
 type UseLiveRewindPlayerParams = {
+    /**
+     * Gọi khi server từ chối token của luồng. Trình phát không tự lấy token được, mà nếu không có
+     * đường báo ra ngoài thì nó sẽ retry vô hạn bằng đúng cái token đã chết - luồng đứng vĩnh viễn
+     * dù chỉ cần một token mới là xong.
+     */
+    onAuthError?: () => void
     scheduleId?: string
     stream: null | StreamView
     token?: string
@@ -65,7 +79,7 @@ export function formatDuration(seconds: number): string {
  * <p>Port từ `vox-streaming/demo/web/monitor.js`, vốn đã là bản prototype chạy được và đã xử lý xong
  * đúng những chỗ khó: thứ tự hls.js/native, neo đồng hồ tường, viết lại token cho mọi request.
  */
-export function useLiveRewindPlayer({ scheduleId, stream, token }: UseLiveRewindPlayerParams) {
+export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: UseLiveRewindPlayerParams) {
     const videoRef = useRef<HTMLVideoElement | null>(null)
     const hlsRef = useRef<Hls | null>(null)
     const usingNativeHlsRef = useRef(false)
@@ -87,6 +101,15 @@ export function useLiveRewindPlayer({ scheduleId, stream, token }: UseLiveRewind
     const draggingRef = useRef(false)
     const followingLiveRef = useRef(true)
     const tokenRef = useRef<string | undefined>(token)
+    /**
+     * Đọc qua ref vì cùng một lý do với `token`: `stream` là object mới sau MỖI sự kiện frame (xem
+     * `streamsReducer`), tức mỗi `FRAME_INTERVAL_SECS` giây. Giữ `startedAt` ở đây cho phép effect
+     * bên dưới khoá vào `streamId` - một primitive - thay vì vào identity của object.
+     */
+    const startedAtRef = useRef<string | undefined>(stream?.startedAt)
+    /** Cùng lý do với hai ref trên: giữ callback ngoài deps để không dựng lại trình phát. */
+    const onAuthErrorRef = useRef(onAuthError)
+    const lastAuthRefreshRef = useRef(0)
 
     const [status, setStatus] = useState<PlayerStatus>({ kind: 'idle', message: '' })
     const [seek, setSeek] = useState<null | SeekReadout>(null)
@@ -95,6 +118,29 @@ export function useLiveRewindPlayer({ scheduleId, stream, token }: UseLiveRewind
     useEffect(() => {
         tokenRef.current = token
     }, [token])
+
+    useEffect(() => {
+        startedAtRef.current = stream?.startedAt
+    }, [stream?.startedAt])
+
+    useEffect(() => {
+        onAuthErrorRef.current = onAuthError
+    }, [onAuthError])
+
+    /**
+     * Xin token mới khi server từ chối token hiện tại.
+     *
+     * <p>Chặn theo thời gian vì hls.js retry lỗi mạng rất dồn dập: không có nó thì một token chết sẽ
+     * biến thành hàng chục request token mỗi giây, đúng lúc backend đang có vấn đề.
+     */
+    const requestFreshToken = useCallback(() => {
+        const now = Date.now()
+        if (now - lastAuthRefreshRef.current < AUTH_REFRESH_THROTTLE_MS) {
+            return
+        }
+        lastAuthRefreshRef.current = now
+        onAuthErrorRef.current?.()
+    }, [])
 
     const mediaToDate = useCallback((mediaTime: number) => {
         const anchor = wallAnchorRef.current
@@ -129,11 +175,20 @@ export function useLiveRewindPlayer({ scheduleId, stream, token }: UseLiveRewind
         return { end: seekable.end(seekable.length - 1), start: seekable.start(0) }
     }, [])
 
-    // Vòng đời trình phát: gắn với luồng đang chọn. Token cố tình KHÔNG nằm trong deps - nó được đọc
-    // qua ref trong xhrSetup, nên một lần refresh token không dựng lại player và không giật về live.
+    // Vòng đời trình phát: gắn với luồng đang chọn, và CHỈ dựng lại khi đổi sang luồng khác.
+    //
+    // Cả `token` lẫn `stream` đều cố tình không nằm trong deps, vì cùng một lý do: mỗi lần deps đổi
+    // là một lần destroy() + loadSource() + attachMedia(), tức tải lại manifest, tải lại init
+    // segment và buffer lại từ đầu - người xem thấy đúng một khoảng đứng hình.
+    //
+    // Với `token` thì mỗi 4 phút. Với `stream` thì tệ hơn nhiều: `streamsReducer` dựng object mới
+    // cho luồng sau MỖI sự kiện frame, nên để nguyên object trong deps sẽ phá và dựng lại trình phát
+    // mỗi FRAME_INTERVAL_SECS giây - mặc định là 5. Khoá vào `streamId` mới là thứ thực sự thay đổi
+    // khi giám thị chuyển luồng; hai trường còn lại effect cần thì đọc qua ref.
+    const streamId = stream?.streamId
     useEffect(() => {
         const video = videoRef.current
-        if (!video || !stream || !scheduleId || !token) {
+        if (!video || !streamId || !scheduleId || !tokenRef.current) {
             setStatus({ kind: 'idle', message: '' })
             return
         }
@@ -146,7 +201,9 @@ export function useLiveRewindPlayer({ scheduleId, stream, token }: UseLiveRewind
         setSeek(null)
         setStatus({ kind: 'loading', message: 'Đang tải luồng…' })
 
-        const url = manifestUrl(scheduleId, stream.streamId, token)
+        // Chỉ là token khởi tạo. Mọi request sau đó - kể cả manifest hls.js tự poll lại - đều được
+        // xhrSetup ghi đè bằng `tokenRef.current`, nên URL này cũ đi không sao.
+        const url = manifestUrl(scheduleId, streamId, tokenRef.current)
         let mediaErrorRecoveries = 0
 
         // hls.js được thử TRƯỚC, native HLS chỉ là phương án dự phòng. Đảo thứ tự không phải khác
@@ -215,6 +272,16 @@ export function useLiveRewindPlayer({ scheduleId, stream, token }: UseLiveRewind
                 // Log cả lỗi không fatal: một lần đơ hình im lặng nhìn từ ngoài chính là chuỗi lỗi
                 // buffer/stall không fatal, và đây là chỗ duy nhất thấy được chẩn đoán của hls.js.
                 console.warn('hls.js error', data.type, data.details, `fatal=${data.fatal}`, data)
+
+                // Kiểm tra TRƯỚC nhánh !fatal: một token hết hạn xuất hiện dưới dạng chuỗi 401 không
+                // fatal ở lần poll manifest, và chỉ trở thành fatal sau khi hls.js đã thử lại đủ số
+                // lần. Chờ tới lúc fatal mới xin token mới là để luồng đứng hình vài chục giây trong
+                // khi thứ cần làm đã rõ ngay từ lỗi đầu tiên.
+                const status = data.response?.code
+                if (status === 401 || status === 403) {
+                    requestFreshToken()
+                }
+
                 if (!data.fatal) {
                     return
                 }
@@ -239,9 +306,13 @@ export function useLiveRewindPlayer({ scheduleId, stream, token }: UseLiveRewind
             hls.attachMedia(video)
         }
 
-        const streamStartMs = stream.startedAt ? new Date(stream.startedAt).getTime() : Number.NaN
-
         const tick = () => {
+            // Đọc lại mỗi nhịp thay vì chốt một lần lúc dựng player: `streamsReducer` tạo entry tạm
+            // với `startedAt: ''` khi frame về trước snapshot, nên giá trị thật có thể đến muộn. Đọc
+            // ở đây thì thanh tua tự chuyển sang mốc tuyệt đối lúc nó tới, không cần dựng lại gì.
+            const startedAt = startedAtRef.current
+            const streamStartMs = startedAt ? new Date(startedAt).getTime() : Number.NaN
+
             const dvr = readDvrWindow(video)
             if (!dvr) {
                 setSeek(null)
@@ -299,10 +370,11 @@ export function useLiveRewindPlayer({ scheduleId, stream, token }: UseLiveRewind
             seekDomainRef.current = null
             draggingRef.current = false
         }
-        // token đọc qua ref có chủ ý: đưa nó vào deps sẽ dựng lại trình phát mỗi 4 phút (nhịp refetch
-        // của monitor token) và giật người xem về mép live ngay giữa lúc đang tua lại.
+        // token và startedAt đọc qua ref có chủ ý, và `stream` được thu về `streamId`: xem lý do đầy
+        // đủ ở đầu effect. Tóm tắt - deps ở đây đổi là player bị dựng lại và người xem đứng hình,
+        // nên chỉ những thứ thực sự bắt buộc phải dựng lại mới được đứng đây.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [scheduleId, stream, dateToMedia, mediaToDate, readDvrWindow])
+    }, [scheduleId, streamId, dateToMedia, mediaToDate, readDvrWindow, requestFreshToken])
 
     const onScrubStart = useCallback(() => {
         draggingRef.current = true

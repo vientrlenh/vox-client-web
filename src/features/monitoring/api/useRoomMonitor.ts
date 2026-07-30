@@ -234,5 +234,9 @@ export function useScheduleMonitor({ examId, scheduleId }: UseScheduleMonitorPar
     // Token được trả ra ngoài để trình phát live-rewind dùng chung một nguồn: manifest HLS bị poll
     // lại liên tục và mỗi lần poll đều xác thực lại token, nên nó cần đúng bản mới nhất mà hook này
     // đang giữ. Tự quản một vòng refresh riêng sẽ tạo ra hai đồng hồ lệch nhau cho cùng một TTL.
-    return { alerts, connectionState, streamToken: token, streams }
+    // refreshStreamToken được trả ra vì cùng lý do với streamToken: trình phát live-rewind là bên
+    // duy nhất thấy được server từ chối token (WebSocket đã tự chữa qua ws.onerror), nhưng nó không
+    // tự lấy token được. Không có đường này thì một token hết hạn khiến hls.js retry vô hạn bằng
+    // đúng token đã chết và luồng đứng vĩnh viễn.
+    return { alerts, connectionState, refreshStreamToken: refetchToken, streamToken: token, streams }
 }

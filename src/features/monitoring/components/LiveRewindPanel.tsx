@@ -6,6 +6,7 @@ import { getStreamTypeLabel, type StreamType } from '../types'
 
 type LiveRewindPanelProps = {
     availableStreams: StreamView[]
+    onAuthError?: () => void
     onClose: () => void
     onSelectStreamType: (streamType: StreamType) => void
     participantName: string
@@ -16,6 +17,7 @@ type LiveRewindPanelProps = {
 
 export function LiveRewindPanel({
     availableStreams,
+    onAuthError,
     onClose,
     onSelectStreamType,
     participantName,
@@ -24,7 +26,7 @@ export function LiveRewindPanel({
     token,
 }: LiveRewindPanelProps) {
     const { goLive, isFollowingLive, onScrubCommit, onScrubStart, seek, status, videoRef } =
-        useLiveRewindPlayer({ scheduleId, stream, token })
+        useLiveRewindPlayer({ onAuthError, scheduleId, stream, token })
 
     // Thanh trượt trải hết thời gian stream đã chạy, kể cả phần không tua được, nên độ dài của nó
     // luôn bằng thời lượng thật của stream.
