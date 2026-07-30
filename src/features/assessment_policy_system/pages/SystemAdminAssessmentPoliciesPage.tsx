@@ -14,6 +14,7 @@ import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { AssessmentPolicyTable } from '../components/AssessmentPolicyTable';
 import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPolicyDialog';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
+import { RubricVersionPoliciesDialog } from '../components/RubricVersionPoliciesDialog';
 import { Pagination } from '@/shared/components/Pagination';
 import type { AssessmentPolicy, CreateAssessmentPolicyPayload, UpdateAssessmentPolicyPayload } from '../types';
 
@@ -32,6 +33,7 @@ export function SystemAdminAssessmentPoliciesPage() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<AssessmentPolicy | null>(null);
+  const [viewingRubricVersionPolicy, setViewingRubricVersionPolicy] = useState<AssessmentPolicy | null>(null);
 
   const { data: languages } = useLanguageOptionsQuery();
 
@@ -182,6 +184,7 @@ export function SystemAdminAssessmentPoliciesPage() {
           onViewDetails={(policy) => navigate(`/system-admin/assessment-policies/${policy.id}`)}
           onEdit={(policy) => setEditingPolicy(policy)}
           onDelete={handleDeletePolicy}
+          onViewRubricVersion={(policy) => setViewingRubricVersionPolicy(policy)}
         />
         {!isLoading && !isError && policies.length > 0 && (
           <Pagination currentPage={page} totalPages={totalPages} totalElements={totalElements} itemName="assessment policy" onPageChange={setPage} />
@@ -200,6 +203,13 @@ export function SystemAdminAssessmentPoliciesPage() {
         onClose={() => setEditingPolicy(null)}
         onSubmit={handleUpdatePolicy}
         isPending={isUpdating}
+      />
+
+      <RubricVersionPoliciesDialog
+        isOpen={Boolean(viewingRubricVersionPolicy)}
+        onClose={() => setViewingRubricVersionPolicy(null)}
+        rubricVersionId={viewingRubricVersionPolicy?.rubricVersionId}
+        rubricVersion={viewingRubricVersionPolicy?.rubricVersion}
       />
     </section>
   );
