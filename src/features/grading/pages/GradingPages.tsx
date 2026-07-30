@@ -49,22 +49,19 @@ import {
   useAutoAssignGradingMutation,
   useClearInvalidResultMutation,
   useDeclineGradingAssignmentMutation,
-  useInvalidateGradingByResultMutation,
   useInvalidateResultMutation,
   useReassignGradingMutation,
   useReclaimOverdueMutation,
   useRegradeResultMutation,
   useRemoveGradingAssignmentMutation,
   useSetGradingDeadlineMutation,
-  useSubmitGradingByResultMutation,
   useUpholdResultMutation,
   type ItemGradeInput,
 } from '../api/useGradingMutations'
-import { useGradingPreviewByResultQuery, useGradingPreviewQuery } from '../api/useGradingPreviewQuery'
+import { useGradingPreviewQuery } from '../api/useGradingPreviewQuery'
 import {
   useGradingAssignmentsQuery,
   useGradingStatsQuery,
-  useGradingTaskDetailBySchoolQuery,
   useGradingTaskDetailQuery,
   useMyGradingTasksQuery,
 } from '../api/useGradingQueries'
@@ -228,7 +225,6 @@ function itemTabItems(items: GradingTaskItem[]): SegmentItem[] {
 // ============================= School Admin: Coordination board =============================
 
 export function SchoolAdminGradingPage() {
-  const navigate = useNavigate()
   const [tab, setTab] = useState('board')
   // Giữ CẢ object thay vì mỗi id: danh sách kỳ thi giờ phân trang phía server nên không còn
   // mảng đầy đủ để tra ngược ra tên — mà tên thì cần cho tên file CSV và 3 dialog bên dưới.
@@ -504,7 +500,7 @@ export function SchoolAdminGradingPage() {
   ]
 
   return (
-    <section className="mx-auto grid max-w-320 gap-5">
+    <section className="mx-auto grid max-w-7xl gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageHeading eyebrow="Chấm điểm" title="Điều phối chấm bài">
           Giao bài cho giáo viên ở bốn vòng chấm:{' '}
@@ -983,16 +979,8 @@ export function SchoolAdminGradingPage() {
 
                           <td className="px-4 py-3">
                             <RowActions menu={rowMenu} resultCode={row.resultCode}>
-                              {/* Nhà trường luôn xem/chấm trực tiếp được, kể cả bài chưa gán ai
-                                  hoặc đang gán cho giáo viên khác — không phụ thuộc phân công. */}
-                              <button
-                                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
-                                onClick={() => navigate(`/school-admin/grading/${row.candidateResultId}`)}
-                                type="button"
-                              >
-                                <Mic className="size-4" />
-                                {completed ? 'Xem lại' : 'Xem / Chấm'}
-                              </button>
+                              {/* Nhà trường chỉ điều phối — giao bài, đổi người, xem lịch sử điểm.
+                                  Việc chấm nằm ở phía giáo viên đang cầm phân công. */}
                               {completed ? null : (
                                 <button
                                   className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700"
@@ -1992,63 +1980,6 @@ export function TeacherGradingTaskPage() {
         )
       }
       submitPending={regradeMutation.isPending}
-      usePreview={usePreview}
-    />
-  )
-}
-
-// ============================= School Admin: Grade one submission directly =============================
-
-/**
- * Nhà trường xem/chấm trực tiếp theo candidateResultId — không cần phân công
- * trước, xem được cả bài chưa gán ai hoặc đang gán cho giáo viên khác.
- */
-export function SchoolAdminGradingTaskPage() {
-  const navigate = useNavigate()
-  const { candidateResultId } = useParams()
-  const detailQuery = useGradingTaskDetailBySchoolQuery(candidateResultId ?? null)
-  const submitMutation = useSubmitGradingByResultMutation()
-  const invalidateMutation = useInvalidateGradingByResultMutation()
-  const detail = detailQuery.data
-
-  if (detailQuery.isLoading) {
-    return <PageLoader />
-  }
-
-  if (!detail) {
-    return (
-      <section className="mx-auto max-w-300">
-        <BackButton onClick={() => navigate('/school-admin/grading')} />
-        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-400">
-          Không tìm thấy bài cần chấm.
-        </div>
-      </section>
-    )
-  }
-  const currentCandidateResultId = detail.candidateResultId
-
-  function usePreview(items: ItemGradeInput[], enabled: boolean) {
-    return useGradingPreviewByResultQuery(currentCandidateResultId, items, { enabled })
-  }
-
-  return (
-    <GradingTaskDetailView
-      detail={detail}
-      invalidatePending={invalidateMutation.isPending}
-      onBack={() => navigate('/school-admin/grading')}
-      onInvalidate={(reason, handlers) =>
-        invalidateMutation.mutate(
-          { candidateResultId: currentCandidateResultId, reason },
-          { onError: handlers.onError, onSuccess: () => handlers.onSuccess() },
-        )
-      }
-      onSubmit={(items, handlers) =>
-        submitMutation.mutate(
-          { candidateResultId: currentCandidateResultId, items },
-          { onError: handlers.onError, onSuccess: (result) => handlers.onSuccess(result.totalScore) },
-        )
-      }
-      submitPending={submitMutation.isPending}
       usePreview={usePreview}
     />
   )

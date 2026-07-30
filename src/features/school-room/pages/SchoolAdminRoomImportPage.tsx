@@ -7,7 +7,11 @@ import {
   RefreshCw,
   Upload,
 } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import {
+  buildImportSessionDetailPath,
+  type ImportSessionNavState,
+} from '@/features/imports'
 import {
   useAcceptRoomImportMutation,
   usePreviewRoomImportMutation,
@@ -190,50 +194,14 @@ function SampleRowsTable({ preview }: SampleRowsTableProps) {
   )
 }
 
-type ImportAcceptedPanelProps = {
-  message: string
-}
-
-function ImportAcceptedPanel({ message }: ImportAcceptedPanelProps) {
-  return (
-    <section className="grid gap-5 rounded-lg border border-emerald-200 bg-emerald-50 p-5">
-      <div className="flex items-start gap-3">
-        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700">
-          <CheckCircle2 aria-hidden="true" className="size-5" />
-        </span>
-        <div>
-          <h2 className="text-lg font-black text-emerald-950">
-            Đã tiếp nhận yêu cầu import
-          </h2>
-          <p className="mt-1 text-sm font-semibold text-emerald-800">
-            {message}
-          </p>
-          <p className="mt-2 text-sm font-medium text-emerald-800/90">
-            Dữ liệu được xử lý bất đồng bộ. Danh sách phòng học sẽ được cập nhật
-            sau khi hệ thống hoàn tất — hãy làm mới danh sách sau ít phút để kiểm
-            tra kết quả.
-          </p>
-        </div>
-      </div>
-
-      <Link
-        className="inline-flex h-11 w-fit items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
-        to="/school-admin/rooms"
-      >
-        Quay lại danh sách phòng học
-      </Link>
-    </section>
-  )
-}
-
 export function SchoolAdminRoomImportPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const previewMutation = usePreviewRoomImportMutation()
   const acceptMutation = useAcceptRoomImportMutation()
   const [preview, setPreview] = useState<PreviewImportResponse | null>(null)
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<PageMessage | null>(null)
-  const [acceptedMessage, setAcceptedMessage] = useState<string | null>(null)
 
   const missingFields = getMissingRequiredFields(mapping)
   const canAccept = Boolean(preview) && missingFields.length === 0
@@ -244,7 +212,6 @@ export function SchoolAdminRoomImportPage() {
 
     if (!isAcceptedFile(file)) {
       setPreview(null)
-      setAcceptedMessage(null)
       setMessage({
         text: 'File không hợp lệ. Vui lòng chọn file CSV hoặc Excel.',
         tone: 'error',
@@ -254,14 +221,12 @@ export function SchoolAdminRoomImportPage() {
 
     try {
       setMessage(null)
-      setAcceptedMessage(null)
       const nextPreview = await previewMutation.mutateAsync({ file })
       setPreview(nextPreview.data)
       setMapping(createInitialMapping(nextPreview.data))
       setMessage({ text: nextPreview.message, tone: 'success' })
     } catch (error) {
       setPreview(null)
-      setAcceptedMessage(null)
       setMessage({
         text:
           getErrorMessage(error) ??
@@ -290,7 +255,7 @@ export function SchoolAdminRoomImportPage() {
 
     try {
       setMessage(null)
-      const response = await acceptMutation.mutateAsync({
+      await acceptMutation.mutateAsync({
         payload: { confirmedMapping: mapping },
         sessionId: preview.importSessionId,
       })
@@ -298,11 +263,17 @@ export function SchoolAdminRoomImportPage() {
       await queryClient.invalidateQueries({
         queryKey: schoolRoomManagementQueryKeys.all,
       })
-      setPreview(null)
-      setMapping({})
-      setAcceptedMessage(
-        response.message ??
-          'Yêu cầu import phòng học đã được tiếp nhận, đang xử lý.',
+      // Backend import ngầm nên số liệu trả về lúc này chưa phải kết quả cuối:
+      // chuyển sang trang chi tiết phiên import để theo dõi trạng thái file.
+      navigate(
+        buildImportSessionDetailPath('/school-admin', preview.importSessionId),
+        {
+          state: {
+            invalidateKeys: [schoolRoomManagementQueryKeys.all],
+            returnLabel: 'Quay lại danh sách phòng học',
+            returnTo: '/school-admin/rooms',
+          } satisfies ImportSessionNavState,
+        },
       )
     } catch (error) {
       setMessage({
@@ -475,10 +446,6 @@ export function SchoolAdminRoomImportPage() {
             </button>
           </div>
         </>
-      ) : null}
-
-      {acceptedMessage ? (
-        <ImportAcceptedPanel message={acceptedMessage} />
       ) : null}
     </section>
   )

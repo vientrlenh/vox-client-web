@@ -4,30 +4,13 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2, FileSpreadsheet, RefreshCw, Upload, AlertTriangle } from 'lucide-react';
-import { fetchImportSessionStatus } from '@/features/imports';
+import { buildImportSessionDetailPath, type ImportSessionNavState } from '@/features/imports';
 import { useAppSelector } from '@/app/store/hooks';
 import { usePreviewSchoolAssessmentPolicyImportMutation } from '../api/usePreviewSchoolAssessmentPolicyImportMutation';
 import { useAcceptSchoolAssessmentPolicyImportMutation } from '../api/useAcceptSchoolAssessmentPolicyImportMutation';
 import { assessmentPolicyQueryKeys } from '../api/useSchoolAssessmentPoliciesQuery';
 import { formatAssessmentPolicyDate } from '../types';
 import type { PreviewAssessmentPolicyImportResponse } from '../types';
-
-const TERMINAL_IMPORT_STATUSES = ['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'];
-
-// Import chạy ngầm (async) ở BE, nên sau khi accept phải chờ session
-// chuyển sang trạng thái cuối rồi mới invalidate cache + điều hướng,
-// nếu không danh sách policy vẫn cũ cho tới khi người dùng tự F5.
-async function waitForImportSessionToFinish(sessionId: string, maxAttempts = 20, intervalMs = 1500) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const session = await fetchImportSessionStatus(sessionId);
-    const status = session?.status?.trim().toUpperCase();
-    if (status && TERMINAL_IMPORT_STATUSES.includes(status)) {
-      return session;
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  return null;
-}
 
 type PageMessage = {
   text: string;
@@ -207,11 +190,10 @@ export function SchoolAdminAssessmentPolicyImportPage() {
   const [preview, setPreview] = useState<PreviewAssessmentPolicyImportResponse | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<PageMessage | null>(null);
-  const [isWaitingForResult, setIsWaitingForResult] = useState(false);
 
   const missingFields = getMissingRequiredFields(mapping);
   const canAccept = Boolean(preview) && missingFields.length === 0;
-  const isBusy = previewMutation.isPending || acceptMutation.isPending || isWaitingForResult;
+  const isBusy = previewMutation.isPending || acceptMutation.isPending;
 
   async function handleFileChange(file?: File) {
     if (!file) return;
@@ -255,28 +237,23 @@ export function SchoolAdminAssessmentPolicyImportPage() {
 
     try {
       setMessage(null);
-      const response = await acceptMutation.mutateAsync({
+      await acceptMutation.mutateAsync({
         payload: { confirmedMapping: mapping },
         sessionId: preview.importSessionId,
       });
 
-      setIsWaitingForResult(true);
-      const finishedSession = await waitForImportSessionToFinish(preview.importSessionId);
-      setIsWaitingForResult(false);
-
       await queryClient.invalidateQueries({ queryKey: assessmentPolicyQueryKeys.lists() });
 
-      if (finishedSession) {
-        alert(
-          `Import hoàn tất (${finishedSession.status}). Đã import ${finishedSession.importedRows}/${finishedSession.totalRows} dòng.`
-        );
-      } else {
-        alert(response.message || 'Import đang được xử lý trong nền, vui lòng kiểm tra lại sau ít phút.');
-      }
-
-      navigate('/school-admin/assessment-policies');
+      // Backend import ngầm nên số liệu trả về lúc này chưa phải kết quả cuối:
+      // chuyển sang trang chi tiết phiên import để theo dõi trạng thái file.
+      navigate(buildImportSessionDetailPath('/school-admin', preview.importSessionId), {
+        state: {
+          invalidateKeys: [assessmentPolicyQueryKeys.lists()],
+          returnLabel: 'Quay lại danh sách chính sách',
+          returnTo: '/school-admin/assessment-policies',
+        } satisfies ImportSessionNavState,
+      });
     } catch (error) {
-      setIsWaitingForResult(false);
       setMessage({
         text: getErrorMessage(error) ?? 'Không thể xác nhận import Assessment Policy. Vui lòng thử lại.',
         tone: 'error',
@@ -418,11 +395,7 @@ export function SchoolAdminAssessmentPolicyImportPage() {
               type="button"
             >
               <CheckCircle2 aria-hidden="true" className="size-4" />
-              {isWaitingForResult
-                ? 'Đang xử lý dữ liệu...'
-                : acceptMutation.isPending
-                  ? 'Đang gửi yêu cầu...'
-                  : 'Xác nhận import'}
+              {acceptMutation.isPending ? 'Đang gửi yêu cầu...' : 'Xác nhận import'}
             </button>
           </div>
         </>

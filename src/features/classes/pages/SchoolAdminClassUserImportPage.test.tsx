@@ -132,6 +132,11 @@ function renderPage(queryClient = createQueryClient()) {
         element={<SchoolAdminClassUserImportPage />}
         path="/school-admin/classes/:classId/users/import"
       />
+      {/* Sau khi accept, trang điều hướng sang chi tiết phiên import. */}
+      <Route
+        element={<p>Trang chi tiết phiên import</p>}
+        path="/school-admin/imports/:sessionId"
+      />
     </Routes>,
     {
       queryClient,
@@ -217,7 +222,7 @@ describe('SchoolAdminClassUserImportPage', () => {
     ).toBeDisabled()
   })
 
-  it('accepts the import and invalidates class queries', async () => {
+  it('accepts the import, invalidates class queries and opens the session detail page', async () => {
     mockImportSuccess()
     const queryClient = createQueryClient()
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries')
@@ -243,8 +248,9 @@ describe('SchoolAdminClassUserImportPage', () => {
         },
       )
     })
-    expect(await screen.findByText('Import học viên hoàn tất')).toBeInTheDocument()
-    expect(screen.getByText('Đã import')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Trang chi tiết phiên import'),
+    ).toBeInTheDocument()
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['class-management'],
     })

@@ -5,29 +5,13 @@ import { useParams, useNavigate, Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, CheckCircle2, FileSpreadsheet, RefreshCw, Upload } from 'lucide-react';
 import { useAppSelector } from '@/app/store/hooks';
-import { fetchImportSessionStatus } from '@/features/imports';
+import { buildImportSessionDetailPath, type ImportSessionNavState } from '@/features/imports';
 import { usePreviewSchoolRubricResultBandImportMutation } from '../api/usePreviewSchoolRubricResultBandImportMutation';
 import { useAcceptSchoolRubricResultBandImportMutation } from '../api/useAcceptSchoolRubricResultBandImportMutation';
 import { searchRubricResultBandKeys } from '../api/useSearchSchoolRubricResultBandsQuery';
 import { formatRubricImportDate } from '../types';
 import type { PreviewRubricResultBandImportResponse } from '../types';
 
-const TERMINAL_IMPORT_STATUSES = ['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'];
-
-// Import chạy ngầm (async) ở BE, nên sau khi accept phải chờ session
-// chuyển sang trạng thái cuối rồi mới invalidate cache + điều hướng,
-// nếu không danh sách thang điểm vẫn rỗng cho tới khi người dùng tự F5.
-async function waitForImportSessionToFinish(sessionId: string, maxAttempts = 20, intervalMs = 1500) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const session = await fetchImportSessionStatus(sessionId);
-    const status = session?.status?.trim().toUpperCase();
-    if (status && TERMINAL_IMPORT_STATUSES.includes(status)) {
-      return session;
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  return null;
-}
 
 type PageMessage = {
   text: string;
@@ -198,11 +182,10 @@ export function SchoolAdminRubricResultBandImportPage() {
   const [preview, setPreview] = useState<PreviewRubricResultBandImportResponse | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<PageMessage | null>(null);
-  const [isWaitingForResult, setIsWaitingForResult] = useState(false);
 
   const missingFields = getMissingRequiredFields(mapping);
   const canAccept = Boolean(preview) && missingFields.length === 0;
-  const isBusy = previewMutation.isPending || acceptMutation.isPending || isWaitingForResult;
+  const isBusy = previewMutation.isPending || acceptMutation.isPending;
 
   async function handleFileChange(file?: File) {
     if (!file) return;
@@ -251,26 +234,18 @@ export function SchoolAdminRubricResultBandImportPage() {
         sessionId: preview.sessionId,
       });
 
-      // BE xử lý import ở hàng đợi ngầm (async), nên phải chờ session
-      // chuyển sang trạng thái cuối rồi mới invalidate cache, nếu không
-      // danh sách thang điểm vẫn rỗng cho tới khi người dùng tự F5.
-      setIsWaitingForResult(true);
-      const finishedSession = await waitForImportSessionToFinish(preview.sessionId);
-      setIsWaitingForResult(false);
-
       await queryClient.invalidateQueries({ queryKey: searchRubricResultBandKeys.all });
 
-      if (finishedSession) {
-        alert(
-          `Import hoàn tất (${finishedSession.status}). Đã import ${finishedSession.importedRows}/${finishedSession.totalRows} dòng.`
-        );
-      } else {
-        alert('Import đang được xử lý trong nền, vui lòng kiểm tra lại sau ít phút.');
-      }
-
-      navigate(`/school-admin/rubrics/${rubricId ?? ''}/versions/${versionId ?? ''}`);
+      // Backend import ngầm nên số liệu trả về lúc này chưa phải kết quả cuối:
+      // chuyển sang trang chi tiết phiên import để theo dõi trạng thái file.
+      navigate(buildImportSessionDetailPath('/school-admin', preview.sessionId), {
+        state: {
+          invalidateKeys: [searchRubricResultBandKeys.all],
+          returnLabel: 'Quay lại phiên bản rubric',
+          returnTo: `/school-admin/rubrics/${rubricId ?? ''}/versions/${versionId ?? ''}`,
+        } satisfies ImportSessionNavState,
+      });
     } catch (error) {
-      setIsWaitingForResult(false);
       setMessage({
         text: getErrorMessage(error) ?? 'Không thể xác nhận import thang điểm. Vui lòng thử lại.',
         tone: 'error',
@@ -412,11 +387,7 @@ export function SchoolAdminRubricResultBandImportPage() {
               type="button"
             >
               <CheckCircle2 aria-hidden="true" className="size-4" />
-              {isWaitingForResult
-                ? 'Đang xử lý dữ liệu...'
-                : acceptMutation.isPending
-                  ? 'Đang gửi yêu cầu...'
-                  : 'Xác nhận import'}
+              {acceptMutation.isPending ? 'Đang gửi yêu cầu...' : 'Xác nhận import'}
             </button>
           </div>
         </>

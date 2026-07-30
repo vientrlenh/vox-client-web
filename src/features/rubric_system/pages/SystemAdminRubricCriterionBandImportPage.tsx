@@ -4,29 +4,13 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, CheckCircle2, FileSpreadsheet, RefreshCw, Upload } from 'lucide-react';
-import { fetchImportSessionStatus } from '@/features/imports';
+import { buildImportSessionDetailPath, type ImportSessionNavState } from '@/features/imports';
 import { usePreviewSystemRubricCriterionBandImportMutation } from '../api/usePreviewSystemRubricCriterionBandImportMutation';
 import { useAcceptSystemRubricCriterionBandImportMutation } from '../api/useAcceptSystemRubricCriterionBandImportMutation';
 import { searchRubricCriterionBandKeys } from '../api/useSearchSystemRubricCriterionBandsQuery';
 import { formatRubricImportDate } from '../types';
 import type { PreviewRubricCriterionBandImportResponse } from '../types';
 
-const TERMINAL_IMPORT_STATUSES = ['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'];
-
-// Import chạy ngầm (async) ở BE, nên sau khi accept phải chờ session
-// chuyển sang trạng thái cuối rồi mới invalidate cache + điều hướng,
-// nếu không danh sách mức điểm vẫn rỗng cho tới khi người dùng tự F5.
-async function waitForImportSessionToFinish(sessionId: string, maxAttempts = 20, intervalMs = 1500) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const session = await fetchImportSessionStatus(sessionId);
-    const status = session?.status?.trim().toUpperCase();
-    if (status && TERMINAL_IMPORT_STATUSES.includes(status)) {
-      return session;
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  return null;
-}
 
 type PageMessage = {
   text: string;
@@ -192,11 +176,10 @@ export function SystemAdminRubricCriterionBandImportPage() {
   const [preview, setPreview] = useState<PreviewRubricCriterionBandImportResponse | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<PageMessage | null>(null);
-  const [isWaitingForResult, setIsWaitingForResult] = useState(false);
 
   const missingFields = getMissingRequiredFields(mapping);
   const canAccept = Boolean(preview) && missingFields.length === 0;
-  const isBusy = previewMutation.isPending || acceptMutation.isPending || isWaitingForResult;
+  const isBusy = previewMutation.isPending || acceptMutation.isPending;
 
   async function handleFileChange(file?: File) {
     if (!file) return;
@@ -240,31 +223,23 @@ export function SystemAdminRubricCriterionBandImportPage() {
 
     try {
       setMessage(null);
-      const response = await acceptMutation.mutateAsync({
+      await acceptMutation.mutateAsync({
         payload: { confirmedMapping: mapping },
         sessionId: preview.sessionId,
       });
 
-      // BE xử lý import ở hàng đợi ngầm (async), nên phải chờ session
-      // chuyển sang trạng thái cuối rồi mới invalidate cache, nếu không
-      // danh sách mức điểm vẫn rỗng cho tới khi người dùng tự F5.
-      setIsWaitingForResult(true);
-      const finishedSession = await waitForImportSessionToFinish(preview.sessionId);
-      setIsWaitingForResult(false);
-
       await queryClient.invalidateQueries({ queryKey: searchRubricCriterionBandKeys.all });
 
-      if (finishedSession) {
-        alert(
-          `Import hoàn tất (${finishedSession.status}). Đã import ${finishedSession.importedRows}/${finishedSession.totalRows} dòng.`
-        );
-      } else {
-        alert(response.message || 'Import đang được xử lý trong nền, vui lòng kiểm tra lại sau ít phút.');
-      }
-
-      navigate(`/system-admin/rubrics/${rubricId ?? ''}/versions/${versionId ?? ''}/criteria/${criterionId ?? ''}`);
+      // Backend import ngầm nên số liệu trả về lúc này chưa phải kết quả cuối:
+      // chuyển sang trang chi tiết phiên import để theo dõi trạng thái file.
+      navigate(buildImportSessionDetailPath('/system-admin', preview.sessionId), {
+        state: {
+          invalidateKeys: [searchRubricCriterionBandKeys.all],
+          returnLabel: 'Quay lại tiêu chí',
+          returnTo: `/system-admin/rubrics/${rubricId ?? ''}/versions/${versionId ?? ''}/criteria/${criterionId ?? ''}`,
+        } satisfies ImportSessionNavState,
+      });
     } catch (error) {
-      setIsWaitingForResult(false);
       setMessage({
         text: getErrorMessage(error) ?? 'Không thể xác nhận import mức điểm. Vui lòng thử lại.',
         tone: 'error',
@@ -406,11 +381,7 @@ export function SystemAdminRubricCriterionBandImportPage() {
               type="button"
             >
               <CheckCircle2 aria-hidden="true" className="size-4" />
-              {isWaitingForResult
-                ? 'Đang xử lý dữ liệu...'
-                : acceptMutation.isPending
-                  ? 'Đang gửi yêu cầu...'
-                  : 'Xác nhận import'}
+              {acceptMutation.isPending ? 'Đang gửi yêu cầu...' : 'Xác nhận import'}
             </button>
           </div>
         </>

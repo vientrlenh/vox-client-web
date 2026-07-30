@@ -125,6 +125,30 @@ export const IMPORT_STATUS_DISPLAY: Record<
   },
 }
 
+// Import chạy ngầm ở backend: session đi từ PREVIEWED sang các trạng thái đang
+// xử lý rồi mới tới trạng thái cuối. Hai tập này là nguồn sự thật duy nhất để
+// biết khi nào cần poll và khi nào được phép invalidate cache.
+export const IN_PROGRESS_IMPORT_STATUSES = new Set<string>([
+  'IMPORTING',
+  'QUEUED',
+  'VALIDATING',
+])
+
+export const TERMINAL_IMPORT_STATUSES = new Set<string>([
+  'CANCELLED',
+  'COMPLETED',
+  'EXPIRED',
+  'FAILED',
+])
+
 export function normalizeImportKey(value?: string | null) {
   return value?.trim().toUpperCase() ?? ''
+}
+
+export function isImportInProgress(status?: string | null) {
+  return IN_PROGRESS_IMPORT_STATUSES.has(normalizeImportKey(status))
+}
+
+export function isImportTerminal(status?: string | null) {
+  return TERMINAL_IMPORT_STATUSES.has(normalizeImportKey(status))
 }

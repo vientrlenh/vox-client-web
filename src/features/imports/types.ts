@@ -47,13 +47,6 @@ export type ImportSessionSummary = {
   validRows: number
 }
 
-export type ImportSessionStatus = {
-  id: string
-  importedRows: number
-  status: string
-  totalRows: number
-}
-
 export type ImportSessionDetails = ImportSessionSummary & {
   confirmedMapping: ImportMappingEntry[]
   failureReason: string | null
@@ -87,6 +80,23 @@ export type AcceptImportSessionResponse = {
   skippedRows?: number
   status?: string
   totalRows?: number
+}
+
+// State kèm theo khi trang import điều hướng sang trang chi tiết phiên import.
+// Trang chi tiết không biết feature nào gọi nó, nên feature tự khai báo cache
+// cần invalidate và đích "quay lại" của mình.
+export type ImportSessionNavState = {
+  invalidateKeys?: readonly (readonly unknown[])[]
+  returnLabel?: string
+  returnTo?: string
+}
+
+// basePath là tiền tố theo vai trò: /school-admin, /system-admin hoặc /teacher.
+export function buildImportSessionDetailPath(
+  basePath: string,
+  sessionId: string,
+) {
+  return `${basePath}/imports/${sessionId}`
 }
 
 export function mappingEntriesToRecord(entries: ImportMappingEntry[]) {

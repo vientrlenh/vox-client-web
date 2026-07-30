@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Rows3,
 } from 'lucide-react'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import {
   useAcceptImportSessionMutation,
   useRejectImportSessionMutation,
@@ -20,12 +20,18 @@ import {
   getImportFields,
   getMissingRequiredFields,
 } from '../importFields'
+import { isImportInProgress, isImportTerminal } from '../importTypes'
 import {
   importManagementQueryKeys,
   useImportRowsQuery,
   useImportSessionQuery,
 } from '../api/useImportSessionsQuery'
-import type { ImportDataEntry, ImportMappingEntry, ImportRow } from '../types'
+import type {
+  ImportDataEntry,
+  ImportMappingEntry,
+  ImportRow,
+  ImportSessionNavState,
+} from '../types'
 import {
   formatImportDate,
   formatNullableText,
@@ -37,6 +43,10 @@ import {
 
 const DEFAULT_ROW_PAGE = 1
 const DEFAULT_ROW_PAGE_SIZE = 10
+
+// Chỉ School Admin có route + quyền xem danh sách phiên import (backend chặn
+// query importSessions ở các vai trò khác), nên breadcrumb chỉ là link ở đây.
+const SESSION_LIST_BASE_PATH = '/school-admin'
 
 function getErrorMessage(error: unknown) {
   if (
@@ -369,8 +379,16 @@ function MappingEditor({
   )
 }
 
-export function SchoolAdminImportSessionDetailPage() {
+type ImportSessionDetailPageProps = {
+  // Tiền tố route theo vai trò: /school-admin, /system-admin hoặc /teacher.
+  basePath: string
+}
+
+export function ImportSessionDetailPage({
+  basePath,
+}: ImportSessionDetailPageProps) {
   const { sessionId } = useParams()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const [rowPage, setRowPage] = useState(DEFAULT_ROW_PAGE)
   const [rowPageSize, setRowPageSize] = useState(DEFAULT_ROW_PAGE_SIZE)
@@ -380,7 +398,8 @@ export function SchoolAdminImportSessionDetailPage() {
   >(null)
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<DecisionMessage | null>(null)
-  const sessionQuery = useImportSessionQuery(sessionId ?? null)
+  const navState = (location.state ?? null) as ImportSessionNavState | null
+  const sessionQuery = useImportSessionQuery(sessionId ?? null, { poll: true })
   const rowsQuery = useImportRowsQuery(
     sessionId ?? null,
     rowPage,
@@ -392,11 +411,40 @@ export function SchoolAdminImportSessionDetailPage() {
   const session = sessionQuery.data
   const rows = rowsQuery.data?.content ?? []
   const isAwaitingReview = session?.status?.trim().toUpperCase() === 'PREVIEWED'
+  const isProcessing = isImportInProgress(session?.status)
   const isDeciding = acceptMutation.isPending || rejectMutation.isPending
   const importFields = getImportFields(session?.type)
   const supportsMapping = importFields.length > 0
   const missingFields = getMissingRequiredFields(importFields, mapping)
   const canAccept = supportsMapping && missingFields.length === 0
+  const hasSessionList = basePath === SESSION_LIST_BASE_PATH
+  const sessionListPath = `${basePath}/imports`
+  const backPath =
+    navState?.returnTo ??
+    (hasSessionList ? sessionListPath : `${basePath}/dashboard`)
+  const backLabel = navState?.returnLabel ?? 'Quay lại danh sách import'
+  const hasInvalidatedRef = useRef(false)
+
+  // Trang import điều hướng sang đây ngay khi accept, lúc đó backend còn đang
+  // xử lý ngầm. Chờ session chạm trạng thái cuối rồi mới invalidate cache của
+  // feature gọi tới, nếu không danh sách vẫn rỗng cho tới khi người dùng tự F5.
+  useEffect(() => {
+    if (hasInvalidatedRef.current || !isImportTerminal(session?.status)) {
+      return
+    }
+
+    hasInvalidatedRef.current = true
+    const featureKeys = navState?.invalidateKeys ?? []
+
+    void Promise.all([
+      ...featureKeys.map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+      queryClient.invalidateQueries({
+        queryKey: importManagementQueryKeys.all,
+      }),
+    ])
+  }, [navState?.invalidateKeys, queryClient, session?.status])
 
   function handleRowPageSizeChange(nextPageSize: number) {
     setRowPage(DEFAULT_ROW_PAGE)
@@ -452,6 +500,8 @@ export function SchoolAdminImportSessionDetailPage() {
         type: session.type,
       })
       setPendingDecision(null)
+      // Session quay lại vòng xử lý ngầm, cho phép invalidate lần nữa khi xong.
+      hasInvalidatedRef.current = false
       await refreshAfterDecision()
       setMessage({
         text: response.message || 'Đã duyệt và import phiên thành công.',
@@ -487,16 +537,20 @@ export function SchoolAdminImportSessionDetailPage() {
     }
   }
 
+  const backLink = (
+    <Link
+      className="inline-flex w-fit items-center gap-2 text-sm font-bold text-cyan-700 transition hover:text-cyan-900"
+      to={backPath}
+    >
+      <ArrowLeft aria-hidden="true" className="size-4" />
+      {backLabel}
+    </Link>
+  )
+
   if (!sessionId) {
     return (
       <section className="grid gap-4">
-        <Link
-          className="inline-flex w-fit items-center gap-2 text-sm font-bold text-cyan-700 transition hover:text-cyan-900"
-          to="/school-admin/imports"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          Quay lại danh sách import
-        </Link>
+        {backLink}
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">
           Không tìm thấy mã import trong đường dẫn.
         </div>
@@ -507,13 +561,7 @@ export function SchoolAdminImportSessionDetailPage() {
   if (sessionQuery.isLoading) {
     return (
       <section className="grid gap-4">
-        <Link
-          className="inline-flex w-fit items-center gap-2 text-sm font-bold text-cyan-700 transition hover:text-cyan-900"
-          to="/school-admin/imports"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          Quay lại danh sách import
-        </Link>
+        {backLink}
         <div
           className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600"
           role="status"
@@ -527,13 +575,7 @@ export function SchoolAdminImportSessionDetailPage() {
   if (sessionQuery.isError) {
     return (
       <section className="grid gap-4">
-        <Link
-          className="inline-flex w-fit items-center gap-2 text-sm font-bold text-cyan-700 transition hover:text-cyan-900"
-          to="/school-admin/imports"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          Quay lại danh sách import
-        </Link>
+        {backLink}
         <div
           className="grid gap-4 rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700"
           role="alert"
@@ -560,13 +602,7 @@ export function SchoolAdminImportSessionDetailPage() {
   if (!session) {
     return (
       <section className="grid gap-4">
-        <Link
-          className="inline-flex w-fit items-center gap-2 text-sm font-bold text-cyan-700 transition hover:text-cyan-900"
-          to="/school-admin/imports"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          Quay lại danh sách import
-        </Link>
+        {backLink}
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
           <p className="text-base font-black text-slate-950">
             Không tìm thấy file import
@@ -580,7 +616,7 @@ export function SchoolAdminImportSessionDetailPage() {
 
   return (
     <section
-      aria-labelledby="school-admin-import-detail-title"
+      aria-labelledby="import-session-detail-title"
       className="grid gap-5"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -589,15 +625,19 @@ export function SchoolAdminImportSessionDetailPage() {
             aria-label="Đường dẫn"
             className="flex items-center gap-2 text-sm font-bold text-slate-500"
           >
-            <Link className="transition hover:text-blue-800" to="/school-admin/imports">
-              Quản lý import
-            </Link>
+            {hasSessionList ? (
+              <Link className="transition hover:text-blue-800" to={sessionListPath}>
+                Quản lý import
+              </Link>
+            ) : (
+              <span>Quản lý import</span>
+            )}
             <span aria-hidden="true">/</span>
             <span>Chi tiết file</span>
           </nav>
           <h1
             className="mt-3 text-2xl font-black tracking-0 text-slate-950"
-            id="school-admin-import-detail-title"
+            id="import-session-detail-title"
           >
             Chi tiết file import
           </h1>
@@ -627,7 +667,7 @@ export function SchoolAdminImportSessionDetailPage() {
           ) : null}
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-            disabled={sessionQuery.isFetching}
+            disabled={sessionQuery.isFetching || isProcessing}
             onClick={() => {
               void sessionQuery.refetch()
             }}
@@ -638,13 +678,24 @@ export function SchoolAdminImportSessionDetailPage() {
           </button>
           <Link
             className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-            to="/school-admin/imports"
+            to={backPath}
           >
             <ArrowLeft aria-hidden="true" className="size-4" />
-            Quay lại
+            {backLabel}
           </Link>
         </div>
       </div>
+
+      {isProcessing ? (
+        <div
+          className="flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800"
+          role="status"
+        >
+          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+          Đang xử lý import... Số liệu bên dưới tự cập nhật, bạn không cần tải
+          lại trang.
+        </div>
+      ) : null}
 
       {message ? (
         <div
@@ -894,4 +945,16 @@ export function SchoolAdminImportSessionDetailPage() {
       </section>
     </section>
   )
+}
+
+export function SchoolAdminImportSessionDetailPage() {
+  return <ImportSessionDetailPage basePath="/school-admin" />
+}
+
+export function SystemAdminImportSessionDetailPage() {
+  return <ImportSessionDetailPage basePath="/system-admin" />
+}
+
+export function TeacherImportSessionDetailPage() {
+  return <ImportSessionDetailPage basePath="/teacher" />
 }

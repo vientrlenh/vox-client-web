@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AxiosResponse } from 'axios'
+import { Route, Routes } from 'react-router'
 import { apiClient } from '@/shared/api'
 import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -103,11 +104,25 @@ function mockImportSuccess() {
   })
 }
 
+// Sau khi accept, trang điều hướng sang chi tiết phiên import: render kèm route
+// dò để khẳng định điều hướng thay vì mock useNavigate.
 function renderPage(queryClient = createQueryClient()) {
-  return renderWithProviders(<SchoolAdminClassImportPage />, {
-    queryClient,
-    route: '/school-admin/classes/import',
-  })
+  return renderWithProviders(
+    <Routes>
+      <Route
+        element={<SchoolAdminClassImportPage />}
+        path="/school-admin/classes/import"
+      />
+      <Route
+        element={<p>Trang chi tiết phiên import</p>}
+        path="/school-admin/imports/:sessionId"
+      />
+    </Routes>,
+    {
+      queryClient,
+      route: '/school-admin/classes/import',
+    },
+  )
 }
 
 function getFileInput() {
@@ -206,7 +221,7 @@ describe('SchoolAdminClassImportPage', () => {
     ).toBeDisabled()
   })
 
-  it('accepts the import and invalidates class queries', async () => {
+  it('accepts the import, invalidates class queries and opens the session detail page', async () => {
     mockImportSuccess()
     const queryClient = createQueryClient()
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries')
@@ -235,8 +250,9 @@ describe('SchoolAdminClassImportPage', () => {
         },
       )
     })
-    expect(await screen.findByText('Import lớp học hoàn tất')).toBeInTheDocument()
-    expect(screen.getByText('Đã import')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Trang chi tiết phiên import'),
+    ).toBeInTheDocument()
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['class-management'],
     })

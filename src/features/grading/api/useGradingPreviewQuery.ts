@@ -4,9 +4,6 @@ import type { GradingPreview } from '../types'
 import { GRADING_BASE, type ItemGradeInput } from './useGradingMutations'
 import { gradingKeys } from './useGradingQueries'
 
-const gradingPreviewBySchoolKey = (candidateResultId: string | null, payload: unknown) =>
-  [...gradingKeys.all, 'preview-by-school', candidateResultId, payload] as const
-
 type ApiResponse<T> = {
   data: T
   message: string
@@ -24,15 +21,6 @@ type ApiResponse<T> = {
 export async function previewGrading(assignmentId: string, items: ItemGradeInput[]) {
   const response = await apiClient.post<ApiResponse<GradingPreview>>(
     `${GRADING_BASE}/${assignmentId}/regrade/preview`,
-    { items },
-  )
-  return response.data.data
-}
-
-/** Nhà trường chấm trực tiếp theo candidateResultId, không cần phân công. */
-export async function previewGradingByResult(candidateResultId: string, items: ItemGradeInput[]) {
-  const response = await apiClient.post<ApiResponse<GradingPreview>>(
-    `${GRADING_BASE}/by-result/${candidateResultId}/grade/preview`,
     { items },
   )
   return response.data.data
@@ -57,23 +45,6 @@ export function useGradingPreviewQuery(
     queryFn: () => previewGrading(assignmentId as string, items),
     queryKey: gradingKeys.preview(assignmentId, items),
     // Điểm chỉ phụ thuộc bộ điểm gửi lên; không cần gọi lại khi quay lại tab.
-    refetchOnWindowFocus: false,
-    retry: false,
-    staleTime: Infinity,
-  })
-}
-
-/** Nhà trường chấm trực tiếp theo candidateResultId — cùng hành vi debounce/cache như trên. */
-export function useGradingPreviewByResultQuery(
-  candidateResultId: string | null,
-  items: ItemGradeInput[],
-  options?: { enabled?: boolean },
-) {
-  return useQuery({
-    enabled: candidateResultId != null && items.length > 0 && options?.enabled !== false,
-    placeholderData: (previous) => previous,
-    queryFn: () => previewGradingByResult(candidateResultId as string, items),
-    queryKey: gradingPreviewBySchoolKey(candidateResultId, items),
     refetchOnWindowFocus: false,
     retry: false,
     staleTime: Infinity,
