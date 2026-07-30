@@ -65,7 +65,12 @@ import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
 import { MembersTab } from '../components/MembersTab'
 import { useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
 import { useCreateExamMutation, useDeleteExamMutation, useUpdateExamMutation, useUpdateExamStatusMutation } from '../api/useExamMutations'
-import { getExamStatusDisplay } from '../types'
+import {
+  EXAM_STREAM_SETUP_PAYLOAD,
+  EXAM_STREAM_SETUPS,
+  getExamStatusDisplay,
+  type ExamStreamSetup,
+} from '../types'
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
@@ -257,6 +262,9 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
     locationState?.selectedRubricVersion ?? null,
   )
   const [manualPolicyId, setManualPolicyId] = useState<string | null>(null)
+  // Mặc định mức giám sát đầy đủ, không phải "không giám sát": lựa chọn này không sửa được sau khi
+  // tạo kỳ thi, nên mặc định phải là phương án an toàn và việc hạ nó xuống phải là hành động có ý thức.
+  const [streamSetup, setStreamSetup] = useState<ExamStreamSetup>('BOTH_REQUIRED')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { confirm, dialog } = useConfirmationDialog()
 
@@ -307,6 +315,9 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
         name,
         requiresOtp: true,
         resultDecisionMethod,
+        // Qua bảng map, không gán tay hai trường: server chỉ nhận đúng 5 tổ hợp và mọi tổ hợp khác
+        // trả về 400.
+        ...EXAM_STREAM_SETUP_PAYLOAD[streamSetup],
       })
       await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
       navigate('/school-admin/exams')
@@ -377,6 +388,52 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             ))}
           </select>
         </label>
+
+        <fieldset className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <legend className="text-sm font-bold text-slate-700">Giám sát thi</legend>
+          <p className="text-xs text-slate-500">
+            Quyết định học viên phải chia sẻ những gì trong lúc thi.{' '}
+            <b className="text-slate-700">Không sửa được sau khi tạo kỳ thi.</b>
+          </p>
+
+          <div className="mt-1.5 grid gap-2">
+            {EXAM_STREAM_SETUPS.map((option) => {
+              const isSelected = streamSetup === option.value
+              const isWarning = option.tone === 'warning'
+              return (
+                <label
+                  className={`grid cursor-pointer grid-cols-[auto_1fr] items-start gap-2.5 rounded-lg border bg-white p-3 transition ${
+                    isSelected
+                      ? isWarning
+                        ? 'border-amber-300 ring-2 ring-amber-100'
+                        : 'border-indigo-300 ring-2 ring-indigo-100'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                  key={option.value}
+                >
+                  <input
+                    checked={isSelected}
+                    className="mt-0.5 accent-indigo-600"
+                    name="streamSetup"
+                    onChange={() => setStreamSetup(option.value)}
+                    type="radio"
+                    value={option.value}
+                  />
+                  <span className="grid gap-0.5">
+                    <span className="text-[13px] font-bold text-slate-900">{option.label}</span>
+                    <span
+                      className={`text-xs ${
+                        isWarning && isSelected ? 'font-semibold text-amber-700' : 'text-slate-500'
+                      }`}
+                    >
+                      {option.hint}
+                    </span>
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
 
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>

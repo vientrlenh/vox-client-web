@@ -84,6 +84,42 @@ const SystemAdminSchoolDirectoryImportPage = lazy(() =>
   })),
 )
 
+const SystemAdminFrameworksPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SystemAdminFrameworksPage,
+  })),
+)
+
+const SystemAdminFrameworkDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SystemAdminFrameworkDetailPage,
+  })),
+)
+
+const SystemAdminFrameworkVersionDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SystemAdminFrameworkVersionDetailPage,
+  })),
+)
+
+const SchoolAdminFrameworksPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SchoolAdminFrameworksPage,
+  })),
+)
+
+const SchoolAdminFrameworkDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SchoolAdminFrameworkDetailPage,
+  })),
+)
+
+const SchoolAdminFrameworkVersionDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SchoolAdminFrameworkVersionDetailPage,
+  })),
+)
+
 const SchoolAdminClassesPage = lazy(() =>
   import("@/features/classes").then((module) => ({
     default: module.SchoolAdminClassesPage,
@@ -670,6 +706,18 @@ export function AppRoutes() {
             <Route path="system-admin/questions/create" element={<SystemAdminCreateQuestionPage />} />
             <Route path="system-admin/questions/:questionId/edit" element={<SystemAdminEditQuestionPage />} />
             <Route path="system-admin/questions/:questionId" element={<SystemAdminQuestionDetailPage />} />
+            <Route  
+              path="system-admin/frameworks"
+              element={<SystemAdminFrameworksPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId"
+              element={<SystemAdminFrameworkDetailPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId/versions/:versionId"
+              element={<SystemAdminFrameworkVersionDetailPage />}
+            />
             <Route
               path="system-admin/rubrics"
               element={<SystemAdminRubricsPage />}
@@ -818,6 +866,9 @@ export function AppRoutes() {
               path="school-admin/classes/:classId"
               element={<SchoolAdminClassDetailPage />}
             />
+            <Route path="school-admin/frameworks" element={<SchoolAdminFrameworksPage />} />
+            <Route path="school-admin/frameworks/:frameworkId" element={<SchoolAdminFrameworkDetailPage />} />
+            <Route path="school-admin/frameworks/:frameworkId/versions/:versionId" element={<SchoolAdminFrameworkVersionDetailPage />} />
             <Route path="school-admin/question-banks" element={<SchoolAdminQuestionBanksPage />} />
             <Route path="school-admin/question-banks/:bankId" element={<SchoolAdminQuestionBankDetailPage />} />
             <Route path="school-admin/question-topics" element={<SchoolAdminQuestionTopicsPage />} />
