@@ -8,8 +8,8 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
-import type { SchoolUser } from '@/features/school-users/types'
 import { examResultQueryKeys } from '@/features/exam-results/api/useExamResultQueries'
+import type { ExamDirectoryUser } from '../api/examDirectoryQueries'
 import {
   useAddCandidateMutation,
   useFlagExamSessionMutation,
@@ -25,6 +25,7 @@ import {
   getScheduleLabel,
   type ExamAttemptSummaryDto,
   type ExamCandidateDto,
+  type ExamKind,
   type ExamPaperDto,
 } from '../types'
 import { ImportCandidatesModal } from './ImportCandidatesModal'
@@ -38,6 +39,8 @@ const UNBLOCK_REASON = 'Giám thị dỡ cấm để học sinh tiếp tục bà
 type CandidatesTabProps = {
   canManage: boolean
   examId: string
+  /** Quyết định có lối nhập theo niên khóa hay không — xem `ImportCandidatesModal`. */
+  examKind: ExamKind
   papers: ExamPaperDto[]
 }
 
@@ -64,7 +67,7 @@ function getCandidateBadge(candidate: ExamCandidateDto) {
   return getCandidateStatusDisplay(candidate.scheduleId ? candidate.status : undefined)
 }
 
-export function CandidatesTab({ canManage, examId, papers }: CandidatesTabProps) {
+export function CandidatesTab({ canManage, examId, examKind, papers }: CandidatesTabProps) {
   const queryClient = useQueryClient()
   const candidatesQuery = useExamCandidatesQuery(examId)
   const schedulesQuery = useExamSchedulesQuery(examId)
@@ -118,10 +121,7 @@ export function CandidatesTab({ canManage, examId, papers }: CandidatesTabProps)
     await queryClient.invalidateQueries({ queryKey: examResultQueryKeys.all })
   }
 
-  async function handleAddCandidate(student: SchoolUser) {
-    if (!student.userId) {
-      return
-    }
+  async function handleAddCandidate(student: ExamDirectoryUser) {
     try {
       await addCandidateMutation.mutateAsync({ examId, payload: { studentId: student.userId } })
       await invalidateAll()
@@ -392,6 +392,7 @@ export function CandidatesTab({ canManage, examId, papers }: CandidatesTabProps)
 
       {showStudentPicker ? (
         <StudentPickerModal
+          examId={examId}
           excludeUserIds={candidates.map((candidate) => candidate.studentId)}
           onClose={() => setShowStudentPicker(false)}
           onSelect={(student) => void handleAddCandidate(student)}
@@ -400,6 +401,8 @@ export function CandidatesTab({ canManage, examId, papers }: CandidatesTabProps)
 
       {showImportModal ? (
         <ImportCandidatesModal
+          examId={examId}
+          examKind={examKind}
           onClose={() => setShowImportModal(false)}
           onImportClass={(schoolClassId) => void handleImportClass(schoolClassId)}
           onImportGrade={(schoolGradeId) => void handleImportGrade(schoolGradeId)}

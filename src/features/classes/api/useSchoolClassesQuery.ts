@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
-import type { ClassFilters, PageResult, SchoolClass } from '../types'
+import type {
+  ClassFilters,
+  ClassUserCandidateFilters,
+  PageResult,
+  SchoolClass,
+} from '../types'
 
 const SCHOOL_CLASS_FIELDS = `
   id
@@ -59,6 +64,21 @@ export const classManagementQueryKeys = {
     [...classManagementQueryKeys.all, 'detail', id] as const,
   classUsers: (classId: string | null, page: number, size: number) =>
     [...classManagementQueryKeys.all, 'users', classId, page, size] as const,
+  usersNotInClass: (
+    classId: string | null,
+    page: number,
+    size: number,
+    filters: ClassUserCandidateFilters,
+  ) =>
+    [
+      ...classManagementQueryKeys.all,
+      'users-not-in-class',
+      classId,
+      page,
+      size,
+      filters.search,
+      filters.roleCode,
+    ] as const,
   classes: (page: number, size: number, filters: ClassFilters) =>
     [
       ...classManagementQueryKeys.all,

@@ -7,7 +7,11 @@ import {
   RefreshCw,
   Upload,
 } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import {
+  buildImportSessionDetailPath,
+  type ImportSessionNavState,
+} from '@/features/imports'
 import { schoolDirectoryManagementQueryKeys } from '../api/useSchoolDirectoriesQuery'
 import {
   useAcceptSchoolDirectoryImportMutation,
@@ -189,42 +193,8 @@ function SampleRowsTable({ preview }: SampleRowsTableProps) {
   )
 }
 
-type ImportResultPanelProps = {
-  message: string
-}
-
-function ImportResultPanel({ message }: ImportResultPanelProps) {
-  return (
-    <section className="grid gap-5 rounded-lg border border-emerald-200 bg-emerald-50 p-5">
-      <div className="flex items-start gap-3">
-        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700">
-          <CheckCircle2 aria-hidden="true" className="size-5" />
-        </span>
-        <div>
-          <h2 className="text-lg font-black text-emerald-950">
-            Đã nhận yêu cầu import
-          </h2>
-          <p className="mt-1 text-sm font-semibold text-emerald-800">
-            {message}
-          </p>
-          <p className="mt-1 text-sm font-medium text-emerald-700">
-            Quá trình import chạy nền (bất đồng bộ). Danh sách sẽ cập nhật dần khi
-            hệ thống xử lý xong.
-          </p>
-        </div>
-      </div>
-
-      <Link
-        className="inline-flex h-11 w-fit items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
-        to="/system-admin/school-directory"
-      >
-        Quay lại danh mục trường
-      </Link>
-    </section>
-  )
-}
-
 export function SystemAdminSchoolDirectoryImportPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const previewMutation = usePreviewSchoolDirectoryImportMutation()
   const acceptMutation = useAcceptSchoolDirectoryImportMutation()
@@ -232,7 +202,6 @@ export function SystemAdminSchoolDirectoryImportPage() {
     useState<PreviewSchoolDirectoryImportResponse | null>(null)
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<PageMessage | null>(null)
-  const [resultMessage, setResultMessage] = useState<string | null>(null)
 
   const missingFields = getMissingRequiredFields(mapping)
   const canAccept = Boolean(preview) && missingFields.length === 0
@@ -245,7 +214,6 @@ export function SystemAdminSchoolDirectoryImportPage() {
 
     if (!isAcceptedFile(file)) {
       setPreview(null)
-      setResultMessage(null)
       setMessage({
         text: 'File không hợp lệ. Vui lòng chọn file CSV hoặc Excel.',
         tone: 'error',
@@ -255,7 +223,6 @@ export function SystemAdminSchoolDirectoryImportPage() {
 
     try {
       setMessage(null)
-      setResultMessage(null)
       const nextPreview = await previewMutation.mutateAsync({ file })
 
       setPreview(nextPreview.data)
@@ -263,7 +230,6 @@ export function SystemAdminSchoolDirectoryImportPage() {
       setMessage({ text: nextPreview.message, tone: 'success' })
     } catch (error) {
       setPreview(null)
-      setResultMessage(null)
       setMessage({
         text:
           getErrorMessage(error) ??
@@ -297,7 +263,7 @@ export function SystemAdminSchoolDirectoryImportPage() {
 
     try {
       setMessage(null)
-      const response = await acceptMutation.mutateAsync({
+      await acceptMutation.mutateAsync({
         payload: {
           confirmedMapping: mapping,
         },
@@ -307,8 +273,18 @@ export function SystemAdminSchoolDirectoryImportPage() {
       await queryClient.invalidateQueries({
         queryKey: schoolDirectoryManagementQueryKeys.all,
       })
-      setResultMessage(response.message)
-      setMessage({ text: response.message, tone: 'success' })
+      // Backend import ngầm nên số liệu trả về lúc này chưa phải kết quả cuối:
+      // chuyển sang trang chi tiết phiên import để theo dõi trạng thái file.
+      navigate(
+        buildImportSessionDetailPath('/system-admin', preview.importSessionId),
+        {
+          state: {
+            invalidateKeys: [schoolDirectoryManagementQueryKeys.all],
+            returnLabel: 'Quay lại danh mục trường',
+            returnTo: '/system-admin/school-directory',
+          } satisfies ImportSessionNavState,
+        },
+      )
     } catch (error) {
       setMessage({
         text:
@@ -462,7 +438,6 @@ export function SystemAdminSchoolDirectoryImportPage() {
               disabled={isBusy}
               onClick={() => {
                 setPreview(null)
-                setResultMessage(null)
                 setMapping({})
                 setMessage(null)
               }}
@@ -484,8 +459,6 @@ export function SystemAdminSchoolDirectoryImportPage() {
           </div>
         </>
       ) : null}
-
-      {resultMessage ? <ImportResultPanel message={resultMessage} /> : null}
     </section>
   )
 }

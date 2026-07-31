@@ -15,6 +15,7 @@ import {
   PlayCircle,
   Plus,
   Rocket,
+  Timer,
   Trash2,
   X,
 } from 'lucide-react'
@@ -29,7 +30,6 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
-import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
@@ -48,6 +48,7 @@ import {
 import {
   formatDate,
   formatDateTime,
+  formatDurationSeconds,
   formatNullableText,
   getAssessmentPolicyStrictnessLabel,
   getExamPaperStatusDisplay,
@@ -669,7 +670,7 @@ type ExamDetailPageProps = {
   canReleaseSecurePool: boolean
 }
 
-type ExamDetailTab = 'assessment' | 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
+type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
 
 function ExamDetailPage({
   basePath,
@@ -763,6 +764,37 @@ function ExamDetailPage({
     }
   }
 
+  /**
+   * Chuyển trạng thái kỳ thi có thể hỏng vì nhiều lý do người dùng sửa được: `SCHEDULE`
+   * chạy qua kiểm tra hạn mức gói (chưa có gói / quá số học sinh / hết token) và trả 422,
+   * `START`/`CLOSE` thì kiểm tra ca thi và mã đề. Không bắt lỗi ở đây thì bấm nút xong
+   * không có gì xảy ra và người dùng không biết vì sao.
+   */
+  async function handleStatusAction(
+    forExamId: string,
+    action: 'CANCEL' | 'CLOSE' | 'PUBLISH_RESULTS' | 'SCHEDULE' | 'START',
+  ) {
+    try {
+      await updateStatusMutation.mutateAsync({ examId: forExamId, payload: { action } })
+      await invalidate()
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handleDeleteExam(forExamId: string) {
+    if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
+      return
+    }
+    try {
+      await deleteMutation.mutateAsync(forExamId)
+      await invalidate()
+      navigate(basePath)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
   if (bundleQuery.isLoading) {
     return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
   }
@@ -843,16 +875,7 @@ function ExamDetailPage({
               <>
                 <button
                   className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
-                  onClick={() => {
-                    void (async () => {
-                      if (!(await confirm({ message: 'Bạn có chắc muốn xóa kỳ thi này không?' }))) {
-                        return
-                      }
-                      await deleteMutation.mutateAsync(exam.id)
-                      await invalidate()
-                      navigate(basePath)
-                    })()
-                  }}
+                  onClick={() => void handleDeleteExam(exam.id)}
                   type="button"
                 >
                   <Trash2 aria-hidden="true" className="size-4" />
@@ -861,11 +884,7 @@ function ExamDetailPage({
                 {primaryStatusAction ? (
                   <button
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
-                    onClick={() =>
-                      void updateStatusMutation
-                        .mutateAsync({ examId: exam.id, payload: { action: primaryStatusAction.action } })
-                        .then(() => invalidate())
-                    }
+                    onClick={() => void handleStatusAction(exam.id, primaryStatusAction.action)}
                     type="button"
                   >
                     {primaryStatusAction.icon}
@@ -882,6 +901,8 @@ function ExamDetailPage({
           { icon: <Languages aria-hidden="true" className="size-3.5" />, label: 'Tiếng Anh' },
           { icon: <Calendar aria-hidden="true" className="size-3.5" />, label: `${formatDateTime(exam.openAt)} – ${formatDateTime(exam.closeAt)}` },
           { icon: <Clock4 aria-hidden="true" className="size-3.5" />, label: `Số lượt thi tối đa: ${exam.maxAttempt ?? 1}` },
+          // Hệ thống tự tính từ các mã đề. Hiện ra vì mọi ca thi phải dài tối thiểu bằng con số này.
+          { icon: <Timer aria-hidden="true" className="size-3.5" />, label: `Thời gian làm bài: ${formatDurationSeconds(exam.examTimeDurationSecond)}` },
           { icon: <CircleCheck aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
         ]}
         onEdit={canManageInfo ? () => setShowEditModal(true) : undefined}
@@ -896,7 +917,6 @@ function ExamDetailPage({
         <TabPillGroup
           items={[
             { label: 'Phân công', value: 'people' },
-            { label: 'Phương thức đánh giá', value: 'assessment' },
             { label: 'Blueprint', value: 'blueprint' },
             { label: 'Đề bài', value: 'papers' },
             { label: 'Học sinh', value: 'students' },
@@ -1072,9 +1092,9 @@ function ExamDetailPage({
 
       {tab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
 
-      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
-
-      {tab === 'students' ? <CandidatesTab canManage={canManageSchedule} examId={exam.id} papers={papers} /> : null}
+      {tab === 'students' ? (
+        <CandidatesTab canManage={canManageSchedule} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
+      ) : null}
 
       {tab === 'blueprint' ? (
         <BlueprintAttachPanel
@@ -1097,7 +1117,10 @@ function ExamDetailPage({
         <ScheduleTab
           canManage={canManageSchedule}
           deliveryMode={exam.deliveryMode}
+          examCloseAt={exam.closeAt}
           examId={exam.id}
+          examOpenAt={exam.openAt}
+          examTimeDurationSecond={exam.examTimeDurationSecond}
           isClassTest={false}
           onGoToPapers={() => setTab('papers')}
           onSetDeliveryMode={canManageSchedule ? (mode) => void handleSetDeliveryMode(exam.id, mode) : undefined}

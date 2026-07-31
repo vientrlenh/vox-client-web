@@ -146,7 +146,7 @@ export function SchoolDirectoryStep({
 
         <ContactInfoFields disabled={isSubmitting} />
 
-        <div className="border-t border-slate-200 pt-4">
+        <div className="min-w-0 border-t border-slate-200 pt-4">
           <DocumentFilesField
             disabled={isSubmitting}
             files={files}

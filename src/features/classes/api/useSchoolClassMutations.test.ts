@@ -4,7 +4,7 @@ import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import type { CreateSchoolClassRequest } from '../types'
 import {
-  addClassUser,
+  addClassUsersBulk,
   createSchoolClass,
   deleteSchoolClass,
   removeClassUser,
@@ -167,7 +167,7 @@ describe('class management mutations', () => {
   it('manages users in a class through REST endpoints', async () => {
     jest.mocked(apiClient.post).mockResolvedValue({
       data: {
-        data: { schoolClassUserId: 'class-user-1' },
+        data: { addedUserIds: ['user-1'], failed: [] },
         message: 'Added',
       },
     } as AxiosResponse<ApiResponse<unknown>>)
@@ -184,7 +184,7 @@ describe('class management mutations', () => {
       },
     } as AxiosResponse<ApiResponse<unknown>>)
 
-    await addClassUser({ classId: 'class-1', userId: 'user-1' })
+    await addClassUsersBulk({ classId: 'class-1', userIds: ['user-1', 'user-2'] })
     await removeClassUser({ classId: 'class-1', userId: 'user-1' })
     await updateClassUserStatus({
       classId: 'class-1',
@@ -193,8 +193,8 @@ describe('class management mutations', () => {
     })
 
     expect(apiClient.post).toHaveBeenCalledWith(
-      `/v1/schools/${schoolId}/classes/class-1/users`,
-      { userId: 'user-1' },
+      `/v1/schools/${schoolId}/classes/class-1/users/bulk`,
+      { userIds: ['user-1', 'user-2'] },
     )
     expect(apiClient.delete).toHaveBeenCalledWith(
       `/v1/schools/${schoolId}/classes/class-1/users/user-1`,

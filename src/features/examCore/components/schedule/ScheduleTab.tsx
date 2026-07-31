@@ -6,7 +6,7 @@ import type { ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { TabPillGroup } from '@/shared/ui/TabPill'
-import type { SchoolUser } from '@/features/school-users/types'
+import type { ExamDirectoryUser } from '../../api/examDirectoryQueries'
 import {
   useAddProctorToScheduleMutation,
   useAssignCandidateScheduleMutation,
@@ -32,7 +32,12 @@ type ScheduleSubTab = 'assign' | 'rooms' | 'sessions'
 type ScheduleTabProps = {
   canManage: boolean
   deliveryMode?: ExamDeliveryMode
+  // Ba trường dưới đây chỉ để dựng ràng buộc khung giờ trong modal tạo/sửa ca thi —
+  // xem CreateScheduleModal. Đều là dữ liệu chỉ đọc của kỳ thi.
+  examCloseAt?: string | null
   examId: string
+  examOpenAt?: string | null
+  examTimeDurationSecond?: number | null
   isClassTest: boolean
   onGoToPapers: () => void
   onSetDeliveryMode?: (mode: ExamDeliveryMode) => void
@@ -43,7 +48,10 @@ type ScheduleTabProps = {
 export function ScheduleTab({
   canManage,
   deliveryMode,
+  examCloseAt,
   examId,
+  examOpenAt,
+  examTimeDurationSecond,
   isClassTest,
   onGoToPapers,
   onSetDeliveryMode,
@@ -193,10 +201,7 @@ export function ScheduleTab({
     }
   }
 
-  async function handleAddProctor(schedule: ExamScheduleDto, teacher: SchoolUser) {
-    if (!teacher.userId) {
-      return
-    }
+  async function handleAddProctor(schedule: ExamScheduleDto, teacher: ExamDirectoryUser) {
     try {
       await addProctorMutation.mutateAsync({ examId, payload: { teacherId: teacher.userId }, scheduleId: schedule.id })
       await invalidate()
@@ -574,6 +579,10 @@ export function ScheduleTab({
 
       {showCreateModal ? (
         <CreateScheduleModal
+          examCloseAt={examCloseAt}
+          examOpenAt={examOpenAt}
+          examTimeDurationSecond={examTimeDurationSecond}
+          isClassTest={isClassTest}
           onClose={() => setShowCreateModal(false)}
           onSubmit={(input) => void handleCreateSchedule(input)}
           submitting={createScheduleMutation.isPending}
@@ -582,11 +591,15 @@ export function ScheduleTab({
 
       {editingSchedule ? (
         <CreateScheduleModal
+          examCloseAt={examCloseAt}
+          examOpenAt={examOpenAt}
+          examTimeDurationSecond={examTimeDurationSecond}
           initial={{
             endDate: editingSchedule.endDate,
             room: editingSchedule.room,
             startDate: editingSchedule.startDate,
           }}
+          isClassTest={isClassTest}
           onClose={() => setEditingSchedule(null)}
           onSubmit={(input) => void handleUpdateSchedule(input)}
           submitLabel="Lưu thay đổi"
@@ -597,6 +610,7 @@ export function ScheduleTab({
 
       {managingProctorsFor ? (
         <ManageProctorsModal
+          examId={examId}
           onAdd={(teacher) => void handleAddProctor(managingProctorsFor, teacher)}
           onClose={() => setManagingProctorsFor(null)}
           onRemove={(proctorId) => void handleRemoveProctor(managingProctorsFor, proctorId)}

@@ -1,14 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
 import type {
+  AiQualityReport,
   AssignableTeacher,
+  ExamCandidateResultStatus,
   GradingAssignmentRow,
   GradingAssignmentStatus,
-  GradingExamOption,
   GradingPage,
+  GradingRoundType,
   GradingStats,
   GradingTask,
   GradingTaskDetail,
+  ResultStatusHistoryEntry,
 } from '../types'
 
 const CRITERION_SCORE_FIELDS = `
@@ -34,7 +37,12 @@ const GRADING_ASSIGNMENTS_QUERY = `
     $examId: ID
     $scheduleId: ID
     $teacherId: ID
+    $resultStatus: String
+    $roundType: GradingRoundType
     $status: GradingAssignmentStatus
+    $unassignedOnly: Boolean
+    $overdueOnly: Boolean
+    $hasOpenAppeal: Boolean
     $search: String
     $page: Int
     $size: Int
@@ -43,7 +51,12 @@ const GRADING_ASSIGNMENTS_QUERY = `
       examId: $examId
       scheduleId: $scheduleId
       teacherId: $teacherId
+      resultStatus: $resultStatus
+      roundType: $roundType
       status: $status
+      unassignedOnly: $unassignedOnly
+      overdueOnly: $overdueOnly
+      hasOpenAppeal: $hasOpenAppeal
       search: $search
       page: $page
       size: $size
@@ -55,13 +68,19 @@ const GRADING_ASSIGNMENTS_QUERY = `
         className
         examName
         resultStatus
+        totalScore
         flagged
         assignmentId
         teacherId
         teacherName
+        roundType
         assignmentStatus
+        outcome
         assignedAt
         completedAt
+        deadlineAt
+        overdue
+        hasOpenAppeal
       }
       page
       size
@@ -74,25 +93,47 @@ const GRADING_ASSIGNMENTS_QUERY = `
 const GRADING_STATS_QUERY = `
   query GradingStats($examId: ID, $scheduleId: ID) {
     gradingStats(examId: $examId, scheduleId: $scheduleId) {
-      totalToGrade
+      total
+      byResultStatus {
+        status
+        count
+      }
       unassigned
       assigned
+      overdue
+      teacherProgress {
+        teacherId
+        teacherName
+        assigned
+        completed
+        overdue
+      }
     }
   }
 `
 
 const MY_GRADING_TASKS_QUERY = `
-  query MyGradingTasks($status: GradingAssignmentStatus, $page: Int, $size: Int) {
-    myGradingTasks(status: $status, page: $page, size: $size) {
+  query MyGradingTasks(
+    $status: GradingAssignmentStatus
+    $roundType: GradingRoundType
+    $page: Int
+    $size: Int
+  ) {
+    myGradingTasks(status: $status, roundType: $roundType, page: $page, size: $size) {
       content {
         assignmentId
         candidateResultId
         resultCode
         examName
         partCount
+        roundType
         status
+        resultStatus
+        currentScore
         flagged
         assignedAt
+        deadlineAt
+        overdue
       }
       page
       size
@@ -109,48 +150,18 @@ const GRADING_TASK_DETAIL_QUERY = `
       candidateResultId
       resultCode
       examName
+      roundType
       assignmentStatus
       resultStatus
       flagged
       flagReason
       currentTotalScore
+      scoreBefore
+      deadlineAt
+      overdue
       editable
-      items {
-        paperItemId
-        responseId
-        partLabel
-        currentItemScore
-        currentFeedbackSummary
-        currentScores { ${CRITERION_SCORE_FIELDS} }
-        turns { ${TURN_FIELDS} }
-      }
-      criteria {
-        id
-        code
-        label
-        description
-        minScore
-        maxScore
-        weight
-        required
-      }
-    }
-  }
-`
-
-const GRADING_TASK_DETAIL_BY_SCHOOL_QUERY = `
-  query GradingTaskDetailBySchool($candidateResultId: ID!) {
-    gradingTaskDetailBySchool(candidateResultId: $candidateResultId) {
-      assignmentId
-      candidateResultId
-      resultCode
-      examName
-      assignmentStatus
-      resultStatus
-      flagged
-      flagReason
-      currentTotalScore
-      editable
+      allowedOutcomes
+      appealReason
       items {
         paperItemId
         responseId
@@ -184,14 +195,40 @@ const ASSIGNABLE_TEACHERS_QUERY = `
   }
 `
 
-// Chỉ id + name: đây là nguồn cho một dropdown lọc, không cần kéo cả papers/sections
-// như EXAM_LIST_FIELDS của feature exam.
-const GRADING_EXAM_OPTIONS_QUERY = `
-  query GradingExamOptions($page: Int!, $size: Int!) {
-    exams(page: $page, size: $size) {
-      content {
-        id
-        name
+const RESULT_STATUS_HISTORY_QUERY = `
+  query ResultStatusHistory($candidateResultId: ID!) {
+    resultStatusHistory(candidateResultId: $candidateResultId) {
+      id
+      candidateResultId
+      fromStatus
+      toStatus
+      scoreBefore
+      scoreAfter
+      source
+      actorId
+      actorName
+      reason
+      createdAt
+    }
+  }
+`
+
+const AI_QUALITY_REPORT_QUERY = `
+  query AiQualityReport($examId: ID) {
+    aiQualityReport(examId: $examId) {
+      reviewed
+      upheld
+      regraded
+      invalidated
+      regradeRate
+      averageDelta
+      maxDelta
+      byTeacher {
+        teacherId
+        teacherName
+        reviewed
+        regraded
+        averageDelta
       }
     }
   }
@@ -199,16 +236,22 @@ const GRADING_EXAM_OPTIONS_QUERY = `
 
 export type FetchGradingAssignmentsInput = {
   examId?: string
+  hasOpenAppeal?: boolean
+  overdueOnly?: boolean
   page: number
+  resultStatus?: '' | ExamCandidateResultStatus
+  roundType?: '' | GradingRoundType
   scheduleId?: string
   search?: string
   size: number
   status?: '' | GradingAssignmentStatus
   teacherId?: string
+  unassignedOnly?: boolean
 }
 
 export type FetchMyGradingTasksInput = {
   page: number
+  roundType?: '' | GradingRoundType
   size: number
   status?: '' | GradingAssignmentStatus
 }
@@ -219,19 +262,21 @@ export type FetchGradingStatsInput = {
 }
 
 export const gradingKeys = {
+  aiQuality: (examId?: string) => [...gradingKeys.all, 'ai-quality', examId ?? ''] as const,
   all: ['grading'] as const,
   assignments: (input: FetchGradingAssignmentsInput) =>
     [...gradingKeys.all, 'assignments', input] as const,
-  stats: (input: FetchGradingStatsInput) => [...gradingKeys.all, 'stats', input] as const,
+  finalizePreview: (examId: string | null) =>
+    [...gradingKeys.all, 'finalize-preview', examId] as const,
+  history: (candidateResultId: string | null) =>
+    [...gradingKeys.all, 'result-history', candidateResultId] as const,
   myTasks: (input: FetchMyGradingTasksInput) => [...gradingKeys.all, 'my-tasks', input] as const,
-  taskDetail: (assignmentId: string | null) =>
-    [...gradingKeys.all, 'task-detail', assignmentId] as const,
-  taskDetailBySchool: (candidateResultId: string | null) =>
-    [...gradingKeys.all, 'task-detail-by-school', candidateResultId] as const,
-  teachers: (search?: string) => [...gradingKeys.all, 'teachers', search] as const,
-  examOptions: () => [...gradingKeys.all, 'exam-options'] as const,
   preview: (assignmentId: string | null, payload: unknown) =>
     [...gradingKeys.all, 'preview', assignmentId, payload] as const,
+  stats: (input: FetchGradingStatsInput) => [...gradingKeys.all, 'stats', input] as const,
+  taskDetail: (assignmentId: string | null) =>
+    [...gradingKeys.all, 'task-detail', assignmentId] as const,
+  teachers: (search?: string) => [...gradingKeys.all, 'teachers', search] as const,
 }
 
 export async function fetchGradingAssignments(input: FetchGradingAssignmentsInput) {
@@ -239,12 +284,19 @@ export async function fetchGradingAssignments(input: FetchGradingAssignmentsInpu
     gradingAssignments: GradingPage<GradingAssignmentRow>
   }>(GRADING_ASSIGNMENTS_QUERY, {
     examId: input.examId || undefined,
+    // Ba cờ boolean chỉ gửi khi BẬT: gửi `false` là một bộ lọc khác hẳn với "không lọc"
+    // ở `hasOpenAppeal` (false = chỉ bài KHÔNG có đơn đang mở).
+    hasOpenAppeal: input.hasOpenAppeal ? true : undefined,
+    overdueOnly: input.overdueOnly ? true : undefined,
     page: input.page,
+    resultStatus: input.resultStatus || undefined,
+    roundType: input.roundType || undefined,
     scheduleId: input.scheduleId || undefined,
     search: input.search?.trim() || undefined,
     size: input.size,
     status: input.status || undefined,
     teacherId: input.teacherId || undefined,
+    unassignedOnly: input.unassignedOnly ? true : undefined,
   })
   return data.gradingAssignments
 }
@@ -262,6 +314,7 @@ export async function fetchMyGradingTasks(input: FetchMyGradingTasksInput) {
     MY_GRADING_TASKS_QUERY,
     {
       page: input.page,
+      roundType: input.roundType || undefined,
       size: input.size,
       status: input.status || undefined,
     },
@@ -277,14 +330,6 @@ export async function fetchGradingTaskDetail(assignmentId: string) {
   return data.gradingTaskDetail
 }
 
-export async function fetchGradingTaskDetailBySchool(candidateResultId: string) {
-  const data = await graphQLRequest<{ gradingTaskDetailBySchool: GradingTaskDetail }>(
-    GRADING_TASK_DETAIL_BY_SCHOOL_QUERY,
-    { candidateResultId },
-  )
-  return data.gradingTaskDetailBySchool
-}
-
 export async function fetchAssignableTeachers(search?: string) {
   const data = await graphQLRequest<{ assignableTeachers: AssignableTeacher[] }>(
     ASSIGNABLE_TEACHERS_QUERY,
@@ -293,37 +338,28 @@ export async function fetchAssignableTeachers(search?: string) {
   return data.assignableTeachers
 }
 
-export async function fetchGradingExamOptions() {
-  // Cap mềm: đủ cho gần như mọi trường. Vượt trần này thì bộ lọc mới cần chuyển
-  // sang combobox tìm kiếm server-side thay vì kéo toàn bộ về một lần.
-  const data = await graphQLRequest<{ exams: { content: GradingExamOption[] } }>(
-    GRADING_EXAM_OPTIONS_QUERY,
-    { page: 0, size: 500 },
+export async function fetchResultStatusHistory(candidateResultId: string) {
+  const data = await graphQLRequest<{ resultStatusHistory: ResultStatusHistoryEntry[] }>(
+    RESULT_STATUS_HISTORY_QUERY,
+    { candidateResultId },
   )
-  return data.exams.content
+  return data.resultStatusHistory
+}
+
+export async function fetchAiQualityReport(examId?: string) {
+  const data = await graphQLRequest<{ aiQualityReport: AiQualityReport }>(AI_QUALITY_REPORT_QUERY, {
+    examId: examId || undefined,
+  })
+  return data.aiQualityReport
 }
 
 // Phân trang 0-based ở server, UI 1-based: -1 khi query, +1 ở `select`.
 export function useGradingAssignmentsQuery(
   page: number,
   size: number,
-  options?: {
-    examId?: string
-    scheduleId?: string
-    search?: string
-    status?: '' | GradingAssignmentStatus
-    teacherId?: string
-  },
+  options?: Omit<FetchGradingAssignmentsInput, 'page' | 'size'>,
 ) {
-  const input: FetchGradingAssignmentsInput = {
-    examId: options?.examId,
-    page,
-    scheduleId: options?.scheduleId,
-    search: options?.search,
-    size,
-    status: options?.status,
-    teacherId: options?.teacherId,
-  }
+  const input: FetchGradingAssignmentsInput = { ...options, page, size }
   return useQuery({
     queryFn: () => fetchGradingAssignments({ ...input, page: page - 1 }),
     queryKey: gradingKeys.assignments(input),
@@ -331,7 +367,7 @@ export function useGradingAssignmentsQuery(
   })
 }
 
-export function useGradingStatsQuery(options?: { examId?: string; scheduleId?: string }) {
+export function useGradingStatsQuery(options?: FetchGradingStatsInput) {
   const input: FetchGradingStatsInput = {
     examId: options?.examId,
     scheduleId: options?.scheduleId,
@@ -345,9 +381,9 @@ export function useGradingStatsQuery(options?: { examId?: string; scheduleId?: s
 export function useMyGradingTasksQuery(
   page: number,
   size: number,
-  options?: { status?: '' | GradingAssignmentStatus },
+  options?: Omit<FetchMyGradingTasksInput, 'page' | 'size'>,
 ) {
-  const input: FetchMyGradingTasksInput = { page, size, status: options?.status }
+  const input: FetchMyGradingTasksInput = { ...options, page, size }
   return useQuery({
     queryFn: () => fetchMyGradingTasks({ ...input, page: page - 1 }),
     queryKey: gradingKeys.myTasks(input),
@@ -366,16 +402,6 @@ export function useGradingTaskDetailQuery(assignmentId: string | null) {
   })
 }
 
-// Nhà trường xem/chấm trực tiếp theo candidateResultId, không cần phân công.
-export function useGradingTaskDetailBySchoolQuery(candidateResultId: string | null) {
-  return useQuery({
-    enabled: candidateResultId != null,
-    queryFn: () => fetchGradingTaskDetailBySchool(candidateResultId as string),
-    queryKey: gradingKeys.taskDetailBySchool(candidateResultId),
-    refetchOnWindowFocus: false,
-  })
-}
-
 export function useAssignableTeachersQuery(search?: string) {
   return useQuery({
     queryFn: () => fetchAssignableTeachers(search),
@@ -383,9 +409,18 @@ export function useAssignableTeachersQuery(search?: string) {
   })
 }
 
-export function useGradingExamOptionsQuery() {
+export function useResultStatusHistoryQuery(candidateResultId: string | null) {
   return useQuery({
-    queryFn: fetchGradingExamOptions,
-    queryKey: gradingKeys.examOptions(),
+    enabled: candidateResultId != null,
+    queryFn: () => fetchResultStatusHistory(candidateResultId as string),
+    queryKey: gradingKeys.history(candidateResultId),
+  })
+}
+
+export function useAiQualityReportQuery(examId?: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    enabled: options?.enabled !== false,
+    queryFn: () => fetchAiQualityReport(examId),
+    queryKey: gradingKeys.aiQuality(examId),
   })
 }

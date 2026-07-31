@@ -1,8 +1,8 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient, graphQLRequest } from '@/shared/api'
 import type {
+  BulkAddClassUsersResponse,
   ClassUserMutationResponse,
-  CreateClassUserResponse,
   CreateSchoolClassRequest,
   CreateSchoolClassResponse,
   DeleteSchoolClassResponse,
@@ -27,9 +27,9 @@ type DeleteSchoolClassInput = {
   classId: string
 }
 
-type AddClassUserInput = {
+type AddClassUsersBulkInput = {
   classId: string
-  userId: string
+  userIds: string[]
 }
 
 type RemoveClassUserInput = {
@@ -104,14 +104,14 @@ export async function deleteSchoolClass({
   return response.data
 }
 
-export async function addClassUser({
+export async function addClassUsersBulk({
   classId,
-  userId,
-}: AddClassUserInput): Promise<MutationResult<CreateClassUserResponse>> {
+  userIds,
+}: AddClassUsersBulkInput): Promise<MutationResult<BulkAddClassUsersResponse>> {
   const schoolId = requireSchoolId()
-  const response = await apiClient.post<ApiResponse<CreateClassUserResponse>>(
-    `/v1/schools/${schoolId}/classes/${classId}/users`,
-    { userId },
+  const response = await apiClient.post<ApiResponse<BulkAddClassUsersResponse>>(
+    `/v1/schools/${schoolId}/classes/${classId}/users/bulk`,
+    { userIds },
   )
 
   return response.data
@@ -163,9 +163,9 @@ export function useDeleteSchoolClassMutation() {
   })
 }
 
-export function useAddClassUserMutation() {
+export function useAddClassUsersBulkMutation() {
   return useMutation({
-    mutationFn: addClassUser,
+    mutationFn: addClassUsersBulk,
   })
 }
 

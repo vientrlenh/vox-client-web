@@ -1,3 +1,4 @@
+import type { GradingAssignmentStatus, GradingOutcome } from '@/features/grading/types'
 import type { StatusTone } from '@/shared/ui/StatusBadge'
 
 // Enum BE dùng CHỮ HOA — dùng thẳng, không map qua chữ thường (chuẩn hoá tại một chỗ).
@@ -5,12 +6,9 @@ export type AppealStatus =
   | 'PENDING'
   | 'APPROVED'
   | 'GRADING'
-  | 'COMPARING'
   | 'PUBLISHED'
   | 'REJECTED'
-
-// BE chỉ có 2 giá trị — KHÔNG có REMOVED (gỡ giám khảo là xoá cứng bản ghi).
-export type AppealReviewerStatus = 'ASSIGNED' | 'SUBMITTED'
+  | 'WITHDRAWN'
 
 export type TimelineTone = 'info' | 'success' | 'violet' | 'danger'
 
@@ -41,16 +39,6 @@ export type AppealCriterionScore = {
   rationale?: string | null
 }
 
-// Thang điểm 1 tiêu chí của rubric (để dựng form chấm + kẹp giá trị nhập).
-export type AppealCriterionMeta = {
-  id: string
-  code: string
-  label: string
-  description?: string | null
-  minScore: number
-  maxScore: number
-}
-
 // Một lượt hỏi-đáp trong bài nói, mỗi lượt có audio/transcript riêng.
 export type AppealTurn = {
   id: string
@@ -75,26 +63,21 @@ export type AppealItem = {
   finalScore?: number | null
 }
 
-// Báo cáo chấm lại của một giám khảo cho MỘT phần thi.
-export type AppealReviewerItem = {
-  appealItemId: string
-  partLabel?: string | null
-  suggestedScore: number
-  note?: string | null
-  scores: AppealCriterionScore[]
-}
-
+/**
+ * Giám khảo được giao chấm lại. Từ bản rework, đây chính là một dòng phân công chấm bài
+ * (vòng `APPEAL`) — nên trạng thái/kết luận dùng chung enum với feature `grading`.
+ * Mỗi đơn chỉ có TỐI ĐA MỘT giám khảo; đổi người = gán lại, không có thao tác gỡ.
+ */
 export type AppealReviewer = {
+  assignmentId: string
   reviewerId: string
-  reviewerName: string
-  status: AppealReviewerStatus
-  done: boolean
-  assignedAt: string
-  submittedAt?: string | null
-  // Trung bình điểm đề xuất của các phần; null khi chưa nộp.
-  suggestedScore?: number | null
-  // Rỗng khi giám khảo chưa nộp báo cáo.
-  items: AppealReviewerItem[]
+  reviewerName?: string | null
+  status: GradingAssignmentStatus
+  outcome?: GradingOutcome | null
+  assignedAt?: string | null
+  completedAt?: string | null
+  deadlineAt?: string | null
+  overdue: boolean
 }
 
 // Một dòng trong danh sách đơn (GraphQL `appeals`).
@@ -109,8 +92,9 @@ export type AppealSummary = {
   status: AppealStatus
   requestedAt: string
   deadline?: string | null
-  reviewerCount: number
-  doneCount: number
+  // Một giám khảo cho mỗi đơn — null khi chưa phân công.
+  reviewerName?: string | null
+  reviewerStatus?: GradingAssignmentStatus | null
   overdue: boolean
 }
 
@@ -130,33 +114,16 @@ export type AppealDetail = {
   finalScore?: number | null
   approvedAt?: string | null
   resolvedAt?: string | null
+  withdrawnAt?: string | null
+  // Lý do admin vẫn giao cho người đã chấm tay bài này (bỏ qua xung đột lợi ích).
+  reviewerOverrideReason?: string | null
   // Các phần thi được phúc khảo, mỗi phần kèm điểm đối chiếu và lượt nói riêng.
   items: AppealItem[]
-  reviewers: AppealReviewer[]
+  reviewer?: AppealReviewer | null
   overdue: boolean
   // Thang điểm rubric — chính là khoảng BE validate partScore khi công bố.
   scoringScaleMin: number
   scoringScaleMax: number
-}
-
-// Một dòng trong việc của giám khảo (GraphQL `myAppealTasks`).
-export type AppealTask = {
-  appealId: string
-  examName: string
-  partLabels: string[]
-  deadline?: string | null
-  myStatus: AppealReviewerStatus
-  overdue: boolean
-}
-
-// Màn chấm lại của giám khảo (GraphQL `appealTaskDetail`) — chấm mù, KHÔNG có reviewers khác.
-export type AppealTaskDetail = {
-  appealId: string
-  // Các phần thi phải chấm lại, mỗi phần kèm lượt nói và điểm đối chiếu riêng.
-  items: AppealItem[]
-  criteria: AppealCriterionMeta[]
-  // Báo cáo của chính mình theo từng phần; RỖNG khi chưa nộp.
-  myReport: AppealReviewerItem[]
 }
 
 // Ứng viên cho picker phân công (GraphQL `appealReviewers`).
@@ -164,6 +131,8 @@ export type AppealReviewerLite = {
   id: string
   name: string
   load: number
+  // Đã chấm tay chính bài này ⇒ xung đột lợi ích. Vẫn gán được nhưng phải nêu lý do.
+  conflicted: boolean
 }
 
 export type AppealPage<T> = {
@@ -179,15 +148,16 @@ export type AppealStats = {
   processing: number
   published: number
   rejected: number
+  withdrawn: number
 }
 
 const STATUS_DISPLAY: Record<AppealStatus, { label: string; tone: StatusTone }> = {
-  PENDING: { label: 'Chờ duyệt', tone: 'warning' },
   APPROVED: { label: 'Chờ phân công', tone: 'info' },
   GRADING: { label: 'Đang chấm lại', tone: 'violet' },
-  COMPARING: { label: 'Chờ đối chiếu', tone: 'info' },
+  PENDING: { label: 'Chờ duyệt', tone: 'warning' },
   PUBLISHED: { label: 'Đã công bố', tone: 'success' },
   REJECTED: { label: 'Từ chối', tone: 'danger' },
+  WITHDRAWN: { label: 'Học sinh đã rút', tone: 'neutral' },
 }
 
 export function getAppealStatusDisplay(status: AppealStatus) {
@@ -202,51 +172,15 @@ export function avgScore(scores: AppealCriterionScore[]): number {
   return scores.reduce((total, s) => total + s.score, 0) / scores.length
 }
 
-/**
- * Điểm đề xuất chung của đơn = trung bình `suggestedScore` của các giám khảo đã nộp.
- * BE đã tính sẵn `suggestedScore` (trung bình các phần, HALF_UP scale 2) — không tự tính lại.
- * Đơn nhiều phần thì đây là con số tổng quan; điểm công bố lấy theo TỪNG phần bên dưới.
- */
-export function suggestedPartScore(reviewers: AppealReviewer[]): number | null {
-  const submitted = reviewers.filter((r) => r.done && r.suggestedScore != null)
-  if (submitted.length === 0) {
-    return null
-  }
-  const sum = submitted.reduce((total, r) => total + (r.suggestedScore ?? 0), 0)
-  return bandRound(sum / submitted.length)
-}
-
-/** Điểm đề xuất cho MỘT phần thi = trung bình điểm các giám khảo đã chấm phần đó. */
-export function suggestedScoreForItem(
-  reviewers: AppealReviewer[],
-  appealItemId: string,
-): number | null {
-  const scores = reviewers
-    .flatMap((reviewer) => reviewer.items)
-    .filter((item) => item.appealItemId === appealItemId)
-    .map((item) => item.suggestedScore)
-  if (scores.length === 0) {
-    return null
-  }
-  return bandRound(scores.reduce((total, score) => total + score, 0) / scores.length)
-}
-
-/** Báo cáo của các giám khảo cho MỘT phần thi, kèm tên người chấm để hiển thị. */
-export function reviewerItemsForItem(reviewers: AppealReviewer[], appealItemId: string) {
-  return reviewers.flatMap((reviewer) => {
-    const found = reviewer.items.find((item) => item.appealItemId === appealItemId)
-    return found ? [{ reviewer, item: found }] : []
-  })
-}
-
 /** Nhãn gộp các phần thi của một đơn cho danh sách. */
 export function partLabelsText(labels: string[]): string {
   return labels.length > 0 ? labels.join(' · ') : '—'
 }
 
 /**
- * Không có API timeline — FE tự ghép từ các mốc của đơn (guide §6).
- * Trả về theo thứ tự thời gian: nộp → duyệt → phân công → nộp báo cáo → công bố/từ chối.
+ * Không có API timeline — FE tự ghép từ các mốc của đơn.
+ * Thứ tự: nộp → duyệt → phân công → chấm xong → công bố/từ chối, hoặc nhánh rút đơn.
+ * Từ bản rework, giám khảo chấm xong là đơn công bố luôn nên hai mốc cuối sát nhau.
  */
 export function buildTimeline(detail: AppealDetail): TimelineEvent[] {
   const events: TimelineEvent[] = [
@@ -271,36 +205,41 @@ export function buildTimeline(detail: AppealDetail): TimelineEvent[] {
     })
   }
 
-  const assignedAts = detail.reviewers
-    .map((r) => r.assignedAt)
-    .filter(Boolean)
-    .sort()
-  if (assignedAts.length > 0) {
+  const reviewer = detail.reviewer
+  const reviewerName = reviewer?.reviewerName ?? 'Giám khảo'
+
+  if (reviewer?.assignedAt) {
     events.push({
       icon: 'users',
-      role: `${detail.reviewers.length} giám khảo`,
-      t: formatIsoDateTime(assignedAts[0]),
-      text: `Phân công ${detail.reviewers.length} giám khảo chấm lại`,
+      role: 'Phân công',
+      t: formatIsoDateTime(reviewer.assignedAt),
+      text: `Giao ${reviewerName} chấm lại`,
       tone: 'info',
       who: 'Quản trị trường',
     })
   }
 
-  detail.reviewers
-    .filter((r) => r.submittedAt)
-    .sort((a, b) => (a.submittedAt! < b.submittedAt! ? -1 : 1))
-    .forEach((reviewer) => {
-      events.push({
-        icon: 'file-check',
-        role: 'Giám khảo',
-        t: formatIsoDateTime(reviewer.submittedAt),
-        text: `${reviewer.reviewerName} nộp báo cáo chấm lại`,
-        tone: 'violet',
-        who: reviewer.reviewerName,
-      })
+  if (reviewer?.completedAt) {
+    events.push({
+      icon: 'file-check',
+      role: 'Giám khảo',
+      t: formatIsoDateTime(reviewer.completedAt),
+      text: `${reviewerName} chấm xong`,
+      tone: 'violet',
+      who: reviewerName,
     })
+  }
 
-  if (detail.resolvedAt) {
+  if (detail.status === 'WITHDRAWN' && detail.withdrawnAt) {
+    events.push({
+      icon: 'circle-x',
+      role: 'Rút đơn',
+      t: formatIsoDateTime(detail.withdrawnAt),
+      text: 'Học sinh rút đơn phúc khảo',
+      tone: 'danger',
+      who: 'Học sinh',
+    })
+  } else if (detail.resolvedAt) {
     const rejected = detail.status === 'REJECTED'
     events.push({
       icon: rejected ? 'circle-x' : 'bell-ringing',
@@ -310,7 +249,7 @@ export function buildTimeline(detail: AppealDetail): TimelineEvent[] {
         ? 'Từ chối đơn và thông báo học sinh'
         : 'Công bố kết quả và thông báo học sinh',
       tone: rejected ? 'danger' : 'success',
-      who: 'Quản trị trường',
+      who: rejected ? 'Quản trị trường' : reviewerName,
     })
   }
 

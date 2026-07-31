@@ -18,6 +18,7 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
+  Timer,
   Trash2,
   Users,
   NotebookPen,
@@ -37,7 +38,6 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
-import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
@@ -1606,7 +1606,7 @@ type ClassTestDetailPageProps = {
   canManage: boolean
 }
 
-type DetailTab = 'assessment' | 'blueprint' | 'papers' | 'schedule' | 'students'
+type DetailTab = 'blueprint' | 'papers' | 'schedule' | 'students'
 
 function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const navigate = useNavigate()
@@ -1992,6 +1992,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           { icon: <Calendar aria-hidden="true" className="size-3.5" />, label: `${formatDateTime(exam.openAt)} – ${formatDateTime(exam.closeAt)}` },
           { icon: <Users aria-hidden="true" className="size-3.5" />, label: `GV: ${getExamChairName(exam.members)}` },
           { icon: <Clock aria-hidden="true" className="size-3.5" />, label: `Số lượt thi tối đa: ${exam.maxAttempt ?? 1}` },
+          // Hệ thống tự tính từ đề bài. Khung mở/đóng của bài trên lớp phải đủ dài cho con số này.
+          { icon: <Timer aria-hidden="true" className="size-3.5" />, label: `Thời gian làm bài: ${formatDurationSeconds(exam.examTimeDurationSecond)}` },
           { icon: <CheckCircle2 aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
         ]}
         onEdit={canEditContent ? openEditInfo : undefined}
@@ -2098,7 +2100,6 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       <div className="mt-5.5">
         <TabPillGroup
           items={[
-            { label: 'Phương thức đánh giá', value: 'assessment' },
             { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
             { label: 'Đề bài', value: 'papers' },
             { label: 'Học sinh', value: 'students' },
@@ -2318,9 +2319,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
-
-      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} papers={exam.papers} /> : null}
+      {tab === 'students' ? (
+        <CandidatesTab canManage={canManage} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
+      ) : null}
 
       {tab === 'blueprint' ? (
         <ClassTestBlueprintTab
@@ -2337,7 +2338,10 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         <ScheduleTab
           canManage={canEditContent}
           deliveryMode={exam.deliveryMode}
+          examCloseAt={exam.closeAt}
           examId={exam.id}
+          examOpenAt={exam.openAt}
+          examTimeDurationSecond={exam.examTimeDurationSecond}
           isClassTest
           onGoToPapers={() => setTab('papers')}
           onSetDeliveryMode={

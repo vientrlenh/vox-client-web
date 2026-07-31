@@ -1,15 +1,7 @@
 import { apiClient } from '@/shared/api'
-import {
-  approveAppeal,
-  assignReviewers,
-  publishAppeal,
-  rejectAppeal,
-  removeReviewer,
-  submitReport,
-} from './useReevaluationMutations'
+import { approveAppeal, assignReviewer, rejectAppeal } from './useReevaluationMutations'
 
 const post = jest.spyOn(apiClient, 'post')
-const del = jest.spyOn(apiClient, 'delete')
 
 function okResponse(message: string, data: unknown = 'ok') {
   return { data: { data, message } }
@@ -18,7 +10,6 @@ function okResponse(message: string, data: unknown = 'ok') {
 describe('reevaluation REST mutations', () => {
   beforeEach(() => {
     post.mockReset()
-    del.mockReset()
   })
 
   it('approves with a deadline body and returns the message', async () => {
@@ -39,45 +30,30 @@ describe('reevaluation REST mutations', () => {
     expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/reject', { reason: 'Không đủ căn cứ' })
   })
 
-  it('assigns reviewers with an id list', async () => {
-    post.mockResolvedValue(okResponse('Phân công giám khảo thành công!'))
+  it('assigns exactly one reviewer and returns the new assignment id', async () => {
+    post.mockResolvedValue(okResponse('Phân công giám khảo thành công!', 'asg-1'))
 
-    await assignReviewers('a1', ['t1', 't2'])
-    expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/reviewers', {
-      reviewerIds: ['t1', 't2'],
+    // Endpoint số ít: bản rework bỏ danh sách nhiều giám khảo, mỗi đơn một người chấm.
+    await expect(assignReviewer('a1', { reviewerId: 't1' })).resolves.toBe('asg-1')
+    expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/reviewer', {
+      deadlineAt: undefined,
+      overrideReason: undefined,
+      reviewerId: 't1',
     })
   })
 
-  it('removes a reviewer via DELETE', async () => {
-    del.mockResolvedValue(okResponse('Gỡ giám khảo thành công!'))
+  it('sends the override reason and deadline when the reviewer has a conflict of interest', async () => {
+    post.mockResolvedValue(okResponse('Phân công giám khảo thành công!', 'asg-2'))
 
-    await removeReviewer('a1', 't1')
-    expect(del).toHaveBeenCalledWith('/v1/exam-appeals/a1/reviewers/t1')
-  })
-
-  it('submits one report per appeal item in a single request', async () => {
-    post.mockResolvedValue(okResponse('Nộp báo cáo chấm lại thành công!', 'a1'))
-
-    const items = [
-      { appealItemId: 'i1', note: 'note', scores: [{ criterionId: 'c1', score: 8, rationale: 'ok' }] },
-      { appealItemId: 'i2', note: undefined, scores: [{ criterionId: 'c1', score: 6 }] },
-    ]
-    await submitReport('a1', items)
-    // BE bắt nộp trọn gói mọi phần thi — không có endpoint nộp lẻ từng phần.
-    expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/reviewers/me/report', { items })
-  })
-
-  it('publishes a partScore per item, not a total finalScore', async () => {
-    post.mockResolvedValue(okResponse('Công bố kết quả phúc khảo thành công!'))
-
-    const itemScores = [
-      { appealItemId: 'i1', partScore: 8 },
-      { appealItemId: 'i2', partScore: 6.5 },
-    ]
-    await publishAppeal('a1', itemScores, 'quyết định')
-    expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/publish', {
-      decisionNote: 'quyết định',
-      itemScores,
+    await assignReviewer('a1', {
+      deadlineAt: '2026-07-30T10:00:00.000Z',
+      overrideReason: 'Chỉ còn một giáo viên đủ chuyên môn',
+      reviewerId: 't2',
+    })
+    expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/reviewer', {
+      deadlineAt: '2026-07-30T10:00:00.000Z',
+      overrideReason: 'Chỉ còn một giáo viên đủ chuyên môn',
+      reviewerId: 't2',
     })
   })
 })

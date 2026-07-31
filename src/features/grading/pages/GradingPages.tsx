@@ -1,69 +1,98 @@
 import { useMemo, useState } from 'react'
 import {
+  AlarmClock,
   ArrowLeft,
   Bot,
+  CalendarClock,
+  ChevronRight,
   CircleCheck,
   ClipboardList,
+  Download,
   Flag,
+  Gavel,
   Headphones,
+  History,
   Inbox,
   Info,
+  Lock,
   Mic,
   RefreshCw,
+  Scale,
   Search,
   ShieldAlert,
   ShieldCheck,
+  TimerReset,
   Trash2,
+  Undo2,
   UserPlus,
   UserRoundCog,
   UsersRound,
+  X,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
+import { ExamPickerModal } from '@/features/examCore/components/ExamPickerModal'
+import type { ExamPickerOption } from '@/features/examCore/types'
 import { toApiError } from '@/shared/api'
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
+import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
-import { FilterChips } from '@/shared/ui/FilterChips'
 import { PageLoader } from '@/shared/ui/PageLoader'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { TabPillGroup, type TabPillItem } from '@/shared/ui/TabPill'
+import {
+  useExportExamScoresMutation,
+  useFinalizeExamResultsMutation,
+  useFinalizePreviewQuery,
+} from '../api/useExamResultMutations'
 import {
   useAssignGradingMutation,
   useAutoAssignGradingMutation,
-  useInvalidateGradingByResultMutation,
-  useInvalidateGradingMutation,
+  useClearInvalidResultMutation,
+  useDeclineGradingAssignmentMutation,
+  useInvalidateResultMutation,
   useReassignGradingMutation,
+  useReclaimOverdueMutation,
+  useRegradeResultMutation,
   useRemoveGradingAssignmentMutation,
-  useSubmitGradingByResultMutation,
-  useSubmitGradingMutation,
+  useSetGradingDeadlineMutation,
+  useUpholdResultMutation,
   type ItemGradeInput,
 } from '../api/useGradingMutations'
-import { useGradingPreviewByResultQuery, useGradingPreviewQuery } from '../api/useGradingPreviewQuery'
+import { useGradingPreviewQuery } from '../api/useGradingPreviewQuery'
 import {
   useGradingAssignmentsQuery,
-  useGradingExamOptionsQuery,
   useGradingStatsQuery,
-  useGradingTaskDetailBySchoolQuery,
   useGradingTaskDetailQuery,
   useMyGradingTasksQuery,
 } from '../api/useGradingQueries'
+import { AiQualityPanel } from '../components/AiQualityPanel'
 import { AssignTeacherDialog } from '../components/AssignTeacherDialog'
 import { AutoAssignDialog } from '../components/AutoAssignDialog'
 import { CriterionScoreCard } from '../components/CriterionScoreCard'
+import { FinalizeExamDialog } from '../components/FinalizeExamDialog'
+import { GradingDecisionDialog, type DecisionOutcome } from '../components/GradingDecisionDialog'
 import { GradingTurnList } from '../components/GradingTurnList'
-import { InvalidateDialog } from '../components/InvalidateDialog'
+import { ReclaimOverdueDialog } from '../components/ReclaimOverdueDialog'
 import { RemoveAssignmentDialog } from '../components/RemoveAssignmentDialog'
+import { ResultHistoryDialog } from '../components/ResultHistoryDialog'
+import { SegmentedControl, type SegmentItem } from '../components/SegmentedControl'
+import { SetDeadlineDialog } from '../components/SetDeadlineDialog'
 import { SubmitGradingDialog } from '../components/SubmitGradingDialog'
-import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import {
   avatarClasses,
+  describeReclaimResult,
   formatIsoDateTime,
   formatScore,
   getAssignmentStatusDisplay,
+  getOutcomeDisplay,
   getResultStatusDisplay,
+  getRoundTypeDisplay,
   initials,
   isEveryRequiredCriterionFilled,
+  type ExamCandidateResultStatus,
   type GradingAssignmentRow,
   type GradingAssignmentStatus,
+  type GradingRoundType,
   type GradingTaskDetail,
   type GradingTaskItem,
 } from '../types'
@@ -71,33 +100,103 @@ import {
 const PAGE_SIZE = 20
 const PREVIEW_DEBOUNCE_MS = 500
 
-// Màn admin chỉ liệt kê bài đang chờ chấm (PENDING_REVIEW) nên không có bài
-// COMPLETED để lọc — bài chấm xong rời khỏi bảng. Filter COMPLETED chỉ có ở màn
-// giáo viên (họ vẫn thấy việc đã hoàn thành của mình).
-const ADMIN_STATUS_FILTERS: Array<{ label: string; value: '' | GradingAssignmentStatus }> = [
+const ASSIGNMENT_STATUS_FILTERS: SegmentItem<'' | GradingAssignmentStatus>[] = [
   { label: 'Tất cả', value: '' },
-  { label: 'Đã phân công', value: 'ASSIGNED' },
+  { label: 'Đang chấm', value: 'ASSIGNED' },
+  { label: 'Đã chấm xong', value: 'COMPLETED' },
 ]
 
-const TEACHER_STATUS_FILTERS: Array<{ label: string; value: '' | GradingAssignmentStatus }> = [
-  { label: 'Tất cả', value: '' },
-  { label: 'Đang chờ chấm', value: 'ASSIGNED' },
-  { label: 'Đã chấm xong', value: 'COMPLETED' },
+/** Ô chọn/tìm dùng chung trong toolbar — cùng chiều cao, cùng tông nền. */
+const FIELD_CLASS =
+  'h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-cyan-400'
+
+const ROUND_FILTERS: Array<{ label: string; value: '' | GradingRoundType }> = [
+  { label: 'Tất cả vòng chấm', value: '' },
+  { label: 'Chấm thủ công', value: 'INITIAL' },
+  { label: 'Hậu kiểm', value: 'SPOT_CHECK' },
+  { label: 'Xét vô hiệu', value: 'REMEDIATION' },
+  { label: 'Phúc khảo', value: 'APPEAL' },
+]
+
+const RESULT_STATUS_FILTERS: Array<{ label: string; value: '' | ExamCandidateResultStatus }> = [
+  { label: 'Mọi trạng thái bài', value: '' },
+  { label: 'Chờ soát điểm AI', value: 'PENDING_REVIEW' },
+  { label: 'Đã công bố', value: 'RELEASED' },
+  { label: 'Chờ xử lý phúc khảo', value: 'APPEALED' },
+  { label: 'Đang chấm phúc khảo', value: 'RE_GRADING' },
+  { label: 'Đã vô hiệu', value: 'INVALID' },
+  { label: 'Đã chốt', value: 'FINAL' },
+]
+
+const ADMIN_TABS: SegmentItem[] = [
+  { label: 'Điều phối chấm bài', value: 'board' },
+  { label: 'Chất lượng AI', value: 'ai' },
 ]
 
 function ResultCode({ code }: { code: string }) {
   return (
-    <span className="inline-flex h-7 items-center rounded-lg bg-slate-100 px-2.5 font-mono text-[12.5px] font-bold tracking-wide text-slate-700">
+    <span className="inline-flex h-5.5 items-center rounded-md border border-slate-200 bg-slate-50 px-2 font-mono text-xs font-bold tracking-wide text-slate-900">
       #{code}
     </span>
   )
 }
 
-function FlaggedChip() {
+/** Tiêu đề trang: eyebrow + h1 + mô tả, dùng chung một thang chữ cho cả ba trang. */
+function PageHeading({
+  children,
+  eyebrow,
+  title,
+}: {
+  children?: React.ReactNode
+  eyebrow: string
+  title: string
+}) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10.5px] font-bold text-amber-700">
-      <Flag className="size-3" />
-      Nghi vấn
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-700">{eyebrow}</p>
+      <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-slate-900">{title}</h1>
+      {children ? <p className="mt-1.5 max-w-2xl text-[13px] text-slate-500">{children}</p> : null}
+    </div>
+  )
+}
+
+/** Cột "Thao tác": nút chính + menu ⋯ cho các hành động phụ. */
+function RowActions({
+  children,
+  menu,
+  resultCode,
+}: {
+  children?: React.ReactNode
+  menu: ActionMenuItem[]
+  resultCode: string
+}) {
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      {children}
+      <ActionMenuButton ariaLabel={`Thao tác khác cho bài ${resultCode}`} items={menu} />
+    </div>
+  )
+}
+
+function RoundBadge({ roundType }: { roundType: GradingRoundType | null | undefined }) {
+  const display = getRoundTypeDisplay(roundType)
+  return <StatusBadge label={display.label} tone={display.tone} />
+}
+
+/** Nhãn hạn chấm; quá hạn thì đỏ. `overdue` do BE tính, FE không tự so giờ. */
+function DeadlineLabel({ deadlineAt, overdue }: { deadlineAt?: string | null; overdue: boolean }) {
+  if (!deadlineAt) {
+    return <span className="text-[11px] font-medium text-slate-400">Chưa đặt hạn</span>
+  }
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[11px] tabular-nums ${
+        overdue ? 'font-bold text-red-600' : 'font-semibold text-slate-500'
+      }`}
+    >
+      {overdue ? <AlarmClock className="size-3" /> : <CalendarClock className="size-3" />}
+      {overdue ? 'Quá hạn ' : 'Hạn '}
+      {formatIsoDateTime(deadlineAt)}
     </span>
   )
 }
@@ -105,77 +204,136 @@ function FlaggedChip() {
 function BackButton({ onClick }: { onClick: () => void }) {
   return (
     <button
-      className="mb-4.5 inline-flex items-center gap-1.5 text-[13.5px] font-bold text-slate-500 transition hover:text-slate-700"
+      className="mb-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 transition hover:text-slate-700"
       onClick={onClick}
       type="button"
     >
-      <ArrowLeft className="size-4.5" />
+      <ArrowLeft className="size-4" />
       Quay lại danh sách
     </button>
   )
 }
 
 /** Tab theo từng phần thi: value là paperItemId, nhãn lấy partLabel (thiếu thì "Phần N"). */
-function itemTabItems(items: GradingTaskItem[]): TabPillItem[] {
+function itemTabItems(items: GradingTaskItem[]): SegmentItem[] {
   return items.map((item, index) => ({
     label: item.partLabel ?? `Phần ${index + 1}`,
     value: item.paperItemId,
   }))
 }
 
-// ============================= School Admin: Assignments =============================
+// ============================= School Admin: Coordination board =============================
 
 export function SchoolAdminGradingPage() {
-  const navigate = useNavigate()
-  const [examId, setExamId] = useState('')
+  const [tab, setTab] = useState('board')
+  // Giữ CẢ object thay vì mỗi id: danh sách kỳ thi giờ phân trang phía server nên không còn
+  // mảng đầy đủ để tra ngược ra tên — mà tên thì cần cho tên file CSV và 3 dialog bên dưới.
+  const [selectedExam, setSelectedExam] = useState<ExamPickerOption | null>(null)
+  const [examPickerOpen, setExamPickerOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'' | GradingAssignmentStatus>('')
+  const [roundType, setRoundType] = useState<'' | GradingRoundType>('')
+  const [resultStatus, setResultStatus] = useState<'' | ExamCandidateResultStatus>('')
+  const [unassignedOnly, setUnassignedOnly] = useState(false)
+  const [overdueOnly, setOverdueOnly] = useState(false)
+  const [openAppealOnly, setOpenAppealOnly] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [assignTarget, setAssignTarget] = useState<GradingAssignmentRow | null>(null)
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<GradingAssignmentRow | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<GradingAssignmentRow | null>(null)
   const [autoAssignOpen, setAutoAssignOpen] = useState(false)
+  const [deadlineOpen, setDeadlineOpen] = useState(false)
+  const [reclaimOpen, setReclaimOpen] = useState(false)
+  const [finalizeOpen, setFinalizeOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
+  const examId = selectedExam?.id ?? ''
+  const selectedExamName = selectedExam?.name
+
   const debouncedSearch = useDebouncedValue(search, 350)
-  const assignmentsQuery = useGradingAssignmentsQuery(page, PAGE_SIZE, {
+  const rowsQuery = useGradingAssignmentsQuery(page, PAGE_SIZE, {
     examId,
+    hasOpenAppeal: openAppealOnly,
+    overdueOnly,
+    resultStatus,
+    roundType,
     search: debouncedSearch,
     status,
+    unassignedOnly,
   })
   const statsQuery = useGradingStatsQuery({ examId })
-  const examOptionsQuery = useGradingExamOptionsQuery()
+  const finalizePreviewQuery = useFinalizePreviewQuery(finalizeOpen && examId ? examId : null)
 
   const assignMutation = useAssignGradingMutation()
   const reassignMutation = useReassignGradingMutation()
   const removeMutation = useRemoveGradingAssignmentMutation()
   const autoAssignMutation = useAutoAssignGradingMutation()
+  const deadlineMutation = useSetGradingDeadlineMutation()
+  const reclaimMutation = useReclaimOverdueMutation()
+  const finalizeMutation = useFinalizeExamResultsMutation()
+  const exportMutation = useExportExamScoresMutation()
 
-  const pageData = assignmentsQuery.data
+  const pageData = rowsQuery.data
   const rows = pageData?.content ?? []
   const totalPages = pageData?.totalPages ?? 0
   const totalElements = pageData?.totalElements ?? 0
   const stats = statsQuery.data
-  const selectedExamName = examOptionsQuery.data?.find((exam) => exam.id === examId)?.name
+
+  // Chỉ tick được các dòng trong TRANG hiện tại — chọn xong sang trang khác thì tick
+  // cũ không còn dòng tương ứng, nên lọc lại theo `rows` mỗi lần render.
+  const selectedRows = rows.filter((row) => selectedIds.includes(row.candidateResultId))
+  const selectableUnassigned = selectedRows.filter((row) => !row.assignmentId)
+  const selectedAssignmentIds = selectedRows
+    .map((row) => row.assignmentId)
+    .filter((id): id is string => !!id)
+  const canBulkAssign =
+    selectedRows.length > 0 && selectableUnassigned.length === selectedRows.length
+  const canSetDeadline = selectedAssignmentIds.length === selectedRows.length && selectedRows.length > 0
 
   function resetToFirstPage<T>(setter: (value: T) => void) {
     return (value: T) => {
       setter(value)
       setPage(1)
+      setSelectedIds([])
     }
   }
 
-  function confirmAssign(teacherId: string) {
+  function toggleRow(candidateResultId: string) {
+    setSelectedIds((current) =>
+      current.includes(candidateResultId)
+        ? current.filter((id) => id !== candidateResultId)
+        : [...current, candidateResultId],
+    )
+  }
+
+  function toggleAllOnPage() {
+    setSelectedIds((current) =>
+      rows.every((row) => current.includes(row.candidateResultId))
+        ? current.filter((id) => !rows.some((row) => row.candidateResultId === id))
+        : [...new Set([...current, ...rows.map((row) => row.candidateResultId)])],
+    )
+  }
+
+  const errorToast = (error: unknown) => setMessage(toApiError(error).message)
+
+  function confirmAssign(input: {
+    deadlineAt: string | null
+    roundType: GradingRoundType
+    teacherId: string
+  }) {
     const target = assignTarget
     if (!target) {
       return
     }
-    // Cùng một modal cho gán mới và đổi người: có assignmentId thì là UPDATE dòng
-    // sẵn có, chưa có thì mới tạo — một bài chỉ được có một người chấm.
+    // Cùng một modal cho gán mới và đổi người; đổi người là endpoint khác vì nó
+    // không tạo vòng mới, chỉ thay teacherId của phân công đang mở.
     if (target.assignmentId) {
       reassignMutation.mutate(
-        { assignmentId: target.assignmentId, teacherId },
+        { assignmentId: target.assignmentId, teacherId: input.teacherId },
         {
-          onError: (error) => setMessage(toApiError(error).message),
+          onError: errorToast,
           onSuccess: () => {
             setAssignTarget(null)
             setMessage(`Đã đổi giáo viên chấm bài #${target.resultCode}.`)
@@ -184,13 +342,45 @@ export function SchoolAdminGradingPage() {
       )
       return
     }
-    assignMutation.mutate([{ candidateResultId: target.candidateResultId, teacherId }], {
-      onError: (error) => setMessage(toApiError(error).message),
-      onSuccess: () => {
-        setAssignTarget(null)
-        setMessage(`Đã phân công chấm bài #${target.resultCode}.`)
+    assignMutation.mutate(
+      {
+        assignments: [{ candidateResultId: target.candidateResultId, teacherId: input.teacherId }],
+        deadlineAt: input.deadlineAt,
+        roundType: input.roundType,
       },
-    })
+      {
+        onError: errorToast,
+        onSuccess: () => {
+          setAssignTarget(null)
+          setMessage(`Đã phân công chấm bài #${target.resultCode}.`)
+        },
+      },
+    )
+  }
+
+  function confirmBulkAssign(input: {
+    deadlineAt: string | null
+    roundType: GradingRoundType
+    teacherId: string
+  }) {
+    assignMutation.mutate(
+      {
+        assignments: selectableUnassigned.map((row) => ({
+          candidateResultId: row.candidateResultId,
+          teacherId: input.teacherId,
+        })),
+        deadlineAt: input.deadlineAt,
+        roundType: input.roundType,
+      },
+      {
+        onError: errorToast,
+        onSuccess: () => {
+          setBulkAssignOpen(false)
+          setMessage(`Đã phân công ${selectableUnassigned.length} bài.`)
+          setSelectedIds([])
+        },
+      },
+    )
   }
 
   function confirmRemove() {
@@ -201,7 +391,7 @@ export function SchoolAdminGradingPage() {
     removeMutation.mutate(target.assignmentId, {
       onError: (error) => {
         setRemoveTarget(null)
-        setMessage(toApiError(error).message)
+        errorToast(error)
       },
       onSuccess: () => {
         setRemoveTarget(null)
@@ -210,289 +400,662 @@ export function SchoolAdminGradingPage() {
     })
   }
 
-  function confirmAutoAssign(teacherIds: string[]) {
+  function confirmAutoAssign(input: Parameters<typeof autoAssignMutation.mutate>[0]) {
     autoAssignMutation.mutate(
-      { examId, teacherIds },
+      { ...input, examId },
       {
-        onError: (error) => setMessage(toApiError(error).message),
-        onSuccess: (result) => {
+        onError: errorToast,
+        onSuccess: (assignmentIds) => {
           setAutoAssignOpen(false)
           setMessage(
-            result.data.length > 0
-              ? `Đã phân công tự động ${result.data.length} bài.`
-              : 'Không còn bài nào chưa phân công.',
+            assignmentIds.length > 0
+              ? `Đã phân công tự động ${assignmentIds.length} bài.`
+              : 'Không có bài nào đủ điều kiện cho vòng chấm đã chọn.',
           )
         },
       },
     )
   }
 
+  function confirmDeadline(deadlineAt: string | null) {
+    deadlineMutation.mutate(
+      { assignmentIds: selectedAssignmentIds, deadlineAt },
+      {
+        onError: errorToast,
+        onSuccess: (ids) => {
+          setDeadlineOpen(false)
+          setSelectedIds([])
+          setMessage(
+            deadlineAt
+              ? `Đã đặt hạn chấm cho ${ids.length} phân công.`
+              : `Đã gỡ hạn chấm của ${ids.length} phân công.`,
+          )
+        },
+      },
+    )
+  }
+
+  function confirmReclaim(input: { newDeadlineAt: string | null; reassignToTeacherIds: string[] }) {
+    reclaimMutation.mutate(
+      {
+        // Không tick dòng nào = thu hồi mọi phân công quá hạn trong phạm vi kỳ thi.
+        assignmentIds: selectedAssignmentIds,
+        examId: examId || undefined,
+        newDeadlineAt: input.newDeadlineAt,
+        reassignToTeacherIds: input.reassignToTeacherIds,
+      },
+      {
+        onError: errorToast,
+        onSuccess: (result) => {
+          setReclaimOpen(false)
+          setSelectedIds([])
+          setMessage(describeReclaimResult(result))
+        },
+      },
+    )
+  }
+
+  function confirmFinalize(releasePendingWithAiScores: boolean) {
+    finalizeMutation.mutate(
+      { examId, releasePendingWithAiScores },
+      {
+        onError: errorToast,
+        onSuccess: (count) => {
+          setFinalizeOpen(false)
+          setMessage(`Đã chốt sổ ${count} kết quả của kỳ thi.`)
+        },
+      },
+    )
+  }
+
+  const assignPending = assignMutation.isPending || reassignMutation.isPending
+
+  // Chỉ `Phân công tự động` ở lại làm nút chính; ba hành động còn lại vào menu ⋯ để
+  // header không còn là một hàng bốn nút cạnh nhau tranh nhau sự chú ý.
+  const headerMenuItems: ActionMenuItem[] = [
+    { icon: RefreshCw, id: 'refresh', label: 'Làm mới', onSelect: () => rowsQuery.refetch() },
+    {
+      // BE bắt buộc phạm vi (examId hoặc scheduleId) — không chặn ở đây thì bấm vào
+      // chỉ nhận về lỗi 400, cùng lý do với `finalize` ngay dưới.
+      disabled: !examId || exportMutation.isPending,
+      disabledReason: 'Chọn kỳ thi trước khi xuất bảng điểm',
+      icon: Download,
+      id: 'export',
+      label: 'Xuất bảng điểm',
+      onSelect: () =>
+        exportMutation.mutate(
+          { examId: examId || undefined, examName: selectedExamName },
+          { onError: errorToast, onSuccess: () => setMessage('Đã tải bảng điểm CSV.') },
+        ),
+    },
+    {
+      disabled: !examId,
+      disabledReason: 'Chọn kỳ thi trước khi chốt sổ',
+      icon: Lock,
+      id: 'finalize',
+      label: 'Chốt sổ kỳ thi',
+      onSelect: () => setFinalizeOpen(true),
+      tone: 'warning',
+    },
+  ]
+
   return (
-    <section className="mx-auto max-w-300">
+    <section className="mx-auto grid max-w-7xl gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">Chấm bài</p>
-          <h1 className="mt-1.5 text-[30px] font-extrabold tracking-tight text-slate-900">
-            Phân công chấm bài
-          </h1>
-          <p className="mt-1.5 max-w-xl text-[15px] text-slate-500">
-            Giao bài đang chờ chấm cho giáo viên và theo dõi tiến độ. Bài đã công bố không nằm trong
-            danh sách này.
-          </p>
-        </div>
-        <div className="flex gap-2.5">
+        <PageHeading eyebrow="Chấm điểm" title="Điều phối chấm bài">
+          Giao bài cho giáo viên ở bốn vòng chấm:{' '}
+          <b className="font-semibold text-slate-700">chấm thủ công</b> bài AI không đủ tự tin,{' '}
+          <b className="font-semibold text-slate-700">hậu kiểm</b> bài đã công bố,{' '}
+          <b className="font-semibold text-slate-700">xét lại</b> bài bị vô hiệu và{' '}
+          <b className="font-semibold text-slate-700">phúc khảo</b> theo đơn học sinh.
+        </PageHeading>
+        <div className="flex items-center gap-2">
           <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-[13.5px] font-bold text-slate-600 transition hover:bg-slate-50"
-            onClick={() => assignmentsQuery.refetch()}
-            type="button"
-          >
-            <RefreshCw className="size-4" />
-            Làm mới
-          </button>
-          <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-cyan-600 px-4.5 text-[13.5px] font-bold text-white shadow-lg shadow-cyan-600/25 transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-            // BE bắt buộc phạm vi: phân công tự động luôn chạy trong một kỳ thi.
-            disabled={!examId || (stats?.unassigned ?? 0) === 0}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-cyan-600 px-4 text-[13px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            // BE bắt buộc phạm vi: phân công tự động luôn chạy trong một kỳ thi hoặc ca thi.
+            disabled={!examId}
             onClick={() => setAutoAssignOpen(true)}
             title={examId ? undefined : 'Chọn kỳ thi trước khi phân công tự động'}
             type="button"
           >
-            <UsersRound className="size-4.5" />
+            <UsersRound className="size-4" />
             Phân công tự động
           </button>
+          <ActionMenuButton ariaLabel="Thao tác khác cho kỳ thi" items={headerMenuItems} />
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={<Inbox size={19} />}
-          iconTone="indigo"
-          label="Tổng bài cần chấm"
-          value={stats?.totalToGrade ?? '-'}
-        />
-        <StatCard
-          icon={<UserPlus size={19} />}
-          iconTone="amber"
-          label="Chưa phân công"
-          value={stats?.unassigned ?? '-'}
-        />
-        <StatCard
-          icon={<ClipboardList size={19} />}
-          iconTone="violet"
-          label="Đã phân công"
-          value={stats?.assigned ?? '-'}
-        />
-      </div>
+      <SegmentedControl ariaLabel="Khu vực" items={ADMIN_TABS} onChange={setTab} value={tab} />
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <select
-          aria-label="Lọc theo kỳ thi"
-          className="h-11 min-w-56 rounded-lg border border-slate-200 bg-white px-3.5 text-[13.5px] font-semibold text-slate-700 outline-none focus:border-cyan-400"
-          onChange={(event) => resetToFirstPage(setExamId)(event.target.value)}
-          value={examId}
-        >
-          <option value="">Tất cả kỳ thi</option>
-          {(examOptionsQuery.data ?? []).map((exam) => (
-            <option key={exam.id} value={exam.id}>
-              {exam.name}
-            </option>
-          ))}
-        </select>
-        <div className="relative min-w-60 flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3.5 text-[13.5px] font-medium text-slate-700 outline-none focus:border-cyan-400"
-            onChange={(event) => resetToFirstPage(setSearch)(event.target.value)}
-            placeholder="Tìm theo mã bài hoặc tên giáo viên…"
-            type="search"
-            value={search}
-          />
-        </div>
-      </div>
+      {tab === 'ai' ? (
+        <AiQualityPanel examId={examId || undefined} />
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              hint="trong phạm vi đang xem"
+              icon={<Inbox size={19} />}
+              iconTone="slate"
+              label="Tổng số bài"
+              value={stats?.total ?? '-'}
+            />
+            {/* Hai thẻ dưới đây kiêm luôn bộ lọc — thay cho hàng chip riêng trước đây. */}
+            <StatCard
+              active={unassignedOnly}
+              hint={unassignedOnly ? 'Đang lọc theo nhóm này' : 'Bấm để chỉ xem nhóm này'}
+              icon={<UserPlus size={19} />}
+              iconTone="amber"
+              label="Chưa phân công"
+              onClick={() => resetToFirstPage(setUnassignedOnly)(!unassignedOnly)}
+              value={stats?.unassigned ?? '-'}
+            />
+            <StatCard
+              hint="đã giao, chờ giáo viên nộp"
+              icon={<ClipboardList size={19} />}
+              iconTone="violet"
+              label="Đang chấm"
+              value={stats?.assigned ?? '-'}
+            />
+            <StatCard
+              active={overdueOnly}
+              hint={overdueOnly ? 'Đang lọc theo nhóm này' : 'Bấm để chỉ xem nhóm này'}
+              icon={<AlarmClock size={19} />}
+              iconTone="red"
+              label="Quá hạn"
+              onClick={() => resetToFirstPage(setOverdueOnly)(!overdueOnly)}
+              value={stats?.overdue ?? '-'}
+            />
+          </div>
 
-      <FilterChips items={ADMIN_STATUS_FILTERS} onChange={resetToFirstPage(setStatus)} value={status} />
+          {/* Dải đếm theo trạng thái + tiến độ giáo viên gập lại: hữu ích nhưng không phải
+              thứ cần xem mỗi lần vào trang, và mở sẵn thì đẩy bảng xuống dưới màn hình đầu. */}
+          {stats && (stats.byResultStatus.length > 0 || stats.teacherProgress.length > 0) ? (
+            <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3 text-[13px] font-bold text-slate-700">
+                <ChevronRight className="size-4 text-slate-400 transition group-open:rotate-90" />
+                <span className="flex-1">Chi tiết tiến độ</span>
+                <span className="text-[11px] font-medium text-slate-400">
+                  {stats.byResultStatus.length} trạng thái bài · {stats.teacherProgress.length} giáo
+                  viên
+                </span>
+              </summary>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-220 border-collapse text-left">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-5 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Mã bài
-                </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Học sinh
-                </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Kỳ thi
-                </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Giáo viên chấm
-                </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Trạng thái
-                </th>
-                <th className="px-5 py-3.5 text-right text-[11px] font-extrabold uppercase text-slate-500">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {assignmentsQuery.isLoading ? (
-                <tr>
-                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={6}>
-                    Đang tải…
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={6}>
-                    Không có bài nào cần chấm.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => {
-                  const assignment = getAssignmentStatusDisplay(row.assignmentStatus)
-                  const completed = row.assignmentStatus === 'COMPLETED'
-                  return (
-                    <tr className="border-b border-slate-100" key={row.candidateResultId}>
-                      <td className="px-5 py-3.5">
-                        <ResultCode code={row.resultCode} />
-                        {row.flagged ? (
-                          <div className="mt-1">
-                            <FlaggedChip />
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <span
-                            className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold ${avatarClasses(row.studentName ?? '?')}`}
+              <div className="grid gap-4 px-5 pb-5">
+                {stats.byResultStatus.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Theo trạng thái bài
+                    </span>
+                    {stats.byResultStatus.map((entry) => {
+                      const display = getResultStatusDisplay(entry.status)
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600"
+                          key={entry.status}
+                        >
+                          {display.label}
+                          <b className="font-extrabold tabular-nums text-slate-900">{entry.count}</b>
+                        </span>
+                      )
+                    })}
+                  </div>
+                ) : null}
+
+                {stats.teacherProgress.length > 0 ? (
+                  <div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      <Scale className="size-3.5" />
+                      Tiến độ theo giáo viên
+                    </div>
+                    <div className="mt-2.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {stats.teacherProgress.map((teacher) => {
+                        const name = teacher.teacherName ?? 'Không rõ'
+                        return (
+                          <div
+                            className="flex items-center gap-2.5 rounded-xl border border-slate-200 px-3 py-2.5"
+                            key={teacher.teacherId}
                           >
-                            {initials(row.studentName ?? '?')}
-                          </span>
-                          <div className="leading-tight">
-                            <div className="text-[13.5px] font-bold text-slate-900">
-                              {row.studentName ?? '—'}
-                            </div>
-                            <div className="text-[11.5px] font-semibold text-slate-400">
-                              {row.className ? `Lớp ${row.className}` : 'Chưa xếp lớp'}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-[13px] font-semibold text-slate-600">
-                        {row.examName ?? '—'}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {row.teacherName ? (
-                          <>
-                            <div className="text-[13px] font-bold text-slate-700">
-                              {row.teacherName}
-                            </div>
-                            <div className="text-[11px] font-medium text-slate-400">
-                              Giao {formatIsoDateTime(row.assignedAt)}
-                            </div>
-                          </>
-                        ) : (
-                          <span className="text-[13px] font-semibold text-slate-400">
-                            Chưa phân công
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <StatusBadge label={assignment.label} tone={assignment.tone} />
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-2">
-                          {/* Nhà trường luôn xem/chấm trực tiếp được, kể cả bài chưa gán ai
-                              hoặc đang gán cho giáo viên khác — không phụ thuộc phân công. */}
-                          <button
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 text-[12.5px] font-bold text-slate-600 transition hover:bg-slate-50"
-                            onClick={() => navigate(`/school-admin/grading/${row.candidateResultId}`)}
-                            type="button"
-                          >
-                            <Mic className="size-4" />
-                            {completed ? 'Xem lại' : 'Xem / Chấm'}
-                          </button>
-                          {completed ? (
-                            <span className="text-[12.5px] font-semibold text-slate-400">
-                              Đã chốt {formatIsoDateTime(row.completedAt)}
+                            <span
+                              className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${avatarClasses(name)}`}
+                            >
+                              {initials(name)}
                             </span>
-                          ) : (
-                            <>
-                              <button
-                                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-[12.5px] font-bold text-white transition hover:bg-cyan-700"
-                                onClick={() => setAssignTarget(row)}
-                                type="button"
-                              >
-                                {row.assignmentId ? (
-                                  <>
-                                    <UserRoundCog className="size-4" />
-                                    Đổi giáo viên
-                                  </>
-                                ) : (
-                                  <>
-                                    <UserPlus className="size-4" />
-                                    Phân công
-                                  </>
-                                )}
-                              </button>
-                              {row.assignmentId ? (
-                                <button
-                                  aria-label={`Gỡ phân công bài ${row.resultCode}`}
-                                  className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-                                  onClick={() => setRemoveTarget(row)}
-                                  type="button"
-                                >
-                                  <Trash2 className="size-4" />
-                                </button>
-                              ) : null}
-                            </>
-                          )}
-                        </div>
+                            <div className="min-w-0 leading-tight">
+                              <div className="truncate text-[13px] font-bold text-slate-800">
+                                {name}
+                              </div>
+                              <div className="text-[11px] font-medium tabular-nums text-slate-400">
+                                {teacher.assigned} đang chấm · {teacher.completed} xong
+                                {teacher.overdue > 0 ? (
+                                  <span className="font-bold text-red-600">
+                                    {' '}
+                                    · {teacher.overdue} quá hạn
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </details>
+          ) : null}
+
+          {/* Toàn bộ bộ lọc trong MỘT thanh: trước đây trải ra ba hàng với ba kiểu chip khác nhau. */}
+          <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center gap-1">
+              <button
+                aria-label="Chọn kỳ thi"
+                className={`${FIELD_CLASS} inline-flex min-w-48 max-w-64 items-center gap-1.5 text-left`}
+                onClick={() => setExamPickerOpen(true)}
+                type="button"
+              >
+                <Search aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
+                <span className="truncate">{selectedExamName ?? 'Tất cả kỳ thi'}</span>
+              </button>
+              {selectedExam ? (
+                <button
+                  aria-label="Bỏ lọc kỳ thi"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+                  onClick={() => resetToFirstPage(setSelectedExam)(null)}
+                  type="button"
+                >
+                  <X aria-hidden="true" className="size-3.5" />
+                </button>
+              ) : null}
+            </div>
+            <select
+              aria-label="Lọc theo vòng chấm"
+              className={`${FIELD_CLASS} min-w-40`}
+              onChange={(event) =>
+                resetToFirstPage(setRoundType)(event.target.value as '' | GradingRoundType)
+              }
+              value={roundType}
+            >
+              {ROUND_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Lọc theo trạng thái bài"
+              className={`${FIELD_CLASS} min-w-40`}
+              onChange={(event) =>
+                resetToFirstPage(setResultStatus)(
+                  event.target.value as '' | ExamCandidateResultStatus,
+                )
+              }
+              value={resultStatus}
+            >
+              {RESULT_STATUS_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <span aria-hidden="true" className="hidden h-6 w-px bg-slate-200 sm:block" />
+
+            <button
+              aria-pressed={openAppealOnly}
+              className={[
+                'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition',
+                openAppealOnly
+                  ? 'bg-cyan-600 text-white'
+                  : 'border border-slate-200 text-slate-600 hover:bg-slate-50',
+              ].join(' ')}
+              onClick={() => resetToFirstPage(setOpenAppealOnly)(!openAppealOnly)}
+              type="button"
+            >
+              <Gavel className="size-3.5" />
+              Có đơn phúc khảo đang mở
+            </button>
+
+            <div className="relative min-w-52 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <input
+                className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-medium text-slate-700 outline-none focus:border-cyan-400"
+                onChange={(event) => resetToFirstPage(setSearch)(event.target.value)}
+                placeholder="Tìm theo mã bài, tên học sinh hoặc giáo viên…"
+                type="search"
+                value={search}
+              />
+            </div>
+          </div>
+
+          {selectedRows.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+              <span className="text-[13px] font-bold text-cyan-800">
+                Đã chọn {selectedRows.length} bài
+              </span>
+              <button
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                disabled={!canBulkAssign}
+                onClick={() => setBulkAssignOpen(true)}
+                title={canBulkAssign ? undefined : 'Chỉ gán được các bài chưa có phân công đang mở'}
+                type="button"
+              >
+                <UserPlus className="size-4" />
+                Phân công {selectableUnassigned.length} bài
+              </button>
+              <button
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-cyan-300 bg-white px-3.5 text-xs font-bold text-cyan-700 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+                disabled={!canSetDeadline}
+                onClick={() => setDeadlineOpen(true)}
+                title={canSetDeadline ? undefined : 'Chỉ đặt hạn được cho bài đã có phân công'}
+                type="button"
+              >
+                <CalendarClock className="size-4" />
+                Đặt hạn chấm
+              </button>
+              <button
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3.5 text-xs font-bold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+                disabled={selectedAssignmentIds.length === 0}
+                onClick={() => setReclaimOpen(true)}
+                type="button"
+              >
+                <TimerReset className="size-4" />
+                Thu hồi
+              </button>
+              <button
+                className="ml-auto text-xs font-bold text-slate-500 underline underline-offset-2 transition hover:text-slate-700"
+                onClick={() => setSelectedIds([])}
+                type="button"
+              >
+                Bỏ chọn
+              </button>
+            </div>
+          ) : (stats?.overdue ?? 0) > 0 ? (
+            <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlarmClock className="size-4 text-amber-600" />
+              <span className="flex-1 text-[13px] font-medium text-amber-800">
+                Có <b className="font-extrabold tabular-nums">{stats?.overdue}</b> phân công quá hạn
+                trong phạm vi đang xem.
+              </span>
+              <button
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3.5 text-xs font-bold text-amber-700 transition hover:bg-amber-100"
+                onClick={() => setReclaimOpen(true)}
+                type="button"
+              >
+                <TimerReset className="size-4" />
+                Thu hồi toàn bộ
+              </button>
+            </div>
+          ) : null}
+
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-3.5 py-2.5">
+              <SegmentedControl
+                ariaLabel="Trạng thái phân công"
+                items={ASSIGNMENT_STATUS_FILTERS}
+                onChange={resetToFirstPage(setStatus)}
+                value={status}
+              />
+              <span className="ml-auto text-xs font-medium text-slate-500">
+                <b className="font-extrabold tabular-nums text-slate-900">{totalElements}</b> bài
+                khớp bộ lọc
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-200 border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="w-9 py-2.5 pl-4">
+                      <input
+                        aria-label="Chọn tất cả bài trong trang"
+                        checked={rows.length > 0 && rows.every((row) => selectedIds.includes(row.candidateResultId))}
+                        className="size-4 accent-cyan-600"
+                        onChange={toggleAllOnPage}
+                        type="checkbox"
+                      />
+                    </th>
+                    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Bài thi
+                    </th>
+                    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Trạng thái &amp; vòng chấm
+                    </th>
+                    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Người chấm &amp; hạn
+                    </th>
+                    <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Điểm
+                    </th>
+                    <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Thao tác
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rowsQuery.isLoading ? (
+                    <tr>
+                      <td className="px-5 py-12 text-center text-[13px] text-slate-400" colSpan={6}>
+                        Đang tải…
                       </td>
                     </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-3.5">
-          <span className="text-[12.5px] font-semibold text-slate-500">
-            <b className="text-slate-900">{totalElements}</b> bài · trang {totalPages ? page : 0}/
-            {totalPages}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
-              disabled={assignmentsQuery.isFetching || page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-              type="button"
-            >
-              Trước
-            </button>
-            <button
-              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
-              disabled={assignmentsQuery.isFetching || page >= totalPages}
-              onClick={() => setPage((current) => current + 1)}
-              type="button"
-            >
-              Sau
-            </button>
+                  ) : rows.length === 0 ? (
+                    <tr>
+                      <td className="px-5 py-12 text-center text-[13px] text-slate-400" colSpan={6}>
+                        Không có bài nào khớp bộ lọc.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((row) => {
+                      const assignment = getAssignmentStatusDisplay(row.assignmentStatus)
+                      const result = getResultStatusDisplay(row.resultStatus)
+                      const outcome = getOutcomeDisplay(row.outcome)
+                      const completed = row.assignmentStatus === 'COMPLETED'
+                      // Lịch sử điểm + gỡ phân công chuyển vào menu ⋯ để mỗi dòng chỉ còn
+                      // MỘT nút nổi bật — trước đây ba nút cạnh nhau trên mọi dòng.
+                      const rowMenu: ActionMenuItem[] = [
+                        {
+                          icon: History,
+                          id: 'history',
+                          label: 'Lịch sử điểm',
+                          onSelect: () => setHistoryTarget(row),
+                        },
+                        ...(row.assignmentId && !completed
+                          ? [
+                              {
+                                icon: Trash2,
+                                id: 'remove',
+                                label: 'Gỡ phân công',
+                                onSelect: () => setRemoveTarget(row),
+                                tone: 'danger' as const,
+                              },
+                            ]
+                          : []),
+                      ]
+                      return (
+                        <tr
+                          className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70"
+                          key={row.candidateResultId}
+                        >
+                          <td className="py-3 pl-4">
+                            <input
+                              aria-label={`Chọn bài ${row.resultCode}`}
+                              checked={selectedIds.includes(row.candidateResultId)}
+                              className="size-4 accent-cyan-600"
+                              onChange={() => toggleRow(row.candidateResultId)}
+                              type="checkbox"
+                            />
+                          </td>
+
+                          {/* Mã bài + cờ + học sinh + lớp + kỳ thi — trước đây là hai cột riêng. */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <span
+                                className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${avatarClasses(row.studentName ?? '?')}`}
+                              >
+                                {initials(row.studentName ?? '?')}
+                              </span>
+                              <div className="min-w-0 leading-tight">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <ResultCode code={row.resultCode} />
+                                  {row.flagged ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                                      <Flag className="size-3" />
+                                      Nghi vấn
+                                    </span>
+                                  ) : null}
+                                  {row.hasOpenAppeal ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
+                                      <Gavel className="size-3" />
+                                      Có đơn
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="mt-1 truncate text-[13px] font-semibold text-slate-900">
+                                  {row.studentName ?? '—'}
+                                </div>
+                                <div className="truncate text-[11px] font-medium text-slate-400">
+                                  {row.className ? `Lớp ${row.className}` : 'Chưa xếp lớp'}
+                                  {row.examName ? ` · ${row.examName}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Trạng thái bài + vòng chấm + kết quả vòng, xếp ngang một hàng. */}
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <StatusBadge label={result.label} tone={result.tone} />
+                              {row.roundType ? (
+                                <>
+                                  <RoundBadge roundType={row.roundType} />
+                                  {outcome ? (
+                                    <StatusBadge label={outcome.label} tone={outcome.tone} />
+                                  ) : (
+                                    <StatusBadge label={assignment.label} tone={assignment.tone} />
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-[11px] font-medium text-slate-400">
+                                  Chưa mở vòng nào
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Giáo viên + hạn chấm — trước đây là hai cột riêng. */}
+                          <td className="px-4 py-3">
+                            {row.teacherName ? (
+                              <div className="grid gap-0.5 leading-tight">
+                                <div className="text-[13px] font-semibold text-slate-900">
+                                  {row.teacherName}
+                                </div>
+                                {row.assignmentId && !completed ? (
+                                  <DeadlineLabel deadlineAt={row.deadlineAt} overdue={row.overdue} />
+                                ) : null}
+                                <div className="text-[11px] font-medium tabular-nums text-slate-400">
+                                  {completed
+                                    ? `Xong ${formatIsoDateTime(row.completedAt)}`
+                                    : `Giao ${formatIsoDateTime(row.assignedAt)}`}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-[13px] font-medium text-slate-400">
+                                Chưa phân công
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3 text-right">
+                            <span
+                              className={
+                                row.totalScore == null
+                                  ? 'text-sm font-medium text-slate-400'
+                                  : 'text-sm font-extrabold tabular-nums text-slate-900'
+                              }
+                            >
+                              {formatScore(row.totalScore)}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <RowActions menu={rowMenu} resultCode={row.resultCode}>
+                              {/* Nhà trường chỉ điều phối — giao bài, đổi người, xem lịch sử điểm.
+                                  Việc chấm nằm ở phía giáo viên đang cầm phân công. */}
+                              {completed ? null : (
+                                <button
+                                  className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700"
+                                  onClick={() => setAssignTarget(row)}
+                                  type="button"
+                                >
+                                  {row.assignmentId ? (
+                                    <>
+                                      <UserRoundCog className="size-4" />
+                                      Đổi giáo viên
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserPlus className="size-4" />
+                                      Phân công
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </RowActions>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-2.5">
+              <span className="text-xs font-medium text-slate-500">
+                <b className="font-extrabold tabular-nums text-slate-900">{totalElements}</b> bài ·
+                trang {totalPages ? page : 0}/{totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                  disabled={rowsQuery.isFetching || page <= 1}
+                  onClick={() => setPage((current) => current - 1)}
+                  type="button"
+                >
+                  Trước
+                </button>
+                <button
+                  className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                  disabled={rowsQuery.isFetching || page >= totalPages}
+                  onClick={() => setPage((current) => current + 1)}
+                  type="button"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
       {assignTarget ? (
         <AssignTeacherDialog
           currentTeacherId={assignTarget.teacherId}
-          isPending={assignMutation.isPending || reassignMutation.isPending}
+          isPending={assignPending}
           onCancel={() => setAssignTarget(null)}
           onConfirm={confirmAssign}
           resultCode={assignTarget.resultCode}
+          resultStatus={assignTarget.resultStatus}
           studentName={assignTarget.studentName}
+        />
+      ) : null}
+
+      {bulkAssignOpen ? (
+        <AssignTeacherDialog
+          isPending={assignMutation.isPending}
+          onCancel={() => setBulkAssignOpen(false)}
+          onConfirm={confirmBulkAssign}
+          resultCode={`${selectableUnassigned.length} bài đã chọn`}
+          resultStatus={selectableUnassigned[0]?.resultStatus}
         />
       ) : null}
 
@@ -506,6 +1069,15 @@ export function SchoolAdminGradingPage() {
         />
       ) : null}
 
+      {historyTarget ? (
+        <ResultHistoryDialog
+          candidateResultId={historyTarget.candidateResultId}
+          onClose={() => setHistoryTarget(null)}
+          resultCode={historyTarget.resultCode}
+          studentName={historyTarget.studentName}
+        />
+      ) : null}
+
       {autoAssignOpen ? (
         <AutoAssignDialog
           examName={selectedExamName}
@@ -513,6 +1085,48 @@ export function SchoolAdminGradingPage() {
           onCancel={() => setAutoAssignOpen(false)}
           onConfirm={confirmAutoAssign}
           unassignedCount={stats?.unassigned ?? 0}
+        />
+      ) : null}
+
+      {deadlineOpen ? (
+        <SetDeadlineDialog
+          assignmentCount={selectedAssignmentIds.length}
+          isPending={deadlineMutation.isPending}
+          onCancel={() => setDeadlineOpen(false)}
+          onConfirm={confirmDeadline}
+        />
+      ) : null}
+
+      {reclaimOpen ? (
+        <ReclaimOverdueDialog
+          examName={selectedExamName}
+          isPending={reclaimMutation.isPending}
+          onCancel={() => setReclaimOpen(false)}
+          onConfirm={confirmReclaim}
+          overdueCount={stats?.overdue ?? 0}
+          selectedCount={selectedAssignmentIds.length}
+        />
+      ) : null}
+
+      {finalizeOpen ? (
+        <FinalizeExamDialog
+          examName={selectedExamName}
+          isLoading={finalizePreviewQuery.isLoading}
+          isPending={finalizeMutation.isPending}
+          onCancel={() => setFinalizeOpen(false)}
+          onConfirm={confirmFinalize}
+          preview={finalizePreviewQuery.data}
+        />
+      ) : null}
+
+      {examPickerOpen ? (
+        <ExamPickerModal
+          onClear={() => resetToFirstPage(setSelectedExam)(null)}
+          onClose={() => setExamPickerOpen(false)}
+          // Qua `resetToFirstPage` chứ không set thẳng: đổi kỳ thi phải kéo bảng về trang 1
+          // và bỏ các dòng đang tick, nếu không sẽ thao tác hàng loạt lên bài của kỳ thi cũ.
+          onSelect={(exam) => resetToFirstPage(setSelectedExam)(exam)}
+          selectedExamId={selectedExam?.id ?? null}
         />
       ) : null}
 
@@ -527,79 +1141,104 @@ export function TeacherGradingPage() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<'' | GradingAssignmentStatus>('')
-  const tasksQuery = useMyGradingTasksQuery(page, PAGE_SIZE, { status })
+  const [roundType, setRoundType] = useState<'' | GradingRoundType>('')
+  const tasksQuery = useMyGradingTasksQuery(page, PAGE_SIZE, { roundType, status })
 
-  // Số cho thẻ thống kê phải là TỔNG toàn bộ, không phải đếm trên trang hiện tại
-  // (và phải độc lập với filter đang chọn). Hai query size=1 chỉ để lấy totalElements;
-  // enum chỉ có ASSIGNED/COMPLETED nên tổng được giao = pending + done.
+  // Số cho thẻ thống kê là TỔNG toàn bộ (độc lập filter). Hai query size=1 chỉ để lấy
+  // totalElements; enum chỉ có ASSIGNED/COMPLETED nên tổng được giao = pending + done.
   const assignedCountQuery = useMyGradingTasksQuery(1, 1, { status: 'ASSIGNED' })
   const completedCountQuery = useMyGradingTasksQuery(1, 1, { status: 'COMPLETED' })
 
   const pageData = tasksQuery.data
   const tasks = pageData?.content ?? []
-  // Footer phân trang bám theo list đang xem (đã lọc); thẻ thống kê dùng tổng chung.
   const totalElements = pageData?.totalElements ?? 0
   const totalPages = pageData?.totalPages ?? 0
   const pending = assignedCountQuery.data?.totalElements ?? 0
   const done = completedCountQuery.data?.totalElements ?? 0
-  const totalAssigned = pending + done
+  // Quá hạn chỉ đếm được trên trang đang xem — BE không có thẻ số riêng cho giáo viên.
+  const overdueOnPage = tasks.filter((task) => task.overdue).length
 
   return (
-    <section className="mx-auto max-w-300">
-      <div>
-        <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">Chấm bài</p>
-        <h1 className="mt-1.5 text-[30px] font-extrabold tracking-tight text-slate-900">
-          Bài cần chấm
-        </h1>
-        <p className="mt-1.5 max-w-xl text-[15px] text-slate-500">
-          Nghe lại bài nói và chấm theo từng tiêu chí của rubric. Bạn chấm ẩn danh — hệ thống không
-          hiển thị thông tin học sinh.
-        </p>
-      </div>
+    <section className="mx-auto grid max-w-300 gap-5">
+      <PageHeading eyebrow="Chấm điểm" title="Bài cần chấm">
+        Một hàng đợi cho cả bốn vòng chấm. Bạn chấm ẩn danh — hệ thống không hiển thị thông tin học
+        sinh.
+      </PageHeading>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <StatCard icon={<Headphones size={19} />} iconTone="amber" label="Cần chấm" value={pending} />
+      <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
+          hint="tổng, không phụ thuộc bộ lọc"
+          icon={<Headphones size={19} />}
+          iconTone="amber"
+          label="Cần chấm"
+          value={pending}
+        />
+        <StatCard
+          hint="tổng, không phụ thuộc bộ lọc"
           icon={<CircleCheck size={19} />}
           iconTone="emerald"
           label="Đã chấm xong"
           value={done}
         />
         <StatCard
-          icon={<Inbox size={19} />}
-          iconTone="indigo"
-          label="Tổng được giao"
-          value={totalAssigned}
+          hint="chỉ đếm trên trang đang xem"
+          icon={<AlarmClock size={19} />}
+          iconTone="red"
+          label="Quá hạn (trang này)"
+          value={overdueOnPage}
         />
       </div>
 
-      <FilterChips
-        items={TEACHER_STATUS_FILTERS}
-        onChange={(next) => {
-          setStatus(next)
-          setPage(1)
-        }}
-        value={status}
-      />
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {/* Hai bộ lọc gộp vào đầu bảng thay vì hai hàng rời phía trên. */}
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-3.5 py-2.5">
+          <SegmentedControl
+            ariaLabel="Trạng thái phân công"
+            items={ASSIGNMENT_STATUS_FILTERS}
+            onChange={(next) => {
+              setStatus(next)
+              setPage(1)
+            }}
+            value={status}
+          />
+          <select
+            aria-label="Lọc theo vòng chấm"
+            className={`${FIELD_CLASS} min-w-40`}
+            onChange={(event) => {
+              setRoundType(event.target.value as '' | GradingRoundType)
+              setPage(1)
+            }}
+            value={roundType}
+          >
+            {ROUND_FILTERS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="ml-auto text-xs font-medium text-slate-500">
+            <b className="font-extrabold tabular-nums text-slate-900">{totalElements}</b> bài khớp bộ
+            lọc
+          </span>
+        </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="w-full min-w-180 border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-5 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Mã bài
+              <tr className="border-b border-slate-200">
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Bài thi
                 </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Kỳ thi
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Vòng chấm
                 </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Số phần
+                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Điểm hiện tại
                 </th>
-                <th className="px-4 py-3.5 text-[11px] font-extrabold uppercase text-slate-500">
-                  Trạng thái
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Hạn &amp; trạng thái
                 </th>
-                <th className="px-5 py-3.5 text-right text-[11px] font-extrabold uppercase text-slate-500">
+                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Thao tác
                 </th>
               </tr>
@@ -607,13 +1246,13 @@ export function TeacherGradingPage() {
             <tbody>
               {tasksQuery.isLoading ? (
                 <tr>
-                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={5}>
+                  <td className="px-5 py-12 text-center text-[13px] text-slate-400" colSpan={5}>
                     Đang tải…
                   </td>
                 </tr>
               ) : tasks.length === 0 ? (
                 <tr>
-                  <td className="px-5 py-12 text-center text-sm text-slate-400" colSpan={5}>
+                  <td className="px-5 py-12 text-center text-[13px] text-slate-400" colSpan={5}>
                     Chưa có bài nào được giao cho bạn.
                   </td>
                 </tr>
@@ -622,33 +1261,59 @@ export function TeacherGradingPage() {
                   const completed = task.status === 'COMPLETED'
                   const display = getAssignmentStatusDisplay(task.status)
                   return (
-                    <tr className="border-b border-slate-100" key={task.assignmentId}>
-                      <td className="px-5 py-3.5">
-                        <ResultCode code={task.resultCode} />
-                        {task.flagged ? (
-                          <div className="mt-1">
-                            <FlaggedChip />
+                    <tr
+                      className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70"
+                      key={task.assignmentId}
+                    >
+                      {/* Mã bài + cờ + kỳ thi + số phần + mốc giao — trước đây là hai cột. */}
+                      <td className="px-4 py-3">
+                        <div className="grid gap-1 leading-tight">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <ResultCode code={task.resultCode} />
+                            {task.flagged ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                                <Flag className="size-3" />
+                                Nghi vấn
+                              </span>
+                            ) : null}
                           </div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="text-[13.5px] font-semibold text-slate-700">
-                          {task.examName ?? '—'}
-                        </div>
-                        <div className="mt-0.5 text-xs font-medium text-slate-400">
-                          Giao {formatIsoDateTime(task.assignedAt)}
+                          <div className="text-[13px] font-semibold text-slate-900">
+                            {task.examName ?? '—'}
+                          </div>
+                          <div className="text-[11px] font-medium tabular-nums text-slate-400">
+                            {task.partCount} phần · giao {formatIsoDateTime(task.assignedAt)}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 text-[13px] font-semibold text-slate-600">
-                        {task.partCount} phần
+                      <td className="px-4 py-3">
+                        <RoundBadge roundType={task.roundType} />
                       </td>
-                      <td className="px-4 py-3.5">
-                        <StatusBadge label={display.label} tone={display.tone} />
+                      <td className="px-4 py-3 text-right">
+                        <span
+                          className={
+                            task.currentScore == null
+                              ? 'text-sm font-medium text-slate-400'
+                              : 'text-sm font-extrabold tabular-nums text-slate-900'
+                          }
+                        >
+                          {formatScore(task.currentScore)}
+                        </span>
                       </td>
-                      <td className="px-5 py-3.5 text-right">
+                      {/* Hạn chấm + trạng thái phân công — trước đây là hai cột. */}
+                      <td className="px-4 py-3">
+                        <div className="grid justify-items-start gap-1">
+                          {completed ? (
+                            <span className="text-[11px] font-medium text-slate-400">—</span>
+                          ) : (
+                            <DeadlineLabel deadlineAt={task.deadlineAt} overdue={task.overdue} />
+                          )}
+                          <StatusBadge label={display.label} tone={display.tone} />
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
                         <button
                           className={[
-                            'inline-flex h-9.5 items-center gap-1.5 rounded-lg px-4 text-[13px] font-bold transition',
+                            'inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold transition',
                             completed
                               ? 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                               : 'bg-cyan-600 text-white hover:bg-cyan-700',
@@ -657,7 +1322,7 @@ export function TeacherGradingPage() {
                           type="button"
                         >
                           <Mic className="size-4" />
-                          {completed ? 'Xem lại' : 'Chấm ngay'}
+                          {completed ? 'Xem lại' : 'Mở bài'}
                         </button>
                       </td>
                     </tr>
@@ -667,14 +1332,15 @@ export function TeacherGradingPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-3.5">
-          <span className="text-[12.5px] font-semibold text-slate-500">
-            <b className="text-slate-900">{totalElements}</b> bài · trang {totalPages ? page : 0}/
-            {totalPages}
+
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-2.5">
+          <span className="text-xs font-medium text-slate-500">
+            <b className="font-extrabold tabular-nums text-slate-900">{totalElements}</b> bài · trang{' '}
+            {totalPages ? page : 0}/{totalPages}
           </span>
           <div className="flex items-center gap-2">
             <button
-              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+              className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               disabled={tasksQuery.isFetching || page <= 1}
               onClick={() => setPage((current) => current - 1)}
               type="button"
@@ -682,7 +1348,7 @@ export function TeacherGradingPage() {
               Trước
             </button>
             <button
-              className="h-9 rounded-lg border border-slate-200 px-3 text-[13px] font-bold text-slate-700 disabled:opacity-50"
+              className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               disabled={tasksQuery.isFetching || page >= totalPages}
               onClick={() => setPage((current) => current + 1)}
               type="button"
@@ -722,27 +1388,63 @@ function initialFeedback(detail: GradingTaskDetail): Record<string, string> {
   return result
 }
 
-type PreviewResult = { data?: { totalScore?: number | null; resultBandName?: string | null; itemScores: Array<{ paperItemId: string; itemScore?: number | null }> }; isFetching: boolean }
+type PreviewResult = {
+  data?: {
+    totalScore?: number | null
+    resultBandName?: string | null
+    itemScores: Array<{ paperItemId: string; itemScore?: number | null }>
+  }
+  isFetching: boolean
+}
+
+type DecisionHandlers = {
+  onError: (error: unknown) => void
+  // `nextAssignmentId` chỉ CLEARED_INVALID trả về (vòng INITIAL BE vừa mở cho
+  // chính người thao tác) — các outcome còn lại gọi không kèm gì.
+  onSuccess: (nextAssignmentId?: string | null) => void
+}
+
+const DECISION_SUCCESS_MESSAGE: Record<DecisionOutcome, string> = {
+  CLEARED_INVALID: 'Đã gỡ vô hiệu. Lượt chấm thủ công đã được mở cho bạn.',
+  DECLINED: 'Đã trả lại phân công.',
+  INVALIDATED: 'Đã vô hiệu bài thi.',
+  UPHELD: 'Đã giữ nguyên điểm bài thi.',
+}
 
 /**
  * Màn chấm dùng chung cho cả giáo viên (theo assignmentId) và nhà trường (theo
  * candidateResultId, có thể chưa có phân công) — cùng UI, chỉ khác cách gọi
  * API ở phía trên. `detail.assignmentId` null xảy ra đúng ở luồng nhà trường
  * chấm một bài chưa ai nhận.
+ *
+ * `onDecision` bỏ trống (nhà trường chấm trực tiếp, không qua phân công) thì
+ * màn chỉ còn Nộp điểm và Vô hiệu — ba hành động còn lại (giữ nguyên/gỡ vô
+ * hiệu/trả lại phân công) đều thao tác trên MỘT phân công cụ thể, không áp
+ * dụng khi chưa có ai được giao bài.
  */
 function GradingTaskDetailView({
+  decisionPending,
   detail,
   invalidatePending,
   onBack,
+  onDecision,
   onInvalidate,
+  onNavigateToAssignment,
   onSubmit,
   submitPending,
   usePreview,
 }: {
+  decisionPending?: boolean
   detail: GradingTaskDetail
   invalidatePending: boolean
   onBack: () => void
-  onInvalidate: (reason: string, handlers: { onError: (error: unknown) => void; onSuccess: () => void }) => void
+  onDecision?: (
+    outcome: Exclude<DecisionOutcome, 'INVALIDATED'>,
+    reason: string,
+    handlers: DecisionHandlers,
+  ) => void
+  onInvalidate: (reason: string, handlers: DecisionHandlers) => void
+  onNavigateToAssignment?: (assignmentId: string) => void
   onSubmit: (
     items: ItemGradeInput[],
     handlers: { onError: (error: unknown) => void; onSuccess: (totalScore?: number | null) => void },
@@ -754,8 +1456,7 @@ function GradingTaskDetailView({
   const [feedback, setFeedback] = useState<Record<string, string>>({})
   const [activeItemId, setActiveItemId] = useState('')
   const [initializedFor, setInitializedFor] = useState<string | null>(null)
-  const [flagAcknowledged, setFlagAcknowledged] = useState(false)
-  const [invalidateOpen, setInvalidateOpen] = useState(false)
+  const [decision, setDecision] = useState<DecisionOutcome | null>(null)
   const [submitOpen, setSubmitOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -766,15 +1467,9 @@ function GradingTaskDetailView({
     setScores(initialScores(detail))
     setFeedback(initialFeedback(detail))
     setActiveItemId(detail.items[0]?.paperItemId ?? '')
-    setFlagAcknowledged(false)
     setInitializedFor(detail.candidateResultId)
   }
 
-  /**
-   * Chỉ gửi lên preview những phần đã nhập ĐỦ tiêu chí bắt buộc — BE từ chối phần
-   * thiếu tiêu chí, còn phần chưa gửi thì nó tự dùng điểm đang lưu. Nhờ vậy tổng
-   * cập nhật dần theo từng phần thay vì im lặng tới khi chấm xong hết.
-   */
   const previewItems = useMemo<ItemGradeInput[]>(() => {
     const required = detail.criteria.filter((criterion) => criterion.required)
     return detail.items
@@ -782,9 +1477,6 @@ function GradingTaskDetailView({
         required.every((criterion) => scores[item.paperItemId]?.[criterion.id] != null),
       )
       .map((item) => ({
-        // KHÔNG đưa feedbackSummary vào đây: tổng điểm chỉ phụ thuộc bộ điểm, mà
-        // payload nằm trong queryKey — kèm feedback thì mỗi lần gõ nhận xét lại bắn
-        // một request preview trả về đúng con số cũ. Feedback vẫn gửi đủ ở lúc nộp.
         criterionScores: detail.criteria
           .filter((criterion) => scores[item.paperItemId]?.[criterion.id] != null)
           .map((criterion) => ({
@@ -796,22 +1488,32 @@ function GradingTaskDetailView({
   }, [detail, scores])
 
   const debouncedPreviewItems = useDebouncedValue(previewItems, PREVIEW_DEBOUNCE_MS)
-  const previewQuery = usePreview(debouncedPreviewItems, detail.editable === true)
+  // Chỉ tính thử khi vòng này thật sự cho chấm lại — vòng xét vô hiệu không có
+  // REGRADED nên gọi preview ở đó chỉ tạo lỗi đỏ.
+  const canRegrade = detail.allowedOutcomes.includes('REGRADED')
+  const previewQuery = usePreview(debouncedPreviewItems, canRegrade && detail.editable === true)
 
   const readOnly = !detail.editable
+  const roundDisplay = getRoundTypeDisplay(detail.roundType)
+  const resultDisplay = getResultStatusDisplay(detail.resultStatus)
   const activeItem = detail.items.find((item) => item.paperItemId === activeItemId) ?? detail.items[0]
   const allFilled = isEveryRequiredCriterionFilled(detail, scores)
   const preview = previewQuery.data
   const previewItemScore = (paperItemId: string) =>
     preview?.itemScores.find((score) => score.paperItemId === paperItemId)?.itemScore ?? null
-  // Bài nghi vấn: bắt xem và quyết trước, không cho chấm ngay để tránh bỏ sót vi phạm.
-  const blockedByFlag = detail.flagged && !flagAcknowledged && !readOnly
+  const allows = (outcome: DecisionOutcome) => detail.allowedOutcomes.includes(outcome)
 
   function setScore(paperItemId: string, criterionId: string, value: number | null) {
     setScores((current) => ({
       ...current,
       [paperItemId]: { ...current[paperItemId], [criterionId]: value },
     }))
+  }
+
+  const onActionError = (error: unknown) => {
+    setDecision(null)
+    setSubmitOpen(false)
+    setMessage(toApiError(error).message)
   }
 
   function doSubmit() {
@@ -840,21 +1542,30 @@ function GradingTaskDetailView({
     })
   }
 
-  function doInvalidate(reason: string) {
-    onInvalidate(reason, {
-      onError: (error) => {
-        setInvalidateOpen(false)
-        setMessage(toApiError(error).message)
+  function confirmDecision(reason: string) {
+    if (!decision) {
+      return
+    }
+    const handlers: DecisionHandlers = {
+      onError: onActionError,
+      onSuccess: (nextAssignmentId) => {
+        setDecision(null)
+        setMessage(DECISION_SUCCESS_MESSAGE[decision])
+        if (nextAssignmentId) {
+          // BE mở luôn vòng INITIAL cho chính giáo viên này — đi thẳng sang đó
+          // thay vì bắt họ tìm lại bài trong hàng đợi.
+          window.setTimeout(() => onNavigateToAssignment?.(nextAssignmentId), 900)
+        } else {
+          window.setTimeout(onBack, 900)
+        }
       },
-      onSuccess: () => {
-        setInvalidateOpen(false)
-        setMessage('Đã vô hiệu bài thi do vi phạm.')
-        window.setTimeout(onBack, 900)
-      },
-    })
+    }
+    if (decision === 'INVALIDATED') {
+      onInvalidate(reason, handlers)
+      return
+    }
+    onDecision?.(decision, reason, handlers)
   }
-
-  const resultDisplay = getResultStatusDisplay(detail.resultStatus)
 
   return (
     <section className="mx-auto max-w-300">
@@ -862,137 +1573,149 @@ function GradingTaskDetailView({
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3.5">
         <div>
-          <p className="text-[12.5px] font-bold uppercase tracking-wide text-cyan-700">Chấm bài</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
-            <h1 className="text-[25px] font-extrabold tracking-tight text-slate-900">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-700">
+            {roundDisplay.label}
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
               Bài #{detail.resultCode}
             </h1>
+            <RoundBadge roundType={detail.roundType} />
             <StatusBadge label={resultDisplay.label} tone={resultDisplay.tone} />
           </div>
-          <p className="mt-1 text-[13.5px] font-medium text-slate-500">
+          <p className="mt-1.5 text-xs font-medium text-slate-500">
             {detail.examName ?? 'Kỳ thi'} · {detail.items.length} phần thi ·{' '}
             {detail.criteria.length} tiêu chí
+            {detail.scoreBefore != null ? (
+              <>
+                {' '}
+                · Điểm khi được giao{' '}
+                <b className="font-bold tabular-nums text-slate-900">
+                  {formatScore(detail.scoreBefore)}
+                </b>
+              </>
+            ) : null}
           </p>
         </div>
-        {readOnly ? (
-          <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600">
-            <CircleCheck className="size-4" />
-            Chỉ xem — bài đã chốt
-          </div>
-        ) : (
-          <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700">
-            <ShieldCheck className="size-4" />
-            Chấm ẩn danh
-          </div>
-        )}
+        <div className="flex flex-col items-end gap-1.5">
+          {readOnly ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+              <CircleCheck className="size-3.5" />
+              Chỉ xem — phân công đã đóng
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
+              <ShieldCheck className="size-3.5" />
+              Chấm ẩn danh
+            </span>
+          )}
+          {detail.deadlineAt && !readOnly ? (
+            <DeadlineLabel deadlineAt={detail.deadlineAt} overdue={detail.overdue} />
+          ) : null}
+        </div>
       </div>
 
-      {readOnly ? (
-        <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
-          <Info className="mt-0.5 size-4.5 shrink-0 text-slate-400" />
-          <div className="text-[12.5px] font-medium leading-relaxed text-slate-600">
-            Bài này đã được chốt điểm và không thể chấm lại. Bạn đang xem lại điểm đã nộp.
+      {/* Một thẻ ngữ cảnh thay cho tối đa ba banner full-width xếp dọc: hint vòng chấm là
+          dòng chính, lý do phúc khảo và cờ nghi vấn thành các dòng nền màu bên trong. */}
+      <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="flex items-start gap-2.5 px-4 py-3">
+          <Info className="mt-0.5 size-4 shrink-0 text-slate-400" />
+          <div className="text-[13px] leading-relaxed text-slate-600">
+            {roundDisplay.hint}
+            {readOnly ? ' Bạn đang xem lại phân công đã hoàn thành.' : ''}
             {detail.currentTotalScore != null ? (
               <>
                 {' '}
-                Tổng điểm: <b className="text-slate-900">{formatScore(detail.currentTotalScore)}</b>.
+                Điểm đang có:{' '}
+                <b className="font-bold tabular-nums text-slate-900">
+                  {formatScore(detail.currentTotalScore)}
+                </b>
+                .
               </>
             ) : null}
           </div>
         </div>
-      ) : null}
 
-      {detail.flagged && !readOnly ? (
-        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
-          <div className="flex items-start gap-2.5">
-            <Flag className="mt-0.5 size-5 shrink-0 text-amber-600" />
-            <div className="flex-1">
-              <div className="text-[13.5px] font-extrabold text-amber-900">
+        {detail.appealReason ? (
+          <div className="flex items-start gap-2.5 border-t border-red-200 bg-red-50 px-4 py-3">
+            <Gavel className="mt-0.5 size-4 shrink-0 text-red-600" />
+            <div>
+              <div className="text-[13px] font-bold text-red-900">
+                Lý do học sinh nêu trong đơn phúc khảo
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-red-800">{detail.appealReason}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {detail.flagged ? (
+          <div className="flex items-start gap-2.5 border-t border-amber-200 bg-amber-50 px-4 py-3">
+            <Flag className="mt-0.5 size-4 shrink-0 text-amber-600" />
+            <div>
+              <div className="text-[13px] font-bold text-amber-900">
                 Bài thi bị đánh dấu nghi vấn
               </div>
               {detail.flagReason ? (
-                <p className="mt-1 text-[12.5px] leading-relaxed text-amber-800">
-                  {detail.flagReason}
-                </p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-800">{detail.flagReason}</p>
               ) : null}
-              <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-amber-700">
-                Nghe bài rồi quyết định. Cờ chỉ thực sự được gỡ khi bạn <b>nộp điểm</b> — rời trang
-                giữa chừng thì bài vẫn còn cờ.
+              <p className="mt-1.5 text-xs leading-relaxed text-amber-700">
+                Nghe bài rồi quyết định. Cờ chỉ thực sự được gỡ khi bạn nộp điểm hoặc giữ nguyên
+                điểm — rời trang giữa chừng thì bài vẫn còn cờ.
               </p>
-              {flagAcknowledged ? null : (
-                <div className="mt-3 flex flex-wrap gap-2.5">
-                  <button
-                    className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-[13px] font-bold text-white transition hover:bg-emerald-700"
-                    onClick={() => setFlagAcknowledged(true)}
-                    type="button"
-                  >
-                    <ShieldCheck className="size-4" />
-                    Không vi phạm — tiếp tục chấm
-                  </button>
-                  <button
-                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-300 bg-white px-4 text-[13px] font-bold text-red-600 transition hover:bg-red-50"
-                    onClick={() => setInvalidateOpen(true)}
-                    type="button"
-                  >
-                    <ShieldAlert className="size-4" />
-                    Xác nhận vi phạm
-                  </button>
-                </div>
-              )}
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
-      {blockedByFlag ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-400">
-          Hãy quyết định về cờ nghi vấn ở trên trước khi chấm điểm.
-        </div>
-      ) : (
-        <div className="grid gap-7">
-          {detail.items.length > 1 ? (
-            <TabPillGroup
-              items={itemTabItems(detail.items)}
-              onChange={setActiveItemId}
-              value={activeItem?.paperItemId ?? ''}
-            />
-          ) : null}
+      <div className="grid gap-4">
+        {detail.items.length > 1 ? (
+          <SegmentedControl
+            ariaLabel="Phần thi"
+            items={itemTabItems(detail.items)}
+            onChange={setActiveItemId}
+            value={activeItem?.paperItemId ?? ''}
+          />
+        ) : null}
 
-          {(activeItem ? [activeItem] : []).map((item) => (
-            <div className="grid gap-4.5 lg:grid-cols-[1.15fr_1fr]" key={item.paperItemId}>
-              <div className="grid gap-4.5">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
-                      <Mic className="size-4.5 text-cyan-700" />
-                      Bản ghi bài nói · {item.partLabel ?? 'Phần thi'}
-                    </div>
-                    <span className="text-xs font-semibold text-slate-400">
-                      {item.turns.length} lượt
-                    </span>
+        {(activeItem ? [activeItem] : []).map((item) => (
+          <div
+            className={canRegrade ? 'grid items-start gap-4 lg:grid-cols-[1.15fr_1fr]' : 'grid gap-4'}
+            key={item.paperItemId}
+          >
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <Mic className="size-4 text-cyan-700" />
+                    Bản ghi bài nói · {item.partLabel ?? 'Phần thi'}
                   </div>
-                  <div className="mt-4">
-                    <GradingTurnList turns={item.turns} />
-                  </div>
-                  <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-violet-50 px-3.5 py-3">
-                    <Bot className="size-4.5 text-violet-600" />
-                    <span className="flex-1 text-[12.5px] font-semibold text-violet-700">
-                      Điểm của bản chấm hiện tại
-                    </span>
-                    <span className="text-[12.5px] font-bold text-violet-700">
-                      {formatScore(item.currentItemScore)}
-                    </span>
-                  </div>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    {item.turns.length} lượt
+                  </span>
                 </div>
+                <div className="mt-3.5">
+                  <GradingTurnList turns={item.turns} />
+                </div>
+                <div className="mt-3.5 flex items-center gap-2.5 rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2.5">
+                  <Bot className="size-4 text-violet-600" />
+                  <span className="flex-1 text-xs font-semibold text-violet-700">
+                    Điểm của bản chấm hiện tại
+                  </span>
+                  <span className="text-[13px] font-extrabold tabular-nums text-violet-700">
+                    {formatScore(item.currentItemScore)}
+                  </span>
+                </div>
+              </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
-                  <div className="flex items-center gap-2 text-[13px] font-extrabold text-slate-900">
-                    <ClipboardList className="size-4.5 text-cyan-700" />
+              {canRegrade ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <ClipboardList className="size-4 text-cyan-700" />
                     Nhận xét · {item.partLabel ?? 'Phần thi'}
                   </div>
                   <textarea
                     aria-label={`Nhận xét cho ${item.partLabel ?? 'phần thi'}`}
-                    className="mt-3 min-h-30 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[13.5px] leading-relaxed text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="mt-3 min-h-24 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[13px] leading-relaxed text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
                     disabled={readOnly}
                     maxLength={2048}
                     onChange={(event) =>
@@ -1005,19 +1728,23 @@ function GradingTaskDetailView({
                     value={feedback[item.paperItemId] ?? ''}
                   />
                 </div>
-              </div>
+              ) : null}
+            </div>
 
-              <div className="grid gap-3.5">
-                <div className="flex items-center justify-between rounded-2xl border-2 border-cyan-500 bg-linear-to-r from-cyan-50 to-white px-5 py-4">
+            {canRegrade ? (
+              <div className="grid gap-3">
+                {/* Viền thường + số lớn, không còn viền cyan đậm + gradient: điểm phần
+                    không nên tranh sự chú ý với tổng điểm ở thanh dưới. */}
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
                   <div>
-                    <div className="text-[12.5px] font-bold text-cyan-700">
+                    <div className="text-[13px] font-bold text-cyan-700">
                       Điểm phần · {item.partLabel ?? 'Phần thi'}
                     </div>
-                    <div className="text-[11.5px] font-medium text-slate-400">
+                    <div className="text-[11px] font-medium text-slate-400">
                       Hệ thống tính theo trọng số tiêu chí
                     </div>
                   </div>
-                  <div className="text-[38px] font-extrabold leading-none text-cyan-600">
+                  <div className="text-[30px] font-extrabold leading-none tabular-nums text-cyan-700">
                     {readOnly
                       ? formatScore(item.currentItemScore)
                       : formatScore(previewItemScore(item.paperItemId))}
@@ -1038,63 +1765,121 @@ function GradingTaskDetailView({
                   />
                 ))}
               </div>
-            </div>
-          ))}
+            ) : null}
+          </div>
+        ))}
+      </div>
 
-          {readOnly ? (
-            <div className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 text-[15px] font-bold text-slate-500">
-              <CircleCheck className="size-5" />
-              Bài đã chốt — không thể chấm lại
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-                <div>
-                  <div className="text-[12.5px] font-bold text-emerald-700">
-                    Tổng điểm cả bài (tạm tính)
-                  </div>
-                  <div className="text-[11.5px] font-medium text-emerald-700/70">
-                    {previewQuery.isFetching
-                      ? 'Đang tính lại…'
-                      : allFilled
-                        ? 'Hệ thống tính từ điểm tiêu chí bạn nhập'
-                        : 'Phần chưa chấm đang dùng điểm hiện tại'}
-                  </div>
+      {readOnly ? (
+        <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 py-3.5 text-[13px] font-bold text-slate-500">
+          <CircleCheck className="size-4" />
+          Phân công đã đóng — không thao tác được nữa
+        </div>
+      ) : (
+        /* Thanh dính đáy: tổng điểm tạm tính + đúng các nút BE cho phép, để giáo viên
+           không phải cuộn xuống hết trang mới thao tác được. */
+        <div className="sticky bottom-0 z-20 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_-6px_20px_rgb(15_23_42/0.07)]">
+          {canRegrade ? (
+            <div className="flex items-center gap-3 border-slate-200 pr-3.5 sm:border-r">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Tổng điểm cả bài (tạm tính)
                 </div>
-                <div className="text-right">
-                  <div className="text-[34px] font-extrabold leading-none text-emerald-600">
-                    {formatScore(preview?.totalScore)}
-                  </div>
-                  {preview?.resultBandName ? (
-                    <div className="text-[11.5px] font-bold text-emerald-700/80">
-                      {preview.resultBandName}
-                    </div>
-                  ) : null}
+                <div className="text-[11px] font-medium text-slate-400">
+                  {previewQuery.isFetching
+                    ? 'Đang tính lại…'
+                    : allFilled
+                      ? 'Hệ thống tính từ điểm tiêu chí bạn nhập'
+                      : 'Phần chưa chấm đang dùng điểm hiện tại'}
                 </div>
               </div>
+              <div className="text-right">
+                <div className="text-[28px] font-extrabold leading-none tabular-nums text-emerald-600">
+                  {formatScore(preview?.totalScore)}
+                </div>
+                {preview?.resultBandName ? (
+                  <div className="text-[11px] font-bold text-emerald-700">
+                    {preview.resultBandName}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {/* DECLINED không nằm trong allowedOutcomes vì nó hợp lệ ở MỌI vòng — luôn hiện
+              khi còn chấm được, trừ luồng nhà trường chấm trực tiếp (không có phân công
+              nào để trả lại). */}
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            {onDecision ? (
               <button
-                className="inline-flex h-12.5 w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 text-[15px] font-bold text-white shadow-lg shadow-cyan-600/30 transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-bold text-slate-600 transition hover:bg-slate-50"
+                onClick={() => setDecision('DECLINED')}
+                type="button"
+              >
+                <Undo2 className="size-4" />
+                Trả lại phân công
+              </button>
+            ) : null}
+
+            {allows('INVALIDATED') ? (
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3.5 text-[13px] font-bold text-red-600 transition hover:bg-red-50"
+                onClick={() => setDecision('INVALIDATED')}
+                type="button"
+              >
+                <ShieldAlert className="size-4" />
+                Kết luận vi phạm
+              </button>
+            ) : null}
+
+            {onDecision && allows('CLEARED_INVALID') ? (
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3.5 text-[13px] font-bold text-emerald-700 transition hover:bg-emerald-50"
+                onClick={() => setDecision('CLEARED_INVALID')}
+                type="button"
+              >
+                <ShieldCheck className="size-4" />
+                Gỡ vô hiệu
+              </button>
+            ) : null}
+
+            {onDecision && allows('UPHELD') ? (
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3.5 text-[13px] font-bold text-emerald-700 transition hover:bg-emerald-50"
+                onClick={() => setDecision('UPHELD')}
+                type="button"
+              >
+                <ShieldCheck className="size-4" />
+                Giữ nguyên điểm
+              </button>
+            ) : null}
+
+            {canRegrade ? (
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-[13px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                 disabled={!allFilled || submitPending}
                 onClick={() => setSubmitOpen(true)}
                 type="button"
               >
-                <CircleCheck className="size-5" />
+                <CircleCheck className="size-4" />
                 {allFilled
                   ? `Nộp điểm cho ${detail.items.length} phần thi`
                   : 'Chấm đủ tiêu chí bắt buộc của mọi phần để nộp'}
               </button>
-            </div>
-          )}
+            ) : null}
+          </div>
         </div>
       )}
 
-      {invalidateOpen ? (
-        <InvalidateDialog
+      {decision ? (
+        <GradingDecisionDialog
           flagReason={detail.flagReason}
-          isPending={invalidatePending}
-          onCancel={() => setInvalidateOpen(false)}
-          onConfirm={doInvalidate}
+          isPending={decision === 'INVALIDATED' ? invalidatePending : decisionPending}
+          onCancel={() => setDecision(null)}
+          onConfirm={confirmDecision}
+          outcome={decision}
           resultCode={detail.resultCode}
+          roundType={detail.roundType}
         />
       ) : null}
 
@@ -1107,6 +1892,8 @@ function GradingTaskDetailView({
           partCount={detail.items.length}
           resultBandName={preview?.resultBandName}
           resultCode={detail.resultCode}
+          roundType={detail.roundType}
+          scoreBefore={detail.scoreBefore ?? detail.currentTotalScore}
           totalScore={preview?.totalScore}
         />
       ) : null}
@@ -1120,8 +1907,11 @@ export function TeacherGradingTaskPage() {
   const navigate = useNavigate()
   const { assignmentId } = useParams()
   const detailQuery = useGradingTaskDetailQuery(assignmentId ?? null)
-  const submitMutation = useSubmitGradingMutation()
-  const invalidateMutation = useInvalidateGradingMutation()
+  const regradeMutation = useRegradeResultMutation()
+  const upholdMutation = useUpholdResultMutation()
+  const invalidateMutation = useInvalidateResultMutation()
+  const clearInvalidMutation = useClearInvalidResultMutation()
+  const declineMutation = useDeclineGradingAssignmentMutation()
   const detail = detailQuery.data
 
   if (detailQuery.isLoading) {
@@ -1140,82 +1930,57 @@ export function TeacherGradingTaskPage() {
   }
   const currentAssignmentId = detail.assignmentId
 
+  function usePreview(items: ItemGradeInput[], enabled: boolean) {
+    return useGradingPreviewQuery(currentAssignmentId, items, { enabled })
+  }
+
   return (
     <GradingTaskDetailView
+      decisionPending={
+        upholdMutation.isPending || clearInvalidMutation.isPending || declineMutation.isPending
+      }
       detail={detail}
       invalidatePending={invalidateMutation.isPending}
       onBack={() => navigate('/teacher/grading')}
+      onDecision={(outcome, reason, handlers) => {
+        switch (outcome) {
+          case 'UPHELD':
+            upholdMutation.mutate(
+              { assignmentId: currentAssignmentId, reason },
+              { onError: handlers.onError, onSuccess: () => handlers.onSuccess() },
+            )
+            return
+          case 'CLEARED_INVALID':
+            clearInvalidMutation.mutate(
+              { assignmentId: currentAssignmentId, reason },
+              {
+                onError: handlers.onError,
+                onSuccess: (result) => handlers.onSuccess(result.nextAssignmentId),
+              },
+            )
+            return
+          case 'DECLINED':
+            declineMutation.mutate(
+              { assignmentId: currentAssignmentId, reason },
+              { onError: handlers.onError, onSuccess: () => handlers.onSuccess() },
+            )
+        }
+      }}
       onInvalidate={(reason, handlers) =>
         invalidateMutation.mutate(
-          { assignmentId: currentAssignmentId, reason: reason || undefined },
-          handlers,
+          { assignmentId: currentAssignmentId, reason },
+          { onError: handlers.onError, onSuccess: () => handlers.onSuccess() },
         )
       }
+      onNavigateToAssignment={(nextAssignmentId) => navigate(`/teacher/grading/${nextAssignmentId}`)}
       onSubmit={(items, handlers) =>
-        submitMutation.mutate(
+        regradeMutation.mutate(
           { assignmentId: currentAssignmentId, items },
           { onError: handlers.onError, onSuccess: (result) => handlers.onSuccess(result.totalScore) },
         )
       }
-      submitPending={submitMutation.isPending}
-      usePreview={(items, enabled) =>
-        useGradingPreviewQuery(currentAssignmentId, items, { enabled })
-      }
-    />
-  )
-}
-
-// ============================= School Admin: Grade one submission directly =============================
-
-/**
- * Nhà trường xem/chấm trực tiếp theo candidateResultId — không cần phân công
- * trước, xem được cả bài chưa gán ai hoặc đang gán cho giáo viên khác.
- */
-export function SchoolAdminGradingTaskPage() {
-  const navigate = useNavigate()
-  const { candidateResultId } = useParams()
-  const detailQuery = useGradingTaskDetailBySchoolQuery(candidateResultId ?? null)
-  const submitMutation = useSubmitGradingByResultMutation()
-  const invalidateMutation = useInvalidateGradingByResultMutation()
-  const detail = detailQuery.data
-
-  if (detailQuery.isLoading) {
-    return <PageLoader />
-  }
-
-  if (!detail) {
-    return (
-      <section className="mx-auto max-w-300">
-        <BackButton onClick={() => navigate('/school-admin/grading')} />
-        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-400">
-          Không tìm thấy bài cần chấm.
-        </div>
-      </section>
-    )
-  }
-  const currentCandidateResultId = detail.candidateResultId
-
-  return (
-    <GradingTaskDetailView
-      detail={detail}
-      invalidatePending={invalidateMutation.isPending}
-      onBack={() => navigate('/school-admin/grading')}
-      onInvalidate={(reason, handlers) =>
-        invalidateMutation.mutate(
-          { candidateResultId: currentCandidateResultId, reason: reason || undefined },
-          handlers,
-        )
-      }
-      onSubmit={(items, handlers) =>
-        submitMutation.mutate(
-          { candidateResultId: currentCandidateResultId, items },
-          { onError: handlers.onError, onSuccess: (result) => handlers.onSuccess(result.totalScore) },
-        )
-      }
-      submitPending={submitMutation.isPending}
-      usePreview={(items, enabled) =>
-        useGradingPreviewByResultQuery(currentCandidateResultId, items, { enabled })
-      }
+      submitPending={regradeMutation.isPending}
+      usePreview={usePreview}
     />
   )
 }

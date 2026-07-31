@@ -19,6 +19,11 @@ const SCHOOL_CLASS_USERS_QUERY = `
           email
           phone
           fullName
+          roles {
+            id
+            code
+            name
+          }
         }
       }
       page

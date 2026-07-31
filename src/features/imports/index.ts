@@ -1,4 +1,10 @@
 export { SchoolAdminImportSessionsPage } from './pages/SchoolAdminImportSessionsPage'
-export { SchoolAdminImportSessionDetailPage } from './pages/SchoolAdminImportSessionDetailPage'
-export { fetchImportSession, fetchImportSessionStatus } from './api/useImportSessionsQuery'
-export type { ImportSessionDetails, ImportSessionStatus } from './types'
+export {
+  ImportSessionDetailPage,
+  SchoolAdminImportSessionDetailPage,
+  SystemAdminImportSessionDetailPage,
+  TeacherImportSessionDetailPage,
+} from './pages/ImportSessionDetailPage'
+export { fetchImportSession } from './api/useImportSessionsQuery'
+export { buildImportSessionDetailPath } from './types'
+export type { ImportSessionDetails, ImportSessionNavState } from './types'

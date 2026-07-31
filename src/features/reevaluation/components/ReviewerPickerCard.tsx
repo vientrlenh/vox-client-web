@@ -1,4 +1,4 @@
-import { Check, ClipboardList } from 'lucide-react'
+import { Check, ClipboardList, TriangleAlert } from 'lucide-react'
 import { avatarClasses, initials, type AppealReviewerLite } from '../types'
 
 type ReviewerPickerCardProps = {
@@ -23,7 +23,10 @@ function loadStyle(load: number): { className: string; label: string } {
   }
 }
 
-/** Card chọn giám khảo chấm lại (hiển thị mức tải hiện tại). */
+/**
+ * Card chọn giám khảo chấm lại: mức tải hiện tại + cảnh báo xung đột lợi ích.
+ * Người `conflicted` vẫn chọn được — BE cho phép, nhưng đòi lý do ghi đè.
+ */
 export function ReviewerPickerCard({ reviewer, selected, onToggle }: ReviewerPickerCardProps) {
   const load = loadStyle(reviewer.load)
   return (
@@ -32,7 +35,9 @@ export function ReviewerPickerCard({ reviewer, selected, onToggle }: ReviewerPic
         'flex items-center gap-3.5 rounded-2xl border p-4 text-left transition',
         selected
           ? 'border-cyan-500 bg-cyan-50'
-          : 'border-slate-200 bg-white hover:border-slate-300',
+          : reviewer.conflicted
+            ? 'border-amber-200 bg-amber-50/40 hover:border-amber-300'
+            : 'border-slate-200 bg-white hover:border-slate-300',
       ].join(' ')}
       onClick={onToggle}
       type="button"
@@ -51,6 +56,12 @@ export function ReviewerPickerCard({ reviewer, selected, onToggle }: ReviewerPic
           <ClipboardList className="size-3" />
           {load.label}
         </span>
+        {reviewer.conflicted ? (
+          <span className="mt-1 flex items-center gap-1 text-[11px] font-bold text-amber-700">
+            <TriangleAlert className="size-3" />
+            Đã chấm tay bài này
+          </span>
+        ) : null}
       </div>
       <span
         className={[

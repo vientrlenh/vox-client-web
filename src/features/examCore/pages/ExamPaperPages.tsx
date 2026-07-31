@@ -165,6 +165,9 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
     .filter(Boolean) as string[]
 
   function calculateDurationAfterSelection(question: { maxResponseSeconds?: number | null; preparationTimeSeconds?: number | null }) {
+    if (!paper) {
+      return 0
+    }
     return paper.sections.reduce(
       (sum, section) =>
         sum +

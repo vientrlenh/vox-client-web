@@ -1,5 +1,6 @@
 import { CalendarDays, ChevronDown, Paperclip, X } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useRef } from 'react'
 
 export type FieldConfig = {
   autoComplete?: string
@@ -52,28 +53,65 @@ export function TextField({
   )
 }
 
+const MIN_BIRTH_DATE = '1900-01-01'
+
+/** Ngày hôm nay theo múi giờ máy người dùng, dạng `yyyy-MM-dd`. */
+function getTodayValue(): string {
+  const now = new Date()
+  const month = `${now.getMonth() + 1}`.padStart(2, '0')
+  const day = `${now.getDate()}`.padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
 export function DateField({ disabled }: { disabled?: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function openCalendar() {
+    const input = inputRef.current
+    if (!input || disabled) {
+      return
+    }
+    input.focus()
+    try {
+      input.showPicker?.()
+    } catch {
+      // Trình duyệt không cho mở lịch bằng script: người dùng vẫn nhập tay được.
+    }
+  }
+
   return (
-    <label className="block min-w-0" htmlFor="birth-date">
-      <span className="mb-1.5 block text-xs font-bold leading-4 text-blue-950">
+    <div className="min-w-0">
+      <label
+        className="mb-1.5 block text-xs font-bold leading-4 text-blue-950"
+        htmlFor="birth-date"
+      >
         Ngày sinh <RequiredMark />
-      </span>
-      <span className="relative block">
+      </label>
+      <div className="relative">
         <input
-          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-xs font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-xs font-medium text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 [&::-webkit-calendar-picker-indicator]:hidden"
           disabled={disabled}
           id="birth-date"
+          max={getTodayValue()}
+          min={MIN_BIRTH_DATE}
           name="dateOfBirth"
-          placeholder="dd/mm/yyyy"
+          onClick={openCalendar}
+          ref={inputRef}
           required
-          type="text"
+          type="date"
         />
-        <CalendarDays
-          aria-hidden="true"
-          className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-500"
-        />
-      </span>
-    </label>
+        <button
+          aria-label="Mở lịch chọn ngày sinh"
+          className="absolute right-1.5 top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={disabled}
+          onClick={openCalendar}
+          tabIndex={-1}
+          type="button"
+        >
+          <CalendarDays aria-hidden="true" className="size-4" />
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -207,7 +245,7 @@ export function DocumentFilesField({
   }
 
   return (
-    <div className="grid gap-2">
+    <div className="grid min-w-0 gap-2">
       <span className="block text-xs font-bold leading-4 text-blue-950">
         Tài liệu xác thực {required ? <RequiredMark /> : '(không bắt buộc)'}
       </span>
@@ -216,14 +254,17 @@ export function DocumentFilesField({
       </p>
 
       {files.length > 0 && (
-        <ul className="grid gap-1.5">
+        <ul className="grid min-w-0 gap-1.5">
           {files.map((file, index) => (
             <li
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+              className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
               key={`${file.name}-${index}`}
             >
               <Paperclip aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
-              <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-700">
+              <span
+                className="min-w-0 flex-1 truncate text-xs font-medium text-slate-700"
+                title={file.name}
+              >
                 {file.name}
               </span>
               <span className="shrink-0 text-[10px] font-medium text-slate-400">

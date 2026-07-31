@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { gradingKeys } from '@/features/grading/api/useGradingQueries'
 import { apiClient } from '@/shared/api'
 import { reevaluationKeys } from './useReevaluationQueries'
 
@@ -9,23 +10,15 @@ type ApiResponse<T> = {
 
 const BASE = '/v1/exam-appeals'
 
-export type CriterionScoreInput = {
-  criterionId: string
-  score: number
-  rationale?: string
-}
-
-/** Báo cáo chấm lại cho MỘT phần thi. */
-export type ItemReportInput = {
-  appealItemId: string
-  scores: CriterionScoreInput[]
-  note?: string
-}
-
-/** Điểm công bố cho MỘT phần thi. */
-export type ItemScoreInput = {
-  appealItemId: string
-  partScore: number
+/**
+ * Giao MỘT giám khảo chấm lại. `overrideReason` chỉ cần khi người được chọn đã chấm tay
+ * chính bài này (`AppealReviewerLite.conflicted`) — BE dùng nó làm dấu vết cho quyết định
+ * bỏ qua xung đột lợi ích. Gán lại lần nữa = đổi người, không có thao tác gỡ riêng.
+ */
+export type AssignReviewerInput = {
+  reviewerId: string
+  overrideReason?: string
+  deadlineAt?: string | null
 }
 
 export async function approveAppeal(id: string, deadline: string) {
@@ -38,45 +31,24 @@ export async function rejectAppeal(id: string, reason: string) {
   return response.data.message
 }
 
-export async function assignReviewers(id: string, reviewerIds: string[]) {
-  const response = await apiClient.post<ApiResponse<string>>(`${BASE}/${id}/reviewers`, {
-    reviewerIds,
+/** Trả về id của DÒNG PHÂN CÔNG vừa tạo, không phải id đơn. */
+export async function assignReviewer(id: string, input: AssignReviewerInput) {
+  const response = await apiClient.post<ApiResponse<string>>(`${BASE}/${id}/reviewer`, {
+    deadlineAt: input.deadlineAt ?? undefined,
+    overrideReason: input.overrideReason || undefined,
+    reviewerId: input.reviewerId,
   })
-  return response.data.message
-}
-
-export async function removeReviewer(id: string, reviewerId: string) {
-  const response = await apiClient.delete<ApiResponse<string>>(
-    `${BASE}/${id}/reviewers/${reviewerId}`,
-  )
-  return response.data.message
-}
-
-/** BE yêu cầu nộp TRỌN GÓI mọi phần thi của đơn trong một request — không có nộp lẻ. */
-export async function submitReport(id: string, items: ItemReportInput[]) {
-  const response = await apiClient.post<ApiResponse<string>>(
-    `${BASE}/${id}/reviewers/me/report`,
-    { items },
-  )
-  return response.data.message
-}
-
-/** Tương tự: phải nhập điểm cho đủ mọi phần thi của đơn. */
-export async function publishAppeal(
-  id: string,
-  itemScores: ItemScoreInput[],
-  decisionNote?: string,
-) {
-  const response = await apiClient.post<ApiResponse<string>>(`${BASE}/${id}/publish`, {
-    decisionNote,
-    itemScores,
-  })
-  return response.data.message
+  return response.data.data
 }
 
 function useInvalidateReevaluation() {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: reevaluationKeys.all })
+  return async () => {
+    await queryClient.invalidateQueries({ queryKey: reevaluationKeys.all })
+    // Giao giám khảo = mở một phân công chấm bài vòng APPEAL, nên hàng chờ bên
+    // feature `grading` cũng đổi theo.
+    await queryClient.invalidateQueries({ queryKey: gradingKeys.all })
+  }
 }
 
 export function useApproveMutation() {
@@ -98,42 +70,8 @@ export function useRejectMutation() {
 export function useAssignMutation() {
   const invalidate = useInvalidateReevaluation()
   return useMutation({
-    mutationFn: ({ id, reviewerIds }: { id: string; reviewerIds: string[] }) =>
-      assignReviewers(id, reviewerIds),
-    onSuccess: invalidate,
-  })
-}
-
-export function useRemoveReviewerMutation() {
-  const invalidate = useInvalidateReevaluation()
-  return useMutation({
-    mutationFn: ({ id, reviewerId }: { id: string; reviewerId: string }) =>
-      removeReviewer(id, reviewerId),
-    onSuccess: invalidate,
-  })
-}
-
-export function useSubmitReportMutation() {
-  const invalidate = useInvalidateReevaluation()
-  return useMutation({
-    mutationFn: ({ id, items }: { id: string; items: ItemReportInput[] }) =>
-      submitReport(id, items),
-    onSuccess: invalidate,
-  })
-}
-
-export function usePublishMutation() {
-  const invalidate = useInvalidateReevaluation()
-  return useMutation({
-    mutationFn: ({
-      id,
-      itemScores,
-      decisionNote,
-    }: {
-      id: string
-      itemScores: ItemScoreInput[]
-      decisionNote?: string
-    }) => publishAppeal(id, itemScores, decisionNote),
+    mutationFn: ({ id, ...input }: AssignReviewerInput & { id: string }) =>
+      assignReviewer(id, input),
     onSuccess: invalidate,
   })
 }

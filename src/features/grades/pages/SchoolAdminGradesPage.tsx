@@ -153,6 +153,7 @@ type GradeLevelTableProps = {
   onDelete: (gradeLevel: SchoolGradeLevel) => void
   onEdit: (gradeLevel: SchoolGradeLevel) => void
   onRetry: () => void
+  onView: (gradeLevel: SchoolGradeLevel) => void
 }
 
 function GradeLevelTable({
@@ -163,6 +164,7 @@ function GradeLevelTable({
   onDelete,
   onEdit,
   onRetry,
+  onView,
 }: GradeLevelTableProps) {
   if (isLoading) {
     return (
@@ -254,7 +256,7 @@ function GradeLevelTable({
                         {
                           id: 'view',
                           label: 'Xem chi tiết',
-                          onSelect: () => navigate(`/school-admin/grades/${gradeLevel.id}`),
+                          onSelect: () => onView(gradeLevel),
                           tone: 'primary',
                         },
                         {
@@ -536,6 +538,7 @@ export function SchoolAdminGradesPage() {
           onRetry={() => {
             void gradeLevelsQuery.refetch()
           }}
+          onView={(gradeLevel) => navigate(`/school-admin/grades/${gradeLevel.id}`)}
         />
         <Pagination
           isDisabled={gradeLevelsQuery.isLoading || gradeLevelsQuery.isError}

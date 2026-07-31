@@ -1,5 +1,4 @@
-import type { StatusTone } from '@/shared/ui/StatusBadge'
-import type { ExamMemberRole, ExamStatus, ResultDecisionMethod } from '@/features/examCore/types'
+import type { ExamMemberRole, ResultDecisionMethod } from '@/features/examCore/types'
 
 export type { ExamMemberRole } from '@/features/examCore/types'
 
@@ -123,24 +122,9 @@ export type AttachExamBlueprintRequest = {
   newBlueprint?: CreateBlueprintInlineRequest | null
 }
 
-export function getExamStatusDisplay(status?: ExamStatus | string | null): { tone: StatusTone; label: string } {
-  switch (status) {
-    case 'DRAFT':
-      return { tone: 'warning', label: 'Bản nháp' }
-    case 'SCHEDULED':
-      return { tone: 'info', label: 'Đã lên lịch' }
-    case 'IN_PROGRESS':
-      return { tone: 'violet', label: 'Đang diễn ra' }
-    case 'CLOSED':
-      return { tone: 'neutral', label: 'Đã đóng' }
-    case 'RESULTS_PUBLISHED':
-      return { tone: 'success', label: 'Đã công bố kết quả' }
-    case 'CANCELLED':
-      return { tone: 'danger', label: 'Đã hủy' }
-    default:
-      return { tone: 'neutral', label: String(status ?? '-') }
-  }
-}
+// Đã chuyển xuống `examCore` để các màn dùng chung (kể cả picker) khỏi phải import ngược
+// lên feature `exam`. Re-export để call-site cũ không phải đổi.
+export { getExamStatusDisplay } from '@/features/examCore/types'
 
 export function getMemberRoleDisplay(role?: ExamMemberRole | null) {
   switch (role) {

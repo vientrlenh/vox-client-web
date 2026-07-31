@@ -21,15 +21,22 @@ import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { SchoolClassFormDialog } from '../components/SchoolClassFormDialog'
 import {
-  useAddClassUserMutation,
+  ClassUserPickerDialog,
+  ClassUserRoleBadges,
+  type SelectedClassUser,
+} from '../components/ClassUserPickerDialog'
+import {
+  useAddClassUsersBulkMutation,
   useRemoveClassUserMutation,
   useUpdateSchoolClassMutation,
   useUpdateClassUserStatusMutation,
 } from '../api/useSchoolClassMutations'
+import { getClassErrorMessage } from '../api/schoolClassApiUtils'
 import { useSchoolClassQuery } from '../api/useSchoolClassQuery'
 import { useSchoolClassUsersQuery } from '../api/useSchoolClassUsersQuery'
 import { classManagementQueryKeys } from '../api/useSchoolClassesQuery'
 import type {
+  BulkAddClassUsersResponse,
   ClassUser,
   RelatedClassObject,
   SchoolClass,
@@ -52,27 +59,57 @@ type ActiveTab = 'info' | 'users'
 
 type PageMessage = {
   text: string
-  tone: 'error' | 'success'
+  tone: 'error' | 'success' | 'warning'
 }
 
-function getErrorMessage(error: unknown) {
-  if (
-    error &&
-    typeof error === 'object' &&
-    'message' in error &&
-    typeof error.message === 'string'
-  ) {
-    if (
-      error.message.includes('Missing schoolId in access token') ||
-      error.message.includes('Missing VITE_SCHOOL_ID')
-    ) {
-      return 'Chưa xác định được trường học hiện tại. Vui lòng đăng nhập lại.'
-    }
-
-    return error.message
+function getMessageClassName(tone?: PageMessage['tone']) {
+  if (tone === 'success') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
   }
 
-  return undefined
+  if (tone === 'warning') {
+    return 'border-amber-200 bg-amber-50 text-amber-800'
+  }
+
+  return 'border-red-200 bg-red-50 text-red-700'
+}
+
+/**
+ * Endpoint bulk trả về thành công một phần, nên phải tổng hợp lại: bao nhiêu người vào
+ * được lớp, ai không vào được và vì sao. `selectedUsers` dùng để đổi userId thành tên/email
+ * cho dễ đọc, vì response chỉ mang userId.
+ */
+function buildBulkAddMessage(
+  result: BulkAddClassUsersResponse,
+  selectedUsers: SelectedClassUser[],
+): PageMessage {
+  const addedCount = result.addedUserIds.length
+  const total = addedCount + result.failed.length
+
+  if (result.failed.length === 0) {
+    return {
+      text: `Đã thêm ${addedCount} người dùng vào lớp.`,
+      tone: 'success',
+    }
+  }
+
+  const labelByUserId = new Map(
+    selectedUsers.map((selectedUser) => [
+      selectedUser.userId,
+      selectedUser.fullName?.trim() || selectedUser.email || selectedUser.userId,
+    ]),
+  )
+  const details = result.failed
+    .map(
+      (failure) =>
+        `${labelByUserId.get(failure.userId) ?? failure.userId} — ${failure.reason}`,
+    )
+    .join('; ')
+
+  return {
+    text: `Đã thêm ${addedCount}/${total} người dùng. Không thêm được: ${details}.`,
+    tone: addedCount > 0 ? 'warning' : 'error',
+  }
 }
 
 type StatusBadgeProps = {
@@ -323,13 +360,14 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(DEFAULT_USER_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_USER_PAGE_SIZE)
-  const [userId, setUserId] = useState('')
   const [message, setMessage] = useState<PageMessage | null>(null)
+  const [isPickerOpen, setIsPickerOpen] = useState(false)
+  const [pickerError, setPickerError] = useState<string | null>(null)
   const [removeTarget, setRemoveTarget] = useState<ClassUser | null>(null)
   const [removeError, setRemoveError] = useState<string | null>(null)
 
   const usersQuery = useSchoolClassUsersQuery(classId, page, pageSize)
-  const addMutation = useAddClassUserMutation()
+  const addMutation = useAddClassUsersBulkMutation()
   const removeMutation = useRemoveClassUserMutation()
   const statusMutation = useUpdateClassUserStatusMutation()
   const users = usersQuery.data?.content ?? []
@@ -347,6 +385,10 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
     await queryClient.invalidateQueries({
       queryKey: usersQueryKey,
     })
+    // Người vừa được thêm phải biến mất khỏi modal ở lần mở tiếp theo.
+    await queryClient.invalidateQueries({
+      queryKey: [...classManagementQueryKeys.all, 'users-not-in-class'],
+    })
   }
 
   function handlePageSizeChange(nextPageSize: number) {
@@ -354,32 +396,24 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
     setPageSize(nextPageSize)
   }
 
-  async function handleAddUser() {
-    const trimmedUserId = userId.trim()
-
-    if (!trimmedUserId) {
-      setMessage({ text: 'ID học viên là bắt buộc.', tone: 'error' })
-      return
-    }
-
+  async function handleAddUsers(selectedUsers: SelectedClassUser[]) {
     try {
       setMessage(null)
+      setPickerError(null)
       const result = await addMutation.mutateAsync({
         classId,
-        userId: trimmedUserId,
+        userIds: selectedUsers.map((selectedUser) => selectedUser.userId),
       })
 
-      setUserId('')
+      setIsPickerOpen(false)
       setPage(DEFAULT_USER_PAGE)
       await invalidateUsers()
-      setMessage({ text: result.message, tone: 'success' })
+      setMessage(buildBulkAddMessage(result.data, selectedUsers))
     } catch (error) {
-      setMessage({
-        text:
-          getErrorMessage(error) ??
+      setPickerError(
+        getClassErrorMessage(error) ??
           'Không thể thêm học viên vào lớp. Vui lòng thử lại.',
-        tone: 'error',
-      })
+      )
     }
   }
 
@@ -397,7 +431,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
     } catch (error) {
       setMessage({
         text:
-          getErrorMessage(error) ??
+          getClassErrorMessage(error) ??
           'Không thể cập nhật trạng thái học viên. Vui lòng thử lại.',
         tone: 'error',
       })
@@ -421,16 +455,13 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
       setMessage({ text: result.message, tone: 'success' })
     } catch (error) {
       setRemoveError(
-        getErrorMessage(error) ??
+        getClassErrorMessage(error) ??
           'Không thể xóa học viên khỏi lớp. Vui lòng thử lại.',
       )
     }
   }
 
-  const messageClassName =
-    message?.tone === 'success'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-      : 'border-red-200 bg-red-50 text-red-700'
+  const messageClassName = getMessageClassName(message?.tone)
 
   return (
     <section aria-labelledby="class-users-title" className="grid gap-4">
@@ -446,14 +477,28 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
             Thêm, xóa và cập nhật trạng thái học viên đang tham gia lớp học.
           </p>
         </div>
-        <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
-          onClick={() => navigate(`/school-admin/classes/${classId}/users/import`)}
-          type="button"
-        >
-          <Upload aria-hidden="true" className="size-4" />
-          Import học viên
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
+            onClick={() => navigate(`/school-admin/classes/${classId}/users/import`)}
+            type="button"
+          >
+            <Upload aria-hidden="true" className="size-4" />
+            Import học viên
+          </button>
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
+            disabled={isActionPending}
+            onClick={() => {
+              setPickerError(null)
+              setIsPickerOpen(true)
+            }}
+            type="button"
+          >
+            <UserPlus aria-hidden="true" className="size-4" />
+            Thêm học viên
+          </button>
+        </div>
       </div>
 
       {message ? (
@@ -464,33 +509,6 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
           {message.text}
         </div>
       ) : null}
-
-      <form
-        className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-end"
-        onSubmit={(event) => {
-          event.preventDefault()
-          void handleAddUser()
-        }}
-      >
-        <label className="grid flex-1 gap-2 text-sm font-bold text-slate-700">
-          ID học viên
-          <input
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            disabled={isActionPending}
-            onChange={(event) => setUserId(event.target.value)}
-            placeholder="Nhập ID học viên"
-            value={userId}
-          />
-        </label>
-        <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
-          disabled={isActionPending}
-          type="submit"
-        >
-          <UserPlus aria-hidden="true" className="size-4" />
-          Thêm học viên
-        </button>
-      </form>
 
       {usersQuery.isLoading ? (
         <div
@@ -507,7 +525,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
           role="alert"
         >
           <span>
-            {getErrorMessage(usersQuery.error) ??
+            {getClassErrorMessage(usersQuery.error) ??
               'Không thể tải danh sách học viên.'}
           </span>
           <button
@@ -541,6 +559,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
                 <tr>
                   <th className="px-4 py-3">Người dùng</th>
                   <th className="px-4 py-3">Số điện thoại</th>
+                  <th className="px-4 py-3">Vai trò</th>
                   <th className="px-4 py-3">Trạng thái</th>
                   <th className="px-4 py-3">Ngày tham gia</th>
                   <th className="px-4 py-3">Ngày rời lớp</th>
@@ -568,6 +587,9 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
                       </td>
                       <td className="px-4 py-4 text-sm font-semibold text-slate-600">
                         {formatNullableText(classUser.user?.phone)}
+                      </td>
+                      <td className="px-4 py-4">
+                        <ClassUserRoleBadges roles={classUser.user?.roles} />
                       </td>
                       <td className="px-4 py-4">
                         <UserStatusBadge isActive={classUser.isActive} />
@@ -624,6 +646,23 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
         totalElements={usersQuery.data?.totalElements ?? 0}
         totalPages={usersQuery.data?.totalPages ?? 0}
       />
+
+      {isPickerOpen ? (
+        <ClassUserPickerDialog
+          classId={classId}
+          errorMessage={pickerError ?? undefined}
+          isSubmitting={addMutation.isPending}
+          onClose={() => {
+            if (!addMutation.isPending) {
+              setPickerError(null)
+              setIsPickerOpen(false)
+            }
+          }}
+          onSubmit={(selectedUsers) => {
+            void handleAddUsers(selectedUsers)
+          }}
+        />
+      ) : null}
 
       {removeTarget ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6">
@@ -728,7 +767,7 @@ export function SchoolAdminClassDetailPage() {
       setPageMessage({ text: result.message, tone: 'success' })
     } catch (error) {
       setEditError(
-        getErrorMessage(error) ?? 'Không thể lưu lớp học. Vui lòng thử lại.',
+        getClassErrorMessage(error) ?? 'Không thể lưu lớp học. Vui lòng thử lại.',
       )
     }
   }
@@ -785,7 +824,7 @@ export function SchoolAdminClassDetailPage() {
           role="alert"
         >
           <span>
-            {getErrorMessage(schoolClassQuery.error) ??
+            {getClassErrorMessage(schoolClassQuery.error) ??
               'Không thể tải thông tin lớp học.'}
           </span>
           <button
@@ -962,7 +1001,7 @@ export function SchoolAdminClassDetailPage() {
         isLanguagesError={languagesQuery.isError}
         isLanguagesLoading={languagesQuery.isLoading}
         isSubmitting={updateMutation.isPending}
-        languageErrorMessage={getErrorMessage(languagesQuery.error)}
+        languageErrorMessage={getClassErrorMessage(languagesQuery.error)}
         languages={languagesQuery.data?.content ?? []}
         mode="edit"
         onClose={closeEditDialog}
