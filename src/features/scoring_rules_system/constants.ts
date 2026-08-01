@@ -20,7 +20,6 @@ const SECONDS_FIELD: ScoringRuleParamField = { name: 'seconds', label: 'Số gi�
 const WORDS_FIELD: ScoringRuleParamField = { name: 'words', label: 'Số từ', type: 'number' };
 const CRITERION_CODE_FIELD: ScoringRuleParamField = { name: 'criterionCode', label: 'Mã tiêu chí', type: 'text' };
 const SCORE_FIELD: ScoringRuleParamField = { name: 'score', label: 'Điểm', type: 'decimal' };
-const BAND_CODE_FIELD: ScoringRuleParamField = { name: 'bandCode', label: 'Mã band', type: 'text' };
 const RATIO_FIELD: ScoringRuleParamField = { name: 'ratio', label: 'Tỉ lệ (0-1)', type: 'decimal', placeholder: '0.0 - 1.0' };
 const CONFIDENCE_FIELD: ScoringRuleParamField = { name: 'confidence', label: 'Độ tin cậy (0-1)', type: 'decimal', placeholder: '0.0 - 1.0' };
 const WORDS_PER_MINUTE_FIELD: ScoringRuleParamField = { name: 'wordsPerMinute', label: 'Từ/phút', type: 'decimal' };
@@ -34,8 +33,6 @@ export const CONDITION_TYPE_OPTIONS: ScoringRuleTypeOption[] = [
 
   { value: 'CRITERION_SCORE_LESS_THAN', label: 'Điểm tiêu chí nhỏ hơn', fields: [CRITERION_CODE_FIELD, SCORE_FIELD] },
   { value: 'CRITERION_SCORE_GREATER_THAN', label: 'Điểm tiêu chí lớn hơn', fields: [CRITERION_CODE_FIELD, SCORE_FIELD] },
-  { value: 'CRITERION_BAND_AT_OR_BELOW', label: 'Band tiêu chí ở mức hoặc thấp hơn', fields: [CRITERION_CODE_FIELD, BAND_CODE_FIELD] },
-  { value: 'CRITERION_BAND_AT_OR_ABOVE', label: 'Band tiêu chí ở mức hoặc cao hơn', fields: [CRITERION_CODE_FIELD, BAND_CODE_FIELD] },
 
   { value: 'FINAL_SCORE_LESS_THAN', label: 'Điểm tổng nhỏ hơn', fields: [SCORE_FIELD] },
   { value: 'FINAL_SCORE_GREATER_THAN', label: 'Điểm tổng lớn hơn', fields: [SCORE_FIELD] },

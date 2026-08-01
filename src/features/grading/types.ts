@@ -4,7 +4,36 @@ import type { StatusTone } from '@/shared/ui/StatusBadge'
 // BE cố tình chỉ có 2 trạng thái: nộp cả bài trong một lần nên KHÔNG có IN_PROGRESS.
 export type GradingAssignmentStatus = 'ASSIGNED' | 'COMPLETED'
 
-// Trạng thái bài nộp. Chỉ PENDING_REVIEW mới chấm được — bài đã RELEASED không chấm lại.
+/**
+ * Vòng chấm. Một bài đi qua nhiều vòng theo thời gian, mỗi vòng một dòng phân công
+ * và tối đa một dòng đang mở. Thay cho cặp `GradingWorkKind` (GRADING/RECHECK) cũ.
+ */
+export type GradingRoundType = 'INITIAL' | 'SPOT_CHECK' | 'REMEDIATION' | 'APPEAL'
+
+/** Kết luận của giáo viên khi đóng một phân công. */
+export type GradingOutcome =
+  | 'UPHELD'
+  | 'REGRADED'
+  | 'INVALIDATED'
+  | 'CLEARED_INVALID'
+  | 'DECLINED'
+
+/** Cách chọn tập bài khi giao tự động. */
+export type GradingSampleSelectionMode = 'ALL' | 'RANDOM_PERCENT' | 'RISK_BASED' | 'MANUAL_LIST'
+
+/** Ai/cái gì đã đổi trạng thái một bài. */
+export type ResultStatusChangeSource =
+  | 'AI_EVALUATION'
+  | 'TEACHER_INITIAL'
+  | 'TEACHER_SPOT_CHECK'
+  | 'TEACHER_REMEDIATION'
+  | 'TEACHER_APPEAL'
+  | 'ADMIN_BULK_FINALIZE'
+  | 'EXAM_PUBLISH'
+  | 'SYSTEM'
+
+// Trạng thái bài nộp. Bài RELEASED vẫn hậu kiểm được — tiến độ nằm ở dòng phân công,
+// không ở trạng thái bài, nên đừng suy "chấm được hay không" từ đây (dùng `editable`).
 export type ExamCandidateResultStatus =
   | 'PENDING_REVIEW'
   | 'RELEASED'
@@ -63,36 +92,56 @@ export type GradingTaskItem = {
   turns: GradingTurn[]
 }
 
-/** Màn chấm. KHÔNG có tên/ID học sinh — giáo viên chấm ẩn danh. */
+/**
+ * Màn chấm. KHÔNG có tên/ID học sinh — giáo viên chấm ẩn danh.
+ * `assignmentId`/`assignmentStatus` null = bài chưa được gán ai (chỉ xảy ra khi
+ * nhà trường xem/chấm trực tiếp theo candidateResultId).
+ */
 export type GradingTaskDetail = {
-  assignmentId: string
+  assignmentId?: string | null
   candidateResultId: string
   resultCode: string
   examName?: string | null
+  roundType: GradingRoundType
   assignmentStatus: GradingAssignmentStatus
   resultStatus?: ExamCandidateResultStatus | null
   flagged: boolean
   flagReason?: string | null
   currentTotalScore?: number | null
+  // Điểm lúc được giao — mốc để giáo viên biết mình đang sửa từ đâu.
+  scoreBefore?: number | null
+  deadlineAt?: string | null
+  overdue: boolean
   // Cờ chỉ-đọc do BE quyết. Dùng thẳng cờ này, KHÔNG tự suy từ status.
   editable: boolean
+  // Nút nào được dựng do BE quyết theo GradingRoundPolicy — KHÔNG tự suy từ roundType,
+  // suy ở hai nơi thì sớm muộn hai nơi lệch nhau.
+  allowedOutcomes: GradingOutcome[]
+  // Chỉ có ở vòng APPEAL: lý do học sinh nêu trong đơn.
+  appealReason?: string | null
   items: GradingTaskItem[]
   criteria: GradingCriterionMeta[]
 }
 
-/** Hàng đợi của giáo viên. Ẩn danh: không có tên/ID học sinh. */
+/** Hàng đợi của giáo viên — MỘT danh sách cho cả bốn vòng. Ẩn danh. */
 export type GradingTask = {
   assignmentId: string
   candidateResultId: string
   resultCode: string
   examName?: string | null
   partCount: number
+  roundType: GradingRoundType
   status: GradingAssignmentStatus
+  resultStatus?: ExamCandidateResultStatus | null
+  // Ở vòng hậu kiểm/phúc khảo đây là điểm đã công bố.
+  currentScore?: number | null
   flagged: boolean
   assignedAt?: string | null
+  deadlineAt?: string | null
+  overdue: boolean
 }
 
-/** Dòng bảng phân công của admin. `assignmentId` null = bài chưa gán ai. */
+/** Dòng bảng điều phối của admin. `assignmentId` null = bài chưa có phân công đang mở. */
 export type GradingAssignmentRow = {
   candidateResultId: string
   resultCode: string
@@ -100,34 +149,90 @@ export type GradingAssignmentRow = {
   className?: string | null
   examName?: string | null
   resultStatus?: ExamCandidateResultStatus | null
+  totalScore?: number | null
   flagged: boolean
   assignmentId?: string | null
   teacherId?: string | null
   teacherName?: string | null
+  roundType?: GradingRoundType | null
   assignmentStatus?: GradingAssignmentStatus | null
+  outcome?: GradingOutcome | null
   assignedAt?: string | null
   completedAt?: string | null
+  deadlineAt?: string | null
+  overdue: boolean
+  // Còn đơn phúc khảo chưa kết thúc — không nên giao vòng khác lúc này.
+  hasOpenAppeal: boolean
 }
 
 /**
- * `totalToGrade` CHỈ đếm bài đang chờ chấm — bài đã công bố không nằm trong khối lượng.
- * Không có `completed`: bài chấm xong rời khỏi phạm vi màn phân công của admin.
+ * Thẻ số đầu màn điều phối. Mẫu số là TOÀN BỘ bài của phạm vi đang xem — admin nay
+ * điều phối cả bốn vòng nên phải thấy cả bài đã công bố đang được hậu kiểm.
  */
 export type GradingStats = {
-  totalToGrade: number
+  total: number
+  byResultStatus: Array<{ status: ExamCandidateResultStatus; count: number }>
   unassigned: number
   assigned: number
+  overdue: number
+  teacherProgress: Array<{
+    teacherId: string
+    teacherName?: string | null
+    assigned: number
+    completed: number
+    overdue: number
+  }>
+}
+
+/** Một mốc trong dòng thời gian điểm. Bảng chỉ-ghi-thêm: không sửa được gì ở đây. */
+export type ResultStatusHistoryEntry = {
+  id: string
+  candidateResultId: string
+  fromStatus?: ExamCandidateResultStatus | null
+  toStatus: ExamCandidateResultStatus
+  scoreBefore?: number | null
+  scoreAfter?: number | null
+  source: ResultStatusChangeSource
+  actorId?: string | null
+  // null nghĩa là hệ thống tự đổi (AI chấm xong, job chốt sổ).
+  actorName?: string | null
+  reason?: string | null
+  createdAt: string
+}
+
+/** "AI chấm lệch bao nhiêu", đo từ chính dữ liệu hậu kiểm (vòng SPOT_CHECK đã xong). */
+export type AiQualityReport = {
+  reviewed: number
+  upheld: number
+  regraded: number
+  invalidated: number
+  regradeRate?: number | null
+  averageDelta?: number | null
+  maxDelta?: number | null
+  byTeacher: Array<{
+    teacherId?: string | null
+    teacherName?: string | null
+    reviewed: number
+    regraded: number
+    averageDelta?: number | null
+  }>
+}
+
+/** Ảnh chụp trước khi admin chốt sổ cả kỳ thi. */
+export type BulkFinalizePreview = {
+  total: number
+  readyToFinalize: number
+  pendingUnassigned: number
+  pendingAssigned: number
+  openAppeals: number
+  invalid: number
+  blockingResultIds: string[]
 }
 
 export type AssignableTeacher = {
   id: string
   name?: string | null
   load: number
-}
-
-export type GradingExamOption = {
-  id: string
-  name: string
 }
 
 export type GradingPage<T> = {
@@ -138,18 +243,61 @@ export type GradingPage<T> = {
   totalPages: number
 }
 
-/** Kết quả `/grade/preview` — tổng và điểm từng phần đều do BE tính. */
+/** Kết quả `/regrade/preview` — tổng và điểm từng phần đều do BE tính. */
 export type GradingPreview = {
   totalScore?: number | null
   resultBandName?: string | null
   itemScores: Array<{ paperItemId: string; itemScore?: number | null }>
 }
 
-/** Kết quả `/grade` — tổng và trạng thái do BE tính lại sau khi ghi. */
-export type SubmitGradingResult = {
+/**
+ * Kết quả chung của bốn hành động chấm bài. Một kiểu trả về cho cả bốn để sau khi
+ * bấm nút chỉ có MỘT đường xử lý: đọc `resultStatus` + `totalScore` rồi vẽ lại.
+ */
+export type GradingActionResult = {
+  assignmentId: string
   candidateResultId: string
-  totalScore?: number | null
+  outcome: GradingOutcome
   resultStatus?: ExamCandidateResultStatus | null
+  totalScore?: number | null
+  // Phân công vừa được mở tiếp; hiện chỉ CLEARED_INVALID sinh ra (mở vòng INITIAL
+  // cho chính giáo viên đó).
+  nextAssignmentId?: string | null
+}
+
+/**
+ * Kết quả một lượt thu hồi phân công quá hạn. HAI danh sách tách bạch, không phải một
+ * mảng mang hai nghĩa: `reclaimed` là phân công cũ vừa đóng, `reassigned` là phân công
+ * mới vừa mở cho nhóm thay thế (rỗng khi admin chỉ thu hồi mà không chọn ai).
+ */
+export type ReclaimOverdueResult = {
+  reclaimedAssignmentIds: string[]
+  reassignedAssignmentIds: string[]
+  // BE xử lý tối đa 500 phân công một lượt. true = còn dòng quá hạn chưa xử lý, bấm
+  // lại là chạy lượt sau — không có cờ này thì lượt bị cắt trông y hệt lượt đã xong.
+  hasMore: boolean
+}
+
+/**
+ * Câu tường thuật cho một lượt thu hồi. Gộp ở đây vì cả ba trường đều phải xuất hiện:
+ * chỉ đọc `reclaimedAssignmentIds` thì admin không biết bài đã được giao lại hay đang
+ * nằm ở hàng chưa giao, và bỏ `hasMore` thì lượt bị cắt ở trần 500 trông như đã xong.
+ */
+export function describeReclaimResult(result: ReclaimOverdueResult): string {
+  const reclaimed = result.reclaimedAssignmentIds.length
+  if (reclaimed === 0) {
+    return 'Không có phân công quá hạn nào để thu hồi.'
+  }
+  const reassigned = result.reassignedAssignmentIds.length
+  const parts = [
+    reassigned > 0
+      ? `Đã thu hồi ${reclaimed} phân công quá hạn và giao lại ${reassigned} phân công mới.`
+      : `Đã thu hồi ${reclaimed} phân công quá hạn, bài quay về hàng chưa giao.`,
+  ]
+  if (result.hasMore) {
+    parts.push('Vẫn còn phân công quá hạn chưa xử lý — bấm thu hồi lần nữa để chạy tiếp.')
+  }
+  return parts.join(' ')
 }
 
 const ASSIGNMENT_STATUS_DISPLAY: Record<
@@ -170,12 +318,21 @@ export function getAssignmentStatusDisplay(status: GradingAssignmentStatus | nul
 const RESULT_STATUS_DISPLAY: Partial<
   Record<ExamCandidateResultStatus, { label: string; tone: StatusTone }>
 > = {
-  APPEALED: { label: 'Đang phúc khảo', tone: 'info' },
+  // "Chờ xử lý" vs "Đang chấm" ở RE_GRADING: hai trạng thái này chỉ khác nhau ở chỗ
+  // đã có giám khảo bắt tay vào chấm chưa, nên nhãn phải khác nhau ngay từ chữ đầu.
+  APPEALED: { label: 'Chờ xử lý phúc khảo', tone: 'info' },
+  FAILED: { label: 'Không đạt', tone: 'danger' },
   FINAL: { label: 'Đã chốt', tone: 'success' },
   INVALID: { label: 'Đã vô hiệu', tone: 'danger' },
-  PENDING_REVIEW: { label: 'Chờ chấm', tone: 'warning' },
+  PASSED: { label: 'Đạt', tone: 'success' },
+  // KHÔNG phải "chưa ai chấm": AI đã chấm xong, bài đang chờ người soát lại điểm đó
+  // trước khi công bố. Ra khỏi hàng chờ bằng một trong hai đường — giao giáo viên một
+  // vòng chấm (họ uphold/regrade), hoặc admin chốt sổ hàng loạt ở màn Điều phối. Không
+  // còn nút duyệt lẻ từng bài ở màn Kết quả kỳ thi.
+  PENDING_REVIEW: { label: 'Chờ soát điểm AI', tone: 'warning' },
   RELEASED: { label: 'Đã công bố', tone: 'success' },
-  RE_GRADING: { label: 'Đang chấm lại', tone: 'violet' },
+  RETAKE_REQUIRED: { label: 'Phải thi lại', tone: 'warning' },
+  RE_GRADING: { label: 'Đang chấm phúc khảo', tone: 'violet' },
 }
 
 export function getResultStatusDisplay(status: ExamCandidateResultStatus | null | undefined) {
@@ -183,6 +340,104 @@ export function getResultStatusDisplay(status: ExamCandidateResultStatus | null 
     return { label: '—', tone: 'neutral' as StatusTone }
   }
   return RESULT_STATUS_DISPLAY[status] ?? { label: status, tone: 'neutral' as StatusTone }
+}
+
+const ROUND_TYPE_DISPLAY: Record<
+  GradingRoundType,
+  { label: string; tone: StatusTone; hint: string }
+> = {
+  APPEAL: {
+    hint: 'Chấm theo đơn phúc khảo của học sinh — nộp là công bố luôn.',
+    label: 'Phúc khảo',
+    tone: 'danger',
+  },
+  INITIAL: {
+    // Nhãn "thủ công" không tự nó phân biệt được với ba vòng kia (vòng nào cũng do
+    // người chấm), nên hint phải gánh phần nêu lý do bài rơi vào vòng này.
+    hint: 'AI chấm không đủ tự tin nên chuyển bài sang cho giáo viên chấm.',
+    label: 'Chấm thủ công',
+    tone: 'info',
+  },
+  REMEDIATION: {
+    hint: 'Xét lại bài đang bị vô hiệu để giữ nguyên hoặc gỡ vô hiệu.',
+    label: 'Xét vô hiệu',
+    tone: 'warning',
+  },
+  SPOT_CHECK: {
+    hint: 'Hậu kiểm bài đã công bố — bài giữ nguyên trạng thái suốt quá trình.',
+    label: 'Hậu kiểm',
+    tone: 'violet',
+  },
+}
+
+export function getRoundTypeDisplay(roundType: GradingRoundType | null | undefined) {
+  if (!roundType) {
+    return { hint: '', label: '—', tone: 'neutral' as StatusTone }
+  }
+  return ROUND_TYPE_DISPLAY[roundType]
+}
+
+const OUTCOME_DISPLAY: Record<GradingOutcome, { label: string; tone: StatusTone }> = {
+  CLEARED_INVALID: { label: 'Đã gỡ vô hiệu', tone: 'success' },
+  DECLINED: { label: 'Đã trả lại', tone: 'neutral' },
+  INVALIDATED: { label: 'Kết luận vi phạm', tone: 'danger' },
+  REGRADED: { label: 'Đã chấm lại', tone: 'violet' },
+  UPHELD: { label: 'Giữ nguyên điểm', tone: 'success' },
+}
+
+export function getOutcomeDisplay(outcome: GradingOutcome | null | undefined) {
+  if (!outcome) {
+    return null
+  }
+  return OUTCOME_DISPLAY[outcome]
+}
+
+const SOURCE_DISPLAY: Record<ResultStatusChangeSource, string> = {
+  ADMIN_BULK_FINALIZE: 'Admin chốt sổ kỳ thi',
+  AI_EVALUATION: 'AI chấm tự động',
+  EXAM_PUBLISH: 'Công bố kết quả kỳ thi',
+  SYSTEM: 'Hệ thống',
+  TEACHER_APPEAL: 'Giáo viên chấm phúc khảo',
+  TEACHER_INITIAL: 'Giáo viên chấm thủ công',
+  TEACHER_REMEDIATION: 'Giáo viên xét vô hiệu',
+  TEACHER_SPOT_CHECK: 'Giáo viên hậu kiểm',
+}
+
+export function getSourceLabel(source: ResultStatusChangeSource | null | undefined) {
+  return source ? (SOURCE_DISPLAY[source] ?? source) : '—'
+}
+
+/**
+ * Ba vòng admin tự phân công được. Vòng APPEAL KHÔNG có ở đây: nó gắn với một đơn
+ * phúc khảo cụ thể nên đi qua màn đơn phúc khảo (BE từ chối APPEAL ở endpoint này).
+ */
+export const ADMIN_ASSIGNABLE_ROUNDS: GradingRoundType[] = [
+  'INITIAL',
+  'SPOT_CHECK',
+  'REMEDIATION',
+]
+
+/**
+ * Vòng phù hợp với một bài, suy từ trạng thái bài. Đây là bản sao FE của
+ * `GradingRoundPolicy.assignableStatuses` — chỉ dùng để GỢI Ý vòng trong modal phân
+ * công; BE vẫn là chỗ chốt và sẽ từ chối nếu bài không ở đúng trạng thái.
+ */
+export function suggestedRoundFor(
+  status: ExamCandidateResultStatus | null | undefined,
+): GradingRoundType | null {
+  switch (status) {
+    case 'PENDING_REVIEW':
+      return 'INITIAL'
+    case 'RELEASED':
+      return 'SPOT_CHECK'
+    case 'INVALID':
+      return 'REMEDIATION'
+    case 'APPEALED':
+    case 'RE_GRADING':
+      return 'APPEAL'
+    default:
+      return null
+  }
 }
 
 /** Đã nhập điểm cho MỌI tiêu chí bắt buộc của mọi phần thi hay chưa. */
@@ -230,6 +485,32 @@ export function formatScore(n: number | null | undefined): string {
   return Number(n).toFixed(2).replace(/0$/, '')
 }
 
+/** Chênh lệch có dấu: +0.5 / -1.0. Rỗng khi thiếu một trong hai đầu. */
+export function formatScoreDelta(
+  before: number | null | undefined,
+  after: number | null | undefined,
+): string | null {
+  if (before == null || after == null) {
+    return null
+  }
+  const delta = after - before
+  if (delta === 0) {
+    return 'không đổi'
+  }
+  return `${delta > 0 ? '+' : '−'}${formatScore(Math.abs(delta))}`
+}
+
+/**
+ * Phần trăm gọn: BE trả thang 0–100 (`regradeRate` đã nhân 100 ở query repository),
+ * nên truyền thẳng số đó — 42 -> "42%", 42.5 -> "42.5%". ĐỪNG nhân thêm 100 ở đây.
+ */
+export function formatPercent(n: number | null | undefined): string {
+  if (n == null) {
+    return '—'
+  }
+  return `${Number(n).toFixed(1).replace(/\.0$/, '')}%`
+}
+
 /** ISO-8601 -> "dd/MM · HH:mm". Rỗng -> "—". */
 export function formatIsoDateTime(iso: string | null | undefined): string {
   if (!iso) {
@@ -244,6 +525,18 @@ export function formatIsoDateTime(iso: string | null | undefined): string {
   const hh = String(date.getHours()).padStart(2, '0')
   const mi = String(date.getMinutes()).padStart(2, '0')
   return `${dd}/${mm} · ${hh}:${mi}`
+}
+
+/**
+ * Giá trị `<input type="datetime-local">` -> ISO có offset để BE parse thành
+ * OffsetDateTime. Chuỗi rỗng -> null, nghĩa là "gỡ hạn".
+ */
+export function localDateTimeToIso(value: string): string | null {
+  if (!value) {
+    return null
+  }
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 /** Định dạng thời lượng giây -> m:ss. */

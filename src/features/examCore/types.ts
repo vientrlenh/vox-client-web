@@ -109,6 +109,9 @@ export type ExamBlueprintSlotDto = {
   fixedQuestion?: {
     code?: string | null
     id: string
+    maxResponseSeconds?: number | null
+    minResponseSeconds?: number | null
+    preparationTimeSeconds?: number | null
     questionText?: string | null
     status?: string | null
   } | null
@@ -134,6 +137,7 @@ export type ExamBlueprintSectionDto = {
 }
 
 export type ExamBlueprintVersionDto = {
+  blueprintId: string
   code: string
   description?: string | null
   effectiveFrom?: string | null
@@ -201,6 +205,21 @@ export type SchoolRoomLite = {
   description?: string | null
   id: string
   name: string
+}
+
+/**
+ * Bản rút gọn của kỳ thi, dành cho các màn CHỌN kỳ thi.
+ *
+ * <p>Cố ý không dùng `ExamDto`: query danh sách kỳ thi đầy đủ kéo cả
+ * `papers → sections → items` qua DataLoader — quá nặng cho một ô lọc.
+ */
+export type ExamPickerOption = {
+  closeAt?: string | null
+  code: string
+  id: string
+  name: string
+  openAt?: string | null
+  status: ExamStatus
 }
 
 export type ExamScheduleProctorDto = {
@@ -303,6 +322,7 @@ export function getCandidateName(candidate: Pick<ExamCandidateDto, 'student' | '
 
 export type ExamDto = {
   assessmentPolicyId?: string | null
+  blueprint?: ExamBlueprintDto | null
   blueprintId?: string | null
   blueprintVersionId?: string | null
   closeAt?: string | null
@@ -310,6 +330,10 @@ export type ExamDto = {
   createdAt?: string | null
   deliveryMode?: ExamDeliveryMode
   description?: string | null
+  // Thời gian làm bài của kỳ thi, tính bằng GIÂY. BE tự tính = MAX(thời lượng) trên các
+  // mã đề, nên đây là field CHỈ ĐỌC — FE không gửi lên ở create/update. Dùng nó để dựng
+  // ràng buộc "ca thi phải dài tối thiểu bằng thời gian làm bài" (xem CreateScheduleModal).
+  examTimeDurationSecond?: number | null
   id: string
   kind: ExamKind
   languageId: string
@@ -451,6 +475,25 @@ export function formatDate(value?: string | null) {
     month: '2-digit',
     year: 'numeric',
   }).format(date)
+}
+
+export function getExamStatusDisplay(status?: ExamStatus | string | null): { tone: StatusTone; label: string } {
+  switch (status) {
+    case 'DRAFT':
+      return { tone: 'warning', label: 'Bản nháp' }
+    case 'SCHEDULED':
+      return { tone: 'info', label: 'Đã lên lịch' }
+    case 'IN_PROGRESS':
+      return { tone: 'violet', label: 'Đang diễn ra' }
+    case 'CLOSED':
+      return { tone: 'neutral', label: 'Đã đóng' }
+    case 'RESULTS_PUBLISHED':
+      return { tone: 'success', label: 'Đã công bố kết quả' }
+    case 'CANCELLED':
+      return { tone: 'danger', label: 'Đã hủy' }
+    default:
+      return { tone: 'neutral', label: String(status ?? '-') }
+  }
 }
 
 export function getExamPaperStatusDisplay(status?: string | null, examKind?: ExamKind): { tone: StatusTone; label: string } {

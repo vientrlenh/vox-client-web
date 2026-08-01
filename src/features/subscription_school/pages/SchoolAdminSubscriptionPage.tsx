@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Diamond, Receipt, ShoppingBag } from 'lucide-react'
+import { Diamond, Receipt, ShoppingBag, Users } from 'lucide-react'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
@@ -17,15 +17,25 @@ import {
 } from '../api/usePaymentLinkMutations'
 import { useCancelMySubscriptionMutation } from '../api/useCancelMySubscriptionMutation'
 import { useInvoicesQuery } from '../api/useInvoicesQuery'
+import {
+  useClassTestQuotaAllocationsQuery,
+  usePracticeQuotaAllocationsQuery,
+} from '../api/useQuotaAllocationQueries'
+import {
+  useAllocateClassTestQuotaMutation,
+  useAllocatePracticeQuotaMutation,
+} from '../api/useQuotaAllocationMutations'
 import { MyPlanCard } from '../components/MyPlanCard'
 import { UsageBarsGrid } from '../components/UsageBarsGrid'
 import { PlanBrowseGrid } from '../components/PlanBrowseGrid'
 import { TokenTopUpPanel } from '../components/TokenTopUpPanel'
 import { PaymentConfirmDialog } from '../components/PaymentConfirmDialog'
 import { InvoicesTable } from '../components/InvoicesTable'
+import { QuotaAllocationPanel } from '../components/QuotaAllocationPanel'
 import { minutesToSeconds, QUOTA_TYPES, type RequestType, type SubscriptionPlan, type TokenTopUpState } from '../types'
 
-type SchoolSubscriptionTab = 'plan' | 'browse' | 'invoices'
+type SchoolSubscriptionTab = 'plan' | 'browse' | 'quota' | 'invoices'
+type QuotaAllocationTab = 'teachers' | 'students'
 
 const DEFAULT_PAGE = 1
 const EMPTY_TOKEN_STATE: TokenTopUpState = { CLASS_TEST: 0, GRADING: 0, PRACTICE: 0 }
@@ -39,6 +49,7 @@ function getErrorMessage(error: unknown) {
 
 export function SchoolAdminSubscriptionPage() {
   const [tab, setTab] = useState<SchoolSubscriptionTab>('plan')
+  const [quotaTab, setQuotaTab] = useState<QuotaAllocationTab>('teachers')
   const [toast, setToast] = useState<{ text: string; tone: 'error' | 'success' } | null>(null)
   const [tokenState, setTokenState] = useState<TokenTopUpState>(EMPTY_TOKEN_STATE)
   const [pendingSelection, setPendingSelection] = useState<{ plan: SubscriptionPlan; requestType: RequestType } | null>(
@@ -52,12 +63,16 @@ export function SchoolAdminSubscriptionPage() {
   const usageQuery = useMySubscriptionUsageQuery()
   const plansQuery = useSubscriptionPlansQuery(DEFAULT_PAGE, 50)
   const invoicesQuery = useInvoicesQuery(invoicesPage, 10)
+  const classTestQuotaQuery = useClassTestQuotaAllocationsQuery()
+  const practiceQuotaQuery = usePracticeQuotaAllocationsQuery()
 
   const submitRequestMutation = useSubmitSubscriptionRequestMutation()
   const requestPaymentLinkMutation = useCreatePaymentLinkForSubscriptionRequestMutation()
   const renewPaymentLinkMutation = useCreatePaymentLinkForRenewalMutation()
   const tokenPaymentLinkMutation = useCreatePaymentLinkForTokenPurchaseMutation()
   const cancelMutation = useCancelMySubscriptionMutation()
+  const allocateClassTestQuotaMutation = useAllocateClassTestQuotaMutation()
+  const allocatePracticeQuotaMutation = useAllocatePracticeQuotaMutation()
 
   const subscription = mySubscriptionQuery.data ?? null
   const activePlans = (plansQuery.data?.content ?? []).filter((plan) => plan.status === 'ACTIVE')
@@ -149,6 +164,24 @@ export function SchoolAdminSubscriptionPage() {
     }
   }
 
+  async function handleAllocateClassTestQuota(payload: Parameters<typeof allocateClassTestQuotaMutation.mutateAsync>[0]) {
+    try {
+      await allocateClassTestQuotaMutation.mutateAsync(payload)
+      setToast({ text: 'Đã cập nhật phân bổ hạn mức kiểm tra lớp', tone: 'success' })
+    } catch (error) {
+      setToast({ text: getErrorMessage(error) ?? 'Không thể phân bổ hạn mức kiểm tra lớp.', tone: 'error' })
+    }
+  }
+
+  async function handleAllocatePracticeQuota(payload: Parameters<typeof allocatePracticeQuotaMutation.mutateAsync>[0]) {
+    try {
+      await allocatePracticeQuotaMutation.mutateAsync(payload)
+      setToast({ text: 'Đã cập nhật phân bổ hạn mức luyện tập', tone: 'success' })
+    } catch (error) {
+      setToast({ text: getErrorMessage(error) ?? 'Không thể phân bổ hạn mức luyện tập.', tone: 'error' })
+    }
+  }
+
   return (
     <section aria-labelledby="school-admin-subscription-title" className="grid gap-6">
       <div>
@@ -164,6 +197,7 @@ export function SchoolAdminSubscriptionPage() {
         items={[
           { icon: <Diamond className="size-4" />, label: 'Gói của tôi', value: 'plan' },
           { icon: <ShoppingBag className="size-4" />, label: 'Đăng ký / Nâng cấp', value: 'browse' },
+          { icon: <Users className="size-4" />, label: 'Phân bổ hạn mức', value: 'quota' },
           { icon: <Receipt className="size-4" />, label: 'Hóa đơn', value: 'invoices' },
         ]}
         onChange={setTab}
@@ -210,6 +244,41 @@ export function SchoolAdminSubscriptionPage() {
               state={tokenState}
             />
           ) : null}
+        </div>
+      ) : null}
+
+      {tab === 'quota' ? (
+        <div className="grid gap-5">
+          <TabPillGroup
+            items={[
+              { label: 'Giáo viên - Kiểm tra lớp', value: 'teachers' },
+              { label: 'Học sinh - Luyện tập', value: 'students' },
+            ]}
+            onChange={setQuotaTab}
+            value={quotaTab}
+          />
+
+          {quotaTab === 'teachers' ? (
+            <QuotaAllocationPanel
+              errorMessage={getErrorMessage(classTestQuotaQuery.error)}
+              isError={classTestQuotaQuery.isError}
+              isLoading={classTestQuotaQuery.isLoading}
+              isSubmitting={allocateClassTestQuotaMutation.isPending}
+              onSubmit={(payload) => void handleAllocateClassTestQuota(payload)}
+              summary={classTestQuotaQuery.data}
+              userLabel="giáo viên"
+            />
+          ) : (
+            <QuotaAllocationPanel
+              errorMessage={getErrorMessage(practiceQuotaQuery.error)}
+              isError={practiceQuotaQuery.isError}
+              isLoading={practiceQuotaQuery.isLoading}
+              isSubmitting={allocatePracticeQuotaMutation.isPending}
+              onSubmit={(payload) => void handleAllocatePracticeQuota(payload)}
+              summary={practiceQuotaQuery.data}
+              userLabel="học sinh"
+            />
+          )}
         </div>
       ) : null}
 

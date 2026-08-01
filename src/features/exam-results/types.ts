@@ -64,6 +64,8 @@ export type ExamItemCriterionScoreDto = {
   criterionName?: string | null
   finalScore: number
   id: string
+  maxScore?: number | null
+  minScore?: number | null
   rationale?: string | null
   rawScore: number
   rubricCriterionId: string
@@ -176,15 +178,17 @@ export function formatScore(value?: number | null) {
 export function getExamResultStatusDisplay(status?: string | null): { label: string; tone: StatusTone } {
   switch (status) {
     case 'PENDING_REVIEW':
-      return { label: 'Chờ duyệt', tone: 'warning' }
+      return { label: 'Chờ soát điểm AI', tone: 'warning' }
     case 'RELEASED':
       return { label: 'Đã công bố', tone: 'success' }
     case 'FINAL':
       return { label: 'Chốt điểm', tone: 'success' }
+    // Tông phải khớp với RESULT_STATUS_DISPLAY của feature grading — cùng một bài mở ở
+    // hai màn hình mà badge đổi màu thì người dùng tưởng là hai trạng thái khác nhau.
     case 'APPEALED':
-      return { label: 'Đang khiếu nại', tone: 'violet' }
+      return { label: 'Đang khiếu nại', tone: 'info' }
     case 'RE_GRADING':
-      return { label: 'Đang chấm lại', tone: 'info' }
+      return { label: 'Đang chấm lại', tone: 'violet' }
     case 'INVALID':
       return { label: 'Không hợp lệ', tone: 'danger' }
     case 'RETAKE_REQUIRED':

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Check, Inbox, X } from 'lucide-react'
+import { CreditCard, Inbox, X } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { SchoolLookupEntry } from '../api/useSchoolLookup'
@@ -20,7 +20,7 @@ type SubscriptionRequestsTableProps = {
   isActionPending: boolean
   isError: boolean
   isLoading: boolean
-  onApprove: (request: SubscriptionRequest) => void
+  onPay: (request: SubscriptionRequest) => void
   onReject: (request: SubscriptionRequest) => void
   onRetry: () => void
   onStatusChange: (status: RequestStatus) => void
@@ -36,7 +36,7 @@ export function SubscriptionRequestsTable({
   isActionPending,
   isError,
   isLoading,
-  onApprove,
+  onPay,
   onReject,
   onRetry,
   onStatusChange,
@@ -129,11 +129,11 @@ export function SubscriptionRequestsTable({
                               <button
                                 className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 disabled={isActionPending}
-                                onClick={() => onApprove(request)}
+                                onClick={() => onPay(request)}
                                 type="button"
                               >
-                                <Check aria-hidden="true" className="size-3.5" />
-                                Duyệt
+                                <CreditCard aria-hidden="true" className="size-3.5" />
+                                Thanh toán PayOS
                               </button>
                               <button
                                 className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"

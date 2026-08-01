@@ -53,6 +53,7 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
   if (!isOpen) return null;
 
   const policies = data?.content ?? [];
+  const liveRubricVersion = policies[0]?.rubricVersion ?? rubricVersion;
   const draftCount = policies.filter((policy) => policy.status === 'DRAFT').length;
   const canPublishRubricVersion = draftCount === 0;
 
@@ -60,16 +61,16 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
     if (!rubricVersionId) return;
 
     const isConfirm = window.confirm(
-      `Xuất bản hàng loạt ${draftCount} Assessment Policy đang DRAFT liên kết với Rubric Version này? Sau khi xuất bản, các Policy sẽ có hiệu lực áp dụng.`
+      `Xuất bản hàng loạt ${draftCount} Chính Sách Đánh Giá đang DRAFT liên kết với Rubric Version này? Sau khi xuất bản, các Chính Sách Đánh Giá sẽ có hiệu lực áp dụng.`
     );
     if (!isConfirm) return;
 
     try {
       const publishedIds = await publishAll(rubricVersionId);
-      alert(`Đã xuất bản thành công ${publishedIds.length} Assessment Policy.`);
+      alert(`Đã xuất bản thành công ${publishedIds.length} Chính Sách Đánh Giá.`);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xuất bản hàng loạt Assessment Policy.');
+      alert(err.message || 'Có lỗi xảy ra khi xuất bản hàng loạt Chính Sách Đánh Giá.');
     }
   };
 
@@ -102,35 +103,35 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
         </div>
 
         <div className="max-h-[80vh] overflow-y-auto p-6">
-          {rubricVersion && (
+          {liveRubricVersion && (
             <div className="rounded-[10px] bg-slate-50 p-4 ring-1 ring-inset ring-slate-200">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <InfoField label="Mã">{rubricVersion.code}</InfoField>
-                <InfoField label="Tên">{rubricVersion.name}</InfoField>
-                <InfoField label="Version">v{rubricVersion.version}</InfoField>
+                <InfoField label="Mã">{liveRubricVersion.code}</InfoField>
+                <InfoField label="Tên">{liveRubricVersion.name}</InfoField>
+                <InfoField label="Version">v{liveRubricVersion.version}</InfoField>
                 <InfoField label="Trạng thái">
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      statusStyles[rubricVersion.status || ''] || 'bg-slate-100 text-slate-600'
+                      statusStyles[liveRubricVersion.status || ''] || 'bg-slate-100 text-slate-600'
                     }`}
                   >
-                    {rubricVersion.status || '—'}
+                    {liveRubricVersion.status || '—'}
                   </span>
                 </InfoField>
               </div>
               <div className="mt-4">
                 <InfoField label="Hiệu lực">
-                  {formatAssessmentPolicyDate(rubricVersion.effectiveFrom)} – {formatAssessmentPolicyDate(rubricVersion.effectiveTo)}
+                  {formatAssessmentPolicyDate(liveRubricVersion.effectiveFrom)} – {formatAssessmentPolicyDate(liveRubricVersion.effectiveTo)}
                 </InfoField>
               </div>
 
-              {rubricVersion.status === 'DRAFT' && (
+              {liveRubricVersion.status === 'DRAFT' && (
                 <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
                     {!canPublishRubricVersion && <Lock className="size-3.5 shrink-0" />}
                     {canPublishRubricVersion
-                      ? 'Đã sẵn sàng — không còn Assessment Policy nào ở trạng thái DRAFT.'
-                      : `Bị khóa cho đến khi xuất bản hết ${draftCount} Assessment Policy DRAFT bên dưới.`}
+                      ? 'Đã sẵn sàng — không còn Chính Sách Đánh Giá nào ở trạng thái DRAFT.'
+                      : `Bị khóa cho đến khi xuất bản hết ${draftCount} Chính Sách Đánh Giá DRAFT bên dưới.`}
                   </p>
                   <button
                     type="button"
@@ -147,14 +148,14 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
           )}
 
           <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-slate-500">
-            Assessment Policy liên kết ({data?.totalElements ?? 0})
+            Chính Sách Đánh Giá liên kết ({data?.totalElements ?? 0})
           </h3>
 
           <div className="mt-3 overflow-hidden rounded-[10px] border border-slate-200">
             {isLoading ? (
               <div className="flex h-32 flex-col items-center justify-center gap-2">
                 <Loader2 className="size-6 animate-spin text-cyan-600" />
-                <p className="text-sm text-slate-500">Đang tải danh sách Assessment Policy...</p>
+                <p className="text-sm text-slate-500">Đang tải danh sách Chính Sách Đánh Giá...</p>
               </div>
             ) : isError ? (
               <div className="flex h-32 flex-col items-center justify-center gap-2 text-center">
@@ -163,7 +164,7 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
               </div>
             ) : policies.length === 0 ? (
               <div className="flex h-32 items-center justify-center text-sm text-slate-500">
-                Chưa có Assessment Policy nào liên kết với Rubric Version này.
+                Chưa có Chính Sách Đánh Giá nào liên kết với Rubric Version này.
               </div>
             ) : (
               <table className="w-full text-left text-sm text-slate-700">
@@ -171,7 +172,6 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
                   <tr>
                     <th className="px-4 py-3">Ngôn ngữ</th>
                     <th className="px-4 py-3">Target Band</th>
-                    <th className="px-4 py-3">Minimum Band</th>
                     <th className="px-4 py-3">Điểm đạt</th>
                     <th className="px-4 py-3">Độ nghiêm ngặt</th>
                     <th className="px-4 py-3">Trạng thái</th>
@@ -182,7 +182,6 @@ export function RubricVersionPoliciesDialog({ isOpen, onClose, schoolId, rubricV
                     <tr key={policy.id}>
                       <td className="px-4 py-3 font-medium text-slate-900">{policy.language?.name || '—'}</td>
                       <td className="px-4 py-3">{policy.targetFrameworkBand?.label || '—'}</td>
-                      <td className="px-4 py-3">{policy.minimumFrameworkBand?.label || '—'}</td>
                       <td className="px-4 py-3">{policy.passingScore ?? '—'}</td>
                       <td className="px-4 py-3">{strictnessLabels[policy.strictness] || policy.strictness}</td>
                       <td className="px-4 py-3">

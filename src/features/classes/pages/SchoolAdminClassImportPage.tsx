@@ -7,16 +7,17 @@ import {
   RefreshCw,
   Upload,
 } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import {
+  buildImportSessionDetailPath,
+  type ImportSessionNavState,
+} from '@/features/imports'
 import {
   useAcceptSchoolClassImportMutation,
   usePreviewSchoolClassImportMutation,
 } from '../api/useSchoolClassImportMutations'
 import { classManagementQueryKeys } from '../api/useSchoolClassesQuery'
-import type {
-  AcceptSchoolClassImportResponse,
-  PreviewSchoolClassImportResponse,
-} from '../types'
+import type { PreviewSchoolClassImportResponse } from '../types'
 import { formatClassDate } from '../types'
 
 type PageMessage = {
@@ -196,45 +197,8 @@ function SampleRowsTable({ preview }: SampleRowsTableProps) {
   )
 }
 
-type ImportResultPanelProps = {
-  result: AcceptSchoolClassImportResponse
-}
-
-function ImportResultPanel({ result }: ImportResultPanelProps) {
-  return (
-    <section className="grid gap-5 rounded-lg border border-emerald-200 bg-emerald-50 p-5">
-      <div className="flex items-start gap-3">
-        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700">
-          <CheckCircle2 aria-hidden="true" className="size-5" />
-        </span>
-        <div>
-          <h2 className="text-lg font-black text-emerald-950">
-            Import lớp học hoàn tất
-          </h2>
-          <p className="mt-1 text-sm font-semibold text-emerald-800">
-            Trạng thái phiên import: {result.status}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard label="Tổng số dòng" value={result.totalRows} />
-        <SummaryCard label="Đã import" value={result.importedRows} />
-        <SummaryCard label="Dòng lỗi" value={result.invalidRows} />
-        <SummaryCard label="Bỏ qua" value={result.skippedRows} />
-      </div>
-
-      <Link
-        className="inline-flex h-11 w-fit items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
-        to="/school-admin/classes"
-      >
-        Quay lại danh sách lớp
-      </Link>
-    </section>
-  )
-}
-
 export function SchoolAdminClassImportPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const previewMutation = usePreviewSchoolClassImportMutation()
   const acceptMutation = useAcceptSchoolClassImportMutation()
@@ -242,9 +206,6 @@ export function SchoolAdminClassImportPage() {
     useState<PreviewSchoolClassImportResponse | null>(null)
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<PageMessage | null>(null)
-  const [result, setResult] = useState<AcceptSchoolClassImportResponse | null>(
-    null,
-  )
 
   const missingFields = getMissingRequiredFields(mapping)
   const canAccept = Boolean(preview) && missingFields.length === 0
@@ -257,7 +218,6 @@ export function SchoolAdminClassImportPage() {
 
     if (!isAcceptedFile(file)) {
       setPreview(null)
-      setResult(null)
       setMessage({
         text: 'File không hợp lệ. Vui lòng chọn file CSV hoặc Excel.',
         tone: 'error',
@@ -267,7 +227,6 @@ export function SchoolAdminClassImportPage() {
 
     try {
       setMessage(null)
-      setResult(null)
       const nextPreview = await previewMutation.mutateAsync({ file })
 
       setPreview(nextPreview.data)
@@ -275,7 +234,6 @@ export function SchoolAdminClassImportPage() {
       setMessage({ text: nextPreview.message, tone: 'success' })
     } catch (error) {
       setPreview(null)
-      setResult(null)
       setMessage({
         text:
           getErrorMessage(error) ??
@@ -309,7 +267,7 @@ export function SchoolAdminClassImportPage() {
 
     try {
       setMessage(null)
-      const response = await acceptMutation.mutateAsync({
+      await acceptMutation.mutateAsync({
         payload: {
           confirmedMapping: mapping,
         },
@@ -319,8 +277,19 @@ export function SchoolAdminClassImportPage() {
       await queryClient.invalidateQueries({
         queryKey: classManagementQueryKeys.all,
       })
-      setResult(response.data)
-      setMessage({ text: response.message, tone: 'success' })
+      // Backend import ngầm nên số liệu trả về lúc này chưa phản ánh kết quả
+      // cuối: chuyển sang trang chi tiết phiên import để người dùng theo dõi
+      // trạng thái file và các dòng lỗi.
+      navigate(
+        buildImportSessionDetailPath('/school-admin', preview.importSessionId),
+        {
+          state: {
+            invalidateKeys: [classManagementQueryKeys.all],
+            returnLabel: 'Quay lại danh sách lớp',
+            returnTo: '/school-admin/classes',
+          } satisfies ImportSessionNavState,
+        },
+      )
     } catch (error) {
       setMessage({
         text:
@@ -471,7 +440,6 @@ export function SchoolAdminClassImportPage() {
               disabled={isBusy}
               onClick={() => {
                 setPreview(null)
-                setResult(null)
                 setMapping({})
                 setMessage(null)
               }}
@@ -493,9 +461,6 @@ export function SchoolAdminClassImportPage() {
           </div>
         </>
       ) : null}
-
-      {result ? <ImportResultPanel result={result} /> : null}
-
     </section>
   )
 }

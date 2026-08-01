@@ -4,7 +4,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   FileQuestion,
-  FileSearch,
+  GraduationCap,
   LogOut,
   Menu,
   MonitorPlay,
@@ -34,6 +34,11 @@ type NavigationGroup = {
 
 const navigationItems = [
   {
+    icon: GraduationCap,
+    label: 'Lớp của tôi',
+    to: '/teacher/classes',
+  },
+  {
     icon: MonitorPlay,
     label: 'Giám sát thi',
     to: '/teacher/monitoring',
@@ -44,14 +49,10 @@ const navigationItems = [
     to: '/teacher/proctor-attendance',
   },
   {
+    // Một cửa cho cả bốn vòng chấm, kể cả phúc khảo — lọc theo vòng ngay trong màn.
     icon: PenLine,
     label: 'Chấm bài',
     to: '/teacher/grading',
-  },
-  {
-    icon: FileSearch,
-    label: 'Chấm phúc khảo',
-    to: '/teacher/reevaluation',
   },
 ]
 

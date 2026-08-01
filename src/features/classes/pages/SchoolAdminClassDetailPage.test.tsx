@@ -8,7 +8,12 @@ import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { SupportedLanguage } from '@/features/languages/types'
-import type { ClassUser, PageResult, SchoolClass } from '../types'
+import type {
+  ClassUser,
+  ClassUserCandidate,
+  PageResult,
+  SchoolClass,
+} from '../types'
 import { formatClassDate } from '../types'
 import { SchoolAdminClassDetailPage } from './SchoolAdminClassDetailPage'
 
@@ -129,6 +134,7 @@ function createClassUser(overrides: Partial<ClassUser> = {}): ClassUser {
       fullName: 'Nguyễn Văn A',
       id: 'user-1',
       phone: '0909000000',
+      roles: [{ code: 'STUDENT', id: 'role-student', name: 'Học sinh' }],
     },
     userId: 'user-1',
     ...overrides,
@@ -149,6 +155,35 @@ function createUserPage(
   }
 }
 
+function createCandidate(
+  overrides: Partial<ClassUserCandidate> = {},
+): ClassUserCandidate {
+  return {
+    id: 'school-user-9',
+    user: {
+      email: 'candidate@vox.edu.vn',
+      fullName: 'Trần Thị B',
+      id: 'user-9',
+      phone: '0909000009',
+      roles: [{ code: 'STUDENT', id: 'role-student', name: 'Học sinh' }],
+    },
+    userId: 'user-9',
+    ...overrides,
+  }
+}
+
+function createCandidatePage(
+  content: ClassUserCandidate[],
+): PageResult<ClassUserCandidate> {
+  return {
+    content,
+    page: 1,
+    size: 10,
+    totalElements: content.length,
+    totalPages: content.length ? 1 : 0,
+  }
+}
+
 function renderPage(route = `/school-admin/classes/${classId}`) {
   return renderWithProviders(
     <Routes>
@@ -165,14 +200,26 @@ function renderPage(route = `/school-admin/classes/${classId}`) {
 }
 
 function mockGraphQLSuccess({
+  candidatesPage = createCandidatePage([createCandidate()]),
   schoolClass = createClass(),
   usersPage = createUserPage([]),
 }: {
+  candidatesPage?: PageResult<ClassUserCandidate>
   schoolClass?: SchoolClass | null
   usersPage?: PageResult<ClassUser>
 } = {}) {
   mockedPost.mockImplementation((_path, body) => {
     const request = body as { query: string; variables?: Record<string, unknown> }
+
+    if (request.query.includes('schoolUsersBySchool')) {
+      return Promise.resolve({
+        data: {
+          data: {
+            schoolUsersBySchool: candidatesPage,
+          },
+        },
+      })
+    }
 
     if (request.query.includes('schoolClassUsers')) {
       return Promise.resolve({
@@ -503,33 +550,95 @@ describe('SchoolAdminClassDetailPage', () => {
     expect(await screen.findByText('Nguyễn Văn A')).toBeInTheDocument()
     expect(screen.getAllByText('student@vox.edu.vn').length).toBeGreaterThan(0)
     expect(screen.getByText('0909000000')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /vai trò/i })).toBeInTheDocument()
+    expect(screen.getByText('Học sinh')).toBeInTheDocument()
     expect(screen.getByText(formatClassDate(classUser.joinedAt))).toBeInTheDocument()
-    expect(screen.getByText('admin-user')).toBeInTheDocument()
   })
 
-  it('adds a user to the class', async () => {
-    mockGraphQLSuccess({ usersPage: createUserPage([]) })
+  it('adds selected users to the class through the picker dialog', async () => {
+    mockGraphQLSuccess({
+      candidatesPage: createCandidatePage([
+        createCandidate(),
+        createCandidate({
+          id: 'school-user-10',
+          user: {
+            email: 'candidate2@vox.edu.vn',
+            fullName: 'Lê Văn C',
+            id: 'user-10',
+            phone: '0909000010',
+            roles: [{ code: 'TEACHER', id: 'role-teacher', name: 'Giáo viên' }],
+          },
+          userId: 'user-10',
+        }),
+      ]),
+      usersPage: createUserPage([]),
+    })
     mockedRestPost.mockResolvedValue({
       data: {
-        data: { schoolClassUserId: 'class-user-1' },
-        message: 'Đã thêm học viên',
+        data: { addedUserIds: ['user-9', 'user-10'], failed: [] },
+        message: 'Thêm người dùng vào lớp học thành công',
       },
     } as AxiosResponse<ApiResponse<unknown>>)
     const user = userEvent.setup()
 
     renderPage()
     await openUsersTab(user)
-
-    await user.type(screen.getByLabelText(/id học viên/i), 'user-1')
     await user.click(screen.getByRole('button', { name: /thêm học viên/i }))
+
+    const dialog = await screen.findByRole('dialog', {
+      name: /thêm học viên vào lớp/i,
+    })
+
+    await within(dialog).findByText('Trần Thị B')
+    await user.click(within(dialog).getByLabelText(/chọn trần thị b/i))
+    await user.click(within(dialog).getByLabelText(/chọn lê văn c/i))
+    await user.click(
+      within(dialog).getByRole('button', { name: /thêm 2 người vào lớp/i }),
+    )
 
     await waitFor(() => {
       expect(mockedRestPost).toHaveBeenCalledWith(
-        `/v1/schools/${schoolId}/classes/${classId}/users`,
-        { userId: 'user-1' },
+        `/v1/schools/${schoolId}/classes/${classId}/users/bulk`,
+        { userIds: ['user-9', 'user-10'] },
       )
     })
-    expect(await screen.findByText('Đã thêm học viên')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Đã thêm 2 người dùng vào lớp.'),
+    ).toBeInTheDocument()
+  })
+
+  it('summarises partial failures returned by the bulk endpoint', async () => {
+    mockGraphQLSuccess({ usersPage: createUserPage([]) })
+    mockedRestPost.mockResolvedValue({
+      data: {
+        data: {
+          addedUserIds: [],
+          failed: [{ reason: 'Người dùng đã thuộc lớp học', userId: 'user-9' }],
+        },
+        message: 'Thêm người dùng vào lớp học thành công',
+      },
+    } as AxiosResponse<ApiResponse<unknown>>)
+    const user = userEvent.setup()
+
+    renderPage()
+    await openUsersTab(user)
+    await user.click(screen.getByRole('button', { name: /thêm học viên/i }))
+
+    const dialog = await screen.findByRole('dialog', {
+      name: /thêm học viên vào lớp/i,
+    })
+
+    await within(dialog).findByText('Trần Thị B')
+    await user.click(within(dialog).getByLabelText(/chọn trần thị b/i))
+    await user.click(
+      within(dialog).getByRole('button', { name: /thêm 1 người vào lớp/i }),
+    )
+
+    expect(
+      await screen.findByText(
+        /đã thêm 0\/1 người dùng.*trần thị b — người dùng đã thuộc lớp học/i,
+      ),
+    ).toBeInTheDocument()
   })
 
   it('toggles and removes a class user', async () => {
@@ -589,12 +698,14 @@ describe('SchoolAdminClassDetailPage', () => {
 
     renderPage()
     await openUsersTab(user)
-
-    await user.type(screen.getByLabelText(/id học viên/i), 'user-1')
     await user.click(screen.getByRole('button', { name: /thêm học viên/i }))
 
+    const dialog = await screen.findByRole('dialog', {
+      name: /thêm học viên vào lớp/i,
+    })
+
     expect(
-      await screen.findByText(
+      await within(dialog).findByText(
         /chưa xác định được trường học hiện tại.*đăng nhập lại/i,
       ),
     ).toBeInTheDocument()

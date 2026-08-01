@@ -7,6 +7,7 @@ import type { AssessmentPolicyPage } from '../types';
 export type SystemAssessmentPolicyFilter = {
   status?: string | null;
   languageId?: string | null;
+  rubricVersionId?: string | null;
 };
 
 export const assessmentPolicyQueryKeys = {
@@ -17,15 +18,14 @@ export const assessmentPolicyQueryKeys = {
 };
 
 const GET_SYSTEM_ASSESSMENT_POLICIES = `
-  query GetSystemAssessmentPolicies($status: String, $languageId: ID, $page: Int, $size: Int) {
-    viewSystemAssessmentPolicies(status: $status, languageId: $languageId, page: $page, size: $size) {
+  query GetSystemAssessmentPolicies($status: String, $languageId: ID, $rubricVersionId: ID, $page: Int, $size: Int) {
+    viewSystemAssessmentPolicies(status: $status, languageId: $languageId, rubricVersionId: $rubricVersionId, page: $page, size: $size) {
       content {
         id
         languageId
         frameworkVersionId
         rubricVersionId
         targetFrameworkBandId
-        minimumFrameworkBandId
         passingScore
         strictness
         version
@@ -57,10 +57,6 @@ const GET_SYSTEM_ASSESSMENT_POLICIES = `
           code
           label
         }
-        minimumFrameworkBand {
-          code
-          label
-        }
       }
       page
       size
@@ -77,7 +73,13 @@ async function fetchSystemAssessmentPolicies(
 ): Promise<AssessmentPolicyPage> {
   const data = await graphQLRequest<{ viewSystemAssessmentPolicies: AssessmentPolicyPage }>(
     GET_SYSTEM_ASSESSMENT_POLICIES,
-    { status: filter.status || null, languageId: filter.languageId || null, page, size }
+    {
+      status: filter.status || null,
+      languageId: filter.languageId || null,
+      rubricVersionId: filter.rubricVersionId || null,
+      page,
+      size,
+    }
   );
 
   const response = data.viewSystemAssessmentPolicies;

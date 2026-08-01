@@ -100,29 +100,6 @@ export type FrameworkCriterionOption = {
 };
 
 // ==========================================
-// 4. RUBRIC CRITERION BAND (Mức điểm chi tiết của Tiêu chí)
-// ==========================================
-export type RubricCriterionBand = {
-  id: string;
-  criterionId: string;
-  code: string;
-  scoreMin: number;
-  scoreMax: number;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-  createdBy?: string | null;
-  updatedBy?: string | null;
-};
-
-export type RubricCriterionBandPage = {
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-  content: RubricCriterionBand[];
-};
-
-// ==========================================
 // 5. RUBRIC RESULT BAND (Xếp loại kết quả cuối cùng)
 // ==========================================
 export type RubricResultBand = {
@@ -193,32 +170,6 @@ export type AcceptRubricCriterionImportRequest = {
 
 export type AcceptRubricCriterionImportResponse = {
   importSessionId: string;
-  importedRows: number;
-  invalidRows: number;
-  skippedRows: number;
-  status: string;
-  totalRows: number;
-};
-
-// ==========================================
-// 8. IMPORT RUBRIC CRITERION BAND (Excel/CSV) - System Admin
-// ==========================================
-export type PreviewRubricCriterionBandImportResponse = {
-  sessionId: string;
-  fileName: string;
-  originalHeaders: string[];
-  sampleRows: Record<string, string | null | undefined>[];
-  suggestedMapping: Record<string, string | null | undefined>;
-  totalRows: number;
-  expiresAt: string | null;
-};
-
-export type AcceptRubricCriterionBandImportRequest = {
-  confirmedMapping: Record<string, string>;
-};
-
-export type AcceptRubricCriterionBandImportResponse = {
-  sessionId: string;
   importedRows: number;
   invalidRows: number;
   skippedRows: number;

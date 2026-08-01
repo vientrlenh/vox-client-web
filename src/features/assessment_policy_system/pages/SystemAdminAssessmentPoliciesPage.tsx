@@ -14,6 +14,7 @@ import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { AssessmentPolicyTable } from '../components/AssessmentPolicyTable';
 import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPolicyDialog';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
+import { RubricVersionPoliciesDialog } from '../components/RubricVersionPoliciesDialog';
 import { Pagination } from '@/shared/components/Pagination';
 import type { AssessmentPolicy, CreateAssessmentPolicyPayload, UpdateAssessmentPolicyPayload } from '../types';
 
@@ -32,6 +33,7 @@ export function SystemAdminAssessmentPoliciesPage() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<AssessmentPolicy | null>(null);
+  const [viewingRubricVersionPolicy, setViewingRubricVersionPolicy] = useState<AssessmentPolicy | null>(null);
 
   const { data: languages } = useLanguageOptionsQuery();
 
@@ -54,10 +56,10 @@ export function SystemAdminAssessmentPoliciesPage() {
     try {
       const createdPolicyIds = await createPolicy(formDataList);
       setIsCreateModalOpen(false);
-      alert(`Đã tạo thành công ${createdPolicyIds.length} Assessment Policy.`);
+      alert(`Đã tạo thành công ${createdPolicyIds.length} Chính Sách Đánh Giá.`);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi tạo Assessment Policy.');
+      alert(err.message || 'Có lỗi xảy ra khi tạo Chính Sách Đánh Giá.');
     }
   };
 
@@ -69,13 +71,13 @@ export function SystemAdminAssessmentPoliciesPage() {
       setEditingPolicy(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật Assessment Policy.');
+      alert(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
     }
   };
 
   const handleDeletePolicy = async (policy: AssessmentPolicy) => {
     const isConfirm = window.confirm(
-      'Bạn có chắc chắn muốn xóa vĩnh viễn Assessment Policy DRAFT này? Hành động này không thể hoàn tác!'
+      'Bạn có chắc chắn muốn xóa vĩnh viễn Chính Sách Đánh Giá DRAFT này? Hành động này không thể hoàn tác!'
     );
     if (!isConfirm) return;
 
@@ -83,7 +85,7 @@ export function SystemAdminAssessmentPoliciesPage() {
       await deletePolicy(policy.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa Assessment Policy.');
+      alert(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
     }
   };
 
@@ -102,7 +104,7 @@ export function SystemAdminAssessmentPoliciesPage() {
       {/* HEADER */}
       <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
-          <ClipboardCheck className="size-[26px] text-indigo-600" /> Quản lý Assessment Policy
+          <ClipboardCheck className="size-[26px] text-indigo-600" /> Quản lý Chính Sách Đánh Giá
         </h1>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -127,7 +129,7 @@ export function SystemAdminAssessmentPoliciesPage() {
             onClick={() => setIsCreateModalOpen(true)}
             className="inline-flex h-11 items-center gap-2 rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 px-6 text-sm font-medium text-white transition hover:opacity-90"
           >
-            <Plus className="size-4" /> Thêm Assessment Policy
+            <Plus className="size-4" /> Thêm Chính Sách Đánh Giá
           </button>
         </div>
       </div>
@@ -182,6 +184,7 @@ export function SystemAdminAssessmentPoliciesPage() {
           onViewDetails={(policy) => navigate(`/system-admin/assessment-policies/${policy.id}`)}
           onEdit={(policy) => setEditingPolicy(policy)}
           onDelete={handleDeletePolicy}
+          onViewRubricVersion={(policy) => setViewingRubricVersionPolicy(policy)}
         />
         {!isLoading && !isError && policies.length > 0 && (
           <Pagination currentPage={page} totalPages={totalPages} totalElements={totalElements} itemName="assessment policy" onPageChange={setPage} />
@@ -200,6 +203,13 @@ export function SystemAdminAssessmentPoliciesPage() {
         onClose={() => setEditingPolicy(null)}
         onSubmit={handleUpdatePolicy}
         isPending={isUpdating}
+      />
+
+      <RubricVersionPoliciesDialog
+        isOpen={Boolean(viewingRubricVersionPolicy)}
+        onClose={() => setViewingRubricVersionPolicy(null)}
+        rubricVersionId={viewingRubricVersionPolicy?.rubricVersionId}
+        rubricVersion={viewingRubricVersionPolicy?.rubricVersion}
       />
     </section>
   );

@@ -8,8 +8,11 @@ export type RubricResultBandItemRequest = {
   code: string;
   name: string;
   description?: string;
-  scoreMin: number;
-  scoreMax: number;
+  // Lưu ý: BE yêu cầu đúng tên field "mappedScoreMin"/"mappedScoreMax" cho request tạo mới
+  // (khác với "scoreMin"/"scoreMax" dùng ở GraphQL view/search/update) — sai tên sẽ bị BE
+  // hiểu là null và trả 400 "Điểm quy đổi tối đa không được để trống".
+  mappedScoreMin: number;
+  mappedScoreMax: number;
   order: number;
 };
 

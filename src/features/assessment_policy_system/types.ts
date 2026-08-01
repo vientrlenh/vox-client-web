@@ -11,7 +11,6 @@ export type AssessmentPolicy = {
   frameworkVersionId: string;
   rubricVersionId: string;
   targetFrameworkBandId: string;
-  minimumFrameworkBandId: string;
   passingScore?: number | null;
   strictness: AssessmentPolicyStrictness;
   version: number;
@@ -38,7 +37,6 @@ export type AssessmentPolicy = {
     effectiveTo?: string | null;
   } | null;
   targetFrameworkBand?: { code: string; label: string } | null;
-  minimumFrameworkBand?: { code: string; label: string } | null;
 };
 
 export type AssessmentPolicyPage = {
@@ -88,7 +86,7 @@ export type FrameworkResultBandDetail = {
 
 export type AssessmentPolicyDetail = Omit<
   AssessmentPolicy,
-  'language' | 'frameworkVersion' | 'rubricVersion' | 'targetFrameworkBand' | 'minimumFrameworkBand'
+  'language' | 'frameworkVersion' | 'rubricVersion' | 'targetFrameworkBand'
 > & {
   schoolId?: string | null;
   school?: AssessmentPolicyRelatedEntity | null;
@@ -99,7 +97,6 @@ export type AssessmentPolicyDetail = Omit<
   frameworkVersion?: FrameworkVersionDetail | null;
   rubricVersion?: RubricVersionDetail | null;
   targetFrameworkBand?: FrameworkResultBandDetail | null;
-  minimumFrameworkBand?: FrameworkResultBandDetail | null;
 };
 
 // ==========================================
@@ -154,7 +151,6 @@ export type CreateAssessmentPolicyPayload = {
   rubricVersionIds: string[];
   languageId: string;
   targetFrameworkBandId: string;
-  minimumFrameworkBandId: string;
   passingScore?: number;
   strictness?: AssessmentPolicyStrictness;
   effectiveFrom: string;
@@ -163,7 +159,6 @@ export type CreateAssessmentPolicyPayload = {
 
 export type UpdateAssessmentPolicyPayload = {
   targetFrameworkBandId: string;
-  minimumFrameworkBandId: string;
   passingScore?: number;
   strictness?: AssessmentPolicyStrictness;
   effectiveFrom: string;

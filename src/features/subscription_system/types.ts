@@ -146,6 +146,13 @@ export type MutationResult<TData> = {
   message: string
 }
 
+export type PaymentLink = {
+  invoiceId: string
+  orderCode: number
+  paymentLinkId: string
+  checkoutUrl: string
+}
+
 export function formatVnd(value?: number | null) {
   const amount = Number(value) || 0
   return `${new Intl.NumberFormat('vi-VN').format(Math.round(amount))} ₫`

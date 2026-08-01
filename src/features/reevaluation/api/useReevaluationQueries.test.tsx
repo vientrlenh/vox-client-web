@@ -3,9 +3,7 @@ import {
   fetchAppeal,
   fetchAppealReviewers,
   fetchAppealStats,
-  fetchAppealTaskDetail,
   fetchAppeals,
-  fetchMyAppealTasks,
 } from './useReevaluationQueries'
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
@@ -32,60 +30,42 @@ describe('reevaluation GraphQL queries', () => {
 
     const body = bodyOf()
     expect(body.query).toContain('appeals(')
+    // Một đơn một giám khảo: danh sách trả tên + trạng thái người đó, không còn đếm số người.
+    expect(body.query).toContain('reviewerName')
+    expect(body.query).toContain('reviewerStatus')
     expect(body.variables).toMatchObject({ page: 0, size: 20, status: 'PENDING' })
     expect(body.variables.keyword).toBeUndefined()
   })
 
-  it('fetches appeal stats', async () => {
-    const stats = { pending: 1, processing: 2, published: 3, rejected: 4 }
+  it('fetches appeal stats including withdrawn appeals', async () => {
+    const stats = { pending: 1, processing: 2, published: 3, rejected: 4, withdrawn: 5 }
     mockedPost.mockResolvedValue({ data: { data: { appealStats: stats } } })
 
     await expect(fetchAppealStats()).resolves.toEqual(stats)
     expect(bodyOf().query).toContain('appealStats')
+    expect(bodyOf().query).toContain('withdrawn')
   })
 
-  it('fetches a single appeal detail by id', async () => {
-    const detail = { id: 'a1', studentName: 'An', items: [], reviewers: [] }
+  it('fetches a single appeal detail by id with its one reviewer', async () => {
+    const detail = { id: 'a1', studentName: 'An', items: [], reviewer: null }
     mockedPost.mockResolvedValue({ data: { data: { appeal: detail } } })
 
     await expect(fetchAppeal('a1')).resolves.toEqual(detail)
 
     const body = bodyOf()
     expect(body.query).toContain('appeal(')
+    expect(body.query).toContain('assignmentId')
     expect(body.variables).toEqual({ id: 'a1' })
   })
 
-  it('fetches my appeal tasks without teacherId (server reads token)', async () => {
-    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
-    mockedPost.mockResolvedValue({ data: { data: { myAppealTasks: page } } })
-
-    await fetchMyAppealTasks({ page: 0, size: 20, status: 'ASSIGNED' })
-
-    const body = bodyOf()
-    expect(body.query).toContain('myAppealTasks(')
-    expect(body.variables).toMatchObject({ page: 0, size: 20, status: 'ASSIGNED' })
-    expect(body.variables).not.toHaveProperty('teacherId')
-  })
-
-  it('fetches the teacher task detail (blind grading view)', async () => {
-    const taskDetail = { appealId: 'a1', items: [], criteria: [], myReport: [] }
-    mockedPost.mockResolvedValue({ data: { data: { appealTaskDetail: taskDetail } } })
-
-    await expect(fetchAppealTaskDetail('a1')).resolves.toEqual(taskDetail)
-
-    const body = bodyOf()
-    expect(body.query).toContain('appealTaskDetail(')
-    expect(body.query).not.toContain('reviewers')
-    expect(body.variables).toEqual({ appealId: 'a1' })
-  })
-
-  it('fetches assignable reviewers with keyword', async () => {
+  it('fetches assignable reviewers scoped to the appeal so conflicts are flagged', async () => {
     mockedPost.mockResolvedValue({ data: { data: { appealReviewers: [] } } })
 
-    await fetchAppealReviewers('ha')
+    await fetchAppealReviewers('a1', 'ha')
 
     const body = bodyOf()
     expect(body.query).toContain('appealReviewers(')
-    expect(body.variables).toEqual({ keyword: 'ha' })
+    expect(body.query).toContain('conflicted')
+    expect(body.variables).toEqual({ appealId: 'a1', keyword: 'ha' })
   })
 })

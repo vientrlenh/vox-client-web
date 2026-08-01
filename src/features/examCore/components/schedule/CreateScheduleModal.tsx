@@ -1,10 +1,28 @@
 import { useState } from 'react'
 import { DoorOpen, X } from 'lucide-react'
-import { toDateTimeLocalValue, type SchoolRoomLite } from '../../types'
+import { formatDateTime, formatDurationSeconds, toDateTimeLocalValue, type SchoolRoomLite } from '../../types'
 import { RoomPickerModal } from './RoomPickerModal'
 
 type CreateScheduleModalProps = {
+  /**
+   * Khung mở/đóng của kỳ thi. Ca thi phải nằm trọn trong khung này — BE kiểm ở
+   * `Exam.isScheduleWindowOutsideExamWindow`. Bỏ trống một cận = kỳ thi chưa đặt cận đó,
+   * và BE cũng không ràng buộc cận đó.
+   */
+  examCloseAt?: string | null
+  examOpenAt?: string | null
+  /**
+   * Thời gian làm bài của kỳ thi (GIÂY, do BE tự tính từ các mã đề). Ca thi ngắn hơn con
+   * số này bị BE từ chối — hiện ra ở đây để người dùng biết mình đang bị chặn vì cái gì.
+   */
+  examTimeDurationSecond?: number | null
   initial?: { endDate?: string | null; room?: SchoolRoomLite | null; startDate?: string | null }
+  /**
+   * Với CLASS_TEST, BE BỎ QUA ràng buộc "ca thi trong khung mở/đóng" khi sửa, vì ca thi
+   * mới là nguồn của openAt/closeAt chứ không phải ngược lại. Áp check đó ở FE sẽ khiến
+   * không dời được lịch bài trên lớp.
+   */
+  isClassTest?: boolean
   onClose: () => void
   onSubmit: (input: { endDate: string; schoolRoomId: string; startDate: string }) => void
   submitLabel?: string
@@ -12,8 +30,51 @@ type CreateScheduleModalProps = {
   title?: string
 }
 
+/**
+ * Kiểm tra tại chỗ những ràng buộc BE sẽ kiểm lại. Trả về câu lỗi đầu tiên, hoặc null.
+ * Mục đích là để người dùng thấy vấn đề ngay trong form thay vì bấm xong mới ăn toast
+ * đỏ — BE vẫn là nơi chốt, đây chỉ là lớp chặn trước.
+ */
+function validateWindow(input: {
+  endDate: string
+  examCloseAt?: string | null
+  examOpenAt?: string | null
+  examTimeDurationSecond?: number | null
+  isClassTest?: boolean
+  startDate: string
+}): string | null {
+  const start = new Date(input.startDate).getTime()
+  const end = new Date(input.endDate).getTime()
+  if (Number.isNaN(start) || Number.isNaN(end)) {
+    return 'Thời gian bắt đầu hoặc kết thúc không hợp lệ.'
+  }
+  if (end <= start) {
+    return 'Thời gian kết thúc phải sau thời gian bắt đầu.'
+  }
+  const minSeconds = input.examTimeDurationSecond ?? 0
+  if (minSeconds > 0 && (end - start) / 1000 < minSeconds) {
+    return `Ca thi phải dài tối thiểu ${formatDurationSeconds(minSeconds)} — bằng thời gian làm bài của kỳ thi.`
+  }
+  if (input.isClassTest) {
+    return null
+  }
+  const openAt = input.examOpenAt ? new Date(input.examOpenAt).getTime() : null
+  if (openAt != null && !Number.isNaN(openAt) && start < openAt) {
+    return `Ca thi không được bắt đầu trước giờ mở của kỳ thi (${formatDateTime(input.examOpenAt)}).`
+  }
+  const closeAt = input.examCloseAt ? new Date(input.examCloseAt).getTime() : null
+  if (closeAt != null && !Number.isNaN(closeAt) && end > closeAt) {
+    return `Ca thi không được kết thúc sau giờ đóng của kỳ thi (${formatDateTime(input.examCloseAt)}).`
+  }
+  return null
+}
+
 export function CreateScheduleModal({
+  examCloseAt,
+  examOpenAt,
+  examTimeDurationSecond,
   initial,
+  isClassTest,
   onClose,
   onSubmit,
   submitLabel = 'Tạo ca thi',
@@ -25,10 +86,33 @@ export function CreateScheduleModal({
   const [endDate, setEndDate] = useState(toDateTimeLocalValue(initial?.endDate))
   const [showRoomPicker, setShowRoomPicker] = useState(false)
 
-  const canSubmit = Boolean(room && startDate && endDate)
+  const windowError =
+    startDate && endDate
+      ? validateWindow({
+          endDate,
+          examCloseAt,
+          examOpenAt,
+          examTimeDurationSecond,
+          isClassTest,
+          startDate,
+        })
+      : null
+  const canSubmit = Boolean(room && startDate && endDate) && windowError == null
+
+  // Kẹp luôn ở picker cho kỳ thi thường — CLASS_TEST không bị ràng khung nên để trống.
+  const windowBounds = isClassTest
+    ? { max: undefined, min: undefined }
+    : {
+        max: toDateTimeLocalValue(examCloseAt) || undefined,
+        min: toDateTimeLocalValue(examOpenAt) || undefined,
+      }
+  const minDurationHint =
+    examTimeDurationSecond && examTimeDurationSecond > 0
+      ? `Ca thi phải dài tối thiểu ${formatDurationSeconds(examTimeDurationSecond)}.`
+      : null
 
   function handleSubmit() {
-    if (!room || !startDate || !endDate) {
+    if (!room || !startDate || !endDate || windowError) {
       return
     }
     onSubmit({
@@ -94,6 +178,8 @@ export function CreateScheduleModal({
             <input
               className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
               id="schedule-start"
+              max={windowBounds.max}
+              min={windowBounds.min}
               onChange={(event) => setStartDate(event.target.value)}
               type="datetime-local"
               value={startDate}
@@ -107,11 +193,22 @@ export function CreateScheduleModal({
             <input
               className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
               id="schedule-end"
+              max={windowBounds.max}
+              min={windowBounds.min}
               onChange={(event) => setEndDate(event.target.value)}
               type="datetime-local"
               value={endDate}
             />
+            {minDurationHint ? (
+              <p className="mt-1.5 text-xs font-medium text-slate-500">{minDurationHint}</p>
+            ) : null}
           </div>
+
+          {windowError ? (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold leading-relaxed text-red-700">
+              {windowError}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">

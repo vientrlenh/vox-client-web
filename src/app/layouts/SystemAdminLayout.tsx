@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   Bell,
+  BookOpen,
   Building2,
   ChevronDown,
   ClipboardCheck,
@@ -66,6 +67,11 @@ const navigationItems: NavigationItem[] = [
     to: '/system-admin/school-directory',
   },
   {
+    icon: BookOpen,
+    label: 'Quản lý framework',
+    to: '/system-admin/frameworks',
+  },
+  {
     icon: Users,
     label: 'Quản lý người dùng',
     to: '/system-admin/users',
@@ -87,7 +93,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     icon: Gavel,
-    label: 'Quản lý Scoring Rules',
+    label: 'Quản lý quy tắc tính điểm',
     to: '/system-admin/scoring-rules',
   },
   {

@@ -116,12 +116,19 @@ type EvaluationGuideFormState = {
 }
 
 const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: QuestionType }> = [
-  { label: 'Đọc to', value: 'READ_ALOUD' },
   { label: 'Trả lời ngắn', value: 'SHORT_ANSWER' },
   { label: 'Trả lời dài', value: 'LONG_ANSWER' },
   { label: 'Ý kiến', value: 'OPINION' },
   { label: 'Mô tả', value: 'DESCRIPTION' },
 ]
+
+const DEFAULT_QUESTION_TYPE: QuestionType = 'SHORT_ANSWER'
+
+function normalizeSelectableQuestionType(type?: QuestionType | string | null): QuestionType {
+  return QUESTION_TYPE_OPTIONS.some((option) => option.value === type)
+    ? (type as QuestionType)
+    : DEFAULT_QUESTION_TYPE
+}
 
 const QUESTION_SHARING_OPTIONS: Array<{ label: string; value: QuestionSharing }> = [
   { label: 'Riêng tư', value: 'PRIVATE' },
@@ -148,7 +155,7 @@ function createInitialForm() {
     promptText: '',
     questionText: '',
     sharing: 'PRIVATE' as QuestionSharing,
-    type: 'READ_ALOUD' as QuestionType,
+    type: DEFAULT_QUESTION_TYPE,
   }
 }
 
@@ -469,7 +476,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       promptText: questionQuery.data.promptText ?? '',
       questionText: questionQuery.data.questionText ?? '',
       sharing: questionQuery.data.sharing,
-      type: questionQuery.data.type,
+      type: normalizeSelectableQuestionType(questionQuery.data.type),
     })
     setAssetForm((current) => mergeAssetForms(current, questionQuery.data.assets))
     setGuideForm({

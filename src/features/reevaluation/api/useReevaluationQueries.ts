@@ -4,12 +4,9 @@ import type {
   AppealDetail,
   AppealPage,
   AppealReviewerLite,
-  AppealReviewerStatus,
   AppealStats,
   AppealStatus,
   AppealSummary,
-  AppealTask,
-  AppealTaskDetail,
 } from '../types'
 
 const CRITERION_SCORE_FIELDS = `
@@ -39,14 +36,6 @@ const APPEAL_ITEM_FIELDS = `
   turns { ${TURN_FIELDS} }
 `
 
-const REVIEWER_ITEM_FIELDS = `
-  appealItemId
-  partLabel
-  suggestedScore
-  note
-  scores { ${CRITERION_SCORE_FIELDS} }
-`
-
 const APPEALS_QUERY = `
   query Appeals($status: AppealStatus, $keyword: String, $page: Int, $size: Int) {
     appeals(status: $status, keyword: $keyword, page: $page, size: $size) {
@@ -60,8 +49,8 @@ const APPEALS_QUERY = `
         status
         requestedAt
         deadline
-        reviewerCount
-        doneCount
+        reviewerName
+        reviewerStatus
         overdue
       }
       page
@@ -79,6 +68,7 @@ const APPEAL_STATS_QUERY = `
       processing
       published
       rejected
+      withdrawn
     }
   }
 `
@@ -100,67 +90,36 @@ const APPEAL_QUERY = `
       finalScore
       approvedAt
       resolvedAt
+      withdrawnAt
+      reviewerOverrideReason
       overdue
       scoringScaleMin
       scoringScaleMax
       items { ${APPEAL_ITEM_FIELDS} }
-      reviewers {
+      reviewer {
+        assignmentId
         reviewerId
         reviewerName
         status
-        done
+        outcome
         assignedAt
-        submittedAt
-        suggestedScore
-        items { ${REVIEWER_ITEM_FIELDS} }
-      }
-    }
-  }
-`
-
-const MY_APPEAL_TASKS_QUERY = `
-  query MyAppealTasks($status: AppealReviewerStatus, $page: Int, $size: Int) {
-    myAppealTasks(status: $status, page: $page, size: $size) {
-      content {
-        appealId
-        examName
-        partLabels
-        deadline
-        myStatus
+        completedAt
+        deadlineAt
         overdue
       }
-      page
-      size
-      totalElements
-      totalPages
     }
   }
 `
 
-const APPEAL_TASK_DETAIL_QUERY = `
-  query AppealTaskDetail($appealId: ID!) {
-    appealTaskDetail(appealId: $appealId) {
-      appealId
-      items { ${APPEAL_ITEM_FIELDS} }
-      criteria {
-        id
-        code
-        label
-        description
-        minScore
-        maxScore
-      }
-      myReport { ${REVIEWER_ITEM_FIELDS} }
-    }
-  }
-`
-
+// `appealId` quyết định cờ `conflicted` (ai đã chấm tay chính bài này) — bỏ đi thì
+// picker mất cảnh báo xung đột lợi ích và admin gán nhầm mà không biết.
 const APPEAL_REVIEWERS_QUERY = `
-  query AppealReviewers($keyword: String) {
-    appealReviewers(keyword: $keyword) {
+  query AppealReviewers($appealId: ID, $keyword: String) {
+    appealReviewers(appealId: $appealId, keyword: $keyword) {
       id
       name
       load
+      conflicted
     }
   }
 `
@@ -172,22 +131,13 @@ export type FetchAppealsInput = {
   status?: '' | AppealStatus
 }
 
-export type FetchMyAppealTasksInput = {
-  page: number
-  size: number
-  status?: '' | AppealReviewerStatus
-}
-
 export const reevaluationKeys = {
   all: ['reevaluation'] as const,
   list: (input: FetchAppealsInput) => [...reevaluationKeys.all, 'list', input] as const,
   stats: () => [...reevaluationKeys.all, 'stats'] as const,
   detail: (id: string | null) => [...reevaluationKeys.all, 'detail', id] as const,
-  myTasks: (input: FetchMyAppealTasksInput) =>
-    [...reevaluationKeys.all, 'my-tasks', input] as const,
-  taskDetail: (appealId: string | null) =>
-    [...reevaluationKeys.all, 'task-detail', appealId] as const,
-  reviewers: (keyword?: string) => [...reevaluationKeys.all, 'reviewers', keyword] as const,
+  reviewers: (appealId: string | null, keyword?: string) =>
+    [...reevaluationKeys.all, 'reviewers', appealId, keyword] as const,
 }
 
 export async function fetchAppeals(input: FetchAppealsInput) {
@@ -210,30 +160,10 @@ export async function fetchAppeal(id: string) {
   return data.appeal
 }
 
-export async function fetchMyAppealTasks(input: FetchMyAppealTasksInput) {
-  const data = await graphQLRequest<{ myAppealTasks: AppealPage<AppealTask> }>(
-    MY_APPEAL_TASKS_QUERY,
-    {
-      page: input.page,
-      size: input.size,
-      status: input.status || undefined,
-    },
-  )
-  return data.myAppealTasks
-}
-
-export async function fetchAppealTaskDetail(appealId: string) {
-  const data = await graphQLRequest<{ appealTaskDetail: AppealTaskDetail }>(
-    APPEAL_TASK_DETAIL_QUERY,
-    { appealId },
-  )
-  return data.appealTaskDetail
-}
-
-export async function fetchAppealReviewers(keyword?: string) {
+export async function fetchAppealReviewers(appealId: string | null, keyword?: string) {
   const data = await graphQLRequest<{ appealReviewers: AppealReviewerLite[] }>(
     APPEAL_REVIEWERS_QUERY,
-    { keyword: keyword || undefined },
+    { appealId: appealId || undefined, keyword: keyword || undefined },
   )
   return data.appealReviewers
 }
@@ -272,30 +202,10 @@ export function useAppealQuery(id: string | null) {
   })
 }
 
-export function useMyAppealTasksQuery(
-  page: number,
-  size: number,
-  options?: { status?: '' | AppealReviewerStatus },
-) {
-  const input: FetchMyAppealTasksInput = { page, size, status: options?.status }
-  return useQuery({
-    queryFn: () => fetchMyAppealTasks({ ...input, page: page - 1 }),
-    queryKey: reevaluationKeys.myTasks(input),
-    select: (data) => ({ ...data, page: data.page + 1 }),
-  })
-}
-
-export function useAppealTaskDetailQuery(appealId: string | null) {
+export function useAppealReviewersQuery(appealId: string | null, keyword?: string) {
   return useQuery({
     enabled: appealId != null,
-    queryFn: () => fetchAppealTaskDetail(appealId as string),
-    queryKey: reevaluationKeys.taskDetail(appealId),
-  })
-}
-
-export function useAppealReviewersQuery(keyword?: string) {
-  return useQuery({
-    queryFn: () => fetchAppealReviewers(keyword),
-    queryKey: reevaluationKeys.reviewers(keyword),
+    queryFn: () => fetchAppealReviewers(appealId, keyword),
+    queryKey: reevaluationKeys.reviewers(appealId, keyword),
   })
 }

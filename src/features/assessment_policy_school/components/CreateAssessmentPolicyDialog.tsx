@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { useFrameworkOptionsQuery, useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
-import { useFrameworkVersionBandsQuery, useFrameworkVersionsQuery } from '../api/useFrameworkVersionOptionsQuery';
+import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
+import { useAllFrameworkVersionsQuery, useFrameworkVersionCriteriaQuery } from '../api/useFrameworkVersionOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
 import { useSchoolGradeLevelOptionsQuery, useSchoolGradeOptionsQuery } from '../api/useSchoolScopeOptionsQuery';
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery';
@@ -31,7 +31,6 @@ type PolicyFormState = {
   frameworkId: string;
   frameworkVersionId: string;
   targetFrameworkBandId: string;
-  minimumFrameworkBandId: string;
   rubricVersionIds: string[];
   passingScore: string;
   strictness: AssessmentPolicyStrictness | '';
@@ -49,7 +48,6 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
     frameworkId: '',
     frameworkVersionId: '',
     targetFrameworkBandId: '',
-    minimumFrameworkBandId: '',
     rubricVersionIds: [],
     passingScore: '',
     strictness: '',
@@ -116,9 +114,10 @@ type PolicyFormFieldsProps = {
 
 function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending }: PolicyFormFieldsProps) {
   const { data: languages } = useLanguageOptionsQuery();
-  const { data: frameworks } = useFrameworkOptionsQuery();
-  const { data: frameworkVersions } = useFrameworkVersionsQuery(form.frameworkId || undefined);
-  const { data: resultBands } = useFrameworkVersionBandsQuery(form.frameworkVersionId || undefined);
+  const { data: allFrameworkVersions, isLoading: isLoadingFrameworkVersions } = useAllFrameworkVersionsQuery();
+  const selectedFrameworkVersion = allFrameworkVersions?.find((fv) => fv.id === form.frameworkVersionId);
+  const resultBands = selectedFrameworkVersion?.resultBands;
+  const { data: frameworkCriteria, isLoading: isLoadingCriteria } = useFrameworkVersionCriteriaQuery(form.frameworkVersionId || undefined);
   const { data: rubrics } = useRubricSearchOptionsQuery(schoolId, form.languageId || undefined);
   const { data: gradeLevels } = useSchoolGradeLevelOptionsQuery(schoolId);
   const { data: grades } = useSchoolGradeOptionsQuery(schoolId, form.schoolGradeLevelId || undefined);
@@ -130,12 +129,15 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
     onChange({ languageId, rubricVersionIds: [] });
   }
 
-  function handleFrameworkChange(frameworkId: string) {
-    onChange({ frameworkId, frameworkVersionId: '', targetFrameworkBandId: '', minimumFrameworkBandId: '' });
-  }
-
+  // Chọn Framework Version trước — Khung năng lực (frameworkId) được tự suy ra từ Version đã chọn,
+  // vì mỗi Version chỉ thuộc đúng 1 Framework.
   function handleFrameworkVersionChange(frameworkVersionId: string) {
-    onChange({ frameworkVersionId, targetFrameworkBandId: '', minimumFrameworkBandId: '' });
+    const matched = allFrameworkVersions?.find((fv) => fv.id === frameworkVersionId);
+    onChange({
+      frameworkVersionId,
+      frameworkId: matched?.frameworkId ?? '',
+      targetFrameworkBandId: '',
+    });
   }
 
   function handleToggleRubricVersion(rubricVersionId: string) {
@@ -166,7 +168,7 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
       {isSecondaryPolicy ? (
         <div className="mb-4 flex items-center justify-between">
           <p className="text-xs font-extrabold uppercase tracking-wide text-cyan-700">
-            Assessment Policy #{index + 1}
+            Chính Sách Đánh Giá #{index + 1}
           </p>
           {onRemove ? (
             <button
@@ -182,6 +184,45 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
       ) : null}
 
       <div className="grid gap-5">
+        <div>
+          <label className="mb-1 block text-sm font-bold text-slate-700">Framework Version (đã PUBLISHED) <span className="text-red-500">*</span></label>
+          <select
+            value={form.frameworkVersionId} onChange={(e) => handleFrameworkVersionChange(e.target.value)}
+            disabled={isPending || isLoadingFrameworkVersions}
+            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+          >
+            <option value="">{isLoadingFrameworkVersions ? 'Đang tải...' : '-- Chọn framework version --'}</option>
+            {allFrameworkVersions?.map((fv) => (
+              <option key={fv.id} value={fv.id}>{fv.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {form.frameworkVersionId ? (
+          <div>
+            <label className="mb-1 block text-sm font-bold text-slate-700">
+              Tiêu chí của Framework Version
+              <span className="ml-1 font-normal text-slate-400">(chỉ để xem tham khảo, không cần chọn)</span>
+            </label>
+            {isLoadingCriteria ? (
+              <p className="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500">Đang tải...</p>
+            ) : frameworkCriteria?.length ? (
+              <div className="grid max-h-56 gap-2 overflow-y-auto rounded-lg border border-slate-300 bg-slate-50/50 p-3">
+                {frameworkCriteria.map((fc) => (
+                  <div key={fc.id} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <p className="text-sm font-bold text-slate-800">{fc.code} - {fc.name}</p>
+                    {fc.description ? <p className="mt-0.5 text-xs text-slate-500">{fc.description}</p> : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500">
+                Framework Version này chưa có tiêu chí nào.
+              </p>
+            )}
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-sm font-bold text-slate-700">Ngôn ngữ <span className="text-red-500">*</span></label>
@@ -194,62 +235,30 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-bold text-slate-700">Khung năng lực <span className="text-red-500">*</span></label>
-            <select
-              value={form.frameworkId} onChange={(e) => handleFrameworkChange(e.target.value)} disabled={isPending}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">-- Chọn khung năng lực --</option>
-              {frameworks?.map((fw) => <option key={fw.id} value={fw.id}>{fw.name}</option>)}
-            </select>
+            <label className="mb-1 block text-sm font-bold text-slate-700">Khung năng lực</label>
+            <input
+              type="text" readOnly value={selectedFrameworkVersion?.frameworkName ?? ''}
+              placeholder="Tự động điền sau khi chọn Framework Version"
+              className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-600 outline-none"
+            />
           </div>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-bold text-slate-700">Framework Version (đã PUBLISHED) <span className="text-red-500">*</span></label>
+          <label className="mb-1 block text-sm font-bold text-slate-700">Target Band <span className="text-red-500">*</span></label>
           <select
-            value={form.frameworkVersionId} onChange={(e) => handleFrameworkVersionChange(e.target.value)}
-            disabled={isPending || !form.frameworkId}
+            value={form.targetFrameworkBandId} onChange={(e) => onChange({ targetFrameworkBandId: e.target.value })}
+            disabled={isPending || !form.frameworkVersionId}
             className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
           >
-            <option value="">-- Chọn framework version --</option>
-            {frameworkVersions?.map((fv) => (
-              <option key={fv.id} value={fv.id}>{fv.code} - {fv.name} (v{fv.version})</option>
-            ))}
+            <option value="">-- Chọn target band --</option>
+            {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
           </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-bold text-slate-700">Target Band <span className="text-red-500">*</span></label>
-            <select
-              value={form.targetFrameworkBandId} onChange={(e) => onChange({ targetFrameworkBandId: e.target.value })}
-              disabled={isPending || !form.frameworkVersionId}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">-- Chọn target band --</option>
-              {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-bold text-slate-700">Minimum Band <span className="text-red-500">*</span></label>
-            <select
-              value={form.minimumFrameworkBandId} onChange={(e) => onChange({ minimumFrameworkBandId: e.target.value })}
-              disabled={isPending || !form.frameworkVersionId}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">-- Chọn minimum band --</option>
-              {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
-            </select>
-          </div>
         </div>
 
         <div>
           <label className="mb-1 block text-sm font-bold text-slate-700">
             Rubric Version <span className="text-red-500">*</span>
-            <span className="ml-1 font-normal text-slate-400">
-              (có thể chọn version từ nhiều Rubric khác nhau — mỗi version sẽ tạo 1 Assessment Policy riêng)
-            </span>
           </label>
           {!form.languageId ? (
             <p className="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500">
@@ -276,10 +285,7 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-bold text-slate-700">
-            Phạm vi áp dụng
-            <span className="ml-1 font-normal text-slate-400">(tùy chọn — để trống cả 3 nếu áp dụng cho toàn trường)</span>
-          </label>
+          <label className="mb-1 block text-sm font-bold text-slate-700">Phạm vi áp dụng</label>
           <div className="grid grid-cols-3 gap-3">
             <select
               value={form.schoolGradeLevelId} onChange={(e) => handleGradeLevelChange(e.target.value)} disabled={isPending}
@@ -388,7 +394,6 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
       !form.frameworkVersionId ||
       form.rubricVersionIds.length === 0 ||
       !form.targetFrameworkBandId ||
-      !form.minimumFrameworkBandId ||
       !form.effectiveFrom
     );
   }
@@ -397,7 +402,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
     e.preventDefault();
 
     if (forms.some(validateForm)) {
-      alert('Vui lòng nhập đầy đủ các trường bắt buộc cho tất cả Assessment Policy!');
+      alert('Vui lòng nhập đầy đủ các trường bắt buộc cho tất cả Chính Sách Đánh Giá!');
       return;
     }
 
@@ -425,7 +430,6 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
         rubricVersionIds: form.rubricVersionIds,
         languageId: form.languageId,
         targetFrameworkBandId: form.targetFrameworkBandId,
-        minimumFrameworkBandId: form.minimumFrameworkBandId,
         effectiveFrom: form.effectiveFrom,
         effectiveTo: form.effectiveTo || undefined,
         passingScore: form.passingScore ? Number(form.passingScore) : undefined,
@@ -443,7 +447,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
 
       <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-2xl">
         <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">Thêm mới Assessment Policy</h2>
+          <h2 className="text-lg font-bold text-slate-900">Thêm mới Chính Sách Đánh Giá</h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
             <X className="size-5" />
           </button>
@@ -470,7 +474,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
               className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-400 bg-slate-50 py-3 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
             >
               <Plus className="size-4.5" />
-              {forms.length < 2 ? 'Tạo Assessment Policy thứ 2' : `Thêm Assessment Policy thứ ${forms.length + 1}`}
+              {forms.length < 2 ? 'Tạo Chính Sách Đánh Giá thứ 2' : `Thêm Chính Sách Đánh Giá thứ ${forms.length + 1}`}
             </button>
           </div>
 

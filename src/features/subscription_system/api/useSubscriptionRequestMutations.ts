@@ -1,19 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
 import { subscriptionRequestQueryKeys } from './useSubscriptionRequestsQuery'
-import { schoolSubscriptionQueryKeys } from './useSchoolSubscriptionsQuery'
-import type { MutationResult, SubscriptionRequest } from '../types'
+import type { MutationResult, PaymentLink, SubscriptionRequest } from '../types'
 
 type ApiResponse<TData> = {
   data: TData
   message: string
-}
-
-async function approveRequest(id: string): Promise<MutationResult<SubscriptionRequest>> {
-  const response = await apiClient.post<ApiResponse<SubscriptionRequest>>(
-    `/v1/subscription-requests/${id}/approve`,
-  )
-  return response.data
 }
 
 async function rejectRequest(id: string): Promise<MutationResult<SubscriptionRequest>> {
@@ -23,16 +15,14 @@ async function rejectRequest(id: string): Promise<MutationResult<SubscriptionReq
   return response.data
 }
 
-export function useApproveRequestMutation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: approveRequest,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: subscriptionRequestQueryKeys.all })
-      queryClient.invalidateQueries({ queryKey: schoolSubscriptionQueryKeys.all })
-    },
-  })
+// System Admin duyệt request bằng cách thanh toán qua PayOS, giống hệt luồng School Admin — request chỉ
+// được kích hoạt sau khi PayOS xác nhận thanh toán (qua webhook hoặc sync-status), không có đường tắt
+// approve-free nữa.
+async function createPaymentLinkForRequest(requestId: string): Promise<MutationResult<PaymentLink>> {
+  const response = await apiClient.post<ApiResponse<PaymentLink>>(
+    `/v1/subscription-requests/${requestId}/payment-link`,
+  )
+  return response.data
 }
 
 export function useRejectRequestMutation() {
@@ -43,5 +33,11 @@ export function useRejectRequestMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: subscriptionRequestQueryKeys.all })
     },
+  })
+}
+
+export function useCreatePaymentLinkForRequestMutation() {
+  return useMutation({
+    mutationFn: createPaymentLinkForRequest,
   })
 }

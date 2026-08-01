@@ -4,29 +4,12 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2, FileSpreadsheet, RefreshCw, Upload, AlertTriangle } from 'lucide-react';
-import { fetchImportSessionStatus } from '@/features/imports';
+import { buildImportSessionDetailPath, type ImportSessionNavState } from '@/features/imports';
 import { usePreviewSystemAssessmentPolicyImportMutation } from '../api/usePreviewSystemAssessmentPolicyImportMutation';
 import { useAcceptSystemAssessmentPolicyImportMutation } from '../api/useAcceptSystemAssessmentPolicyImportMutation';
 import { assessmentPolicyQueryKeys } from '../api/useSystemAssessmentPoliciesQuery';
 import { formatAssessmentPolicyDate } from '../types';
 import type { PreviewAssessmentPolicyImportResponse } from '../types';
-
-const TERMINAL_IMPORT_STATUSES = ['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'];
-
-// Import chạy ngầm (async) ở BE, nên sau khi accept phải chờ session
-// chuyển sang trạng thái cuối rồi mới invalidate cache + điều hướng,
-// nếu không danh sách policy vẫn cũ cho tới khi người dùng tự F5.
-async function waitForImportSessionToFinish(sessionId: string, maxAttempts = 20, intervalMs = 1500) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const session = await fetchImportSessionStatus(sessionId);
-    const status = session?.status?.trim().toUpperCase();
-    if (status && TERMINAL_IMPORT_STATUSES.includes(status)) {
-      return session;
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  return null;
-}
 
 type PageMessage = {
   text: string;
@@ -49,7 +32,6 @@ const IMPORT_FIELDS: ImportField[] = [
   { isRequired: true, label: 'Phiên bản khung', value: 'frameworkVersion' },
   { isRequired: true, label: 'Phiên bản rubric', value: 'rubricVersion' },
   { isRequired: true, label: 'Band mục tiêu', value: 'targetFrameworkBand' },
-  { isRequired: true, label: 'Band tối thiểu', value: 'minimumFrameworkBand' },
   { isRequired: false, label: 'Điểm đạt', value: 'passingScore' },
   { isRequired: false, label: 'Mức độ nghiêm ngặt', value: 'strictness' },
   { isRequired: true, label: 'Ngày bắt đầu', value: 'effectiveFrom' },
@@ -201,11 +183,10 @@ export function SystemAdminAssessmentPolicyImportPage() {
   const [preview, setPreview] = useState<PreviewAssessmentPolicyImportResponse | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<PageMessage | null>(null);
-  const [isWaitingForResult, setIsWaitingForResult] = useState(false);
 
   const missingFields = getMissingRequiredFields(mapping);
   const canAccept = Boolean(preview) && missingFields.length === 0;
-  const isBusy = previewMutation.isPending || acceptMutation.isPending || isWaitingForResult;
+  const isBusy = previewMutation.isPending || acceptMutation.isPending;
 
   async function handleFileChange(file?: File) {
     if (!file) return;
@@ -249,30 +230,25 @@ export function SystemAdminAssessmentPolicyImportPage() {
 
     try {
       setMessage(null);
-      const response = await acceptMutation.mutateAsync({
+      await acceptMutation.mutateAsync({
         payload: { confirmedMapping: mapping },
         sessionId: preview.importSessionId,
       });
 
-      setIsWaitingForResult(true);
-      const finishedSession = await waitForImportSessionToFinish(preview.importSessionId);
-      setIsWaitingForResult(false);
-
       await queryClient.invalidateQueries({ queryKey: assessmentPolicyQueryKeys.lists() });
 
-      if (finishedSession) {
-        alert(
-          `Import hoàn tất (${finishedSession.status}). Đã import ${finishedSession.importedRows}/${finishedSession.totalRows} dòng.`
-        );
-      } else {
-        alert(response.message || 'Import đang được xử lý trong nền, vui lòng kiểm tra lại sau ít phút.');
-      }
-
-      navigate('/system-admin/assessment-policies');
+      // Backend import ngầm nên số liệu trả về lúc này chưa phải kết quả cuối:
+      // chuyển sang trang chi tiết phiên import để theo dõi trạng thái file.
+      navigate(buildImportSessionDetailPath('/system-admin', preview.importSessionId), {
+        state: {
+          invalidateKeys: [assessmentPolicyQueryKeys.lists()],
+          returnLabel: 'Quay lại danh sách chính sách',
+          returnTo: '/system-admin/assessment-policies',
+        } satisfies ImportSessionNavState,
+      });
     } catch (error) {
-      setIsWaitingForResult(false);
       setMessage({
-        text: getErrorMessage(error) ?? 'Không thể xác nhận import Assessment Policy. Vui lòng thử lại.',
+        text: getErrorMessage(error) ?? 'Không thể xác nhận import Chính Sách Đánh Giá. Vui lòng thử lại.',
         tone: 'error',
       });
     }
@@ -291,16 +267,16 @@ export function SystemAdminAssessmentPolicyImportPage() {
         <div>
           <nav aria-label="Đường dẫn" className="flex items-center gap-2 text-sm font-bold text-slate-500">
             <Link className="transition hover:text-indigo-600" to={backToListUrl}>
-              Quản lý Assessment Policy
+              Quản lý Chính Sách Đánh Giá
             </Link>
             <span aria-hidden="true" className="text-slate-300">/</span>
             <span className="text-slate-950">Import hàng loạt</span>
           </nav>
           <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-950" id="system-assessment-policy-import-title">
-            Import Assessment Policy hàng loạt
+            Import Chính Sách Đánh Giá hàng loạt
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-500">
-            Tải lên file CSV hoặc Excel, kiểm tra mapping cột và xác nhận import các Assessment Policy hệ thống mới.
+            Tải lên file CSV hoặc Excel, kiểm tra mapping cột và xác nhận import các Chính Sách Đánh Giá hệ thống mới.
           </p>
         </div>
         <Link
@@ -412,11 +388,7 @@ export function SystemAdminAssessmentPolicyImportPage() {
               type="button"
             >
               <CheckCircle2 aria-hidden="true" className="size-4" />
-              {isWaitingForResult
-                ? 'Đang xử lý dữ liệu...'
-                : acceptMutation.isPending
-                  ? 'Đang gửi yêu cầu...'
-                  : 'Xác nhận import'}
+              {acceptMutation.isPending ? 'Đang gửi yêu cầu...' : 'Xác nhận import'}
             </button>
           </div>
         </>

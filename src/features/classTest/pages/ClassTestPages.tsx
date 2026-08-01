@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   BookOpenCheck,
@@ -18,6 +18,7 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
+  Timer,
   Trash2,
   Users,
   NotebookPen,
@@ -28,7 +29,7 @@ import { useMySchoolClassesQuery } from '@/features/classes/api/useMySchoolClass
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery'
 import type { QuestionDto } from '@/features/question/types'
 import { toApiError } from '@/shared/api'
-import { autoDistributeWeights } from '@/shared/weightDistribution'
+import { autoDistributeWeights, distributeEvenlyWeights } from '@/shared/weightDistribution'
 import { Pagination } from '@/shared/components/Pagination'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -37,16 +38,24 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
-import { AssessmentMethodTab } from '@/features/examCore/components/AssessmentMethodTab'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
 import { QuestionPicker } from '@/features/examCore/components/QuestionPicker'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
 import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
-import { examQueryKeys, fetchExamPaper, useExamBlueprintQuery, useExamBlueprintsQuery, useExamQuery } from '@/features/examCore/api/queries'
+import {
+  examQueryKeys,
+  fetchExamPaper,
+  useExamBlueprintQuery,
+  useExamBlueprintSummaryQuery,
+  useExamBlueprintsQuery,
+  useExamQuery,
+} from '@/features/examCore/api/queries'
 import { useSetExamDeliveryModeMutation, useUpdateExamPaperItemMutation } from '@/features/examCore/api/mutations'
 import { useMatchingTeacherAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
+import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '@/features/examCore/utils/timeQuota'
+import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import {
   formatDate,
   formatDateTime,
@@ -406,6 +415,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createMutation = useCreateClassTestMutation()
+  const createLockedRef = useRef(false)
   const draft = locationState?.draft
   const [name, setName] = useState(draft?.name ?? '')
   const [description, setDescription] = useState(draft?.description ?? '')
@@ -424,6 +434,10 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   const [selectedBlueprint, setSelectedBlueprint] = useState<ExamBlueprintDto | null>(draft?.selectedBlueprint ?? null)
   const [selectedVersion, setSelectedVersion] = useState<ExamBlueprintVersionDto | null>(draft?.selectedVersion ?? null)
   const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword: blueprintKeyword, page: blueprintPage, size: 8 })
+  const browsingBlueprintDetailQuery = useExamBlueprintQuery(browsingBlueprint?.id ?? null)
+  const browsingBlueprintDetail = browsingBlueprintDetailQuery.data ?? browsingBlueprint
+  const canSelectBrowsingVersion = Boolean(browsingBlueprintDetailQuery.data)
+  const subscriptionQuery = useMySubscriptionQuery()
   const { confirm, dialog } = useConfirmationDialog()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectionAssignments, setSelectionAssignments] = useState<Record<string, QuestionDto>>(
@@ -502,6 +516,12 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   }
 
   function addQuestionToSection(sectionKey: string, question: QuestionDto) {
+    const alreadySelected = sections.some((section) => section.questions.some((existing) => existing.id === question.id))
+    const nextDurationSeconds = directQuestionDurationSeconds + (alreadySelected ? 0 : getQuestionAttemptSeconds(question))
+    const nextQuotaWarning = buildTimeQuotaWarning('Bài kiểm tra trên lớp', nextDurationSeconds, maxTimePerAttemptMin)
+    if (nextQuotaWarning) {
+      setErrorMessage(`${nextQuotaWarning} Bạn vẫn có thể đổi câu, nhưng không thể tạo cho tới khi giảm thời lượng.`)
+    }
     setSections((current) => {
       if (current.some((section) => section.questions.some((existing) => existing.id === question.id))) {
         return current
@@ -538,9 +558,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
         if (section.key !== sectionKey) {
           return section
         }
-        const resolved = autoDistributeWeights(
-          section.questions.map((question) => (section.questionWeights[question.id]?.trim() ? Number(section.questionWeights[question.id]) : null)),
-        )
+        const resolved = distributeEvenlyWeights(section.questions.length)
         const questionWeights = { ...section.questionWeights }
         section.questions.forEach((question, index) => {
           questionWeights[question.id] = String(resolved[index])
@@ -551,63 +569,99 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   }
 
   const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0)
+  const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
+  const directQuestionDurationSeconds = sections.reduce(
+    (sum, section) => sum + section.questions.reduce((sectionSum, question) => sectionSum + getQuestionAttemptSeconds(question), 0),
+    0,
+  )
+  const selectedBlueprintDurationSeconds =
+    (selectedVersion?.totalTimeLimitSeconds ?? 0) +
+    Object.values(selectionAssignments).reduce((sum, question) => sum + getQuestionAttemptSeconds(question), 0)
+  const createQuotaWarning =
+    creationMode === 'blueprint'
+      ? buildTimeQuotaWarning('Blueprint đã chọn', selectedBlueprint ? selectedBlueprintDurationSeconds : null, maxTimePerAttemptMin)
+      : buildTimeQuotaWarning('Bài kiểm tra trên lớp', directQuestionDurationSeconds, maxTimePerAttemptMin)
   const pickerSection = pickerForSectionKey ? sections.find((section) => section.key === pickerForSectionKey) : null
 
+  function assignSelectionQuestion(slotId: string, question: QuestionDto) {
+    const previousQuestion = selectionAssignments[slotId]
+    const nextDurationSeconds =
+      selectedBlueprintDurationSeconds -
+      (previousQuestion ? getQuestionAttemptSeconds(previousQuestion) : 0) +
+      getQuestionAttemptSeconds(question)
+    const nextQuotaWarning = buildTimeQuotaWarning('Blueprint đã chọn', nextDurationSeconds, maxTimePerAttemptMin)
+    if (nextQuotaWarning) {
+      setErrorMessage(`${nextQuotaWarning} Bạn vẫn có thể đổi câu, nhưng không thể tạo cho tới khi giảm thời lượng.`)
+    }
+    setSelectionAssignments((current) => ({ ...current, [slotId]: question }))
+    setSelectionPickerSlotId(null)
+  }
+
   async function handleSubmit() {
+    setErrorMessage(null)
     const parsedSectionWeights = creationMode === 'questions' ? sections.map((section) => parseOptionalSectionWeight(section.weight)) : []
     if (!name.trim() || !schoolClassId) {
-      window.alert('Vui lòng nhập tên bài và chọn lớp học.')
+      setErrorMessage('Vui lòng nhập tên bài và chọn lớp học.')
       return
     }
     if (creationMode === 'blueprint') {
       if (!selectedBlueprint || !selectedVersion) {
-        window.alert('Vui lòng chọn một blueprint và phiên bản đã xuất bản.')
+        setErrorMessage('Vui lòng chọn một blueprint và phiên bản đã xuất bản.')
         return
       }
     } else {
       if (sections.length === 0 || sections.every((section) => section.questions.length === 0)) {
-        window.alert('Phải có ít nhất một phần với ít nhất một câu hỏi.')
+        setErrorMessage('Phải có ít nhất một phần với ít nhất một câu hỏi.')
         return
       }
       for (const section of sections) {
         if (!section.title.trim()) {
-          window.alert('Mỗi phần phải có tên.')
+          setErrorMessage('Mỗi phần phải có tên.')
           return
         }
         if (section.questions.length === 0) {
-          window.alert(`Phần "${section.title}" phải có ít nhất một câu hỏi.`)
+          setErrorMessage(`Phần "${section.title}" phải có ít nhất một câu hỏi.`)
           return
         }
       }
       const sectionWeightError = validateOptionalSectionWeights(parsedSectionWeights)
       if (sectionWeightError) {
-        window.alert(sectionWeightError)
+        setErrorMessage(sectionWeightError)
         return
       }
     }
     if (hasAmbiguousPolicy) {
-      window.alert('Vui lòng chọn một chính sách đánh giá phù hợp trước khi tạo.')
+      setErrorMessage('Vui lòng chọn một chính sách đánh giá phù hợp trước khi tạo.')
       return
     }
     if (!openAt || !closeAt) {
-      window.alert('Vui lòng nhập đầy đủ thời gian mở bài và đóng bài.')
+      setErrorMessage('Vui lòng nhập đầy đủ thời gian mở bài và đóng bài.')
       return
     }
     const openAtIso = toIsoDateTime(openAt)
     const closeAtIso = toIsoDateTime(closeAt)
     if (!openAtIso || !closeAtIso) {
-      window.alert('Thời gian mở bài hoặc đóng bài không hợp lệ.')
+      setErrorMessage('Thời gian mở bài hoặc đóng bài không hợp lệ.')
       return
     }
     if (new Date(openAtIso).getTime() >= new Date(closeAtIso).getTime()) {
-      window.alert('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
+      setErrorMessage('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
       return
     }
     if (hasAmbiguousPolicy) {
-      window.alert('Vui lòng chọn một chính sách đánh giá phù hợp trước khi tạo.')
+      setErrorMessage('Vui lòng chọn một chính sách đánh giá phù hợp trước khi tạo.')
       return
     }
+    if (createQuotaWarning) {
+      setErrorMessage(`${createQuotaWarning} Không thể tạo hoặc gắn cấu trúc đề vượt quota của trường.`)
+      return
+    }
+    if (createLockedRef.current || createMutation.isPending) {
+      return
+    }
+    createLockedRef.current = true
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo bài trên lớp này không?' }))) {
+      createLockedRef.current = false
       return
     }
     try {
@@ -666,6 +720,8 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
       navigate('/teacher/class-tests', { state: { successMessage: 'Đã tạo bài trên lớp thành công.' } })
     } catch (error) {
       setErrorMessage(toApiError(error).message)
+    } finally {
+      createLockedRef.current = false
     }
   }
 
@@ -745,7 +801,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
           <p className="text-xs text-slate-500">
-            Không bắt buộc — chọn để tự động gắn chính sách đánh giá (Assessment Policy) phù hợp cho bài trên lớp.
+            Không bắt buộc — chọn để tự động gắn chính sách đánh giá phù hợp cho bài trên lớp.
           </p>
 
           {!selectedRubricVersion ? (
@@ -776,7 +832,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
 
               {hasNoMatchingPolicy ? (
                 <p className="text-xs font-semibold text-amber-700">
-                  Chưa có chính sách đánh giá (Assessment Policy) đã xuất bản cho phiên bản này. Vẫn có thể tạo bài và gắn chính sách
+                  Chưa có chính sách đánh giá đã xuất bản cho phiên bản này. Vẫn có thể tạo bài và gắn chính sách
                   sau, hoặc chọn phiên bản khác.
                 </p>
               ) : null}
@@ -902,6 +958,15 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
                     </button>
                   </div>
                 </div>
+                {createQuotaWarning ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700">
+                    {createQuotaWarning} Không thể tạo hoặc gắn cấu trúc đề vượt quota của trường.
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-500">
+                    Thời lượng dự kiến: {formatDurationSeconds(selectedBlueprintDurationSeconds)}
+                  </div>
+                )}
                 {hasSelectionSlot ? (
                   <p className="text-xs font-semibold text-amber-700">
                     Phiên bản này có ô câu hỏi chọn ngẫu nhiên (SELECTION) — bạn có thể chọn câu hỏi ngay bên dưới,
@@ -965,11 +1030,11 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
                   ))}
                 </div>
               </div>
-            ) : browsingBlueprint ? (
+            ) : browsingBlueprintDetail ? (
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-[13px] font-extrabold text-slate-900">
-                    Chọn phiên bản đã xuất bản của {browsingBlueprint.name}
+                    Chọn phiên bản đã xuất bản của {browsingBlueprintDetail.name}
                   </h3>
                   <button
                     className="shrink-0 text-xs font-bold text-slate-400 hover:text-slate-600"
@@ -979,46 +1044,74 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
                     Quay lại
                   </button>
                 </div>
+                {browsingBlueprintDetailQuery.isLoading ? (
+                  <div className="mt-2.5 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+                    Đang tải chi tiết blueprint…
+                  </div>
+                ) : null}
+                {browsingBlueprintDetailQuery.isError ? (
+                  <div className="mt-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+                    Không tải được chi tiết blueprint: {toApiError(browsingBlueprintDetailQuery.error).message}
+                    <button className="ml-2 underline" onClick={() => void browsingBlueprintDetailQuery.refetch()} type="button">
+                      Thử lại
+                    </button>
+                  </div>
+                ) : null}
                 <div className="mt-2.5 grid gap-2">
-                  {browsingBlueprint.versions.filter((version) => version.status === 'PUBLISHED').length === 0 ? (
+                  {browsingBlueprintDetail.versions.filter((version) => version.status === 'PUBLISHED').length === 0 ? (
                     <div className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
                       Blueprint này chưa có phiên bản nào được xuất bản.
                     </div>
                   ) : (
-                    browsingBlueprint.versions
+                    browsingBlueprintDetail.versions
                       .filter((version) => version.status === 'PUBLISHED')
-                      .map((version) => (
-                        <div
-                          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5"
-                          key={version.id}
-                        >
-                          <button
-                            className="flex flex-1 items-center justify-between text-left text-sm hover:opacity-80"
-                            onClick={() => {
-                              setSelectedBlueprint(browsingBlueprint)
-                              setSelectedVersion(version)
-                              setSelectionAssignments({})
-                              setBrowsingBlueprint(null)
-                            }}
-                            type="button"
+                      .map((version) => {
+                        const quotaWarning = buildTimeQuotaWarning(
+                          `Phiên bản blueprint ${version.code}`,
+                          version.totalTimeLimitSeconds,
+                          maxTimePerAttemptMin,
+                        )
+                        return (
+                          <div
+                            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5"
+                            key={version.id}
                           >
-                            <span className="font-bold text-slate-900">{version.code}</span>
-                            <span className="text-xs text-slate-500">
-                              {version.sectionCount ?? version.sections.length} phần
-                            </span>
-                          </button>
-                          <a
-                            aria-label={`Xem chi tiết ${version.code}`}
-                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                            href={`/teacher/blueprints/${browsingBlueprint.id}/versions/${version.id}`}
-                            rel="noopener noreferrer"
-                            target="_blank"
-                            title="Xem chi tiết"
-                          >
-                            <Eye aria-hidden="true" className="size-3.5" />
-                          </a>
-                        </div>
-                      ))
+                            <button
+                              className="flex flex-1 items-center justify-between text-left text-sm hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={!canSelectBrowsingVersion || Boolean(quotaWarning)}
+                              onClick={() => {
+                                setSelectedBlueprint(browsingBlueprintDetail)
+                                setSelectedVersion(version)
+                                setSelectionAssignments({})
+                                setBrowsingBlueprint(null)
+                              }}
+                              title={
+                                quotaWarning ??
+                                (!canSelectBrowsingVersion ? 'Đang tải chi tiết blueprint trước khi chọn phiên bản' : undefined)
+                              }
+                              type="button"
+                            >
+                              <span>
+                                <span className="font-bold text-slate-900">{version.code}</span>
+                                {quotaWarning ? <span className="mt-1 block text-[11px] font-bold text-red-600">{quotaWarning}</span> : null}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                {version.sectionCount ?? version.sections?.length ?? 0} phần
+                              </span>
+                            </button>
+                            <a
+                              aria-label={`Xem chi tiết ${version.code}`}
+                              className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                              href={`/teacher/blueprints/${browsingBlueprintDetail.id}/versions/${version.id}`}
+                              rel="noopener noreferrer"
+                              target="_blank"
+                              title="Xem chi tiết"
+                            >
+                              <Eye aria-hidden="true" className="size-3.5" />
+                            </a>
+                          </div>
+                        )
+                      })
                   )}
                 </div>
               </div>
@@ -1084,7 +1177,12 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
         ) : (
         <div>
           <div className="flex items-center justify-between">
-            <h2 className="text-[15px] font-extrabold text-slate-900">Các phần và câu hỏi ({totalQuestions} câu)</h2>
+            <div>
+              <h2 className="text-[15px] font-extrabold text-slate-900">Các phần và câu hỏi ({totalQuestions} câu)</h2>
+              <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                Thời lượng dự kiến: {formatDurationSeconds(directQuestionDurationSeconds)}
+              </p>
+            </div>
             <button
               className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-indigo-600 hover:bg-slate-50"
               onClick={addSection}
@@ -1094,6 +1192,11 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
               Thêm phần
             </button>
           </div>
+          {createQuotaWarning ? (
+            <div className="mt-2.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700">
+              {createQuotaWarning} Không thể tạo hoặc gắn cấu trúc đề vượt quota của trường.
+            </div>
+          ) : null}
 
           <div className="mt-2.5 grid gap-3">
             {sections.map((section) => (
@@ -1203,12 +1306,18 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
         <div className="flex justify-end">
           <button
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
-            disabled={createMutation.isPending || !canSubmitPolicy}
+            disabled={createMutation.isPending || !canSubmitPolicy || Boolean(createQuotaWarning)}
             onClick={handleSubmit}
-            title={hasAmbiguousPolicy ? 'Chọn một chính sách đánh giá phù hợp trước khi tạo' : undefined}
+            title={
+              createQuotaWarning
+                ? createQuotaWarning
+                : hasAmbiguousPolicy
+                  ? 'Chọn một chính sách đánh giá phù hợp trước khi tạo'
+                  : undefined
+            }
             type="button"
           >
-            Tạo bài trên lớp
+            {createMutation.isPending ? 'Đang tạo…' : 'Tạo bài trên lớp'}
           </button>
         </div>
       </div>
@@ -1238,10 +1347,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
               .map(([, question]) => question.id),
           ]}
           onClose={() => setSelectionPickerSlotId(null)}
-          onSelect={(question) => {
-            setSelectionAssignments((current) => ({ ...current, [selectionPickerSlotId]: question }))
-            setSelectionPickerSlotId(null)
-          }}
+          onSelect={(question) => assignSelectionQuestion(selectionPickerSlotId, question)}
           scope="teacher"
           selectedQuestionIds={
             selectionAssignments[selectionPickerSlotId] ? [selectionAssignments[selectionPickerSlotId].id] : []
@@ -1268,15 +1374,27 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
   const [browsingBlueprint, setBrowsingBlueprint] = useState<ExamBlueprintDto | null>(null)
   const [showPicker, setShowPicker] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const currentBlueprintQuery = useExamBlueprintQuery(blueprintId ?? null)
+  const currentBlueprintQuery = useExamBlueprintSummaryQuery(blueprintId ?? null)
   const blueprintsQuery = useExamBlueprintsQuery({ isActive: true, keyword, page, size: 8 })
+  const subscriptionQuery = useMySubscriptionQuery()
   const changeMutation = useChangeClassTestBlueprintMutation()
   const { confirm, dialog } = useConfirmationDialog()
 
   const currentBlueprint = currentBlueprintQuery.data
   const currentVersion = currentBlueprint?.versions.find((version) => version.id === blueprintVersionId)
+  const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
 
   async function handleSwitch(newBlueprintId: string, newVersionId: string) {
+    const version = browsingBlueprint?.versions.find((candidate) => candidate.id === newVersionId)
+    const quotaWarning = buildTimeQuotaWarning(
+      `Phiên bản blueprint ${version?.code ?? ''}`.trim(),
+      version?.totalTimeLimitSeconds,
+      maxTimePerAttemptMin,
+    )
+    if (quotaWarning) {
+      setErrorMessage(`${quotaWarning} Không thể gắn blueprint này.`)
+      return
+    }
     if (
       !(await confirm({
         message: 'Đổi blueprint sẽ xóa toàn bộ câu hỏi hiện tại của mã đề và tạo lại theo blueprint mới. Tiếp tục?',
@@ -1386,17 +1504,29 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
             ) : (
               browsingBlueprint.versions
                 .filter((version) => version.status === 'PUBLISHED')
-                .map((version) => (
-                  <button
-                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm hover:bg-slate-50"
-                    key={version.id}
-                    onClick={() => void handleSwitch(browsingBlueprint.id, version.id)}
-                    type="button"
-                  >
-                    <span className="font-bold text-slate-900">{version.code}</span>
-                    <span className="text-xs text-slate-500">{version.sectionCount ?? version.sections.length} phần</span>
-                  </button>
-                ))
+                .map((version) => {
+                  const quotaWarning = buildTimeQuotaWarning(
+                    `Phiên bản blueprint ${version.code}`,
+                    version.totalTimeLimitSeconds,
+                    maxTimePerAttemptMin,
+                  )
+                  return (
+                    <button
+                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={Boolean(quotaWarning)}
+                      key={version.id}
+                      onClick={() => void handleSwitch(browsingBlueprint.id, version.id)}
+                      title={quotaWarning ?? undefined}
+                      type="button"
+                    >
+                      <span>
+                        <span className="font-bold text-slate-900">{version.code}</span>
+                        {quotaWarning ? <span className="mt-1 block text-[11px] font-bold text-red-600">{quotaWarning}</span> : null}
+                      </span>
+                      <span className="text-xs text-slate-500">{version.sectionCount ?? version.sections?.length ?? 0} phần</span>
+                    </button>
+                  )
+                })
             )}
           </div>
         </div>
@@ -1476,7 +1606,7 @@ type ClassTestDetailPageProps = {
   canManage: boolean
 }
 
-type DetailTab = 'assessment' | 'blueprint' | 'papers' | 'schedule' | 'students'
+type DetailTab = 'blueprint' | 'papers' | 'schedule' | 'students'
 
 function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const navigate = useNavigate()
@@ -1484,6 +1614,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const { examId } = useParams()
   const examQuery = useExamQuery(examId ?? null)
   const exam = examQuery.data
+  const subscriptionQuery = useMySubscriptionQuery()
   const updateQuestionsMutation = useUpdateClassTestQuestionsMutation()
   const updateExamMutation = useUpdateClassTestMutation()
   const updateStatusMutation = useUpdateClassTestStatusMutation()
@@ -1518,6 +1649,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   }
 
   const paperSections = exam?.papers[0]?.sections ?? []
+  const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
 
   function currentSectionsPayload() {
     return paperSections.map((section) => ({
@@ -1564,17 +1696,17 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       return
     }
     if (!editOpenAt || !editCloseAt) {
-      window.alert('Vui lòng nhập đầy đủ thời gian mở bài và đóng bài.')
+      setErrorMessage('Vui lòng nhập đầy đủ thời gian mở bài và đóng bài.')
       return
     }
     const openAtIso = toIsoDateTime(editOpenAt)
     const closeAtIso = toIsoDateTime(editCloseAt)
     if (!openAtIso || !closeAtIso) {
-      window.alert('Thời gian mở bài hoặc đóng bài không hợp lệ.')
+      setErrorMessage('Thời gian mở bài hoặc đóng bài không hợp lệ.')
       return
     }
     if (new Date(openAtIso).getTime() >= new Date(closeAtIso).getTime()) {
-      window.alert('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
+      setErrorMessage('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
       return
     }
     try {
@@ -1610,7 +1742,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     }
     const nextWeight = parseOptionalSectionWeight(editSectionWeight)
     if (Number.isNaN(nextWeight)) {
-      window.alert('Trọng số section phải là số hợp lệ.')
+      setErrorMessage('Trọng số section phải là số hợp lệ.')
       return
     }
     const next = currentSectionsPayload().map((section, index) =>
@@ -1620,7 +1752,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     )
     const sectionWeightError = validateOptionalSectionWeights(next.map((section) => section.weight ?? null))
     if (sectionWeightError) {
-      window.alert(sectionWeightError)
+      setErrorMessage(sectionWeightError)
       return
     }
     try {
@@ -1641,6 +1773,12 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
   async function handlePickQuestion(question: QuestionDto) {
     if (!exam || !pickerMode) {
+      return
+    }
+    const candidateDurationSeconds = (exam.papers[0]?.timeDurationSeconds ?? 0) + getQuestionAttemptSeconds(question)
+    const quotaWarning = buildTimeQuotaWarning('Mã đề trên lớp', candidateDurationSeconds, maxTimePerAttemptMin)
+    if (quotaWarning) {
+      setErrorMessage(`${quotaWarning} Không thể gán thêm câu hỏi này.`)
       return
     }
     const current = currentSectionsPayload()
@@ -1690,7 +1828,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     }
     const current = currentSectionsPayload()
     if (current.length <= 1) {
-      window.alert('Bài phải có ít nhất 1 phần — không thể xóa phần cuối cùng.')
+      setErrorMessage('Bài phải có ít nhất 1 phần — không thể xóa phần cuối cùng.')
       return
     }
     if (!(await confirm({ message: 'Xóa phần này? Toàn bộ câu hỏi trong phần cũng sẽ bị xóa.' }))) {
@@ -1854,6 +1992,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           { icon: <Calendar aria-hidden="true" className="size-3.5" />, label: `${formatDateTime(exam.openAt)} – ${formatDateTime(exam.closeAt)}` },
           { icon: <Users aria-hidden="true" className="size-3.5" />, label: `GV: ${getExamChairName(exam.members)}` },
           { icon: <Clock aria-hidden="true" className="size-3.5" />, label: `Số lượt thi tối đa: ${exam.maxAttempt ?? 1}` },
+          // Hệ thống tự tính từ đề bài. Khung mở/đóng của bài trên lớp phải đủ dài cho con số này.
+          { icon: <Timer aria-hidden="true" className="size-3.5" />, label: `Thời gian làm bài: ${formatDurationSeconds(exam.examTimeDurationSecond)}` },
           { icon: <CheckCircle2 aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
         ]}
         onEdit={canEditContent ? openEditInfo : undefined}
@@ -1960,7 +2100,6 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       <div className="mt-5.5">
         <TabPillGroup
           items={[
-            { label: 'Phương thức đánh giá', value: 'assessment' },
             { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
             { label: 'Đề bài', value: 'papers' },
             { label: 'Học sinh', value: 'students' },
@@ -2147,6 +2286,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           {exam.papers.map((paper) => (
             <PaperCard
               key={paper.id}
+              maxTimePerAttemptMin={maxTimePerAttemptMin}
               onOpen={() =>
                 navigate(
                   canManage ? `/teacher/exam-papers/${paper.id}/edit` : `/school-admin/exam-papers/${paper.id}`,
@@ -2179,9 +2319,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {tab === 'assessment' ? <AssessmentMethodTab /> : null}
-
-      {tab === 'students' ? <CandidatesTab canManage={canManage} examId={exam.id} papers={exam.papers} /> : null}
+      {tab === 'students' ? (
+        <CandidatesTab canManage={canManage} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
+      ) : null}
 
       {tab === 'blueprint' ? (
         <ClassTestBlueprintTab
@@ -2198,7 +2338,10 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         <ScheduleTab
           canManage={canEditContent}
           deliveryMode={exam.deliveryMode}
+          examCloseAt={exam.closeAt}
           examId={exam.id}
+          examOpenAt={exam.openAt}
+          examTimeDurationSecond={exam.examTimeDurationSecond}
           isClassTest
           onGoToPapers={() => setTab('papers')}
           onSetDeliveryMode={

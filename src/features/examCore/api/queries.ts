@@ -3,9 +3,12 @@ import { graphQLRequest, requireSchoolId } from '@/shared/api'
 import type {
   ExamCandidateDto,
   ExamBlueprintDto,
+  ExamBlueprintVersionDto,
   ExamDto,
   ExamPaperDto,
+  ExamPickerOption,
   ExamScheduleDto,
+  ExamStatus,
   Paged,
   ProctorCandidateSummaryDto,
   ProctorScheduleSummaryDto,
@@ -96,11 +99,57 @@ export const EXAM_LIST_FIELDS = `
   }
 `
 
+const EXAM_SUMMARY_FIELDS = `
+  id
+  blueprintId
+  blueprintVersionId
+  assessmentPolicyId
+  code
+  name
+  description
+  schoolId
+  languageId
+  status
+  openAt
+  closeAt
+  createdAt
+  updatedAt
+  candidateCount
+  deliveryMode
+  maxAttempt
+  resultDecisionMethod
+  securePool {
+    id
+    status
+  }
+  members {
+    ${EXAM_MEMBER_FIELDS}
+  }
+`
+
+const EXAM_PAPERS_SUMMARY_FIELDS = `
+  id
+  examId
+  blueprintVersionId
+  code
+  variant
+  status
+  timeDurationSeconds
+  sections {
+    id
+    items {
+      id
+      questionId
+    }
+  }
+`
+
 const EXAM_DETAIL_FIELDS = `
   ${EXAM_LIST_FIELDS}
   deliveryMode
   papersLocked
   maxAttempt
+  examTimeDurationSecond
   resultDecisionMethod
   securePool {
     id
@@ -260,7 +309,7 @@ const SCHOOL_ROOMS_QUERY = `
   }
 `
 
-const BLUEPRINT_VERSION_FIELDS = `
+const BLUEPRINT_VERSION_SUMMARY_FIELDS = `
   id
   blueprintId
   version
@@ -273,13 +322,15 @@ const BLUEPRINT_VERSION_FIELDS = `
   sectionCount
   slotCount
   weightSum
+`
+
+const BLUEPRINT_VERSION_FIELDS = `
+  ${BLUEPRINT_VERSION_SUMMARY_FIELDS}
   sections {
     id
     blueprintVersionId
     order
     title
-    instruction
-    sectionTimeLimitSeconds
     sectionWeight
     slots {
       id
@@ -287,8 +338,6 @@ const BLUEPRINT_VERSION_FIELDS = `
       blueprintVersionId
       order
       weight
-      prepTimeSecondsOverride
-      responseTimeSecondsOverride
       slotType
       fixedQuestionId
       selectionSpec {
@@ -302,7 +351,8 @@ const BLUEPRINT_VERSION_FIELDS = `
         id
         code
         questionText
-        status
+        preparationTimeSeconds
+        maxResponseSeconds
       }
     }
   }
@@ -321,9 +371,24 @@ const BLUEPRINT_FIELDS = `
   updatedAt
   versionCount
   sectionCount
-  currentVersion {
-    ${BLUEPRINT_VERSION_FIELDS}
+  versions {
+    ${BLUEPRINT_VERSION_SUMMARY_FIELDS}
   }
+`
+
+const BLUEPRINT_DETAIL_FIELDS = `
+  id
+  schoolId
+  languageId
+  schoolGradeLevelId
+  code
+  name
+  description
+  isActive
+  createdAt
+  updatedAt
+  versionCount
+  sectionCount
   versions {
     ${BLUEPRINT_VERSION_FIELDS}
   }
@@ -334,6 +399,26 @@ const EXAM_QUERY = `
     exam(id: $id) {
       ${EXAM_DETAIL_FIELDS}
     }
+  }
+`
+
+/**
+ * Trang exam detail dùng 1 request duy nhất thay vì tách riêng exam/papers/blueprint/myRole —
+ * mỗi field vẫn resolve gọn (DataLoader + query COUNT), nhưng gộp lại để giảm số request
+ * /graphql đồng thời (mở nhiều tab cùng lúc từng làm cạn pool connection DB).
+ */
+const EXAM_DETAIL_BUNDLE_QUERY = `
+  query ExamDetailBundle($id: ID!) {
+    exam(id: $id) {
+      ${EXAM_SUMMARY_FIELDS}
+      papers {
+        ${EXAM_PAPERS_SUMMARY_FIELDS}
+      }
+      blueprint {
+        ${BLUEPRINT_FIELDS}
+      }
+    }
+    examMyRole(examId: $id)
   }
 `
 
@@ -373,10 +458,26 @@ const EXAM_BLUEPRINTS_QUERY = `
   }
 `
 
+const EXAM_BLUEPRINT_SUMMARY_QUERY = `
+  query ExamBlueprintSummary($id: ID!) {
+    examBlueprint(id: $id) {
+      ${BLUEPRINT_FIELDS}
+    }
+  }
+`
+
 const EXAM_BLUEPRINT_QUERY = `
   query ExamBlueprint($id: ID!) {
     examBlueprint(id: $id) {
-      ${BLUEPRINT_FIELDS}
+      ${BLUEPRINT_DETAIL_FIELDS}
+    }
+  }
+`
+
+const EXAM_BLUEPRINT_VERSION_QUERY = `
+  query ExamBlueprintVersion($id: ID!) {
+    examBlueprintVersion(id: $id) {
+      ${BLUEPRINT_VERSION_FIELDS}
     }
   }
 `
@@ -394,12 +495,16 @@ export type ExamStatusCounts = {
 export const examQueryKeys = {
   all: ['exam-management'] as const,
   blueprint: (id: string | null) => [...examQueryKeys.all, 'blueprint', id] as const,
+  blueprintSummary: (id: string | null) => [...examQueryKeys.all, 'blueprint-summary', id] as const,
+  blueprintVersion: (id: string | null) => [...examQueryKeys.all, 'blueprint-version', id] as const,
   blueprints: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'blueprints', filters] as const,
   candidates: (examId: string | null) => [...examQueryKeys.all, 'candidates', examId] as const,
   classTests: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'class-tests', filters] as const,
   classTestStats: () => [...examQueryKeys.all, 'class-test-stats'] as const,
   exam: (id: string | null) => [...examQueryKeys.all, 'exam', id] as const,
+  examDetailBundle: (id: string | null) => [...examQueryKeys.all, 'exam-detail-bundle', id] as const,
   examPaper: (paperId: string | null) => [...examQueryKeys.all, 'exam-paper', paperId] as const,
+  examPicker: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'exam-picker', filters] as const,
   examStats: () => [...examQueryKeys.all, 'exam-stats'] as const,
   exams: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'exams', filters] as const,
   proctorCandidates: (scheduleId: string | null) => [...examQueryKeys.all, 'proctor-candidates', scheduleId] as const,
@@ -429,6 +534,11 @@ async function fetchExam(id: string) {
   return normalizeDeliveryMode(data.exam)
 }
 
+async function fetchExamDetailBundle(id: string) {
+  const data = await graphQLRequest<{ exam: ExamDto | null; examMyRole: string | null }>(EXAM_DETAIL_BUNDLE_QUERY, { id })
+  return { exam: normalizeDeliveryMode(data.exam), myRole: data.examMyRole }
+}
+
 export async function fetchExamPaper(id: string) {
   const data = await graphQLRequest<{ examPaper: ExamPaperDto | null }>(EXAM_PAPER_QUERY, { id })
   return data.examPaper
@@ -449,11 +559,29 @@ async function fetchBlueprint(id: string) {
   return data.examBlueprint
 }
 
+async function fetchBlueprintSummary(id: string) {
+  const data = await graphQLRequest<{ examBlueprint: ExamBlueprintDto | null }>(EXAM_BLUEPRINT_SUMMARY_QUERY, { id })
+  return data.examBlueprint
+}
+
+async function fetchBlueprintVersion(id: string) {
+  const data = await graphQLRequest<{ examBlueprintVersion: ExamBlueprintVersionDto | null }>(EXAM_BLUEPRINT_VERSION_QUERY, { id })
+  return data.examBlueprintVersion
+}
+
 export function useExamQuery(id: string | null) {
   return useQuery({
     enabled: Boolean(id),
     queryFn: () => fetchExam(id as string),
     queryKey: examQueryKeys.exam(id),
+  })
+}
+
+export function useExamDetailBundleQuery(id: string | null) {
+  return useQuery({
+    enabled: Boolean(id),
+    queryFn: () => fetchExamDetailBundle(id as string),
+    queryKey: examQueryKeys.examDetailBundle(id),
   })
 }
 
@@ -497,6 +625,22 @@ export function useExamBlueprintQuery(id: string | null) {
     enabled: Boolean(id),
     queryFn: () => fetchBlueprint(id as string),
     queryKey: examQueryKeys.blueprint(id),
+  })
+}
+
+export function useExamBlueprintSummaryQuery(id: string | null) {
+  return useQuery({
+    enabled: Boolean(id),
+    queryFn: () => fetchBlueprintSummary(id as string),
+    queryKey: examQueryKeys.blueprintSummary(id),
+  })
+}
+
+export function useExamBlueprintVersionQuery(id: string | null) {
+  return useQuery({
+    enabled: Boolean(id),
+    queryFn: () => fetchBlueprintVersion(id as string),
+    queryKey: examQueryKeys.blueprintVersion(id),
   })
 }
 
@@ -581,5 +725,55 @@ export function useSchoolRoomsQuery(page: number, size: number, search: string) 
   return useQuery({
     queryFn: () => fetchSchoolRooms(page, size, search),
     queryKey: examQueryKeys.schoolRooms(page, size, search),
+  })
+}
+
+// Chỉ những trường một danh sách chọn cần. Đừng thêm `papers`/`members`/`candidateCount`:
+// chúng chạy qua DataLoader nên mỗi field là thêm một loạt query cho mỗi dòng.
+const EXAM_PICKER_QUERY = `
+  query ExamPickerOptions($keyword: String, $status: ExamStatus, $page: Int!, $size: Int!) {
+    exams(keyword: $keyword, status: $status, page: $page, size: $size) {
+      content {
+        id
+        code
+        name
+        status
+        openAt
+        closeAt
+      }
+      page
+      size
+      totalElements
+      totalPages
+    }
+  }
+`
+
+export type FetchExamPickerOptionsInput = {
+  keyword?: string
+  page: number
+  size: number
+  status?: ExamStatus | ''
+}
+
+/** BE lọc `keyword` theo cả `code` lẫn `name` nên không cần lọc thêm ở client. */
+export async function fetchExamPickerOptions(input: FetchExamPickerOptionsInput) {
+  const data = await graphQLRequest<{ exams: Paged<ExamPickerOption> }>(EXAM_PICKER_QUERY, {
+    keyword: input.keyword?.trim() || null,
+    page: input.page - 1,
+    size: input.size,
+    status: input.status || null,
+  })
+  return data.exams
+}
+
+// Phân trang 0-based ở server, UI 1-based: -1 khi query, +1 ở `select`.
+export function useExamPickerOptionsQuery(input: FetchExamPickerOptionsInput) {
+  return useQuery({
+    // Giữ trang cũ trong lúc nạp trang/từ khoá mới, nếu không danh sách chớp trắng mỗi lần gõ.
+    placeholderData: (previousData) => previousData,
+    queryFn: () => fetchExamPickerOptions(input),
+    queryKey: examQueryKeys.examPicker(input),
+    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }

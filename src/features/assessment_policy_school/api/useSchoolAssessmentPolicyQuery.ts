@@ -18,7 +18,6 @@ const GET_SCHOOL_ASSESSMENT_POLICY_DETAIL = `
       frameworkVersionId
       rubricVersionId
       targetFrameworkBandId
-      minimumFrameworkBandId
       passingScore
       strictness
       version
@@ -39,6 +38,12 @@ const GET_SCHOOL_ASSESSMENT_POLICY_DETAIL = `
         status
         effectiveFrom
         effectiveTo
+        resultBands {
+          id
+          code
+          label
+          order
+        }
       }
       rubricVersion {
         id
@@ -50,13 +55,6 @@ const GET_SCHOOL_ASSESSMENT_POLICY_DETAIL = `
         effectiveTo
       }
       targetFrameworkBand {
-        id
-        code
-        label
-        description
-        order
-      }
-      minimumFrameworkBand {
         id
         code
         label

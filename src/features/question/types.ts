@@ -282,45 +282,6 @@ export type AcceptQuestionImportRequest = {
   confirmedMapping: Record<string, string>
 }
 
-export type ImportSessionDto = {
-  id: string
-  schoolId: string | null
-  type: string
-  fileName: string
-  totalRows: number
-  validRows: number
-  invalidRows: number
-  importedRows: number
-  skippedRows: number
-  status: string
-  failureReason: string | null
-  expiresAt: string | null
-  createdAt: string | null
-  updatedAt: string | null
-}
-
-export type ImportRowErrorDto = {
-  field: string | null
-  message: string
-}
-
-export type ImportRowDto = {
-  id: string
-  sessionId: string
-  rowNumber: number
-  rawData: Array<{ key: string; value: string | null }>
-  errors: ImportRowErrorDto[]
-  status: string
-}
-
-export type ImportRowPage = {
-  content: ImportRowDto[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
-}
-
 export function formatQuestionDate(value?: string | null) {
   if (!value) {
     return '-'

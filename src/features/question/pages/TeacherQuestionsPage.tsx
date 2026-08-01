@@ -63,7 +63,6 @@ const QUESTION_STATUS_OPTIONS: Array<{ label: string; value: '' | QuestionStatus
 
 const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: '' | QuestionType }> = [
   { label: 'Tất cả loại', value: '' },
-  { label: 'Read aloud', value: 'READ_ALOUD' },
   { label: 'Short answer', value: 'SHORT_ANSWER' },
   { label: 'Long answer', value: 'LONG_ANSWER' },
   { label: 'Opinion', value: 'OPINION' },

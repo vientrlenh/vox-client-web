@@ -84,6 +84,42 @@ const SystemAdminSchoolDirectoryImportPage = lazy(() =>
   })),
 )
 
+const SystemAdminFrameworksPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SystemAdminFrameworksPage,
+  })),
+)
+
+const SystemAdminFrameworkDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SystemAdminFrameworkDetailPage,
+  })),
+)
+
+const SystemAdminFrameworkVersionDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SystemAdminFrameworkVersionDetailPage,
+  })),
+)
+
+const SchoolAdminFrameworksPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SchoolAdminFrameworksPage,
+  })),
+)
+
+const SchoolAdminFrameworkDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SchoolAdminFrameworkDetailPage,
+  })),
+)
+
+const SchoolAdminFrameworkVersionDetailPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.SchoolAdminFrameworkVersionDetailPage,
+  })),
+)
+
 const SchoolAdminClassesPage = lazy(() =>
   import("@/features/classes").then((module) => ({
     default: module.SchoolAdminClassesPage,
@@ -105,6 +141,18 @@ const SchoolAdminClassImportPage = lazy(() =>
 const SchoolAdminClassUserImportPage = lazy(() =>
   import("@/features/classes").then((module) => ({
     default: module.SchoolAdminClassUserImportPage,
+  })),
+);
+
+const TeacherMyClassesPage = lazy(() =>
+  import("@/features/classes").then((module) => ({
+    default: module.TeacherMyClassesPage,
+  })),
+);
+
+const TeacherMyClassDetailPage = lazy(() =>
+  import("@/features/classes").then((module) => ({
+    default: module.TeacherMyClassDetailPage,
   })),
 );
 
@@ -180,6 +228,18 @@ const SchoolAdminImportSessionDetailPage = lazy(() =>
   })),
 );
 
+const SystemAdminImportSessionDetailPage = lazy(() =>
+  import("@/features/imports").then((module) => ({
+    default: module.SystemAdminImportSessionDetailPage,
+  })),
+);
+
+const TeacherImportSessionDetailPage = lazy(() =>
+  import("@/features/imports").then((module) => ({
+    default: module.TeacherImportSessionDetailPage,
+  })),
+);
+
 const SystemAdminSchoolsPage = lazy(() =>
   import("@/features/school").then((module) => ({
     default: module.SystemAdminSchoolsPage,
@@ -201,6 +261,12 @@ const TeacherProctorAttendancePage = lazy(() =>
 const SchoolAdminMonitoringRoomsPage = lazy(() =>
   import("@/features/monitoring").then((module) => ({
     default: module.SchoolAdminMonitoringRoomsPage,
+  })),
+);
+
+const MonitoringExamSchedulesPage = lazy(() =>
+  import("@/features/monitoring").then((module) => ({
+    default: module.MonitoringExamSchedulesPage,
   })),
 );
 
@@ -383,12 +449,8 @@ const SchoolAdminReevaluationPage = lazy(() =>
 const SchoolAdminReevaluationDetailPage = lazy(() =>
   import("@/features/reevaluation").then((m) => ({ default: m.SchoolAdminReevaluationDetailPage })),
 );
-const TeacherReevaluationPage = lazy(() =>
-  import("@/features/reevaluation").then((m) => ({ default: m.TeacherReevaluationPage })),
-);
-const TeacherReevaluationRescorePage = lazy(() =>
-  import("@/features/reevaluation").then((m) => ({ default: m.TeacherReevaluationRescorePage })),
-);
+// Giáo viên chấm phúc khảo ở màn `teacher/grading` (vòng chấm APPEAL) — bản rework gộp
+// bốn vòng chấm vào một chỗ nên không còn màn chấm lại riêng.
 
 // grading: chấm điểm thủ công (admin phân công -> giáo viên chấm bài chờ chấm)
 const SchoolAdminGradingPage = lazy(() =>
@@ -487,12 +549,6 @@ const SchoolAdminRubricResultBandImportPage = lazy(() =>
   })),
 );
 
-const SchoolAdminRubricCriterionBandImportPage = lazy(() =>
-  import("@/features/rubrics_school").then((module) => ({
-    default: module.SchoolAdminRubricCriterionBandImportPage,
-  })),
-);
-
 const SystemAdminRubricsPage = lazy(() =>
   import("@/features/rubric_system").then((module) => ({
     default: module.SystemAdminRubricsPage,
@@ -547,12 +603,6 @@ const SystemAdminRubricCriterionImportPage = lazy(() =>
   })),
 );
 
-const SystemAdminRubricCriterionBandImportPage = lazy(() =>
-  import("@/features/rubric_system").then((module) => ({
-    default: module.SystemAdminRubricCriterionBandImportPage,
-  })),
-);
-
 const SchoolAdminAssessmentPoliciesPage = lazy(() =>
   import("@/features/assessment_policy_school").then((module) => ({
     default: module.SchoolAdminAssessmentPoliciesPage,
@@ -577,9 +627,9 @@ const SchoolAdminScoringRulesPage = lazy(() =>
   })),
 );
 
-const SchoolAdminScoringRulePoliciesPage = lazy(() =>
+const SchoolAdminAllScoringRulesPage = lazy(() =>
   import("@/features/scoring_rules_school").then((module) => ({
-    default: module.SchoolAdminScoringRulePoliciesPage,
+    default: module.SchoolAdminAllScoringRulesPage,
   })),
 );
 
@@ -589,15 +639,21 @@ const SystemAdminScoringRulesPage = lazy(() =>
   })),
 );
 
-const SystemAdminScoringRulePoliciesPage = lazy(() =>
+const SystemAdminAllScoringRulesPage = lazy(() =>
   import("@/features/scoring_rules_system").then((module) => ({
-    default: module.SystemAdminScoringRulePoliciesPage,
+    default: module.SystemAdminAllScoringRulesPage,
   })),
 );
 
 const SystemAdminSubscriptionPage = lazy(() =>
   import("@/features/subscription_system").then((module) => ({
     default: module.SystemAdminSubscriptionPage,
+  })),
+);
+
+const SystemAdminSubscriptionPaymentResultPage = lazy(() =>
+  import("@/features/subscription_school").then((module) => ({
+    default: module.PaymentResultPage,
   })),
 );
 
@@ -653,6 +709,12 @@ export function AppRoutes() {
               path="system-admin/school-directory/import"
               element={<SystemAdminSchoolDirectoryImportPage />}
             />
+            {/* Chỉ có route chi tiết: query importSessions (danh sách) bị backend
+                giới hạn cho SCHOOL_ADMIN. */}
+            <Route
+              path="system-admin/imports/:sessionId"
+              element={<SystemAdminImportSessionDetailPage />}
+            />
             <Route
               path="system-admin/schools"
               element={<SystemAdminSchoolsPage />}
@@ -667,6 +729,18 @@ export function AppRoutes() {
             <Route path="system-admin/questions/create" element={<SystemAdminCreateQuestionPage />} />
             <Route path="system-admin/questions/:questionId/edit" element={<SystemAdminEditQuestionPage />} />
             <Route path="system-admin/questions/:questionId" element={<SystemAdminQuestionDetailPage />} />
+            <Route  
+              path="system-admin/frameworks"
+              element={<SystemAdminFrameworksPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId"
+              element={<SystemAdminFrameworkDetailPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId/versions/:versionId"
+              element={<SystemAdminFrameworkVersionDetailPage />}
+            />
             <Route
               path="system-admin/rubrics"
               element={<SystemAdminRubricsPage />}
@@ -692,10 +766,6 @@ export function AppRoutes() {
               element={<SystemAdminRubricCriterionDetailPage />}
             />
             <Route
-              path="system-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId/bands/import"
-              element={<SystemAdminRubricCriterionBandImportPage />}
-            />
-            <Route
               path="system-admin/assessment-policies"
               element={<SystemAdminAssessmentPoliciesPage />}
             />
@@ -713,11 +783,15 @@ export function AppRoutes() {
             />
             <Route
               path="system-admin/scoring-rules"
-              element={<SystemAdminScoringRulePoliciesPage />}
+              element={<SystemAdminAllScoringRulesPage />}
             />
             <Route
               path="system-admin/subscription"
               element={<SystemAdminSubscriptionPage />}
+            />
+            <Route
+              path="system-admin/subscription/payment-result"
+              element={<SystemAdminSubscriptionPaymentResultPage backTo="/system-admin/subscription" />}
             />
           </Route>
         </Route>
@@ -734,6 +808,10 @@ export function AppRoutes() {
             <Route
               path="school-admin/proctor-attendance"
               element={<TeacherProctorAttendancePage />}
+            />
+            <Route
+              path="school-admin/monitoring/exams/:examId"
+              element={<MonitoringExamSchedulesPage />}
             />
             <Route
               path="school-admin/monitoring/exams/:examId/schedules/:scheduleId"
@@ -811,6 +889,9 @@ export function AppRoutes() {
               path="school-admin/classes/:classId"
               element={<SchoolAdminClassDetailPage />}
             />
+            <Route path="school-admin/frameworks" element={<SchoolAdminFrameworksPage />} />
+            <Route path="school-admin/frameworks/:frameworkId" element={<SchoolAdminFrameworkDetailPage />} />
+            <Route path="school-admin/frameworks/:frameworkId/versions/:versionId" element={<SchoolAdminFrameworkVersionDetailPage />} />
             <Route path="school-admin/question-banks" element={<SchoolAdminQuestionBanksPage />} />
             <Route path="school-admin/question-banks/:bankId" element={<SchoolAdminQuestionBankDetailPage />} />
             <Route path="school-admin/question-topics" element={<SchoolAdminQuestionTopicsPage />} />
@@ -876,10 +957,6 @@ export function AppRoutes() {
               element={<SchoolAdminRubricCriterionDetailPage />}
             />
             <Route
-              path="school-admin/rubrics/:rubricId/versions/:versionId/criteria/:criterionId/bands/import"
-              element={<SchoolAdminRubricCriterionBandImportPage />}
-            />
-            <Route
               path="school-admin/assessment-policies"
               element={<SchoolAdminAssessmentPoliciesPage />}
             />
@@ -897,7 +974,7 @@ export function AppRoutes() {
             />
             <Route
               path="school-admin/scoring-rules"
-              element={<SchoolAdminScoringRulePoliciesPage />}
+              element={<SchoolAdminAllScoringRulesPage />}
             />
             <Route
               path="school-admin/subscription"
@@ -924,9 +1001,15 @@ export function AppRoutes() {
               element={<TeacherProctorAttendancePage />}
             />
             <Route
+              path="teacher/monitoring/exams/:examId"
+              element={<MonitoringExamSchedulesPage />}
+            />
+            <Route
               path="teacher/monitoring/exams/:examId/schedules/:scheduleId"
               element={<MonitoringRoomPage />}
             />
+            <Route path="teacher/classes/:classId" element={<TeacherMyClassDetailPage />} />
+            <Route path="teacher/classes" element={<TeacherMyClassesPage />} />
             <Route path="teacher/question-banks" element={<TeacherQuestionBanksPage />} />
             <Route path="teacher/question-banks/:bankId" element={<TeacherQuestionBankDetailPage />} />
             <Route path="teacher/question-topics" element={<TeacherQuestionTopicsPage />} />
@@ -935,6 +1018,9 @@ export function AppRoutes() {
             <Route path="teacher/questions/all" element={<TeacherQuestionsPage />} />
             <Route path="teacher/questions/review" element={<TeacherReviewQuestionsPage />} />
             <Route path="teacher/questions/import" element={<TeacherQuestionImportPage />} />
+            {/* Chỉ có route chi tiết: query importSessions (danh sách) bị backend
+                giới hạn cho SCHOOL_ADMIN. */}
+            <Route path="teacher/imports/:sessionId" element={<TeacherImportSessionDetailPage />} />
             <Route path="teacher/questions/create" element={<TeacherCreateQuestionPage />} />
             <Route path="teacher/questions/:questionId/edit" element={<TeacherEditQuestionPage />} />
             <Route path="teacher/questions/:questionId" element={<TeacherQuestionDetailPage />} />
@@ -947,8 +1033,8 @@ export function AppRoutes() {
             <Route path="teacher/exams" element={<TeacherExamsPage />} />
             <Route path="teacher/exam-results" element={<TeacherExamResultsListPage />} />
             <Route path="teacher/exam-results/:sessionId" element={<TeacherExamResultDetailPage />} />
-            <Route path="teacher/reevaluation/:requestId" element={<TeacherReevaluationRescorePage />} />
-            <Route path="teacher/reevaluation" element={<TeacherReevaluationPage />} />
+            {/* Đường dẫn cũ của màn chấm phúc khảo — giữ redirect cho bookmark đã lưu. */}
+            <Route path="teacher/reevaluation/*" element={<Navigate replace to="/teacher/grading" />} />
             <Route path="teacher/grading/:assignmentId" element={<TeacherGradingTaskPage />} />
             <Route path="teacher/grading" element={<TeacherGradingPage />} />
             <Route path="teacher/blueprints/:blueprintId/versions/new" element={<TeacherCreateBlueprintVersionPage />} />

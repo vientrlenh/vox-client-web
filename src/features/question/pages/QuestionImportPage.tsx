@@ -1,8 +1,12 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
+import {
+  buildImportSessionDetailPath,
+  type ImportSessionNavState,
+} from '@/features/imports'
 import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -13,7 +17,6 @@ import {
   usePreviewQuestionImportMutation,
   useAcceptQuestionImportMutation,
 } from '../api/useQuestionImportMutations'
-import { useImportRowsQuery, useImportSessionQuery } from '../api/useImportSessionQuery'
 import { questionQueryKeys } from '../api/useQuestionsQuery'
 import type { PreviewQuestionImportResponse } from '../types'
 
@@ -110,109 +113,6 @@ Không có dữ liệu mẫu để hiển thị.
   )
 }
 
-function ImportProgressPanel({
-  basePath,
-  sessionId,
-}: {
-  basePath: string
-  sessionId: string
-}) {
-  const sessionQuery = useImportSessionQuery(sessionId, { poll: true })
-  const session = sessionQuery.data
-  const isFinished = session
-    ? !['QUEUED', 'VALIDATING', 'IMPORTING'].includes(session.status)
-    : false
-  const invalidRowsQuery = useImportRowsQuery(
-    sessionId,
-    1,
-    20,
-    isFinished ? 'INVALID' : undefined,
-  )
-
-  if (sessionQuery.isError) {
-    return (
-      <section className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">
-        không tải được trạng thái phiên import: {getErrorMessage(sessionQuery.error) ?? 'Loi khong xac dinh.'}
-        <div className="mt-3">
-          <button
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-red-300 bg-white px-4 text-sm font-bold text-red-700"
-            onClick={() => void sessionQuery.refetch()}
-            type="button"
-          >
-Thử lại          </button>
-        </div>
-      </section>
-    )
-  }
-
-  if (sessionQuery.isLoading || !session) {
-    return (
-      <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">
-        Đang tải trạng thái phiên import...
-      </section>
-    )
-  }
-
-  return (
-    <section className="grid gap-5 rounded-lg border border-indigo-200 bg-indigo-50 p-5">
-      <div>
-        <h2 className="text-lg font-black text-indigo-950">
-          {isFinished ? 'Import hoàn tất' : 'Đang xử lý import...'}
-        </h2>
-        <p className="mt-1 text-sm font-semibold text-indigo-800">
-          Trạng thái phiên import: {session.status}
-          {session.failureReason ? ` - ${session.failureReason}` : ''}
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard label="ổng số dòng" value={session.totalRows} />
-        <SummaryCard label="Đã import" value={session.importedRows} />
-        <SummaryCard label="òng lỗi" value={session.invalidRows} />
-        <SummaryCard label="Bỏ qua (trùng)" value={session.skippedRows} />
-      </div>
-
-      {!isFinished ? (
-        <p className="text-sm font-semibold text-indigo-700">
-Đang xử lý        </p>
-      ) : null}
-
-      {isFinished && session.invalidRows > 0 ? (
-        <div className="grid gap-3">
-          <h3 className="text-base font-black text-indigo-950">Cac dong bi loi</h3>
-          <div className="grid gap-2">
-            {invalidRowsQuery.data?.content.map((row) => (
-              <div
-                className="rounded-lg border border-red-200 bg-white p-3 text-sm"
-                key={row.id}
-              >
-                <p className="font-black text-slate-950">Dong {row.rowNumber}</p>
-                <ul className="mt-1 list-disc pl-5 text-red-700">
-                  {row.errors.map((error, index) => (
-                    <li key={index}>
-                      {error.field ? `${error.field}: ` : ''}
-                      {error.message}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {isFinished ? (
-        <Link
-          className="inline-flex h-11 w-fit items-center justify-center rounded-lg bg-indigo-700 px-4 text-sm font-bold text-white transition hover:bg-indigo-800"
-          to={`${basePath}/questions/all`}
-        >
-Quay lại danh sách câu hỏi
-        </Link>
-      ) : null}
-    </section>
-  )
-}
-
 export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -225,7 +125,6 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
   const [preview, setPreview] = useState<PreviewQuestionImportResponse | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [sessionId, setSessionId] = useState<string | null>(null)
 
   const isSystemAdmin = user?.roles?.includes('SYSTEM_ADMIN') ?? false
   const questionBanksQuery = useQuestionBanksQuery('teacher', 0, 100, true, {
@@ -285,13 +184,23 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
 
     try {
       setError(null)
-      const response = await acceptMutation.mutateAsync({
+      await acceptMutation.mutateAsync({
         payload: { confirmedMapping: buildMappingFromSuggestion(preview) },
         sessionId: preview.importSessionId,
       })
-      setMessage(response.message)
-      setSessionId(preview.importSessionId)
       await queryClient.invalidateQueries({ queryKey: questionQueryKeys.all })
+      // Backend import ngầm nên số liệu trả về lúc này chưa phải kết quả cuối:
+      // chuyển sang trang chi tiết phiên import để theo dõi trạng thái file.
+      navigate(
+        buildImportSessionDetailPath(basePath, preview.importSessionId),
+        {
+          state: {
+            invalidateKeys: [questionQueryKeys.all],
+            returnLabel: 'Quay lại danh sách câu hỏi',
+            returnTo: `${basePath}/questions/all`,
+          } satisfies ImportSessionNavState,
+        },
+      )
     } catch (submitError) {
       setError(
         getErrorMessage(submitError) ??
@@ -343,122 +252,116 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
       <FeedbackToast message={error} onClose={() => setError(null)} tone="error" />
 
-      {sessionId ? (
-        <ImportProgressPanel basePath={basePath} sessionId={sessionId} />
-      ) : (
+      <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5 md:grid-cols-2">
+        <label className="grid gap-2 text-sm font-bold text-slate-700">
+          Ngân hàng câu hỏi
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
+            disabled={Boolean(preview)}
+            onChange={(event) => {
+              setQuestionBankId(event.target.value)
+              setQuestionTopicId('')
+            }}
+            value={questionBankId}
+          >
+            <option value="">Chọn ngân hàng</option>
+            {questionBanksQuery.data?.content.map((bank) => (
+              <option key={bank.id} value={bank.id}>
+                {bank.name} ({bank.code})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-2 text-sm font-bold text-slate-700">
+          Chủ đề
+          <select
+            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
+            disabled={Boolean(preview) || !questionBankId}
+            onChange={(event) => setQuestionTopicId(event.target.value)}
+            value={questionTopicId}
+          >
+            <option value="">Chọn chủ đề</option>
+            {questionTopicsQuery.data?.content.map((topic) => (
+              <option key={topic.id} value={topic.id}>
+                {topic.name} ({topic.code})
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
+      <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5">
+        <div>
+          <h2 className="text-lg font-black text-slate-950">Chọn file import</h2>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            Hỗ trợ file .csv, .xlsx và .xls. Phải chọn ngân hàng + chủ đề trước.
+          </p>
+        </div>
+
+        <label
+          className={`grid cursor-pointer place-items-center gap-3 rounded-lg border border-dashed px-4 py-8 text-center transition ${
+            questionBankId && questionTopicId
+              ? 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50'
+              : 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-60'
+          }`}
+        >
+          <span className="text-sm font-black text-slate-950">
+            Chọn file CSV hoặc Excel
+          </span>
+          <input
+            accept=".csv,.xlsx,.xls"
+            className="sr-only"
+            disabled={isBusy || !questionBankId || !questionTopicId}
+            onChange={(event) => {
+              void handleFileChange(event.currentTarget.files?.[0])
+              event.currentTarget.value = ''
+            }}
+            type="file"
+          />
+        </label>
+
+        {previewMutation.isPending ? (
+          <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
+            Đang đọc file import...
+          </div>
+        ) : null}
+      </section>
+
+      {preview ? (
         <>
-          <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5 md:grid-cols-2">
-            <label className="grid gap-2 text-sm font-bold text-slate-700">
-              Ngân hàng câu hỏi
-              <select
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
-                disabled={Boolean(preview)}
-                onChange={(event) => {
-                  setQuestionBankId(event.target.value)
-                  setQuestionTopicId('')
-                }}
-                value={questionBankId}
-              >
-                <option value="">Chọn ngân hàng</option>
-                {questionBanksQuery.data?.content.map((bank) => (
-                  <option key={bank.id} value={bank.id}>
-                    {bank.name} ({bank.code})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-2 text-sm font-bold text-slate-700">
-              Chủ đề
-              <select
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
-                disabled={Boolean(preview) || !questionBankId}
-                onChange={(event) => setQuestionTopicId(event.target.value)}
-                value={questionTopicId}
-              >
-                <option value="">Chọn chủ đề</option>
-                {questionTopicsQuery.data?.content.map((topic) => (
-                  <option key={topic.id} value={topic.id}>
-                    {topic.name} ({topic.code})
-                  </option>
-                ))}
-              </select>
-            </label>
-          </section>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <SummaryCard label="Tên file" value={preview.fileName} />
+            <SummaryCard label="Tổng số dòng" value={preview.totalRows} />
+            <SummaryCard label="Số cột" value={preview.originalHeaders.length} />
+          </div>
 
-          <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5">
-            <div>
-              <h2 className="text-lg font-black text-slate-950">Chọn file import</h2>
-              <p className="mt-1 text-sm font-medium text-slate-500">
-                Hỗ trợ file .csv, .xlsx và .xls. Phải chọn ngân hàng + chủ đề trước.
-              </p>
-            </div>
+          <SampleRowsTable preview={preview} />
 
-            <label
-              className={`grid cursor-pointer place-items-center gap-3 rounded-lg border border-dashed px-4 py-8 text-center transition ${
-                questionBankId && questionTopicId
-                  ? 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50'
-                  : 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-60'
-              }`}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              disabled={isBusy}
+              onClick={() => {
+                setPreview(null)
+                setMessage(null)
+              }}
+              type="button"
             >
-              <span className="text-sm font-black text-slate-950">
-                Chọn file CSV hoặc Excel
-              </span>
-              <input
-                accept=".csv,.xlsx,.xls"
-                className="sr-only"
-                disabled={isBusy || !questionBankId || !questionTopicId}
-                onChange={(event) => {
-                  void handleFileChange(event.currentTarget.files?.[0])
-                  event.currentTarget.value = ''
-                }}
-                type="file"
-              />
-            </label>
-
-            {previewMutation.isPending ? (
-              <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
-                Đang đọc file import...
-              </div>
-            ) : null}
-          </section>
-
-          {preview ? (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <SummaryCard label="Tên file" value={preview.fileName} />
-                <SummaryCard label="Tổng số dòng" value={preview.totalRows} />
-                <SummaryCard label="Số cột" value={preview.originalHeaders.length} />
-              </div>
-
-              <SampleRowsTable preview={preview} />
-
-              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <button
-                  className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-                  disabled={isBusy}
-                  onClick={() => {
-                    setPreview(null)
-                    setMessage(null)
-                  }}
-                  type="button"
-                >
-                  Chọn file khác
-                </button>
-                <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
-                  disabled={isBusy}
-                  onClick={() => {
-                    void handleAccept()
-                  }}
-                  type="button"
-                >
-                  {acceptMutation.isPending ? 'Dang gui...' : 'Xac nhan import'}
-                </button>
-              </div>
-            </>
-          ) : null}
+              Chọn file khác
+            </button>
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+              disabled={isBusy}
+              onClick={() => {
+                void handleAccept()
+              }}
+              type="button"
+            >
+              {acceptMutation.isPending ? 'Dang gui...' : 'Xac nhan import'}
+            </button>
+          </div>
         </>
-      )}
+      ) : null}
     </section>
   )
 }

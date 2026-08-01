@@ -34,7 +34,14 @@ graphqlApiClient.interceptors.request.use((config) => {
   return config
 })
 
-const AUTH_CLASSIFICATIONS = new Set(['UNAUTHORIZED', 'UNAUTHENTICATED', 'FORBIDDEN'])
+// Chỉ các lỗi mà làm mới token có thể cứu được mới nằm ở đây.
+//
+// `FORBIDDEN` cố tình KHÔNG có mặt: nó nghĩa là "đã đăng nhập nhưng không đủ quyền" —
+// refresh không đổi được điều đó, mà đường đi bên dưới lại biến lỗi này thành 401 giả rồi
+// chạy refresh; refresh hỏng là `clearSession` đá người dùng về `/login` chỉ vì họ mở một
+// màn không có quyền. Để `FORBIDDEN` rơi xuống nhánh lỗi GraphQL thường thì `toApiError`
+// hiện được message tiếng Việt do BE trả về.
+const AUTH_CLASSIFICATIONS = new Set(['UNAUTHORIZED', 'UNAUTHENTICATED'])
 
 function hasAuthError(errors: GraphQLErrorResponse[] | undefined) {
   return !!errors?.some((e) => {

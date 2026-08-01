@@ -126,6 +126,99 @@ describe('import session decision mutations', () => {
     )
   })
 
+  it.each([
+    ['SCHOOL_GRADE_LEVEL', 'grade-levels'],
+    ['SCHOOL_GRADE', 'grades'],
+    ['SCHOOL_ROOM', 'rooms'],
+  ])('accepts a %s session via the %s endpoint', async (type, segment) => {
+    mockAcceptResponse()
+
+    await acceptImportSession({
+      confirmedMapping: { Code: 'code' },
+      sessionId: 'session-1',
+      type,
+    })
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      `/v1/schools/${schoolId}/${segment}/import/session-1/accept`,
+      { confirmedMapping: { Code: 'code' } },
+    )
+  })
+
+  it('accepts a QUESTION session via the questions endpoint without a schoolId', async () => {
+    localStorage.clear()
+    saveSession(null)
+    mockAcceptResponse()
+
+    await acceptImportSession({
+      confirmedMapping: { NoiDung: 'questionText' },
+      sessionId: 'session-1',
+      type: 'QUESTION',
+    })
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/questions/import/session-1/accept',
+      { confirmedMapping: { NoiDung: 'questionText' } },
+    )
+  })
+
+  // Rubric và chính sách đánh giá có hai phạm vi; schoolId của chính phiên
+  // import quyết định endpoint, không phải vai trò người đăng nhập.
+  it.each([
+    [
+      'RUBRIC_VERSION',
+      `/v1/rubrics/schools/${schoolId}/rubrics/versions/import/session-1/accept`,
+      '/v1/rubrics/system/rubrics/versions/import/session-1/accept',
+    ],
+    [
+      'RUBRIC_CRITERION',
+      `/v1/rubrics/schools/${schoolId}/rubric-versions/import-sessions/session-1/accept`,
+      '/v1/rubrics/system/rubrics/criterions/import/session-1/accept',
+    ],
+    [
+      'RUBRIC_CRITERION_BAND',
+      `/v1/rubrics/schools/${schoolId}/rubric-criterions/bands/import/session-1/accept`,
+      '/v1/rubrics/system/rubrics/criterions/bands/import/session-1/accept',
+    ],
+    [
+      'RUBRIC_RESULT_BAND',
+      `/v1/rubrics/school/${schoolId}/rubric-versions/result-bands/import/session-1/accept`,
+      '/v1/rubrics/system/versions/result-bands/import/session-1/accept',
+    ],
+    [
+      'ASSESSMENT_POLICY',
+      `/v1/assessment-policies/schools/${schoolId}/import/session-1/accept`,
+      '/v1/assessment-policies/system/import/session-1/accept',
+    ],
+  ])(
+    'routes %s by the session schoolId',
+    async (type, schoolUrl, systemUrl) => {
+      mockAcceptResponse()
+
+      await acceptImportSession({
+        confirmedMapping: { Code: 'code' },
+        schoolId,
+        sessionId: 'session-1',
+        type,
+      })
+
+      expect(apiClient.post).toHaveBeenLastCalledWith(schoolUrl, {
+        confirmedMapping: { Code: 'code' },
+      })
+
+      await acceptImportSession({
+        confirmedMapping: { Code: 'code' },
+        schoolId: null,
+        sessionId: 'session-1',
+        type,
+      })
+
+      expect(apiClient.post).toHaveBeenLastCalledWith(systemUrl, {
+        confirmedMapping: { Code: 'code' },
+      })
+    },
+  )
+
   it('throws for an unsupported import type', async () => {
     await expect(
       acceptImportSession({

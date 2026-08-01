@@ -5,7 +5,7 @@ import { useParams, useNavigate, Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, CheckCircle2, FileSpreadsheet, RefreshCw, Upload } from 'lucide-react';
 import { useAppSelector } from '@/app/store/hooks';
-import { fetchImportSessionStatus } from '@/features/imports';
+import { buildImportSessionDetailPath, type ImportSessionNavState } from '@/features/imports';
 import { usePreviewSchoolRubricVersionImportMutation } from '../api/usePreviewSchoolRubricVersionImportMutation';
 import { useAcceptSchoolRubricVersionImportMutation } from '../api/useAcceptSchoolRubricVersionImportMutation';
 import { rubricVersionQueryKeys } from '../api/useSchoolRubricVersionsQuery';
@@ -13,22 +13,6 @@ import { searchRubricVersionKeys } from '../api/useSearchSchoolRubricVersionsQue
 import { formatRubricImportDate } from '../types';
 import type { PreviewRubricVersionImportResponse } from '../types';
 
-const TERMINAL_IMPORT_STATUSES = ['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'];
-
-// Import chạy ngầm (async) ở BE, nên sau khi accept phải chờ session
-// chuyển sang trạng thái cuối rồi mới invalidate cache + điều hướng,
-// nếu không danh sách version vẫn rỗng cho tới khi người dùng tự F5.
-async function waitForImportSessionToFinish(sessionId: string, maxAttempts = 20, intervalMs = 1500) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const session = await fetchImportSessionStatus(sessionId);
-    const status = session?.status?.trim().toUpperCase();
-    if (status && TERMINAL_IMPORT_STATUSES.includes(status)) {
-      return session;
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  return null;
-}
 
 type PageMessage = {
   text: string;
@@ -201,11 +185,10 @@ export function SchoolAdminRubricVersionImportPage() {
   const [preview, setPreview] = useState<PreviewRubricVersionImportResponse | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<PageMessage | null>(null);
-  const [isWaitingForResult, setIsWaitingForResult] = useState(false);
 
   const missingFields = getMissingRequiredFields(mapping);
   const canAccept = Boolean(preview) && missingFields.length === 0;
-  const isBusy = previewMutation.isPending || acceptMutation.isPending || isWaitingForResult;
+  const isBusy = previewMutation.isPending || acceptMutation.isPending;
 
   async function handleFileChange(file?: File) {
     if (!file) return;
@@ -249,32 +232,24 @@ export function SchoolAdminRubricVersionImportPage() {
 
     try {
       setMessage(null);
-      const response = await acceptMutation.mutateAsync({
+      await acceptMutation.mutateAsync({
         payload: { confirmedMapping: mapping },
         sessionId: preview.importSessionId,
       });
 
-      // BE xử lý import ở hàng đợi ngầm (async), nên phải chờ session
-      // chuyển sang trạng thái cuối rồi mới invalidate cache, nếu không
-      // danh sách version vẫn rỗng cho tới khi người dùng tự F5.
-      setIsWaitingForResult(true);
-      const finishedSession = await waitForImportSessionToFinish(preview.importSessionId);
-      setIsWaitingForResult(false);
-
       await queryClient.invalidateQueries({ queryKey: rubricVersionQueryKeys.all });
       await queryClient.invalidateQueries({ queryKey: searchRubricVersionKeys.all });
 
-      if (finishedSession) {
-        alert(
-          `Import hoàn tất (${finishedSession.status}). Đã import ${finishedSession.importedRows}/${finishedSession.totalRows} dòng.`
-        );
-      } else {
-        alert(response.message || 'Import đang được xử lý trong nền, vui lòng kiểm tra lại sau ít phút.');
-      }
-
-      navigate(`/school-admin/rubrics/${rubricId ?? ''}`);
+      // Backend import ngầm nên số liệu trả về lúc này chưa phải kết quả cuối:
+      // chuyển sang trang chi tiết phiên import để theo dõi trạng thái file.
+      navigate(buildImportSessionDetailPath('/school-admin', preview.importSessionId), {
+        state: {
+          invalidateKeys: [rubricVersionQueryKeys.all, searchRubricVersionKeys.all],
+          returnLabel: 'Quay lại rubric',
+          returnTo: `/school-admin/rubrics/${rubricId ?? ''}`,
+        } satisfies ImportSessionNavState,
+      });
     } catch (error) {
-      setIsWaitingForResult(false);
       setMessage({
         text: getErrorMessage(error) ?? 'Không thể xác nhận import phiên bản. Vui lòng thử lại.',
         tone: 'error',
@@ -416,11 +391,7 @@ export function SchoolAdminRubricVersionImportPage() {
               type="button"
             >
               <CheckCircle2 aria-hidden="true" className="size-4" />
-              {isWaitingForResult
-                ? 'Đang xử lý dữ liệu...'
-                : acceptMutation.isPending
-                  ? 'Đang gửi yêu cầu...'
-                  : 'Xác nhận import'}
+              {acceptMutation.isPending ? 'Đang gửi yêu cầu...' : 'Xác nhận import'}
             </button>
           </div>
         </>

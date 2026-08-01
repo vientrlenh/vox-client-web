@@ -84,6 +84,11 @@ const navigationItems = [
     to: '/school-admin/students',
   },
   {
+    icon: GraduationCap,
+    label: 'Khung năng lực',
+    to: '/school-admin/frameworks',
+  },
+  {
     icon: Presentation,
     label: 'Quản lý Giáo viên',
     to: '/school-admin/teachers',
@@ -110,7 +115,7 @@ const navigationItems = [
   },
   {
     icon: Gavel,
-    label: 'Quản lý Quy tắc tính điểm',
+    label: 'Quản lý quy tắc tính điểm',
     to: '/school-admin/scoring-rules',
   },
   {
