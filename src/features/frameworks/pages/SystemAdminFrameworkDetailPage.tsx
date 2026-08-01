@@ -99,7 +99,7 @@ function FrameworkDetailPage({ basePath }: { basePath: string }) {
     } catch (error) {
       setEditError(
         getErrorMessage(error) ??
-          'Không thể cập nhật framework. Vui lòng thử lại.',
+          'Không thể cập nhật khung đánh giá năng lực. Vui lòng thử lại.',
       )
     }
   }
@@ -146,7 +146,7 @@ function FrameworkDetailPage({ basePath }: { basePath: string }) {
       setPageMessage({
         text:
           getErrorMessage(error) ??
-          'Không thể đổi trạng thái framework. Vui lòng thử lại.',
+          'Không thể đổi trạng thái khung đánh giá năng lực. Vui lòng thử lại.',
         tone: 'error',
       })
     }
@@ -231,7 +231,7 @@ function FrameworkDetailPage({ basePath }: { basePath: string }) {
           to={`${basePath}/frameworks`}
         >
           <ChevronLeft aria-hidden="true" className="size-4" />
-          Danh sách framework
+          Danh sách khung đánh giá năng lực
         </Link>
       </div>
 
@@ -249,7 +249,7 @@ function FrameworkDetailPage({ basePath }: { basePath: string }) {
         <div className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-white px-6 py-12 text-center">
           <p className="text-sm font-bold text-red-600">
             {getErrorMessage(frameworkQuery.error) ??
-              'Không thể tải thông tin framework.'}
+              'Không thể tải thông tin khung đánh giá năng lực.'}
           </p>
           <button
             className="mt-4 inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"

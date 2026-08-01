@@ -68,7 +68,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     icon: BookOpen,
-    label: 'Quản lý framework',
+    label: 'Quản lý khung đánh giá năng lực',
     to: '/system-admin/frameworks',
   },
   {
@@ -255,7 +255,7 @@ function SystemAdminSidebar({
         Quản trị hệ thống
       </p>
 
-      <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-2 [mask-image:linear-gradient(to_bottom,black,black_calc(100%-24px),transparent)] [scrollbar-color:rgba(255,255,255,0.28)_transparent] scrollbar-thin">
+      <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-2 mask-[linear-gradient(to_bottom,black,black_calc(100%-24px),transparent)] [scrollbar-color:rgba(255,255,255,0.28)_transparent] scrollbar-thin">
         <div className="flex min-h-full flex-col gap-6 pb-6">
           <nav aria-label="Quản trị hệ thống" className="grid gap-3">
             {navigationItems.map(({ icon: Icon, label, to }) => (

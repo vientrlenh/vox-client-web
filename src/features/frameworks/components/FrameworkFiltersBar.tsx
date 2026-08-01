@@ -20,10 +20,10 @@ export function FrameworkFiltersBar({
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
           />
           <input
-            aria-label="Tìm kiếm framework"
+            aria-label="Tìm kiếm khung đánh giá năng lực"
             className="h-11 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             onChange={(event) => onChange('search', event.target.value)}
-            placeholder="Tên framework"
+            placeholder="Tên khung đánh giá năng lực"
             type="search"
             value={filters.search}
           />
@@ -33,7 +33,7 @@ export function FrameworkFiltersBar({
       <label className="grid gap-2 text-sm font-bold text-blue-950">
         Trạng thái
         <select
-          aria-label="Lọc trạng thái framework"
+          aria-label="Lọc trạng thái khung đánh giá năng lực"
           className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-blue-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
           onChange={(event) => onChange('isActive', event.target.value)}
           value={filters.isActive}

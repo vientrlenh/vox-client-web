@@ -27,11 +27,11 @@ export function FrameworkPagination({
 
   return (
     <div className="flex flex-col gap-4 border-t border-slate-200 px-6 py-5 text-sm text-blue-950 md:flex-row md:items-center md:justify-between">
-      <p>Tổng {totalElements} framework</p>
+      <p>Tổng {totalElements} khung đánh giá năng lực</p>
 
       <div className="flex flex-wrap items-center gap-3">
         <select
-          aria-label="Số framework mỗi trang"
+          aria-label="Số khung đánh giá năng lực mỗi trang"
           className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-blue-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
           disabled={isDisabled}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}

@@ -34,10 +34,10 @@ export function FrameworkDeleteDialog({
             className="text-xl font-black text-blue-950"
             id="framework-delete-title"
           >
-            Xóa framework
+            Xóa Khung đánh giá năng lực
           </h2>
           <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-            Framework{' '}
+            Khung đánh giá năng lực{' '}
             <span className="font-bold text-blue-950">
               {formatNullableText(framework.name)}
             </span>{' '}
@@ -70,7 +70,7 @@ export function FrameworkDeleteDialog({
             type="button"
           >
             <Trash2 aria-hidden="true" className="size-4" />
-            {isSubmitting ? 'Đang xóa...' : 'Xóa framework'}
+            {isSubmitting ? 'Đang xóa...' : 'Xóa khung đánh giá năng lực'}
           </button>
         </div>
       </section>

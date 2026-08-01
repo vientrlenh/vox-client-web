@@ -157,7 +157,7 @@ function FrameworksPage({ basePath }: { basePath: string }) {
       setFormTarget(null)
     } catch (error) {
       setFormError(
-        getErrorMessage(error) ?? 'Không thể tạo framework. Vui lòng thử lại.',
+        getErrorMessage(error) ?? 'Không thể tạo khung đánh giá năng lực. Vui lòng thử lại.',
       )
     }
   }
@@ -177,7 +177,7 @@ function FrameworksPage({ basePath }: { basePath: string }) {
     } catch (error) {
       setFormError(
         getErrorMessage(error) ??
-          'Không thể cập nhật framework. Vui lòng thử lại.',
+          'Không thể cập nhật khung đánh giá năng lực. Vui lòng thử lại.',
       )
     }
   }
@@ -197,7 +197,7 @@ function FrameworksPage({ basePath }: { basePath: string }) {
     } catch (error) {
       setDeleteError(
         getErrorMessage(error) ??
-          'Không thể xóa framework. Vui lòng thử lại.',
+          'Không thể xóa khung đánh giá năng lực. Vui lòng thử lại.',
       )
     }
   }
@@ -228,7 +228,7 @@ function FrameworksPage({ basePath }: { basePath: string }) {
       setPageMessage({
         text:
           getErrorMessage(error) ??
-          'Không thể vô hiệu hóa framework. Vui lòng thử lại.',
+          'Không thể vô hiệu hóa khung đánh giá năng lực. Vui lòng thử lại.',
         tone: 'error',
       })
     }

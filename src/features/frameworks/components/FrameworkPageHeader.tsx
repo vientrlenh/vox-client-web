@@ -18,10 +18,10 @@ export function FrameworkPageHeader({
           className="text-2xl font-black text-blue-950 sm:text-3xl"
           id="system-admin-frameworks-title"
         >
-          Quản lý framework
+          Quản lý khung đánh giá năng lực
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Tạo, cập nhật và quản lý trạng thái các framework đánh giá kỹ năng nói.
+          Tạo, cập nhật và quản lý trạng thái các khung đánh giá năng lực đánh giá kỹ năng nói.
         </p>
       </div>
 
@@ -45,7 +45,7 @@ export function FrameworkPageHeader({
             type="button"
           >
             <Plus aria-hidden="true" className="size-4" />
-            Tạo framework
+            Tạo khung đánh giá năng lực
           </button>
         ) : null}
       </div>

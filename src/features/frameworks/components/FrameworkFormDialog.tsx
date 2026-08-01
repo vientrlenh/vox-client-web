@@ -64,19 +64,19 @@ function validateForm(state: FormState, isEditMode: boolean): FieldErrors {
 
   if (!isEditMode) {
     if (!values.code) {
-      errors.code = 'Mã framework không được để trống.'
+      errors.code = 'Mã khung đánh giá năng lực không được để trống.'
     } else if (values.code.length > 100) {
-      errors.code = 'Mã framework không được vượt quá 100 ký tự.'
+      errors.code = 'Mã khung đánh giá năng lực không được vượt quá 100 ký tự.'
     } else if (!/^[A-Z0-9_-]+$/.test(values.code)) {
       errors.code =
-        'Mã framework chỉ được chứa chữ hoa, số, gạch dưới và gạch ngang.'
+        'Mã khung đánh giá năng lực chỉ được chứa chữ hoa, số, gạch dưới và gạch ngang.'
     }
   }
 
   if (!values.name) {
-    errors.name = 'Tên framework không được để trống.'
+    errors.name = 'Tên khung đánh giá năng lực không được để trống.'
   } else if (values.name.length > 200) {
-    errors.name = 'Tên framework không được vượt quá 200 ký tự.'
+    errors.name = 'Tên khung đánh giá năng lực không được vượt quá 200 ký tự.'
   }
 
   if (values.description.length > 2048) {
@@ -143,11 +143,11 @@ export function FrameworkFormDialog({
     )
   }
 
-  const title = isEditMode ? 'Cập nhật framework' : 'Tạo framework'
+  const title = isEditMode ? 'Cập nhật khung đánh giá năng lực' : 'Tạo khung đánh giá năng lực'
   const description = isEditMode
-    ? 'Chỉnh sửa thông tin framework.'
-    : 'Thêm một framework đánh giá mới vào hệ thống.'
-  const submitLabel = isEditMode ? 'Lưu thay đổi' : 'Tạo framework'
+    ? 'Chỉnh sửa thông tin khung đánh giá năng lực.'
+    : 'Thêm một khung đánh giá năng lực đánh giá mới vào hệ thống.'
+  const submitLabel = isEditMode ? 'Lưu thay đổi' : 'Tạo khung đánh giá năng lực'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
@@ -170,7 +170,7 @@ export function FrameworkFormDialog({
             </p>
           </div>
           <button
-            aria-label="Đóng biểu mẫu framework"
+            aria-label="Đóng biểu mẫu khung đánh giá năng lực"
             className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSubmitting}
             onClick={onClose}
@@ -184,7 +184,7 @@ export function FrameworkFormDialog({
           <form className="grid gap-5" onSubmit={handleSubmit}>
             {!isEditMode ? (
               <label className="grid gap-2 text-sm font-bold text-blue-950">
-                <span className="whitespace-nowrap">Mã framework <span className="text-red-500">*</span></span>
+                <span className="whitespace-nowrap">Mã khung đánh giá năng lực <span className="text-red-500">*</span></span>
                 <input
                   autoComplete="off"
                   className={`h-11 rounded-lg border px-3 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50 ${fieldErrors.code ? 'border-red-500' : 'border-slate-200'}`}
@@ -206,14 +206,14 @@ export function FrameworkFormDialog({
             ) : null}
 
             <label className="grid gap-2 text-sm font-bold text-blue-950">
-              <span className="whitespace-nowrap">Tên framework <span className="text-red-500">*</span></span>
+              <span className="whitespace-nowrap">Tên khung đánh giá năng lực <span className="text-red-500">*</span></span>
               <input
                 autoComplete="off"
                 className={`h-11 rounded-lg border px-3 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50 ${fieldErrors.name ? 'border-red-500' : 'border-slate-200'}`}
                 disabled={isSubmitting}
                 maxLength={200}
                 onChange={(event) => updateField('name', event.target.value)}
-                placeholder="Ví dụ: Framework THPT"
+                placeholder="Ví dụ: Khung đánh giá năng lực KNLNNVN"
                 required
                 value={form.name}
               />
@@ -233,7 +233,7 @@ export function FrameworkFormDialog({
                 onChange={(event) =>
                   updateField('description', event.target.value)
                 }
-                placeholder="Nhập mô tả framework nếu cần"
+                placeholder="Nhập mô tả khung đánh giá năng lực nếu cần"
                 value={form.description}
               />
               <span className="text-xs font-medium text-slate-500">
@@ -253,7 +253,7 @@ export function FrameworkFormDialog({
                     Đang hoạt động
                   </span>
                   <span className="mt-1 block text-xs font-medium text-slate-500">
-                    Framework không hoạt động sẽ không xuất hiện trong đánh giá.
+                    Khung đánh giá năng lực không hoạt động sẽ không xuất hiện trong đánh giá.
                   </span>
                 </span>
                 <input
