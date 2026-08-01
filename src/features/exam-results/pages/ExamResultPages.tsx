@@ -22,7 +22,6 @@ import { examQueryKeys, useExamCandidatesQuery, useExamQuery } from '@/features/
 import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
 import { Pagination } from '@/shared/components/Pagination'
 import { formatPublishedResult } from '@/shared/lib/resultScore'
-import { AudioReplayButton } from '@/shared/ui/AudioReplayButton'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
@@ -424,15 +423,19 @@ function AttemptRows({
 
 function ExamResultsListPage({
   detailBasePath,
+  examIdOverride,
+  title = 'Kết quả kỳ thi',
   userRole,
 }: {
   detailBasePath: string
+  examIdOverride?: string | null
+  title?: string
   userRole: ExamResultsUserRole
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
-  const examId = searchParams.get('examId')
+  const examId = examIdOverride ?? searchParams.get('examId')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [page, setPage] = useState(1)
@@ -494,7 +497,7 @@ function ExamResultsListPage({
       <section className="mx-auto max-w-240">
         <StatePanel
           description="Trang này cần `examId` để nạp danh sách kết quả."
-          title="Kết quả kỳ thi"
+          title={title}
           tone="info"
         />
       </section>
@@ -517,7 +520,7 @@ function ExamResultsListPage({
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">Kết quả kỳ thi</h1>
+          <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">{title}</h1>
           <p className="mt-2 text-[15px] text-slate-500">
             {examQuery.data ? `${examQuery.data.name} • ${examQuery.data.code}` : 'Đang tải thông tin kỳ thi...'}
           </p>
@@ -666,7 +669,7 @@ function SectionOverview({ result }: { result: ExamCandidateResultDto }) {
   )
 }
 
-function QuestionEvaluationCard({
+export function QuestionEvaluationCard({
   evaluation,
   itemResult,
   open,
@@ -788,15 +791,20 @@ function QuestionEvaluationCard({
               <div className="grid gap-4">
                 {evaluation.turns.map((turn) => (
                   <div className="rounded-xl border border-slate-200 p-4" key={turn.id}>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
                       <div>
                         <p className="text-sm font-extrabold text-slate-900">
                           {turn.turnType === 'FOLLOWUP' ? `Follow-up ${turn.turnOrder}` : `Turn ${turn.turnOrder}`}
                         </p>
                         {turn.promptText ? <p className="mt-1 text-sm leading-6 text-slate-600">{turn.promptText}</p> : null}
                       </div>
-                      <AudioReplayButton audioUrl={turn.audioUrl} />
                     </div>
+
+                    {turn.audioUrl ? (
+                      <audio className="mt-3 w-full" controls preload="none" src={turn.audioUrl}>
+                        Trình duyệt của bạn không hỗ trợ phát âm thanh.
+                      </audio>
+                    ) : null}
 
                     <div className="mt-4">
                       <WordFeedbackText
@@ -1299,4 +1307,24 @@ export function SchoolAdminExamResultDetailPage() {
 
 export function TeacherExamResultDetailPage() {
   return <ExamResultDetailPage gradingPath="/teacher/grading" />
+}
+
+export function SchoolAdminClassTestResultsListPage() {
+  const { examId } = useParams()
+  return <ExamResultsListPage detailBasePath={`/school-admin/class-tests/${examId}/results`} examIdOverride={examId} title="Kết quả bài trên lớp" userRole="SCHOOL_ADMIN" />
+}
+
+export function TeacherClassTestResultsListPage() {
+  const { examId } = useParams()
+  return <ExamResultsListPage detailBasePath={`/teacher/class-tests/${examId}/results`} examIdOverride={examId} title="Kết quả bài trên lớp" userRole="TEACHER" />
+}
+
+export function SchoolAdminClassTestResultDetailPage() {
+  const { examId } = useParams()
+  return <ExamResultDetailPage gradingPath={`/school-admin/class-tests/${examId}/grading`} />
+}
+
+export function TeacherClassTestResultDetailPage() {
+  const { examId } = useParams()
+  return <ExamResultDetailPage gradingPath={`/teacher/class-tests/${examId}/grading`} />
 }

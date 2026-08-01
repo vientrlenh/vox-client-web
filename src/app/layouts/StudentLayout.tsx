@@ -2,7 +2,10 @@ import { useState } from 'react'
 import {
   Bell,
   BookOpenCheck,
+  CalendarDays,
   ChevronDown,
+  ClipboardList,
+  FileText,
   LogOut,
   Menu,
   Search,
@@ -84,7 +87,37 @@ function StudentSidebar({
           to="/student/exams"
         >
           <BookOpenCheck aria-hidden="true" className="size-5 shrink-0" />
-          <span>Bài thi của tôi</span>
+          <span>Bài kiểm tra của tôi</span>
+        </NavLink>
+        <NavLink
+          className={({ isActive }) =>
+            ['flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition', isActive ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20' : 'text-cyan-50/90 hover:bg-white/10 hover:text-white'].join(' ')
+          }
+          onClick={onNavigate}
+          to="/student/class-tests"
+        >
+          <ClipboardList aria-hidden="true" className="size-5 shrink-0" />
+          <span>Bài tập của tôi</span>
+        </NavLink>
+        <NavLink
+          className={({ isActive }) =>
+            ['flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition', isActive ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20' : 'text-cyan-50/90 hover:bg-white/10 hover:text-white'].join(' ')
+          }
+          onClick={onNavigate}
+          to="/student/schedule"
+        >
+          <CalendarDays aria-hidden="true" className="size-5 shrink-0" />
+          <span>Lịch thi</span>
+        </NavLink>
+        <NavLink
+          className={({ isActive }) =>
+            ['flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition', isActive ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20' : 'text-cyan-50/90 hover:bg-white/10 hover:text-white'].join(' ')
+          }
+          onClick={onNavigate}
+          to="/student/appeals"
+        >
+          <FileText aria-hidden="true" className="size-5 shrink-0" />
+          <span>Đơn phúc khảo</span>
         </NavLink>
       </nav>
 
