@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
+import {
+  parseJsonField,
+  type ExamEvaluationSignalsDto,
+  type ExamValidityDto,
+} from '@/shared/lib/aiEvaluation'
+import type { WordFeedback } from '@/shared/ui/WordFeedbackText'
 import type {
   AiQualityReport,
   AssignableTeacher,
@@ -11,8 +17,22 @@ import type {
   GradingStats,
   GradingTask,
   GradingTaskDetail,
+  GradingTaskItem,
+  GradingTurn,
   ResultStatusHistoryEntry,
 } from '../types'
+
+/** Hình dạng thô trên dây: mấy trường JSON còn là chuỗi. */
+type RawGradingTaskDetail = Omit<GradingTaskDetail, 'items'> & {
+  items: (Omit<GradingTaskItem, 'aiSignals' | 'aiValidity' | 'turns'> & {
+    aiSignals?: string | null
+    aiValidity?: string | null
+    turns: (Omit<GradingTurn, 'pronunciationOverall' | 'wordFeedback'> & {
+      pronunciationOverall?: string | null
+      wordFeedback?: string | null
+    })[]
+  })[]
+}
 
 const CRITERION_SCORE_FIELDS = `
   criterionId
@@ -30,6 +50,10 @@ const TURN_FIELDS = `
   audioUrl
   transcript
   durationSeconds
+  wordCount
+  asrConfidence
+  pronunciationOverall
+  wordFeedback
 `
 
 const GRADING_ASSIGNMENTS_QUERY = `
@@ -170,10 +194,21 @@ const GRADING_TASK_DETAIL_QUERY = `
         paperItemId
         responseId
         partLabel
+        sectionId
+        orderInSection
         currentItemScore
         currentFeedbackSummary
         currentScores { ${CRITERION_SCORE_FIELDS} }
         turns { ${TURN_FIELDS} }
+        aiScores { ${CRITERION_SCORE_FIELDS} }
+        aiOverallConfidence
+        aiFeedbackSummary
+        aiRequiresHumanReview
+        aiReviewReasonCode
+        aiMarkedInvalid
+        aiRequiresRetake
+        aiSignals
+        aiValidity
       }
       criteria {
         id
@@ -343,12 +378,30 @@ export async function fetchMyGradingTasks(input: FetchMyGradingTasksInput) {
   return data.myGradingTasks
 }
 
-export async function fetchGradingTaskDetail(assignmentId: string) {
-  const data = await graphQLRequest<{ gradingTaskDetail: GradingTaskDetail }>(
+/**
+ * BE trả signals/validity/wordFeedback dưới dạng chuỗi JSON (cùng quy ước với
+ * `examItemResponseEvaluation`), nên parse ngay tại tầng fetch — component không phải
+ * biết là dữ liệu từng đi qua dây dưới dạng chuỗi.
+ */
+export async function fetchGradingTaskDetail(assignmentId: string): Promise<GradingTaskDetail> {
+  const data = await graphQLRequest<{ gradingTaskDetail: RawGradingTaskDetail }>(
     GRADING_TASK_DETAIL_QUERY,
     { assignmentId },
   )
-  return data.gradingTaskDetail
+  const detail = data.gradingTaskDetail
+  return {
+    ...detail,
+    items: detail.items.map((item) => ({
+      ...item,
+      aiSignals: parseJsonField<ExamEvaluationSignalsDto>(item.aiSignals),
+      aiValidity: parseJsonField<ExamValidityDto>(item.aiValidity),
+      turns: item.turns.map((turn) => ({
+        ...turn,
+        pronunciationOverall: parseJsonField(turn.pronunciationOverall),
+        wordFeedback: parseJsonField<WordFeedback[]>(turn.wordFeedback),
+      })),
+    })),
+  }
 }
 
 export async function fetchAssignableTeachers(search?: string) {

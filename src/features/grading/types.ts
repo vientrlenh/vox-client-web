@@ -1,4 +1,6 @@
+import type { ExamEvaluationSignalsDto, ExamValidityDto } from '@/shared/lib/aiEvaluation'
 import type { StatusTone } from '@/shared/ui/StatusBadge'
+import type { WordFeedback } from '@/shared/ui/WordFeedbackText'
 
 // Enum BE dùng CHỮ HOA — dùng thẳng, không map qua chữ thường (chuẩn hoá tại một chỗ).
 // BE cố tình chỉ có 2 trạng thái: nộp cả bài trong một lần nên KHÔNG có IN_PROGRESS.
@@ -46,6 +48,8 @@ export type ExamCandidateResultStatus =
   | 'FAILED'
 
 // Một lượt hỏi-đáp. Một phần thi có NHIỀU lượt, mỗi lượt audio/transcript riêng.
+// `wordFeedback`/`pronunciationOverall` là JSON string trên dây, ĐÃ parse ở
+// `fetchGradingTaskDetail` — component nhận thẳng object.
 export type GradingTurn = {
   id: string
   turnOrder?: number | null
@@ -54,6 +58,10 @@ export type GradingTurn = {
   audioUrl?: string | null
   transcript?: string | null
   durationSeconds?: number | null
+  wordCount?: number | null
+  asrConfidence?: number | null
+  pronunciationOverall?: unknown
+  wordFeedback?: WordFeedback[] | null
 }
 
 export type GradingCriterionScore = {
@@ -81,15 +89,34 @@ export type GradingCriterionMeta = {
   required: boolean
 }
 
+/**
+ * MỘT CÂU HỎI cần chấm, không phải một phần thi — `partLabel` là tiêu đề section nên
+ * nhiều câu dùng chung một nhãn, `sectionId` + `orderInSection` mới phân biệt được.
+ *
+ * Các trường `ai*` lấy từ BẢN AI, không phải bản đang hiệu lực: sau khi chấm tay, bản
+ * hiệu lực là bản của giáo viên và không còn signals/turn/rationale của AI.
+ */
 export type GradingTaskItem = {
   paperItemId: string
   responseId: string
   partLabel?: string | null
+  sectionId?: string | null
+  orderInSection: number
   // Điểm của bản chấm đang có hiệu lực (lần đầu là bản AI) — mốc để đối chiếu.
   currentItemScore?: number | null
   currentFeedbackSummary?: string | null
   currentScores: GradingCriterionScore[]
   turns: GradingTurn[]
+  aiScores: GradingCriterionScore[]
+  aiOverallConfidence?: number | null
+  aiFeedbackSummary?: string | null
+  aiRequiresHumanReview: boolean
+  aiReviewReasonCode?: string | null
+  aiMarkedInvalid: boolean
+  aiRequiresRetake: boolean
+  // JSON string trên dây, ĐÃ parse ở `fetchGradingTaskDetail`.
+  aiSignals?: ExamEvaluationSignalsDto | null
+  aiValidity?: ExamValidityDto | null
 }
 
 /**
@@ -129,6 +156,8 @@ export type GradingTask = {
   candidateResultId: string
   resultCode: string
   examName?: string | null
+  // Tên field theo BE, nhưng BE đếm số RESPONSE — tức số CÂU phải chấm, không phải
+  // số phần thi. Hiển thị là "câu".
   partCount: number
   roundType: GradingRoundType
   status: GradingAssignmentStatus
@@ -438,6 +467,26 @@ export function suggestedRoundFor(
     default:
       return null
   }
+}
+
+/**
+ * Nhãn của MỘT câu: "Part 1 · Câu 2". Chỉ ghép số câu khi phần đó có nhiều hơn một
+ * câu — bài mỗi phần một câu thì thêm "· Câu 1" chỉ làm nhãn dài ra vô ích.
+ *
+ * Gộp theo `sectionId` chứ KHÔNG theo `partLabel`: hai section hoàn toàn có thể trùng
+ * tiêu đề, gộp theo tên sẽ đánh số câu xuyên qua ranh giới phần.
+ */
+export function itemLabel(item: GradingTaskItem, items: GradingTaskItem[]): string {
+  const fallbackIndex = items.indexOf(item)
+  const part = item.partLabel ?? `Phần ${fallbackIndex + 1}`
+  const sectionKey = item.sectionId ?? item.paperItemId
+  const siblings = items.filter((other) => (other.sectionId ?? other.paperItemId) === sectionKey)
+  return siblings.length > 1 ? `${part} · Câu ${item.orderInSection}` : part
+}
+
+/** Số phần thi thật sự (số section riêng biệt), khác `items.length` là số CÂU. */
+export function countSections(items: GradingTaskItem[]): number {
+  return new Set(items.map((item) => item.sectionId ?? item.paperItemId)).size
 }
 
 /** Đã nhập điểm cho MỌI tiêu chí bắt buộc của mọi phần thi hay chưa. */

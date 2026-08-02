@@ -1,3 +1,4 @@
+import type { ExamEvaluationSignalsDto, ExamValidityDto } from '@/shared/lib/aiEvaluation'
 import type { StatusTone } from '@/shared/ui/StatusBadge'
 
 export type StudentExamSummaryDto = {
@@ -71,23 +72,12 @@ export type ExamItemCriterionScoreDto = {
   rubricCriterionId: string
 }
 
-export type ExamValidityRuleResultDto = {
-  action?: string | null
-  blocking?: boolean | null
-  category?: string | null
-  evidence?: Record<string, unknown> | null
-  message?: string | null
-  ruleId?: string | null
-  severity?: string | null
-  targetCriteria?: string[] | null
-}
-
-export type ExamValidityDto = {
-  action?: string | null
-  overallSeverity?: string | null
-  ruleResults?: ExamValidityRuleResultDto[] | null
-  validForScoring?: boolean | null
-}
+// Cách đọc kết quả AI dùng chung với màn chấm của giáo viên — xem `@/shared/lib/aiEvaluation`.
+export type {
+  ExamEvaluationSignalsDto,
+  ExamValidityDto,
+  ExamValidityRuleResultDto,
+} from '@/shared/lib/aiEvaluation'
 
 export type PhonemeFeedbackDto = {
   accuracyScore?: number | null
@@ -118,27 +108,6 @@ export type ExamItemEvaluationTurnDto = {
   turnType: string
   wordCount?: number | null
   wordFeedback?: WordFeedbackDto[] | null
-}
-
-export type ExamEvaluationSignalsDto = {
-  asrConfidenceAvg?: number | null
-  audioGateReasonCodes?: string[] | null
-  audioGateStatus?: 'HARD_FAIL' | 'PASS' | 'SOFT_WARN' | 'UNKNOWN' | null
-  audioQuality?: number | null
-  codeSwitchingRatio?: number | null
-  confidenceMode?: 'HIGH_STAKES' | 'MOCK_TEST' | 'PRACTICE' | null
-  durationSeconds?: number | null
-  evidenceReasonCodes?: string[] | null
-  evidenceStatus?: 'INSUFFICIENT_EVIDENCE' | 'SUFFICIENT' | null
-  expectedMinWords?: number | null
-  lengthRatio?: number | null
-  offTopicRatio?: number | null
-  sentenceCount?: number | null
-  silenceRatio?: number | null
-  speechRate?: number | null
-  topicRelevanceScore?: number | null
-  uncertaintyType?: 'INSUFFICIENT_EVIDENCE' | 'MIXED' | 'NONE' | 'SYSTEM_UNCERTAINTY' | null
-  wordCount?: number | null
 }
 
 export type ExamItemEvaluationDto = {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiClient, graphQLRequest } from '@/shared/api'
+import { parseJsonField } from '@/shared/lib/aiEvaluation'
 import type {
   ExamCandidateResultDto,
   ExamItemEvaluationDto,
@@ -152,18 +153,6 @@ export const examResultQueryKeys = {
   evaluation: (answerId: string | null) => [...examResultQueryKeys.all, 'evaluation', answerId] as const,
   myExams: () => [...examResultQueryKeys.all, 'my-exams'] as const,
   session: (sessionId: string | null) => [...examResultQueryKeys.all, 'session', sessionId] as const,
-}
-
-function parseJsonField<T>(value: string | null | undefined): T | null {
-  if (!value) {
-    return null
-  }
-
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return null
-  }
 }
 
 export async function fetchMyExams() {

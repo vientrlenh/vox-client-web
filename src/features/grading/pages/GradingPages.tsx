@@ -66,6 +66,7 @@ import {
   useGradingTaskDetailQuery,
   useMyGradingTasksQuery,
 } from '../api/useGradingQueries'
+import { AiEvaluationSummary } from '../components/AiEvaluationSummary'
 import { AiQualityPanel } from '../components/AiQualityPanel'
 import { AssignTeacherDialog } from '../components/AssignTeacherDialog'
 import { AutoAssignDialog } from '../components/AutoAssignDialog'
@@ -79,8 +80,10 @@ import { ResultHistoryDialog } from '../components/ResultHistoryDialog'
 import { SegmentedControl, type SegmentItem } from '../components/SegmentedControl'
 import { SetDeadlineDialog } from '../components/SetDeadlineDialog'
 import { SubmitGradingDialog } from '../components/SubmitGradingDialog'
+import { ValidityRulesCard } from '../components/ValidityRulesCard'
 import {
   avatarClasses,
+  countSections,
   describeReclaimResult,
   formatIsoDateTime,
   formatScore,
@@ -90,6 +93,7 @@ import {
   getRoundTypeDisplay,
   initials,
   isEveryRequiredCriterionFilled,
+  itemLabel,
   type ExamCandidateResultStatus,
   type GradingAssignmentRow,
   type GradingAssignmentStatus,
@@ -215,10 +219,14 @@ function BackButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-/** Tab theo từng phần thi: value là paperItemId, nhãn lấy partLabel (thiếu thì "Phần N"). */
+/**
+ * Tab theo từng CÂU HỎI (mỗi item là một câu, không phải một phần): value là
+ * paperItemId, nhãn do `itemLabel` dựng để hai câu cùng một phần không hiện hai tab
+ * trùng tên.
+ */
 function itemTabItems(items: GradingTaskItem[]): SegmentItem[] {
-  return items.map((item, index) => ({
-    label: item.partLabel ?? `Phần ${index + 1}`,
+  return items.map((item) => ({
+    label: itemLabel(item, items),
     value: item.paperItemId,
   }))
 }
@@ -1283,7 +1291,7 @@ export function TeacherGradingPage({ fixedExamId, title = 'Bài cần chấm' }:
                             {task.examName ?? '—'}
                           </div>
                           <div className="text-[11px] font-medium tabular-nums text-slate-400">
-                            {task.partCount} phần · giao {formatIsoDateTime(task.assignedAt)}
+                            {task.partCount} câu · giao {formatIsoDateTime(task.assignedAt)}
                           </div>
                         </div>
                       </td>
@@ -1596,8 +1604,9 @@ function GradingTaskDetailView({
             <StatusBadge label={resultDisplay.label} tone={resultDisplay.tone} />
           </div>
           <p className="mt-1.5 text-xs font-medium text-slate-500">
-            {detail.examName ?? 'Kỳ thi'} · {detail.items.length} phần thi ·{' '}
-            {detail.criteria.length} tiêu chí
+            {/* items là danh sách CÂU, không phải phần thi — một phần có thể nhiều câu. */}
+            {detail.examName ?? 'Kỳ thi'} · {detail.items.length} câu ·{' '}
+            {countSections(detail.items)} phần thi · {detail.criteria.length} tiêu chí
             {detail.scoreBefore != null ? (
               <>
                 {' '}
@@ -1699,12 +1708,13 @@ function GradingTaskDetailView({
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                     <Mic className="size-4 text-cyan-700" />
-                    Bản ghi bài nói · {item.partLabel ?? 'Phần thi'}
+                    Bản ghi bài nói · {itemLabel(item, detail.items)}
                   </div>
                   <span className="text-[11px] font-semibold text-slate-400">
                     {item.turns.length} lượt
                   </span>
                 </div>
+                <AiEvaluationSummary item={item} />
                 <div className="mt-3.5">
                   <GradingTurnList turns={item.turns} />
                 </div>
@@ -1719,14 +1729,16 @@ function GradingTaskDetailView({
                 </div>
               </div>
 
+              <ValidityRulesCard item={item} />
+
               {canRegrade ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-5">
                   <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                     <ClipboardList className="size-4 text-cyan-700" />
-                    Nhận xét · {item.partLabel ?? 'Phần thi'}
+                    Nhận xét · {itemLabel(item, detail.items)}
                   </div>
                   <textarea
-                    aria-label={`Nhận xét cho ${item.partLabel ?? 'phần thi'}`}
+                    aria-label={`Nhận xét cho ${itemLabel(item, detail.items)}`}
                     className="mt-3 min-h-24 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[13px] leading-relaxed text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
                     disabled={readOnly}
                     maxLength={2048}
@@ -1736,7 +1748,7 @@ function GradingTaskDetailView({
                         [item.paperItemId]: event.target.value,
                       }))
                     }
-                    placeholder="Nhận xét riêng cho phần thi này…"
+                    placeholder="Nhận xét riêng cho câu này…"
                     value={feedback[item.paperItemId] ?? ''}
                   />
                 </div>
@@ -1750,7 +1762,7 @@ function GradingTaskDetailView({
                 <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
                   <div>
                     <div className="text-[13px] font-bold text-cyan-700">
-                      Điểm phần · {item.partLabel ?? 'Phần thi'}
+                      Điểm câu · {itemLabel(item, detail.items)}
                     </div>
                     <div className="text-[11px] font-medium text-slate-400">
                       Hệ thống tính theo trọng số tiêu chí
@@ -1765,6 +1777,9 @@ function GradingTaskDetailView({
 
                 {detail.criteria.map((criterion) => (
                   <CriterionScoreCard
+                    aiRationale={
+                      item.aiScores.find((score) => score.criterionId === criterion.id)?.rationale
+                    }
                     criterion={criterion}
                     currentValue={
                       item.currentScores.find((score) => score.criterionId === criterion.id)
@@ -1875,8 +1890,8 @@ function GradingTaskDetailView({
               >
                 <CircleCheck className="size-4" />
                 {allFilled
-                  ? `Nộp điểm cho ${detail.items.length} phần thi`
-                  : 'Chấm đủ tiêu chí bắt buộc của mọi phần để nộp'}
+                  ? `Nộp điểm cho ${detail.items.length} câu`
+                  : 'Chấm đủ tiêu chí bắt buộc của mọi câu để nộp'}
               </button>
             ) : null}
           </div>
@@ -1901,7 +1916,7 @@ function GradingTaskDetailView({
           isPending={submitPending}
           onCancel={() => setSubmitOpen(false)}
           onConfirm={doSubmit}
-          partCount={detail.items.length}
+          questionCount={detail.items.length}
           resultBandName={preview?.resultBandName}
           resultCode={detail.resultCode}
           roundType={detail.roundType}

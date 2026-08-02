@@ -21,6 +21,18 @@ import { useForceEndExamSessionMutation } from '@/features/examCore/api/mutation
 import { examQueryKeys, useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
 import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
 import { Pagination } from '@/shared/components/Pagination'
+import {
+  buildValidityRulesForDisplay,
+  criterionScorePercentage,
+  formatConfidencePercent,
+  getAudioGateLabel,
+  getAudioGateTone,
+  getAudioReasonLabel,
+  getConfidenceModeLabel,
+  getEvidenceReasonLabel,
+  getResultScoreTone,
+  getReviewReasonLabel,
+} from '@/shared/lib/aiEvaluation'
 import { formatPublishedResult } from '@/shared/lib/resultScore'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -45,7 +57,6 @@ import {
   getExamResultStatusDisplay,
   type ExamCandidateResultDto,
   type ExamItemEvaluationDto,
-  type ExamValidityRuleResultDto,
 } from '../types'
 
 type ExamResultsUserRole = 'SCHOOL_ADMIN' | 'TEACHER'
@@ -81,43 +92,6 @@ function getPendingRowStatus(candidateStatus?: string | null) {
   }
 }
 
-function formatConfidencePercent(value?: number | null) {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return '-'
-  }
-
-  return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`
-}
-
-function getResultScoreTone(value?: number | null) {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return 'neutral' as const
-  }
-  if (value > 80) {
-    return 'success' as const
-  }
-  if (value >= 45) {
-    return 'warning' as const
-  }
-  return 'danger' as const
-}
-
-function criterionScorePercentage(
-  value?: number | null,
-  minScore?: number | null,
-  maxScore?: number | null,
-) {
-  if (
-    typeof value !== 'number'
-    || typeof minScore !== 'number'
-    || typeof maxScore !== 'number'
-    || maxScore <= minScore
-  ) {
-    return value
-  }
-  return ((value - minScore) / (maxScore - minScore)) * 100
-}
-
 function getResultScoreTextClass(value?: number | null) {
   const tone = getResultScoreTone(value)
   if (tone === 'success') {
@@ -130,150 +104,6 @@ function getResultScoreTextClass(value?: number | null) {
     return 'text-red-600'
   }
   return 'text-slate-400'
-}
-
-type DisplayValidityRule = ExamValidityRuleResultDto & {
-  occurrenceCount: number
-}
-
-function asFiniteNumber(value: unknown): number | null {
-  const number = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(number) ? number : null
-}
-
-function validitySeverityRank(value?: string | null) {
-  return {
-    none: 0,
-    low: 1,
-    medium: 2,
-    high: 3,
-    critical: 4,
-  }[String(value ?? 'none').toLowerCase()] ?? 0
-}
-
-function buildValidityRulesForDisplay(evaluation: ExamItemEvaluationDto): DisplayValidityRule[] {
-  const sourceRules = Array.isArray(evaluation.validity?.ruleResults)
-    ? evaluation.validity.ruleResults.filter((rule) => rule?.ruleId || rule?.message)
-    : []
-  const grouped = new Map<string, DisplayValidityRule>()
-
-  sourceRules.forEach((rule) => {
-    const key = rule.ruleId || rule.message || 'unknown-rule'
-    const existing = grouped.get(key)
-    if (!existing) {
-      grouped.set(key, { ...rule, occurrenceCount: 1 })
-      return
-    }
-
-    grouped.set(key, {
-      ...(validitySeverityRank(rule.severity) > validitySeverityRank(existing.severity)
-        ? rule
-        : existing),
-      occurrenceCount: existing.occurrenceCount + 1,
-    })
-  })
-
-  const wordCount = asFiniteNumber(evaluation.signals?.wordCount)
-  const expectedMinWords = asFiniteNumber(evaluation.signals?.expectedMinWords)
-  const totalDuration = asFiniteNumber(evaluation.signals?.durationSeconds)
-
-  return Array.from(grouped.values()).flatMap((rule) => {
-    if (rule.ruleId === 'answer_length.too_short' && wordCount !== null && expectedMinWords !== null) {
-      if (wordCount >= expectedMinWords) {
-        return []
-      }
-      return [{
-        ...rule,
-        message: `Toàn bộ câu trả lời có ${wordCount} từ, mức tối thiểu dự kiến là ${expectedMinWords} từ.`,
-      }]
-    }
-
-    if (rule.ruleId === 'answer_duration.too_short' && totalDuration !== null) {
-      const expectedDuration = asFiniteNumber(rule.evidence?.expectedMinResponseSeconds)
-      if (expectedDuration !== null) {
-        if (totalDuration >= expectedDuration * 0.5) {
-          return []
-        }
-        return [{
-          ...rule,
-          message: `Tổng thời gian nói là ${totalDuration} giây, thời gian tối thiểu dự kiến là ${expectedDuration} giây.`,
-        }]
-      }
-    }
-
-    return [rule]
-  })
-}
-
-function getReviewReasonLabel(code?: string | null) {
-  if (!code) {
-    return null
-  }
-
-  const labels: Record<string, string> = {
-    ALIGNMENT_COVERAGE_LOW: 'Độ phủ alignment thấp',
-    ALIGNMENT_MISCUE_HIGH: 'Alignment có nhiều miscue bất thường',
-    ALIGNMENT_TIMING_ANOMALY: 'Mốc thời gian alignment bất thường',
-    ASR_LOW_CONF: 'ASR chính có độ tin cậy thấp',
-    AUDIO_CLIPPING: 'Audio bị clipping nghiêm trọng',
-    AUDIO_QUALITY_LOW: 'Chất lượng audio thấp',
-    AUDIO_SNR_TOO_LOW: 'Tỷ lệ tín hiệu trên nhiễu quá thấp',
-    AUDIO_TOO_MUCH_SILENCE: 'Audio có quá ít lời nói hữu ích',
-    CONDUCT_VIOLATION: 'Có vi phạm trong quá trình làm bài',
-    LLM_UNSTABLE_DISCOURSE: 'Chấm coherence chưa ổn định',
-    LLM_UNSTABLE_COHERENCE: 'Chấm coherence chưa ổn định',
-    LLM_UNSTABLE_GRAMMAR: 'Chấm grammar chưa ổn định',
-    LLM_UNSTABLE_VOCABULARY: 'Chấm vocabulary chưa ổn định',
-    LOW_CONFIDENCE: 'Độ tin cậy AI thấp',
-    REFERENCE_DRIFT: 'Reference transcript chưa ổn định',
-    VALIDITY_FLAGGED: 'Có cảnh báo validity cần giáo viên xem lại',
-  }
-  return code.split(',').map((reason) => labels[reason] ?? reason).join(' · ')
-}
-
-function getEvidenceReasonLabel(code: string) {
-  switch (code) {
-    case 'ANSWER_TOO_SHORT':
-      return 'Câu trả lời quá ngắn so với yêu cầu'
-    case 'RESPONSE_DURATION_TOO_SHORT':
-      return 'Thời lượng trả lời quá ngắn so với yêu cầu'
-    case 'TARGET_LANGUAGE_EVIDENCE_TOO_LOW':
-      return 'Chưa có đủ nội dung bằng ngôn ngữ mục tiêu'
-    case 'SPEECH_EVIDENCE_TOO_LOW':
-      return 'Thời lượng lời nói hữu ích quá ít'
-    default:
-      return code
-  }
-}
-
-function getAudioGateLabel(status?: string | null) {
-  switch (status) {
-    case 'HARD_FAIL':
-      return 'Không đạt hard gate'
-    case 'SOFT_WARN':
-      return 'Chất lượng thấp'
-    case 'PASS':
-      return 'Đạt'
-    default:
-      return 'Chưa đủ dữ liệu'
-  }
-}
-
-function getConfidenceModeLabel(mode?: string | null) {
-  switch (mode) {
-    case 'HIGH_STAKES':
-      return 'Profile: High-stakes'
-    case 'MOCK_TEST':
-      return 'Profile: Mock test'
-    case 'PRACTICE':
-      return 'Profile: Practice'
-    default:
-      return null
-  }
-}
-
-function getAudioReasonLabel(code: string) {
-  return getReviewReasonLabel(code) ?? code
 }
 
 function StatePanel({
@@ -751,7 +581,7 @@ export function QuestionEvaluationCard({
                       <p className="text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.signals?.audioQuality)}</p>
                       <StatusBadge
                         label={getAudioGateLabel(evaluation.signals?.audioGateStatus)}
-                        tone={evaluation.signals?.audioGateStatus === 'HARD_FAIL' ? 'danger' : evaluation.signals?.audioGateStatus === 'SOFT_WARN' ? 'warning' : 'neutral'}
+                        tone={getAudioGateTone(evaluation.signals?.audioGateStatus)}
                       />
                     </div>
                     {evaluation.signals?.audioGateReasonCodes?.length ? (
