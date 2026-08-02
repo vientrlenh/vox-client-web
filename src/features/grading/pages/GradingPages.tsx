@@ -233,7 +233,18 @@ function itemTabItems(items: GradingTaskItem[]): SegmentItem[] {
 
 // ============================= School Admin: Coordination board =============================
 
-export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối chấm bài' }: { fixedExamId?: string; title?: string } = {}) {
+/**
+ * Bảng điều phối chấm bài của nhà trường.
+ *
+ * `readOnly` dùng cho BÀI KIỂM TRA TRÊN LỚP: ở đó giáo viên tạo bài tự chấm hết, BE từ
+ * chối mọi thao tác điều phối của nhà trường (`ExamGradingAccessService.rejectClassTestCoordination`).
+ * Không ẩn nút thì admin bấm vào chỉ nhận 403.
+ */
+export function SchoolAdminGradingPage({
+  fixedExamId,
+  readOnly = false,
+  title = 'Điều phối chấm bài',
+}: { fixedExamId?: string; readOnly?: boolean; title?: string } = {}) {
   const [tab, setTab] = useState('board')
   // Giữ CẢ object thay vì mỗi id: danh sách kỳ thi giờ phân trang phía server nên không còn
   // mảng đầy đủ để tra ngược ra tên — mà tên thì cần cho tên file CSV và 3 dialog bên dưới.
@@ -498,15 +509,20 @@ export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối ch
           { onError: errorToast, onSuccess: () => setMessage('Đã tải bảng điểm CSV.') },
         ),
     },
-    {
-      disabled: !examId,
-      disabledReason: 'Chọn kỳ thi trước khi chốt sổ',
-      icon: Lock,
-      id: 'finalize',
-      label: 'Chốt sổ kỳ thi',
-      onSelect: () => setFinalizeOpen(true),
-      tone: 'warning',
-    },
+    // Chốt sổ là thao tác GHI — bài trên lớp do giáo viên tạo bài tự chốt.
+    ...(readOnly
+      ? []
+      : [
+          {
+            disabled: !examId,
+            disabledReason: 'Chọn kỳ thi trước khi chốt sổ',
+            icon: Lock,
+            id: 'finalize',
+            label: 'Chốt sổ kỳ thi',
+            onSelect: () => setFinalizeOpen(true),
+            tone: 'warning',
+          } satisfies ActionMenuItem,
+        ]),
   ]
 
   return (
@@ -520,17 +536,19 @@ export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối ch
           <b className="font-semibold text-slate-700">phúc khảo</b> theo đơn học sinh.
         </PageHeading>
         <div className="flex items-center gap-2">
-          <button
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-cyan-600 px-4 text-[13px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            // BE bắt buộc phạm vi: phân công tự động luôn chạy trong một kỳ thi hoặc ca thi.
-            disabled={!examId}
-            onClick={() => setAutoAssignOpen(true)}
-            title={examId ? undefined : 'Chọn kỳ thi trước khi phân công tự động'}
-            type="button"
-          >
-            <UsersRound className="size-4" />
-            Phân công tự động
-          </button>
+          {readOnly ? null : (
+            <button
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-cyan-600 px-4 text-[13px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              // BE bắt buộc phạm vi: phân công tự động luôn chạy trong một kỳ thi hoặc ca thi.
+              disabled={!examId}
+              onClick={() => setAutoAssignOpen(true)}
+              title={examId ? undefined : 'Chọn kỳ thi trước khi phân công tự động'}
+              type="button"
+            >
+              <UsersRound className="size-4" />
+              Phân công tự động
+            </button>
+          )}
           <ActionMenuButton ariaLabel="Thao tác khác cho kỳ thi" items={headerMenuItems} />
         </div>
       </div>
@@ -737,7 +755,7 @@ export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối ch
             </div>
           </div>
 
-          {selectedRows.length > 0 ? (
+          {selectedRows.length > 0 && !readOnly ? (
             <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
               <span className="text-[13px] font-bold text-cyan-800">
                 Đã chọn {selectedRows.length} bài
@@ -779,7 +797,7 @@ export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối ch
                 Bỏ chọn
               </button>
             </div>
-          ) : (stats?.overdue ?? 0) > 0 ? (
+          ) : (stats?.overdue ?? 0) > 0 && !readOnly ? (
             <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
               <AlarmClock className="size-4 text-amber-600" />
               <span className="flex-1 text-[13px] font-medium text-amber-800">
@@ -815,14 +833,17 @@ export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối ch
               <table className="w-full min-w-200 border-collapse text-left">
                 <thead>
                   <tr className="border-b border-slate-200">
+                    {/* Chỉ đọc thì không có thao tác hàng loạt nào — ô tick chỉ gây hiểu nhầm. */}
                     <th className="w-9 py-2.5 pl-4">
-                      <input
-                        aria-label="Chọn tất cả bài trong trang"
-                        checked={rows.length > 0 && rows.every((row) => selectedIds.includes(row.candidateResultId))}
-                        className="size-4 accent-cyan-600"
-                        onChange={toggleAllOnPage}
-                        type="checkbox"
-                      />
+                      {readOnly ? null : (
+                        <input
+                          aria-label="Chọn tất cả bài trong trang"
+                          checked={rows.length > 0 && rows.every((row) => selectedIds.includes(row.candidateResultId))}
+                          className="size-4 accent-cyan-600"
+                          onChange={toggleAllOnPage}
+                          type="checkbox"
+                        />
+                      )}
                     </th>
                     <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                       Bài thi
@@ -869,7 +890,7 @@ export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối ch
                           label: 'Lịch sử điểm',
                           onSelect: () => setHistoryTarget(row),
                         },
-                        ...(row.assignmentId && !completed
+                        ...(row.assignmentId && !completed && !readOnly
                           ? [
                               {
                                 icon: Trash2,
@@ -887,13 +908,15 @@ export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối ch
                           key={row.candidateResultId}
                         >
                           <td className="py-3 pl-4">
-                            <input
-                              aria-label={`Chọn bài ${row.resultCode}`}
-                              checked={selectedIds.includes(row.candidateResultId)}
-                              className="size-4 accent-cyan-600"
-                              onChange={() => toggleRow(row.candidateResultId)}
-                              type="checkbox"
-                            />
+                            {readOnly ? null : (
+                              <input
+                                aria-label={`Chọn bài ${row.resultCode}`}
+                                checked={selectedIds.includes(row.candidateResultId)}
+                                className="size-4 accent-cyan-600"
+                                onChange={() => toggleRow(row.candidateResultId)}
+                                type="checkbox"
+                              />
+                            )}
                           </td>
 
                           {/* Mã bài + cờ + học sinh + lớp + kỳ thi — trước đây là hai cột riêng. */}
@@ -991,7 +1014,7 @@ export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối ch
                             <RowActions menu={rowMenu} resultCode={row.resultCode}>
                               {/* Nhà trường chỉ điều phối — giao bài, đổi người, xem lịch sử điểm.
                                   Việc chấm nằm ở phía giáo viên đang cầm phân công. */}
-                              {completed ? null : (
+                              {completed || readOnly ? null : (
                                 <button
                                   className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700"
                                   onClick={() => setAssignTarget(row)}
@@ -1147,17 +1170,23 @@ export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối ch
 
 // ============================= Teacher: Queue =============================
 
-export function TeacherGradingPage({ fixedExamId, title = 'Bài cần chấm' }: { fixedExamId?: string; title?: string } = {}) {
+/**
+ * Hàng đợi chấm của giáo viên cho KỲ THI TẬP TRUNG — chấm ẩn danh.
+ *
+ * Bài kiểm tra trên lớp có màn riêng ở `features/classTestGrading`: ở đó giáo viên
+ * thấy tên học sinh và lớp, và đường quay lại trỏ về đúng bài đó.
+ */
+export function TeacherGradingPage({ title = 'Bài cần chấm' }: { title?: string } = {}) {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<'' | GradingAssignmentStatus>('')
   const [roundType, setRoundType] = useState<'' | GradingRoundType>('')
-  const tasksQuery = useMyGradingTasksQuery(page, PAGE_SIZE, { examId: fixedExamId, roundType, status })
+  const tasksQuery = useMyGradingTasksQuery(page, PAGE_SIZE, { roundType, status })
 
   // Số cho thẻ thống kê là TỔNG toàn bộ (độc lập filter). Hai query size=1 chỉ để lấy
   // totalElements; enum chỉ có ASSIGNED/COMPLETED nên tổng được giao = pending + done.
-  const assignedCountQuery = useMyGradingTasksQuery(1, 1, { examId: fixedExamId, status: 'ASSIGNED' })
-  const completedCountQuery = useMyGradingTasksQuery(1, 1, { examId: fixedExamId, status: 'COMPLETED' })
+  const assignedCountQuery = useMyGradingTasksQuery(1, 1, { status: 'ASSIGNED' })
+  const completedCountQuery = useMyGradingTasksQuery(1, 1, { status: 'COMPLETED' })
 
   const pageData = tasksQuery.data
   const tasks = pageData?.content ?? []
@@ -1372,16 +1401,6 @@ export function TeacherGradingPage({ fixedExamId, title = 'Bài cần chấm' }:
   )
 }
 
-export function TeacherClassTestGradingPage() {
-  const { examId } = useParams()
-  return <TeacherGradingPage fixedExamId={examId} title="Chấm bài trên lớp" />
-}
-
-export function SchoolAdminClassTestGradingPage() {
-  const { examId } = useParams()
-  return <SchoolAdminGradingPage fixedExamId={examId} title="Điều phối chấm bài trên lớp" />
-}
-
 // ============================= Teacher: Grade one submission =============================
 
 type ScoreState = Record<string, Record<string, number | null>>
@@ -1442,7 +1461,7 @@ const DECISION_SUCCESS_MESSAGE: Record<DecisionOutcome, string> = {
  * hiệu/trả lại phân công) đều thao tác trên MỘT phân công cụ thể, không áp
  * dụng khi chưa có ai được giao bài.
  */
-function GradingTaskDetailView({
+export function GradingTaskDetailView({
   decisionPending,
   detail,
   invalidatePending,
@@ -1603,6 +1622,21 @@ function GradingTaskDetailView({
             <RoundBadge roundType={detail.roundType} />
             <StatusBadge label={resultDisplay.label} tone={resultDisplay.tone} />
           </div>
+          {/* Danh tính CHỈ hiện khi BE trả về — tức bài kiểm tra trên lớp. Kỳ thi tập
+              trung trả null và chấm mù giữ nguyên. Đừng suy từ route. */}
+          {detail.studentName ? (
+            <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[13px] font-bold text-slate-800">
+              <span
+                className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${avatarClasses(detail.studentName)}`}
+              >
+                {initials(detail.studentName)}
+              </span>
+              {detail.studentName}
+              {detail.className ? (
+                <span className="font-medium text-slate-500">· Lớp {detail.className}</span>
+              ) : null}
+            </p>
+          ) : null}
           <p className="mt-1.5 text-xs font-medium text-slate-500">
             {/* items là danh sách CÂU, không phải phần thi — một phần có thể nhiều câu. */}
             {detail.examName ?? 'Kỳ thi'} · {detail.items.length} câu ·{' '}
@@ -1627,7 +1661,8 @@ function GradingTaskDetailView({
           ) : (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
               <ShieldCheck className="size-3.5" />
-              Chấm ẩn danh
+              {/* Nói "ẩn danh" trên màn đang hiện tên học sinh là nói sai. */}
+              {detail.studentName ? 'Bài kiểm tra trên lớp' : 'Chấm ẩn danh'}
             </span>
           )}
           {detail.deadlineAt && !readOnly ? (
@@ -1930,7 +1965,17 @@ function GradingTaskDetailView({
   )
 }
 
-export function TeacherGradingTaskPage() {
+/**
+ * Màn chấm một bài.
+ *
+ * `basePath` là đường quay lại VÀ tiền tố khi BE mở vòng mới (`nextAssignmentId` của
+ * CLEARED_INVALID). Bài kiểm tra trên lớp truyền `/teacher/class-tests/:examId/grading`
+ * — trước đây ba chỗ này hardcode `/teacher/grading` nên mở một bài trên lớp xong là
+ * bị ném về hàng đợi toàn trường.
+ */
+export function TeacherGradingTaskPage({
+  basePath = '/teacher/grading',
+}: { basePath?: string } = {}) {
   const navigate = useNavigate()
   const { assignmentId } = useParams()
   const detailQuery = useGradingTaskDetailQuery(assignmentId ?? null)
@@ -1948,7 +1993,7 @@ export function TeacherGradingTaskPage() {
   if (!detail || !detail.assignmentId) {
     return (
       <section className="mx-auto max-w-300">
-        <BackButton onClick={() => navigate('/teacher/grading')} />
+        <BackButton onClick={() => navigate(basePath)} />
         <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-400">
           Không tìm thấy bài cần chấm.
         </div>
@@ -1968,7 +2013,7 @@ export function TeacherGradingTaskPage() {
       }
       detail={detail}
       invalidatePending={invalidateMutation.isPending}
-      onBack={() => navigate('/teacher/grading')}
+      onBack={() => navigate(basePath)}
       onDecision={(outcome, reason, handlers) => {
         switch (outcome) {
           case 'UPHELD':
@@ -1999,7 +2044,7 @@ export function TeacherGradingTaskPage() {
           { onError: handlers.onError, onSuccess: () => handlers.onSuccess() },
         )
       }
-      onNavigateToAssignment={(nextAssignmentId) => navigate(`/teacher/grading/${nextAssignmentId}`)}
+      onNavigateToAssignment={(nextAssignmentId) => navigate(`${basePath}/${nextAssignmentId}`)}
       onSubmit={(items, handlers) =>
         regradeMutation.mutate(
           { assignmentId: currentAssignmentId, items },

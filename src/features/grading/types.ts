@@ -146,11 +146,19 @@ export type GradingTaskDetail = {
   allowedOutcomes: GradingOutcome[]
   // Chỉ có ở vòng APPEAL: lý do học sinh nêu trong đơn.
   appealReason?: string | null
+  // Tên học sinh + lớp. CHỈ có với bài kiểm tra trên lớp; kỳ thi tập trung luôn null
+  // vì chấm ẩn danh là bảo đảm công bằng. Render có điều kiện, đừng suy từ route.
+  studentName?: string | null
+  className?: string | null
   items: GradingTaskItem[]
   criteria: GradingCriterionMeta[]
 }
 
-/** Hàng đợi của giáo viên — MỘT danh sách cho cả bốn vòng. Ẩn danh. */
+/**
+ * Hàng đợi của giáo viên — MỘT danh sách cho cả bốn vòng.
+ *
+ * Kỳ thi tập trung chấm ẩn danh; bài kiểm tra trên lớp thì có tên học sinh + lớp.
+ */
 export type GradingTask = {
   assignmentId: string
   candidateResultId: string
@@ -168,6 +176,10 @@ export type GradingTask = {
   assignedAt?: string | null
   deadlineAt?: string | null
   overdue: boolean
+  // Tên học sinh + lớp. CHỈ có với bài kiểm tra trên lớp; kỳ thi tập trung luôn null
+  // vì chấm ẩn danh là bảo đảm công bằng. Render có điều kiện, đừng suy từ route.
+  studentName?: string | null
+  className?: string | null
 }
 
 /** Dòng bảng điều phối của admin. `assignmentId` null = bài chưa có phân công đang mở. */

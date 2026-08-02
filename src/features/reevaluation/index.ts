@@ -4,3 +4,21 @@ export {
   SchoolAdminReevaluationPage,
   SchoolAdminReevaluationDetailPage,
 } from './pages/ReevaluationPages'
+
+// ---------------------------------------------------------------------------
+// Bề mặt dùng lại cho `features/classTestGrading` — bài kiểm tra trên lớp do chính
+// giáo viên tạo bài duyệt đơn và tự nhận chấm phúc khảo (BE: `authorizeSchoolAdminOrClassTestChair`).
+// ---------------------------------------------------------------------------
+export * from './types'
+export {
+  reevaluationKeys,
+  useAppealQuery,
+  useAppealReviewersQuery,
+} from './api/useReevaluationQueries'
+export {
+  useApproveMutation,
+  useAssignMutation,
+  useRejectMutation,
+} from './api/useReevaluationMutations'
+export { ApproveDialog } from './components/ApproveDialog'
+export { RejectDialog } from './components/RejectDialog'

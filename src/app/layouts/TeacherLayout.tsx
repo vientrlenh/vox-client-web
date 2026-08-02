@@ -3,6 +3,7 @@ import {
   Bell,
   ChevronDown,
   ClipboardCheck,
+  ClipboardList,
   FileQuestion,
   GraduationCap,
   LogOut,
@@ -49,10 +50,18 @@ const navigationItems = [
     to: '/teacher/proctor-attendance',
   },
   {
-    // Một cửa cho cả bốn vòng chấm, kể cả phúc khảo — lọc theo vòng ngay trong màn.
+    // Một cửa cho cả bốn vòng chấm của KỲ THI TẬP TRUNG, kể cả phúc khảo — lọc theo
+    // vòng ngay trong màn. Chấm ẩn danh: không hiện thông tin học sinh.
     icon: PenLine,
-    label: 'Chấm bài',
+    label: 'Chấm bài kỳ thi',
     to: '/teacher/grading',
+  },
+  {
+    // Tách hẳn khỏi mục trên: bài trên lớp do chính giáo viên tạo bài chấm hết, thấy
+    // tên học sinh, và việc chấm luôn gắn với MỘT bài cụ thể nên phải chọn bài trước.
+    icon: ClipboardList,
+    label: 'Chấm bài kiểm tra trên lớp',
+    to: '/teacher/class-test-grading',
   },
 ]
 

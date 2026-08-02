@@ -136,6 +136,13 @@ const GRADING_STATS_QUERY = `
   }
 `
 
+/**
+ * Hàng đợi kỳ thi TẬP TRUNG — cố ý KHÔNG hỏi `studentName`/`className`.
+ *
+ * BE cũng không trả (chỉ bài kiểm tra trên lớp mới có), nên đây là tầng phòng thủ thứ
+ * hai chứ không phải điều kiện đủ. Bài trên lớp dùng query riêng ở
+ * `features/classTestGrading`.
+ */
 const MY_GRADING_TASKS_QUERY = `
   query MyGradingTasks(
     $status: GradingAssignmentStatus
@@ -166,10 +173,6 @@ const MY_GRADING_TASKS_QUERY = `
     }
   }
 `
-
-const MY_CLASS_TEST_GRADING_TASKS_QUERY = MY_GRADING_TASKS_QUERY
-  .replace('query MyGradingTasks(', 'query MyClassTestGradingTasks($examId: ID!,')
-  .replace('myGradingTasks(', 'myClassTestGradingTasks(examId: $examId,')
 
 const GRADING_TASK_DETAIL_QUERY = `
   query GradingTaskDetail($assignmentId: ID!) {
@@ -220,6 +223,8 @@ const GRADING_TASK_DETAIL_QUERY = `
         weight
         required
       }
+      studentName
+      className
     }
   }
 `
@@ -289,7 +294,6 @@ export type FetchGradingAssignmentsInput = {
 }
 
 export type FetchMyGradingTasksInput = {
-  examId?: string
   page: number
   roundType?: '' | GradingRoundType
   size: number
@@ -350,22 +354,6 @@ export async function fetchGradingStats(input: FetchGradingStatsInput) {
 }
 
 export async function fetchMyGradingTasks(input: FetchMyGradingTasksInput) {
-  if (input.examId) {
-    const data = await graphQLRequest<{
-      myClassTestGradingTasks: GradingPage<GradingTask>
-    }>(
-      MY_CLASS_TEST_GRADING_TASKS_QUERY,
-      {
-        examId: input.examId,
-        page: input.page,
-        roundType: input.roundType || undefined,
-        size: input.size,
-        status: input.status || undefined,
-      },
-    )
-    return data.myClassTestGradingTasks
-  }
-
   const data = await graphQLRequest<{ myGradingTasks: GradingPage<GradingTask> }>(
     MY_GRADING_TASKS_QUERY,
     {

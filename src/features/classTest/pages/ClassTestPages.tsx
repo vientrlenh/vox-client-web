@@ -18,6 +18,7 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
+  ScrollText,
   Timer,
   Trash2,
   Users,
@@ -94,6 +95,12 @@ const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
   { label: 'Đã đóng', value: 'CLOSED' },
   { label: 'Đã trả điểm', value: 'RESULTS_PUBLISHED' },
 ]
+
+/**
+ * Trạng thái mà bài đã có (hoặc đã từng có) bài nộp — trước đó không có gì để chấm,
+ * hiện nút chấm bài chỉ dẫn tới một màn rỗng.
+ */
+const GRADABLE_STATUSES: ExamStatus[] = ['IN_PROGRESS', 'CLOSED', 'RESULTS_PUBLISHED']
 
 function canStartClassTestManually(exam: ExamDto, nowMs: number) {
   if (exam.status !== 'SCHEDULED') {
@@ -1943,16 +1950,33 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               <ClipboardList aria-hidden="true" className="size-4" />
               Xem kết quả
             </button>
-            {canManage ? (
-              <>
+            {/* Trước khi mở cho học sinh làm thì chưa có bài nộp nào để chấm. Dùng
+                `roleBasePath` chứ không hardcode `/teacher`: route theo dõi của nhà
+                trường đã đăng ký nhưng trước đây không có lối vào nào. */}
+            {GRADABLE_STATUSES.includes(exam.status) ? (
               <button
                 className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                onClick={() => navigate(`/teacher/class-tests/${exam.id}/grading`)}
+                onClick={() => navigate(`${roleBasePath}/class-tests/${exam.id}/grading`)}
                 type="button"
               >
                 <FilePenLine aria-hidden="true" className="size-4" />
-                Chấm bài
+                {canManage ? 'Chấm bài' : 'Theo dõi chấm bài'}
               </button>
+            ) : null}
+            {/* Phúc khảo là việc của chính giáo viên tạo bài — nhà trường không xử lý
+                đơn của bài trên lớp. */}
+            {canManage && GRADABLE_STATUSES.includes(exam.status) ? (
+              <button
+                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => navigate(`/teacher/class-tests/${exam.id}/reevaluation`)}
+                type="button"
+              >
+                <ScrollText aria-hidden="true" className="size-4" />
+                Phúc khảo
+              </button>
+            ) : null}
+            {canManage ? (
+              <>
               <button
                 aria-label="Làm mới"
                 className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"

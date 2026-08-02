@@ -124,7 +124,10 @@ describe('grading GraphQL queries', () => {
     expect(body.query).toContain('allowedOutcomes')
     expect(body.query).toContain('roundType')
     expect(body.query).toContain('weight')
-    expect(body.query).not.toContain('studentName')
+    // Màn chấm dùng chung cho cả kỳ thi tập trung lẫn bài kiểm tra trên lớp, nên query
+    // PHẢI hỏi danh tính. Chốt ẩn danh nằm ở BE: kỳ thi tập trung trả null.
+    // Xem `GradingStudentIdentityQueryTests` phía backend.
+    expect(body.query).toContain('studentName')
     expect(body.variables).toEqual({ assignmentId: 'a1' })
   })
 
