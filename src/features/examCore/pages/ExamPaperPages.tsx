@@ -372,7 +372,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
 
       {revisionNote !== null ? (
         <div className="mt-3.5 grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <label className="text-xs font-bold text-slate-700">Góp ý cho AUTHOR (bắt buộc)</label>
+          <label className="text-xs font-bold text-slate-700">Góp ý cho người ra đề (bắt buộc)</label>
           <textarea
             className="min-h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
             onChange={(event) => setRevisionNote(event.target.value)}

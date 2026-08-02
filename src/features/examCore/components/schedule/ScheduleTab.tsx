@@ -39,6 +39,9 @@ type ScheduleTabProps = {
   examOpenAt?: string | null
   examTimeDurationSecond?: number | null
   isClassTest: boolean
+  // Kỳ thi đã bắt đầu (IN_PROGRESS trở lên): backend khoá mọi thao tác xếp lịch, chỉ còn cho
+  // công bố/hoàn thành/hủy ca vì đó là thao tác vận hành trong lúc thi.
+  locked?: boolean
   onGoToPapers: () => void
   onSetDeliveryMode?: (mode: ExamDeliveryMode) => void
   papers: ExamPaperDto[]
@@ -53,6 +56,7 @@ export function ScheduleTab({
   examOpenAt,
   examTimeDurationSecond,
   isClassTest,
+  locked = false,
   onGoToPapers,
   onSetDeliveryMode,
   papers,
@@ -85,6 +89,8 @@ export function ScheduleTab({
 
   const schedules = schedulesQuery.data ?? []
   const candidates = candidatesQuery.data ?? []
+  // Quyền sửa lịch = quyền quản lý + kỳ thi chưa bắt đầu.
+  const canEdit = canManage && !locked
   const effectiveMode: ExamDeliveryMode = deliveryMode ?? (isClassTest ? 'DEVICE' : 'LAB')
 
   const totalProctors = schedules.reduce((sum, schedule) => sum + schedule.proctors.length, 0)
@@ -183,7 +189,7 @@ export function ScheduleTab({
   async function handleDeleteSchedule(schedule: ExamScheduleDto) {
     if (
       !(await confirm({
-        message: `Xóa ${getScheduleLabel(schedule)}? Chỉ xóa được khi ca chưa có thí sinh.`,
+        message: `Xóa ${getScheduleLabel(schedule)}? Chỉ xóa được khi ca chưa có thí sinh và chưa có giám thị.`,
         title: 'Xóa ca thi',
       }))
     ) {
@@ -255,10 +261,13 @@ export function ScheduleTab({
       return []
     }
     const items: ActionMenuItem[] = []
-    if (schedule.status === 'DRAFT' || (isClassTest && schedule.status === 'PUBLISHED')) {
+    if (canEdit && (schedule.status === 'DRAFT' || (isClassTest && schedule.status === 'PUBLISHED'))) {
       items.push({ id: 'edit', label: 'Sửa ca thi', onSelect: () => setEditingSchedule(schedule) })
     }
-    items.push({ id: 'proctors', label: 'Quản lý giám thị', onSelect: () => setManagingProctorsFor(schedule) })
+    if (canEdit) {
+      items.push({ id: 'proctors', label: 'Quản lý giám thị', onSelect: () => setManagingProctorsFor(schedule) })
+    }
+    // Công bố / hoàn thành / hủy ca là thao tác vận hành nên vẫn dùng được khi kỳ thi đang diễn ra.
     if (schedule.status === 'DRAFT') {
       items.push({
         id: 'publish',
@@ -267,7 +276,7 @@ export function ScheduleTab({
         tone: 'primary',
       })
     }
-    if (schedule.status === 'DRAFT' || schedule.status === 'PUBLISHED') {
+    if (canEdit && (schedule.status === 'DRAFT' || schedule.status === 'PUBLISHED')) {
       items.push({ id: 'move', label: 'Dời ca', onSelect: () => setMovingSchedule(schedule) })
     }
     if (schedule.status === 'PUBLISHED') {
@@ -285,14 +294,24 @@ export function ScheduleTab({
         tone: 'danger',
       })
     }
-    items.push({
-      disabled: schedule.candidateCount > 0,
-      disabledReason: schedule.candidateCount > 0 ? 'Ca đang có thí sinh' : undefined,
-      id: 'delete',
-      label: 'Xóa ca thi',
-      onSelect: () => void handleDeleteSchedule(schedule),
-      tone: 'danger',
-    })
+    if (canEdit) {
+      // Backend chặn xóa khi ca còn thí sinh hoặc còn giám thị — dòng giám thị không có cascade nên
+      // ca xóa mềm mà còn giám thị vẫn hiện ở màn điểm danh.
+      const blockingReason =
+        schedule.candidateCount > 0
+          ? 'Ca đang có thí sinh'
+          : schedule.proctors.length > 0
+            ? 'Ca đang có giám thị'
+            : undefined
+      items.push({
+        disabled: Boolean(blockingReason),
+        disabledReason: blockingReason,
+        id: 'delete',
+        label: 'Xóa ca thi',
+        onSelect: () => void handleDeleteSchedule(schedule),
+        tone: 'danger',
+      })
+    }
     return items
   }
 
@@ -415,11 +434,18 @@ export function ScheduleTab({
         Quy trình: Tạo ca thi (gắn phòng &amp; khung giờ) → công bố ca → xếp học sinh vào ca → phân đề cho học sinh.
       </p>
 
+      {canManage && locked ? (
+        <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-semibold text-amber-800">
+          <Lock aria-hidden="true" className="size-4 shrink-0" />
+          Kỳ thi đã bắt đầu — không thể thay đổi lịch thi. Chỉ còn công bố, hoàn thành hoặc hủy ca.
+        </div>
+      ) : null}
+
       {subTab === 'sessions' ? (
         <div className="grid gap-3">
           <div className="flex items-center justify-between">
             <p className="text-[13px] text-slate-500">Mỗi ca gắn với đúng một phòng thi, khung giờ và giám thị phụ trách.</p>
-            {canManage ? (
+            {canEdit ? (
               <button
                 className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
                 onClick={() => setShowCreateModal(true)}
@@ -478,7 +504,7 @@ export function ScheduleTab({
                   <div className="text-lg font-extrabold text-slate-900">{getScheduleLabel(selectedSchedule)}</div>
                   <div className="mt-1 text-[13px] text-slate-500">{selectedSchedule.candidateCount} học sinh</div>
                 </div>
-                {canManage ? (
+                {canEdit ? (
                   <div className="flex flex-wrap gap-2">
                     {hasUnassignedCandidates ? (
                       <button
@@ -533,7 +559,7 @@ export function ScheduleTab({
                           <span className="text-[13px] font-semibold text-indigo-700">
                             {candidatePaper ? candidatePaper.code : '-'}
                           </span>
-                          {canManage ? (
+                          {canEdit ? (
                             <button
                               aria-label={`Bỏ ${getCandidateName(candidate)} khỏi ca`}
                               className="inline-flex size-6 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-red-600"
@@ -560,6 +586,7 @@ export function ScheduleTab({
 
       {subTab === 'assign' ? (
         <PaperAssignmentPanel
+          canManage={canEdit}
           candidates={candidates}
           examId={examId}
           onApplied={() => void invalidate()}

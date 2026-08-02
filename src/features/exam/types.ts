@@ -124,17 +124,4 @@ export type AttachExamBlueprintRequest = {
 
 // Đã chuyển xuống `examCore` để các màn dùng chung (kể cả picker) khỏi phải import ngược
 // lên feature `exam`. Re-export để call-site cũ không phải đổi.
-export { getExamStatusDisplay } from '@/features/examCore/types'
-
-export function getMemberRoleDisplay(role?: ExamMemberRole | null) {
-  switch (role) {
-    case 'CHAIR':
-      return 'Chủ tịch (CHAIR)'
-    case 'AUTHOR':
-      return 'Soạn đề (AUTHOR)'
-    case 'REVIEWER':
-      return 'Phản biện (REVIEWER)'
-    default:
-      return String(role ?? '-')
-  }
-}
+export { getExamStatusDisplay, getMemberRoleDisplay } from '@/features/examCore/types'

@@ -496,6 +496,27 @@ export function getExamStatusDisplay(status?: ExamStatus | string | null): { ton
   }
 }
 
+/**
+ * Kỳ thi đã bắt đầu trở đi thì backend khóa chỉnh sửa thông tin kỳ thi và mọi thao tác xếp lịch
+ * (xem Exam.isLockedForEditing ở BE). Ẩn nút trước cho khớp thay vì để người dùng bấm rồi ăn lỗi.
+ */
+export function isExamLockedForEditing(status?: ExamStatus | string | null): boolean {
+  return status === 'IN_PROGRESS' || status === 'CLOSED' || status === 'RESULTS_PUBLISHED' || status === 'CANCELLED'
+}
+
+export function getMemberRoleDisplay(role?: ExamMemberRole | null) {
+  switch (role) {
+    case 'CHAIR':
+      return 'Chủ tịch hội đồng'
+    case 'AUTHOR':
+      return 'Ra đề'
+    case 'REVIEWER':
+      return 'Duyệt đề'
+    default:
+      return String(role ?? '-')
+  }
+}
+
 export function getExamPaperStatusDisplay(status?: string | null, examKind?: ExamKind): { tone: StatusTone; label: string } {
   // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED làm mặc định (không dùng luồng duyệt như kỳ thi tập trung),
   // nên với CLASS_TEST, LOCKED nghĩa là "sẵn sàng dùng", không phải "đã khóa không sửa được".

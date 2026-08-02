@@ -53,6 +53,7 @@ import {
   getAssessmentPolicyStrictnessLabel,
   getExamPaperStatusDisplay,
   getResultDecisionMethodDisplay,
+  isExamLockedForEditing,
   RESULT_DECISION_METHODS,
   toDateTimeLocalValue,
   toIsoDateTime,
@@ -102,7 +103,7 @@ function getExamWorkflowSteps(exam: ExamDto, papers: ExamPaperDto[]): { complete
       icon: step2Done ? <Check size={26} /> : <LayoutList size={24} />,
       label: 'Chốt phiên bản',
       state: !step1Done ? 'upcoming' : step2Done ? 'done' : 'current',
-      sublabel: step2Done ? 'Đã chốt' : 'Chờ CHAIR chốt phiên bản',
+      sublabel: step2Done ? 'Đã chốt' : 'Chờ chủ tịch hội đồng chốt phiên bản',
     },
     {
       icon: step3Done ? <Check size={26} /> : <FilePenLine size={24} />,
@@ -809,6 +810,8 @@ function ExamDetailPage({
   const lockedPapers = papers.filter((paper) => paper.status === 'LOCKED').length
   // Backend authorizes schedule/candidate management for SCHOOL_ADMIN (same school) or the exam's CHAIR.
   const canManageSchedule = canManageStatus || myRole === 'CHAIR'
+  // Từ IN_PROGRESS trở đi backend khóa sửa thông tin kỳ thi và mọi thao tác xếp lịch.
+  const examLocked = isExamLockedForEditing(exam.status)
   const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
   const currentBlueprintVersion = attachedBlueprint?.versions.find((version) => version.id === exam.blueprintVersionId)
   const createFromBlueprintQuotaWarning = buildTimeQuotaWarning(
@@ -834,7 +837,7 @@ function ExamDetailPage({
     completedCount === 0
       ? { ctaLabel: 'Gắn blueprint', description: 'Chọn blueprint ở tab Blueprint để bắt đầu.', onClick: () => setTab('blueprint'), title: 'Chưa gắn blueprint' }
       : completedCount === 1
-        ? { ctaLabel: 'Chốt phiên bản', description: 'Chọn phiên bản đã xuất bản để CHAIR chốt dùng cho kỳ thi.', onClick: () => setTab('blueprint'), title: 'Chờ CHAIR chốt phiên bản' }
+        ? { ctaLabel: 'Chốt phiên bản', description: 'Chọn phiên bản đã xuất bản để chủ tịch hội đồng chốt dùng cho kỳ thi.', onClick: () => setTab('blueprint'), title: 'Chờ chủ tịch hội đồng chốt phiên bản' }
         : completedCount === 2
           ? {
               ctaLabel: 'Mở đề thi',
@@ -905,7 +908,7 @@ function ExamDetailPage({
           { icon: <Timer aria-hidden="true" className="size-3.5" />, label: `Thời gian làm bài: ${formatDurationSeconds(exam.examTimeDurationSecond)}` },
           { icon: <CircleCheck aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
         ]}
-        onEdit={canManageInfo ? () => setShowEditModal(true) : undefined}
+        onEdit={canManageInfo && !examLocked ? () => setShowEditModal(true) : undefined}
         statusLabel={statusDisplay.label}
         statusTone={statusDisplay.tone}
         title={exam.name}
@@ -1093,7 +1096,7 @@ function ExamDetailPage({
       {tab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
 
       {tab === 'students' ? (
-        <CandidatesTab canManage={canManageSchedule} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
+        <CandidatesTab canManage={canManageSchedule && !examLocked} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
       ) : null}
 
       {tab === 'blueprint' ? (
@@ -1122,6 +1125,7 @@ function ExamDetailPage({
           examOpenAt={exam.openAt}
           examTimeDurationSecond={exam.examTimeDurationSecond}
           isClassTest={false}
+          locked={examLocked}
           onGoToPapers={() => setTab('papers')}
           onSetDeliveryMode={canManageSchedule ? (mode) => void handleSetDeliveryMode(exam.id, mode) : undefined}
           papers={papers}

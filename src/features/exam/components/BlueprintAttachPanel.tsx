@@ -162,8 +162,8 @@ export function BlueprintAttachPanel({
           {hasPapers
             ? PAPERS_EXIST_MESSAGE
             : canAttach
-              ? 'Bạn là AUTHOR của kỳ thi này nên có thể chọn blueprint có sẵn hoặc tạo mới bên dưới.'
-              : 'Chỉ AUTHOR của kỳ thi (hoặc quản trị trường) mới gắn được blueprint — bạn có thể xem danh sách nhưng không chọn được.'}
+              ? 'Bạn là người ra đề của kỳ thi này nên có thể chọn blueprint có sẵn hoặc tạo mới bên dưới.'
+              : 'Chỉ người ra đề của kỳ thi (hoặc quản trị trường) mới gắn được blueprint — bạn có thể xem danh sách nhưng không chọn được.'}
           {optional ? ' Bước này không bắt buộc — có thể bỏ qua và thêm câu hỏi trực tiếp ở tab Đề bài.' : ''}
         </p>
         {blueprintsQuery.isError ? (
@@ -381,7 +381,7 @@ export function BlueprintAttachPanel({
                 ? PAPERS_EXIST_MESSAGE
                 : canApproveVersion
                   ? 'Chọn một phiên bản đã xuất bản bên dưới để chốt dùng cho kỳ thi.'
-                  : 'Chỉ CHAIR của kỳ thi (hoặc quản trị trường) mới chốt được phiên bản — bạn có thể xem trước.'}
+                  : 'Chỉ chủ tịch hội đồng của kỳ thi (hoặc quản trị trường) mới chốt được phiên bản — bạn có thể xem trước.'}
             </p>
           </div>
           {showVersionPicker ? (
@@ -411,7 +411,7 @@ export function BlueprintAttachPanel({
                 ? 'Blueprint chưa có phiên bản nào — tạo phiên bản mới bên dưới.'
                 : canApproveVersion
                   ? `Có ${blueprint.versions.length} phiên bản đang ở dạng bản nháp, chưa xuất bản — bấm "Xem chi tiết" để duyệt và xuất bản trước khi chốt dùng cho kỳ thi.`
-                  : 'Blueprint chưa có phiên bản nào được xuất bản — CHAIR cần xem chi tiết để duyệt và xuất bản một phiên bản trước.'}
+                  : 'Blueprint chưa có phiên bản nào được xuất bản — chủ tịch hội đồng cần xem chi tiết để duyệt và xuất bản một phiên bản trước.'}
             </p>
             <div className="flex flex-wrap gap-2">
               {blueprint.versions.length > 0 ? (

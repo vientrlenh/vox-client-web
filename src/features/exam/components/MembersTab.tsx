@@ -96,7 +96,7 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
                 <Check aria-hidden="true" className="size-4.5" />
               </span>
               <div>
-                <div className="text-[13px] font-bold text-slate-900">{role}</div>
+                <div className="text-[13px] font-bold text-slate-900">{getMemberRoleDisplay(role)}</div>
                 <div
                   className={[
                     'text-xs font-semibold',
