@@ -615,10 +615,11 @@ export function getMemberRoleDisplay(role?: ExamMemberRole | null) {
 }
 
 export function getExamPaperStatusDisplay(status?: string | null, examKind?: ExamKind): { tone: StatusTone; label: string } {
-  // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED làm mặc định (không dùng luồng duyệt như kỳ thi tập trung),
-  // nên với CLASS_TEST, LOCKED nghĩa là "sẵn sàng dùng", không phải "đã khóa không sửa được".
+  // Bài trên lớp không đi qua luồng duyệt của kỳ thi tập trung: giáo viên tự khoá mã đề một bước
+  // (DRAFT → LOCKED) để mở đường phân đề, và mở lại được bất cứ lúc nào. Nên LOCKED ở đây nghĩa là
+  // "sẵn sàng phân cho học sinh", không phải "đã chốt không đụng vào được nữa".
   if (status === 'LOCKED' && examKind === 'CLASS_TEST') {
-    return { tone: 'success', label: 'Sẵn sàng' }
+    return { tone: 'success', label: 'Sẵn sàng phân đề' }
   }
   switch (status) {
     case 'DRAFT':

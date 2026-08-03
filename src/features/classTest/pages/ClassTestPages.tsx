@@ -41,7 +41,6 @@ import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
-import { PaperCard } from '@/features/examCore/components/PaperCard'
 import { QuestionPicker } from '@/features/examCore/components/QuestionPicker'
 import { RoomPickerModal } from '@/features/examCore/components/schedule/RoomPickerModal'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
@@ -99,6 +98,7 @@ import {
   getClassTestStatusDisplay,
   type ExamStreamSetup,
 } from '../types'
+import { ClassTestPaperAccordionItem } from '../components/ClassTestPaperAccordionItem'
 import { ClassTestPaperComposer } from '../components/ClassTestPaperComposer'
 import {
   parseOptionalSectionWeight,
@@ -1213,6 +1213,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const papers = exam?.papers ?? []
   const selectedPaper = papers.find((paper) => paper.id === selectedPaperId) ?? papers[0] ?? null
   const paperSections = selectedPaper?.sections ?? []
+  // Phân đề chỉ mở khi mọi mã đề đã khoá — đếm ở đây để chỉ đúng việc còn thiếu, thay vì để giáo
+  // viên sang tab Xếp lịch rồi mới gặp thông báo chặn.
+  const unlockedPaperCount = papers.filter((paper) => paper.status !== 'LOCKED').length
   const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
 
   function currentSectionsPayload() {
@@ -1770,312 +1773,357 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       {tab === 'papers' ? (
         <div className="mt-4 grid gap-3.5">
-          {canManage && canEditContent ? (
-            <div className="grid gap-2.5 rounded-xl border border-slate-200 bg-white p-4">
-              <div>
-                <h2 className="text-[15px] font-extrabold text-slate-900">Tạo mã đề</h2>
-                <p className="mt-0.5 text-xs leading-5 text-slate-500">
-                  Soạn nhiều mã đề rồi khoá lại để phân cho học sinh ở tab Xếp lịch — mỗi em một mã đề khác nhau. Chỉ
-                  cần một mã đề thì hệ thống tự gán, không phải phân.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {exam.blueprintId ? (
-                  <button
-                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50 disabled:opacity-60"
-                    disabled={createPaperMutation.isPending}
-                    onClick={() => void handleCreatePaper('blueprint', null)}
-                    type="button"
-                  >
-                    <Plus aria-hidden="true" className="size-4" />
-                    Tạo mã đề từ blueprint
-                  </button>
-                ) : (
-                  <button
-                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50"
-                    onClick={() => setShowPaperComposer(true)}
-                    type="button"
-                  >
-                    <Plus aria-hidden="true" className="size-4" />
-                    Soạn câu hỏi trực tiếp
-                  </button>
-                )}
-                {papers.length > 0 ? (
-                  <div className="flex items-center gap-2">
-                    <select
-                      className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-900"
-                      onChange={(event) => setCopyFromPaperId(event.target.value)}
-                      value={copyFromPaperId}
-                    >
-                      <option value="">Sao chép từ mã đề…</option>
-                      {papers.map((paper) => (
-                        <option key={paper.id} value={paper.id}>
-                          {paper.code}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className="inline-flex h-9.5 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-[13px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-                      disabled={!copyFromPaperId || createPaperMutation.isPending}
-                      onClick={() => void handleCreatePaper('copy', copyFromPaperId)}
-                      type="button"
-                    >
-                      Sao chép
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {canManage && papers.length > 1 ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
-              <span className="text-xs font-bold text-slate-600">Đang soạn mã đề:</span>
-              {papers.map((paper) => (
+          {canManage ? (
+            <div
+              className={[
+                'rounded-xl border px-4 py-3',
+                papers.length > 1 && unlockedPaperCount === 0
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : 'border-indigo-200 bg-indigo-50',
+              ].join(' ')}
+            >
+              <p
+                className={`text-[13px] font-bold ${
+                  papers.length > 1 && unlockedPaperCount === 0 ? 'text-emerald-800' : 'text-indigo-800'
+                }`}
+              >
+                {papers.length === 0
+                  ? 'Bước 1 — Tạo mã đề đầu tiên'
+                  : papers.length === 1
+                    ? 'Bước 2 — Soạn nội dung mã đề'
+                    : unlockedPaperCount > 0
+                      ? `Bước 3 — Khoá mã đề để phân đề (còn ${unlockedPaperCount}/${papers.length} chưa khoá)`
+                      : 'Xong bước đề bài — sang Xếp lịch để phân đề'}
+              </p>
+              <p
+                className={`mt-0.5 text-xs leading-5 ${
+                  papers.length > 1 && unlockedPaperCount === 0 ? 'text-emerald-700' : 'text-indigo-700'
+                }`}
+              >
+                {papers.length === 0
+                  ? 'Bài chưa có mã đề nào. Soạn câu hỏi trực tiếp, hoặc sinh mã đề từ blueprint nếu bài đã gắn blueprint.'
+                  : papers.length === 1
+                    ? 'Một mã đề là đủ để mở bài — hệ thống tự gán cho cả lớp, không cần phân đề. Muốn mỗi em một đề khác nhau thì tạo thêm mã đề.'
+                    : unlockedPaperCount > 0
+                      ? 'Phân đề chỉ mở khi mọi mã đề đã khoá. Khoá xong vẫn mở lại sửa được bất cứ lúc nào.'
+                      : 'Tất cả mã đề đã khoá. Sang tab Xếp lịch, mục "3 · Phân đề" để chia mã đề cho từng học sinh.'}
+              </p>
+              {papers.length > 1 && unlockedPaperCount === 0 ? (
                 <button
-                  className={[
-                    'inline-flex h-8.5 items-center justify-center rounded-full border px-3.5 text-xs font-bold',
-                    paper.id === selectedPaper?.id
-                      ? 'border-indigo-600 bg-indigo-600 text-white'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-                  ].join(' ')}
-                  key={paper.id}
-                  onClick={() => setSelectedPaperId(paper.id)}
+                  className="mt-2 inline-flex h-8.5 items-center justify-center gap-1.5 rounded-full border border-emerald-300 bg-white px-3.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                  onClick={() => setTab('schedule')}
                   type="button"
                 >
-                  {paper.code}
+                  <Calendar aria-hidden="true" className="size-3.5" />
+                  Sang tab Xếp lịch
                 </button>
-              ))}
+              ) : null}
             </div>
           ) : null}
 
-          {canManage && papers.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
-              Bài chưa có mã đề nào — tạo mã đề đầu tiên ở trên để bắt đầu.
-            </div>
-          ) : null}
-
-          {canManage && papers.length > 0 ? (
-            <div className="grid gap-2.5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-[15px] font-extrabold text-slate-900">
-                  Các phần và câu hỏi{selectedPaper ? ` · ${selectedPaper.code}` : ''}
-                </h2>
-                {canEditFreeQuestions ? (
+          {canManage && canEditContent ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-4">
+              <span className="mr-1 text-[13px] font-bold text-slate-700">Tạo mã đề:</span>
+              {exam.blueprintId ? (
+                <button
+                  className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50 disabled:opacity-60"
+                  disabled={createPaperMutation.isPending}
+                  onClick={() => void handleCreatePaper('blueprint', null)}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" className="size-4" />
+                  Từ blueprint
+                </button>
+              ) : (
+                <button
+                  className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50"
+                  onClick={() => setShowPaperComposer(true)}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" className="size-4" />
+                  Soạn câu hỏi trực tiếp
+                </button>
+              )}
+              {papers.length > 0 ? (
+                <>
+                  <select
+                    aria-label="Sao chép từ mã đề"
+                    className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-900"
+                    onChange={(event) => setCopyFromPaperId(event.target.value)}
+                    value={copyFromPaperId}
+                  >
+                    <option value="">Sao chép từ…</option>
+                    {papers.map((paper) => (
+                      <option key={paper.id} value={paper.id}>
+                        Mã đề {paper.variant}
+                      </option>
+                    ))}
+                  </select>
                   <button
-                    className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-indigo-600 hover:bg-slate-50"
-                    onClick={handleOpenAddSection}
+                    className="inline-flex h-9.5 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-[13px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                    disabled={!copyFromPaperId || createPaperMutation.isPending}
+                    onClick={() => void handleCreatePaper('copy', copyFromPaperId)}
                     type="button"
                   >
-                    <Plus aria-hidden="true" className="size-4" />
-                    Thêm phần
+                    Sao chép
                   </button>
-                ) : null}
-              </div>
-              {!canEditContent ? (
-                <p className="text-xs font-semibold text-amber-700">
-                  Bài đã mở cho học sinh làm bài — không thể sửa câu hỏi/section nữa.
-                </p>
-              ) : exam.blueprintId ? (
-                <p className="text-xs font-semibold text-amber-700">
-                  Bài đang dùng blueprint dùng chung — vào tab Blueprint để đổi/gỡ blueprint thay vì sửa trực tiếp ở đây.
-                </p>
+                </>
               ) : null}
-              {paperSections.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
-                  Chưa có phần nào — bấm "Thêm phần" để bắt đầu soạn đề.
-                </div>
-              ) : (
-                paperSections.map((section, sectionIndex) => (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5" key={section.id}>
-                    {editingSectionIndex === sectionIndex ? (
-                      <div className="grid gap-2">
-                        <input
-                          className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
-                          onChange={(event) => setEditSectionTitle(event.target.value)}
-                          value={editSectionTitle}
-                        />
-                        <textarea
-                          className="min-h-14 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
-                          onChange={(event) => setEditSectionInstruction(event.target.value)}
-                          placeholder="Hướng dẫn phần (không bắt buộc)"
-                          value={editSectionInstruction}
-                        />
-                        <input
-                          className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
-                          max="1"
-                          min="0"
-                          onChange={(event) => setEditSectionWeight(event.target.value)}
-                          placeholder="Trọng số (bỏ trống để chia đều)"
-                          step="0.01"
-                          type="number"
-                          value={editSectionWeight}
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            className="inline-flex h-8 items-center justify-center rounded-full bg-indigo-600 px-3.5 text-xs font-bold text-white"
-                            onClick={() => void handleSaveSectionMeta(sectionIndex)}
-                            type="button"
-                          >
-                            Lưu
-                          </button>
-                          <button
-                            className="inline-flex h-8 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
-                            onClick={() => setEditingSectionIndex(null)}
-                            type="button"
-                          >
-                            Hủy
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-2.5">
-                        <div>
-                          <span className="text-sm font-bold text-slate-900">{section.title || `Part ${sectionIndex + 1}`}</span>
-                          {section.weight != null ? <p className="mt-0.5 text-xs font-semibold text-slate-500">Weight: {section.weight.toFixed(2)}</p> : null}
-                          {section.instruction ? <p className="mt-0.5 text-xs text-slate-500">{section.instruction}</p> : null}
-                        </div>
-                        {canEditFreeQuestions ? (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              aria-label={`Sửa ${section.title ?? `phần ${sectionIndex + 1}`}`}
-                              className="inline-flex size-8.5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                              onClick={() => startEditingSection(sectionIndex)}
-                              title="Sửa tên/hướng dẫn phần"
-                              type="button"
-                            >
-                              <Pencil aria-hidden="true" className="size-3.5" />
-                            </button>
-                            <button
-                              className="inline-flex h-8.5 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
-                              onClick={() => setPickerMode({ kind: 'existing', sectionIndex })}
-                              type="button"
-                            >
-                              + Câu hỏi
-                            </button>
-                            {paperSections.length > 1 ? (
-                              <button
-                                aria-label={`Xóa ${section.title ?? `phần ${sectionIndex + 1}`}`}
-                                className="inline-flex size-8.5 items-center justify-center rounded-full border border-red-200 text-red-600 hover:bg-red-50"
-                                onClick={() => void handleRemoveSection(sectionIndex)}
-                                type="button"
-                              >
-                                <Trash2 aria-hidden="true" className="size-3.5" />
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-                    {section.items.length === 0 ? (
-                      <div className="mt-2.5 rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
-                        Chưa có câu hỏi nào trong phần này.
-                      </div>
-                    ) : (
-                      <div className="mt-2.5 grid gap-1.5">
-                        {section.items.map((item, index) => (
-                          <div
-                            className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm"
-                            key={item.id}
-                          >
-                            <div className="min-w-0">
-                              <div className="truncate font-semibold text-slate-800">
-                                {index + 1}. {item.question?.code} — {formatNullableText(item.question?.questionText)}
-                              </div>
-                              {item.question ? (
-                                <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-500">
-                                  <span className="rounded-full bg-slate-50 px-2 py-0.5 ring-1 ring-slate-200">
-                                    Chuẩn bị: {formatDurationSeconds(item.question.preparationTimeSeconds)}
-                                  </span>
-                                  <span className="rounded-full bg-slate-50 px-2 py-0.5 ring-1 ring-slate-200">
-                                    Tối thiểu: {formatDurationSeconds(item.question.minResponseSeconds)}
-                                  </span>
-                                  <span className="rounded-full bg-slate-50 px-2 py-0.5 ring-1 ring-slate-200">
-                                    Tối đa: {formatDurationSeconds(item.question.maxResponseSeconds)}
-                                  </span>
-                                </div>
-                              ) : null}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              {item.question ? (
-                                <a
-                                  aria-label={`Xem chi tiết ${item.question.code}`}
-                                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
-                                  href={`${canManage ? '/teacher' : '/school-admin'}/questions/${item.question.id}`}
-                                  rel="noopener noreferrer"
-                                  target="_blank"
-                                  title="Xem chi tiết câu hỏi"
-                                >
-                                  <Eye aria-hidden="true" className="size-3.5" />
-                                </a>
-                              ) : null}
-                              {canEditFreeQuestions && section.items.length > 1 && item.questionId ? (
-                                <button
-                                  className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
-                                  onClick={() => void handleRemoveQuestion(sectionIndex, item.questionId as string)}
-                                  type="button"
-                                >
-                                  Bỏ
-                                </button>
-                              ) : null}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
             </div>
           ) : null}
-          {papers.map((paper) => (
-            <div className="grid gap-2" key={paper.id}>
-              <PaperCard
-                maxTimePerAttemptMin={maxTimePerAttemptMin}
-                onOpen={() =>
-                  navigate(
-                    `${roleBasePath}/class-tests/${exam.id}/papers/${paper.id}`,
-                    { state: { examId: exam.id, paperId: paper.id } },
-                  )
-                }
-                openLabel={canEditContent ? 'Soạn đề' : 'Xem đề'}
-                paper={paper}
-              />
-              {canManage && canEditContent ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  {paper.status === 'LOCKED' ? (
-                    <button
-                      className="inline-flex h-8.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
-                      onClick={() => void handleUpdatePaperStatus(paper.id, 'REOPEN')}
-                      type="button"
-                    >
-                      <RefreshCw aria-hidden="true" className="size-3.5" />
-                      Mở lại {paper.code} để sửa
-                    </button>
-                  ) : (
-                    <button
-                      className="inline-flex h-8.5 items-center justify-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
-                      onClick={() => void handleUpdatePaperStatus(paper.id, 'LOCK')}
-                      type="button"
-                    >
-                      <Lock aria-hidden="true" className="size-3.5" />
-                      Khoá {paper.code} để phân đề
-                    </button>
-                  )}
-                  {paper.status !== 'LOCKED' && papers.length > 1 ? (
-                    <button
-                      className="inline-flex h-8.5 items-center justify-center gap-1.5 rounded-full border border-red-200 bg-white px-3.5 text-xs font-bold text-red-600 hover:bg-red-50"
-                      onClick={() => void handleDeletePaper(paper.id)}
-                      type="button"
-                    >
-                      <Trash2 aria-hidden="true" className="size-3.5" />
-                      Xoá mã đề
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+
+          {papers.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+              Chưa có mã đề nào.
             </div>
-          ))}
+          ) : null}
+
+          {papers.map((paper) => {
+            const isOpen = paper.id === selectedPaper?.id
+            // Khoá mã đề là để chốt nội dung trước khi phân cho học sinh — nên khoá rồi thì không
+            // sửa tiếp ngay trong thẻ, phải bấm "Mở lại để sửa" cho thành ý định rõ ràng.
+            const canEditThisPaper = canEditFreeQuestions && paper.status !== 'LOCKED'
+            return (
+              <ClassTestPaperAccordionItem
+                actions={
+                  <>
+                    <button
+                      aria-label={`Xem toàn trang mã đề ${paper.variant}`}
+                      className="inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      onClick={() =>
+                        navigate(`${roleBasePath}/class-tests/${exam.id}/papers/${paper.id}`, {
+                          state: { examId: exam.id, paperId: paper.id },
+                        })
+                      }
+                      title="Xem toàn trang"
+                      type="button"
+                    >
+                      <ScrollText aria-hidden="true" className="size-4" />
+                    </button>
+                    {canManage && canEditContent ? (
+                      <>
+                        {paper.status === 'LOCKED' ? (
+                          <button
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                            onClick={() => void handleUpdatePaperStatus(paper.id, 'REOPEN')}
+                            type="button"
+                          >
+                            <RefreshCw aria-hidden="true" className="size-3.5" />
+                            Mở lại để sửa
+                          </button>
+                        ) : (
+                          <button
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100"
+                            onClick={() => void handleUpdatePaperStatus(paper.id, 'LOCK')}
+                            type="button"
+                          >
+                            <Lock aria-hidden="true" className="size-3.5" />
+                            Khoá để phân đề
+                          </button>
+                        )}
+                        {paper.status !== 'LOCKED' && papers.length > 1 ? (
+                          <button
+                            aria-label={`Xoá mã đề ${paper.variant}`}
+                            className="inline-flex size-9 items-center justify-center rounded-full border border-red-200 bg-white text-red-600 hover:bg-red-50"
+                            onClick={() => void handleDeletePaper(paper.id)}
+                            title="Xoá mã đề"
+                            type="button"
+                          >
+                            <Trash2 aria-hidden="true" className="size-4" />
+                          </button>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </>
+                }
+                isOpen={isOpen}
+                key={paper.id}
+                maxTimePerAttemptMin={maxTimePerAttemptMin}
+                onOpen={() => setSelectedPaperId(paper.id)}
+                paper={paper}
+              >
+                <div className="grid gap-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-extrabold text-slate-900">Các phần và câu hỏi</h3>
+                    {canEditThisPaper ? (
+                      <button
+                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-indigo-600 hover:bg-slate-50"
+                        onClick={handleOpenAddSection}
+                        type="button"
+                      >
+                        <Plus aria-hidden="true" className="size-4" />
+                        Thêm phần
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {!canEditContent ? (
+                    <p className="text-xs font-semibold text-amber-700">
+                      Bài đã mở cho học sinh làm bài — không thể sửa câu hỏi/phần nữa.
+                    </p>
+                  ) : exam.blueprintId ? (
+                    <p className="text-xs font-semibold text-amber-700">
+                      Bài đang dùng blueprint dùng chung — vào tab Blueprint để đổi/gỡ blueprint thay vì sửa trực tiếp ở đây.
+                    </p>
+                  ) : paper.status === 'LOCKED' ? (
+                    <p className="text-xs font-semibold text-slate-500">
+                      Mã đề đã khoá và sẵn sàng phân cho học sinh. Bấm "Mở lại để sửa" nếu cần đổi nội dung.
+                    </p>
+                  ) : null}
+
+                  {paperSections.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
+                      Chưa có phần nào — bấm "Thêm phần" để bắt đầu soạn đề.
+                    </div>
+                  ) : (
+                    paperSections.map((section, sectionIndex) => (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5" key={section.id}>
+                        {editingSectionIndex === sectionIndex ? (
+                          <div className="grid gap-2">
+                            <input
+                              aria-label="Tên phần"
+                              className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
+                              onChange={(event) => setEditSectionTitle(event.target.value)}
+                              value={editSectionTitle}
+                            />
+                            <textarea
+                              className="min-h-14 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+                              onChange={(event) => setEditSectionInstruction(event.target.value)}
+                              placeholder="Hướng dẫn phần (không bắt buộc)"
+                              value={editSectionInstruction}
+                            />
+                            <input
+                              aria-label="Trọng số phần"
+                              className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900"
+                              max="1"
+                              min="0"
+                              onChange={(event) => setEditSectionWeight(event.target.value)}
+                              placeholder="Trọng số (bỏ trống để chia đều)"
+                              step="0.01"
+                              type="number"
+                              value={editSectionWeight}
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                className="inline-flex h-8 items-center justify-center rounded-full bg-indigo-600 px-3.5 text-xs font-bold text-white"
+                                onClick={() => void handleSaveSectionMeta(sectionIndex)}
+                                type="button"
+                              >
+                                Lưu
+                              </button>
+                              <button
+                                className="inline-flex h-8 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                                onClick={() => setEditingSectionIndex(null)}
+                                type="button"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2.5">
+                            <div>
+                              <span className="text-sm font-bold text-slate-900">{section.title || `Part ${sectionIndex + 1}`}</span>
+                              {section.weight != null ? (
+                                <p className="mt-0.5 text-xs font-semibold text-slate-500">Trọng số: {section.weight.toFixed(2)}</p>
+                              ) : null}
+                              {section.instruction ? <p className="mt-0.5 text-xs text-slate-500">{section.instruction}</p> : null}
+                            </div>
+                            {canEditThisPaper ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  aria-label={`Sửa ${section.title ?? `phần ${sectionIndex + 1}`}`}
+                                  className="inline-flex size-8.5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                  onClick={() => startEditingSection(sectionIndex)}
+                                  title="Sửa tên/hướng dẫn phần"
+                                  type="button"
+                                >
+                                  <Pencil aria-hidden="true" className="size-3.5" />
+                                </button>
+                                <button
+                                  className="inline-flex h-8.5 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+                                  onClick={() => setPickerMode({ kind: 'existing', sectionIndex })}
+                                  type="button"
+                                >
+                                  + Câu hỏi
+                                </button>
+                                {paperSections.length > 1 ? (
+                                  <button
+                                    aria-label={`Xóa ${section.title ?? `phần ${sectionIndex + 1}`}`}
+                                    className="inline-flex size-8.5 items-center justify-center rounded-full border border-red-200 text-red-600 hover:bg-red-50"
+                                    onClick={() => void handleRemoveSection(sectionIndex)}
+                                    type="button"
+                                  >
+                                    <Trash2 aria-hidden="true" className="size-3.5" />
+                                  </button>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                        {section.items.length === 0 ? (
+                          <div className="mt-2.5 rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
+                            Chưa có câu hỏi nào trong phần này.
+                          </div>
+                        ) : (
+                          <div className="mt-2.5 grid gap-1.5">
+                            {section.items.map((item, index) => (
+                              <div
+                                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm"
+                                key={item.id}
+                              >
+                                <div className="min-w-0">
+                                  <div className="truncate font-semibold text-slate-800">
+                                    {index + 1}. {item.question?.code} — {formatNullableText(item.question?.questionText)}
+                                  </div>
+                                  {item.question ? (
+                                    <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-500">
+                                      <span className="rounded-full bg-slate-50 px-2 py-0.5 ring-1 ring-slate-200">
+                                        Chuẩn bị: {formatDurationSeconds(item.question.preparationTimeSeconds)}
+                                      </span>
+                                      <span className="rounded-full bg-slate-50 px-2 py-0.5 ring-1 ring-slate-200">
+                                        Tối thiểu: {formatDurationSeconds(item.question.minResponseSeconds)}
+                                      </span>
+                                      <span className="rounded-full bg-slate-50 px-2 py-0.5 ring-1 ring-slate-200">
+                                        Tối đa: {formatDurationSeconds(item.question.maxResponseSeconds)}
+                                      </span>
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {item.question ? (
+                                    <a
+                                      aria-label={`Xem chi tiết ${item.question.code}`}
+                                      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                      href={`${roleBasePath}/questions/${item.question.id}`}
+                                      rel="noopener noreferrer"
+                                      target="_blank"
+                                      title="Xem chi tiết câu hỏi"
+                                    >
+                                      <Eye aria-hidden="true" className="size-3.5" />
+                                    </a>
+                                  ) : null}
+                                  {canEditThisPaper && section.items.length > 1 && item.questionId ? (
+                                    <button
+                                      className="inline-flex h-7 items-center justify-center rounded-full border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                                      onClick={() => void handleRemoveQuestion(sectionIndex, item.questionId as string)}
+                                      type="button"
+                                    >
+                                      Bỏ
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ClassTestPaperAccordionItem>
+            )
+          })}
         </div>
       ) : null}
 
