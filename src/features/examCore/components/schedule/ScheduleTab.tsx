@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Lock, Monitor, Plus, Search, Smartphone, UserPlus, Wand2, X } from 'lucide-react'
+import { Laptop, Lock, Monitor, Plus, Search, UserPlus, Wand2, X } from 'lucide-react'
 import { toApiError } from '@/shared/api'
 import type { ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
@@ -324,7 +324,8 @@ export function ScheduleTab({
         <div>
           <div className="text-sm font-extrabold text-slate-900">Hình thức làm bài</div>
           <div className="text-xs text-slate-500">
-            Chọn thiết bị thí sinh dùng để làm bài — điện thoại hoặc máy vi tính. Cả hai đều xếp ca thi, phòng và giám thị.
+            Chọn máy thí sinh dùng để làm bài. Cả hai hình thức đều thi tại phòng, có ca thi và giám thị — không có
+            hình thức làm bài ở nhà.
           </div>
         </div>
       </div>
@@ -338,8 +339,8 @@ export function ScheduleTab({
           type="button"
         >
           <div className="flex items-center gap-2">
-            <Smartphone aria-hidden="true" className="size-4.5 text-indigo-600" />
-            <span className="text-[13px] font-bold text-slate-900">Điện thoại</span>
+            <Laptop aria-hidden="true" className="size-4.5 text-indigo-600" />
+            <span className="text-[13px] font-bold text-slate-900">Thiết bị học sinh</span>
             {effectiveMode === 'DEVICE' ? (
               <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
                 Đang chọn
@@ -347,7 +348,7 @@ export function ScheduleTab({
             ) : null}
           </div>
           <div className="mt-1.5 text-xs leading-5 text-slate-600">
-            Thí sinh làm bài trên điện thoại cá nhân. Vẫn xếp ca thi, phòng và giám thị như thi tập trung.
+            Thí sinh làm bài trên máy cá nhân mang tới phòng thi. Vẫn xếp ca thi, phòng và giám thị như thi tập trung.
           </div>
         </button>
         <button
@@ -360,7 +361,7 @@ export function ScheduleTab({
         >
           <div className="flex items-center gap-2">
             <Monitor aria-hidden="true" className="size-4.5 text-slate-500" />
-            <span className="text-[13px] font-bold text-slate-900">Máy vi tính</span>
+            <span className="text-[13px] font-bold text-slate-900">Thiết bị nhà trường</span>
             {effectiveMode === 'LAB' ? (
               <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
                 Đang chọn
