@@ -37,8 +37,17 @@ type GraphQlExamItemEvaluationTurn = Omit<ExamItemEvaluationDto['turns'][number]
   wordFeedback?: string | null
 }
 
+type GraphQlAiEvaluationContext = Omit<
+  NonNullable<ExamItemEvaluationDto['ai']>, 'signals' | 'suggestions' | 'validity'
+> & {
+  signals?: string | null
+  suggestions?: string | null
+  validity?: string | null
+}
+
 type GraphQlExamItemEvaluationResponse = {
-  examItemResponseEvaluation: (Omit<ExamItemEvaluationDto, 'signals' | 'suggestions' | 'validity' | 'turns'> & {
+  examItemResponseEvaluation: (Omit<ExamItemEvaluationDto, 'ai' | 'signals' | 'suggestions' | 'validity' | 'turns'> & {
+    ai?: GraphQlAiEvaluationContext | null
     signals?: string | null
     suggestions?: string | null
     validity?: string | null
@@ -144,6 +153,22 @@ const EXAM_ITEM_RESPONSE_EVALUATION_QUERY = `
         pronunciationOverall
         wordFeedback
       }
+      ai {
+        evaluationId
+        engineType
+        gradedByModel
+        promptVersion
+        overallConfidence
+        requiresHumanReview
+        reviewReasonCode
+        markedInvalid
+        requiresRetake
+        evaluatedAt
+        feedbackSummary
+        signals
+        validity
+        suggestions
+      }
     }
   }
 `
@@ -204,6 +229,14 @@ export async function fetchExamItemEvaluation(answerId: string) {
 
   return {
     ...evaluation,
+    ai: evaluation.ai
+      ? {
+        ...evaluation.ai,
+        signals: parseJsonField(evaluation.ai.signals),
+        suggestions: parseJsonField(evaluation.ai.suggestions),
+        validity: parseJsonField<ExamValidityDto>(evaluation.ai.validity),
+      }
+      : null,
     signals: parseJsonField(evaluation.signals),
     suggestions: parseJsonField(evaluation.suggestions),
     turns: evaluation.turns.map((turn) => ({

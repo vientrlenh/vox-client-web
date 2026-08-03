@@ -7,6 +7,7 @@ import {
   formatScore,
   getAttemptStatusDisplay,
   getExamResultStatusDisplay,
+  getHiddenResultNotice,
   getStudentExamStatusDisplay,
   type ExamResultItemDto,
   type StudentExamSessionSummaryDto,
@@ -341,7 +342,11 @@ function StudentExamResultPageCore({ title }: { title: string }) {
     )
   }
 
-  const resultHiddenForReview = Boolean(result && session.flagged && result.status === 'PENDING_REVIEW')
+  // Luật "trạng thái nào học sinh được xem" nằm ở BE và đến đây qua `scoreVisible` — cùng
+  // một cờ mà trang giáo viên đang dùng. Trước đây trang này tự suy bằng
+  // `flagged && PENDING_REVIEW`, nên bài chưa ai soát mà không bị gắn cờ vẫn lộ hết điểm.
+  const resultHidden = Boolean(result && !result.scoreVisible)
+  const hiddenNotice = result ? getHiddenResultNotice(result.status) : null
   const resultInvalid = Boolean(result && result.status === 'INVALID')
   const headerStatus = result ? getExamResultStatusDisplay(result.status) : getAttemptStatusDisplay(session.status)
 
@@ -360,17 +365,17 @@ function StudentExamResultPageCore({ title }: { title: string }) {
         title={title}
       />
 
-      {resultHiddenForReview ? (
+      {resultHidden && hiddenNotice ? (
         <div className="mt-5">
           <ResultStatePanel
-            description="Bài thi của bạn đang chờ giáo viên xem xét trước khi công bố kết quả."
-            title="Đang chờ giáo viên xem xét"
-            tone="warning"
+            description={hiddenNotice.description}
+            title={hiddenNotice.title}
+            tone={hiddenNotice.tone}
           />
         </div>
       ) : null}
 
-      {!resultHiddenForReview && resultInvalid ? (
+      {!resultHidden && resultInvalid ? (
         <div className="mt-5">
           <ResultStatePanel
             description="Bài thi của bạn không hợp lệ do vi phạm quy chế thi. Vui lòng liên hệ giám thị/nhà trường nếu có thắc mắc."
@@ -380,7 +385,7 @@ function StudentExamResultPageCore({ title }: { title: string }) {
         </div>
       ) : null}
 
-      {!resultHiddenForReview && !resultInvalid && result ? (
+      {!resultHidden && !resultInvalid && result ? (
         <>
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <StatCard icon={<Target size={19} />} iconTone="indigo" label="Tổng điểm" value={formatScore(result.totalScore)} />
@@ -422,7 +427,7 @@ function StudentExamResultPageCore({ title }: { title: string }) {
         </>
       ) : null}
 
-      {!result && !resultHiddenForReview ? (
+      {!result && !resultHidden ? (
         <div className="mt-5">
           {session.status === 'GRADING_FAILED' ? (
             <ResultStatePanel

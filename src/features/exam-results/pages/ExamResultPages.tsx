@@ -55,6 +55,7 @@ import {
   formatScore,
   getAttemptStatusDisplay,
   getExamResultStatusDisplay,
+  resolveEvaluationDisplay,
   type ExamCandidateResultDto,
   type ExamItemEvaluationDto,
 } from '../types'
@@ -514,7 +515,10 @@ export function QuestionEvaluationCard({
   questionCode?: string | null
   questionText?: string | null
 }) {
-  const validityRules = evaluation ? buildValidityRulesForDisplay(evaluation) : []
+  // Sau khi giáo viên chấm lại, bằng chứng AI nằm ở khối `ai` chứ không còn ở bản hiệu
+  // lực. Đi qua một chỗ gộp duy nhất để màn học sinh và màn giáo viên không lệch nhau.
+  const display = evaluation ? resolveEvaluationDisplay(evaluation) : null
+  const validityRules = display ? buildValidityRulesForDisplay(display) : []
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white">
@@ -543,26 +547,32 @@ export function QuestionEvaluationCard({
 
       {open ? (
         <div className="border-t border-slate-100 px-4 py-4">
-          {!evaluation ? (
+          {!evaluation || !display ? (
             <p className="text-sm text-slate-400">Chưa có evaluation cho câu trả lời này.</p>
           ) : (
             <div className="grid gap-5">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge label={getExamResultStatusDisplay(evaluation.status).label} tone={getExamResultStatusDisplay(evaluation.status).tone} />
-                  {evaluation.requiresRetake ? <StatusBadge label="Cần thi lại" tone="danger" /> : null}
-                  {evaluation.requiresHumanReview ? <StatusBadge label="Cần giáo viên duyệt lại" tone="warning" /> : null}
-                  {evaluation.signals?.uncertaintyType === 'SYSTEM_UNCERTAINTY' || evaluation.signals?.uncertaintyType === 'MIXED' ? (
+                  {display.humanGraded ? <StatusBadge label="Giáo viên chấm lại" tone="violet" /> : null}
+                  {display.requiresRetake ? <StatusBadge label="Cần thi lại" tone="danger" /> : null}
+                  {display.requiresHumanReview ? <StatusBadge label="Cần giáo viên duyệt lại" tone="warning" /> : null}
+                  {display.signals?.uncertaintyType === 'SYSTEM_UNCERTAINTY' || display.signals?.uncertaintyType === 'MIXED' ? (
                     <StatusBadge label="System uncertainty" tone="warning" />
                   ) : null}
-                  {evaluation.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
+                  {display.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
                     <StatusBadge label="Chưa đủ bằng chứng chấm điểm" tone="info" />
                   ) : null}
-                  {getConfidenceModeLabel(evaluation.signals?.confidenceMode) ? (
-                    <StatusBadge label={getConfidenceModeLabel(evaluation.signals?.confidenceMode) as string} tone="neutral" />
+                  {getConfidenceModeLabel(display.signals?.confidenceMode) ? (
+                    <StatusBadge label={getConfidenceModeLabel(display.signals?.confidenceMode) as string} tone="neutral" />
                   ) : null}
-                  {evaluation.markedInvalid ? <StatusBadge label="Đánh dấu không hợp lệ" tone="danger" /> : null}
+                  {display.markedInvalid ? <StatusBadge label="Đánh dấu không hợp lệ" tone="danger" /> : null}
                   <span className="text-xs text-slate-500">Chấm lúc {formatDateTime(evaluation.evaluatedAt)}</span>
+                  {/* Hai mốc thời gian khác nhau: phán quyết của giáo viên và lần AI phân
+                      tích. Gộp làm một là khẳng định sai về thời điểm. */}
+                  {display.aiEvaluatedAt ? (
+                    <span className="text-xs text-slate-500">· phân tích AI {formatDateTime(display.aiEvaluatedAt)}</span>
+                  ) : null}
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
@@ -570,7 +580,7 @@ export function QuestionEvaluationCard({
                       <Gauge aria-hidden="true" className="size-4" />
                       <span className="text-xs font-bold uppercase tracking-wide">Overall confidence</span>
                     </div>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.overallConfidence)}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(display.overallConfidence)}</p>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                     <div className="flex items-center gap-2 text-slate-500">
@@ -578,43 +588,51 @@ export function QuestionEvaluationCard({
                       <span className="text-xs font-bold uppercase tracking-wide">Audio quality</span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.signals?.audioQuality)}</p>
+                      <p className="text-sm font-bold text-slate-900">{formatConfidencePercent(display.signals?.audioQuality)}</p>
                       <StatusBadge
-                        label={getAudioGateLabel(evaluation.signals?.audioGateStatus)}
-                        tone={getAudioGateTone(evaluation.signals?.audioGateStatus)}
+                        label={getAudioGateLabel(display.signals?.audioGateStatus)}
+                        tone={getAudioGateTone(display.signals?.audioGateStatus)}
                       />
                     </div>
-                    {evaluation.signals?.audioGateReasonCodes?.length ? (
+                    {display.signals?.audioGateReasonCodes?.length ? (
                       <p className="mt-1 text-xs text-slate-500">
-                        {evaluation.signals.audioGateReasonCodes.map(getAudioReasonLabel).join(' · ')}
+                        {display.signals.audioGateReasonCodes.map(getAudioReasonLabel).join(' · ')}
                       </p>
                     ) : null}
                   </div>
                 </div>
-                {evaluation.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
+                {display.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
                   <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-900">
                     <div className="flex items-start gap-2">
                       <FileText aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                       <div>
                         <p className="font-bold">Điểm thấp có thể hợp lệ vì chưa đủ bằng chứng.</p>
                         <p className="mt-1 text-sky-800">
-                          {(evaluation.signals.evidenceReasonCodes ?? []).map(getEvidenceReasonLabel).join(' · ')}
+                          {(display.signals.evidenceReasonCodes ?? []).map(getEvidenceReasonLabel).join(' · ')}
                         </p>
                         <p className="mt-1 text-xs text-sky-700">Cờ này không tự động được xem là lỗi hệ thống và không tự bật human review.</p>
                       </div>
                     </div>
                   </div>
                 ) : null}
-                {evaluation.requiresHumanReview || evaluation.reviewReasonCode ? (
+                {display.requiresHumanReview || display.reviewReasonCode ? (
                   <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
                     <div className="flex items-start gap-2">
                       <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                      <p>{getReviewReasonLabel(evaluation.reviewReasonCode) ?? 'Bài làm cần được giáo viên xem lại trước khi tin cậy hoàn toàn.'}</p>
+                      <p>{getReviewReasonLabel(display.reviewReasonCode) ?? 'Bài làm cần được giáo viên xem lại trước khi tin cậy hoàn toàn.'}</p>
                     </div>
                   </div>
                 ) : null}
                 {evaluation.feedbackSummary ? (
                   <p className="mt-3 text-sm leading-6 text-slate-700">{evaluation.feedbackSummary}</p>
+                ) : null}
+                {/* Nhận xét của AI để riêng, không trộn vào nhận xét của giáo viên: đây là
+                    hai người khác nhau nói về cùng một bài. */}
+                {display.aiFeedbackSummary ? (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Nhận xét của AI (tham khảo)</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">{display.aiFeedbackSummary}</p>
+                  </div>
                 ) : null}
               </div>
 
@@ -696,7 +714,7 @@ export function QuestionEvaluationCard({
                           {rule?.action ? (
                             <span>
                               Hành động:{' '}
-                              {evaluation.validity?.validForScoring !== false && rule.action === 'reject_or_zero'
+                              {display.validity?.validForScoring !== false && rule.action === 'reject_or_zero'
                                 ? 'chỉ áp dụng ở lượt bị gắn cờ; toàn bài vẫn được chấm'
                                 : rule.action}
                             </span>
