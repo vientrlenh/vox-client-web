@@ -97,10 +97,6 @@ const navigationGroups: NavigationGroup[] = [
         to: '/teacher/blueprints',
       },
       {
-        label: 'Tạo bài trên lớp',
-        to: '/teacher/class-tests/create',
-      },
-      {
         label: 'Bài trên lớp của tôi',
         to: '/teacher/class-tests',
       },
