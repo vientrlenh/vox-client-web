@@ -32,6 +32,88 @@ export const RESULT_DECISION_METHODS: ResultDecisionMethod[] = ['HIGHEST', 'LATE
 export type AssessmentPolicyStrictness = 'LENIENT' | 'STANDARD' | 'STRICT'
 
 
+export type ExamStreamType = 'CAMERA' | 'SCREEN'
+
+export type ExamStreamTypePermission = 'ALL' | 'ANY'
+
+/**
+ * Cấu hình giám sát của kỳ thi, mô hình hoá thành MỘT giá trị thay vì hai trường rời.
+ *
+ * <p>Server (ExamStreamConfigResolver) chỉ nhận đúng 5 tổ hợp: permission phải vắng khi chỉ chọn
+ * một loại stream, và bắt buộc khi chọn cả hai. Cặp checkbox + dropdown riêng diễn đạt được 12 tổ
+ * hợp, trong đó 5 tổ hợp trả về 400 và 3 tổ hợp khác nhau lại cho cùng một kết quả - nên UI phải
+ * chọn 1 trong 5, không phải tự ghép.
+ *
+ * <p>Với một union 5 nhánh thì tổ hợp sai đơn giản là không biểu đạt được.
+ *
+ * <p>Dùng chung cho cả kỳ thi tập trung lẫn bài kiểm tra trên lớp: hai luồng tạo đi qua đúng một
+ * validator ở server, nên không có lý do gì để hai form diễn đạt nó theo hai cách khác nhau.
+ */
+export type ExamStreamSetup =
+  | 'BOTH_REQUIRED'
+  | 'BOTH_STUDENT_CHOICE'
+  | 'CAMERA_ONLY'
+  | 'NO_MONITORING'
+  | 'SCREEN_ONLY'
+
+export type ExamStreamSetupPayload = {
+  requiredStreamTypes: ExamStreamType[] | null
+  streamTypePermission: ExamStreamTypePermission | null
+}
+
+export const EXAM_STREAM_SETUP_PAYLOAD: Record<ExamStreamSetup, ExamStreamSetupPayload> = {
+  BOTH_REQUIRED: { requiredStreamTypes: ['CAMERA', 'SCREEN'], streamTypePermission: 'ALL' },
+  BOTH_STUDENT_CHOICE: { requiredStreamTypes: ['CAMERA', 'SCREEN'], streamTypePermission: 'ANY' },
+  CAMERA_ONLY: { requiredStreamTypes: ['CAMERA'], streamTypePermission: null },
+  NO_MONITORING: { requiredStreamTypes: null, streamTypePermission: null },
+  SCREEN_ONLY: { requiredStreamTypes: ['SCREEN'], streamTypePermission: null },
+}
+
+export type ExamStreamSetupOption = {
+  hint: string
+  label: string
+  tone?: 'warning'
+  value: ExamStreamSetup
+}
+
+/**
+ * Thứ tự hiển thị: an toàn nhất trước, phá hoại nhất sau cùng.
+ *
+ * <p>Nhãn nói theo **hệ quả** chứ không dùng tên enum: "ANY"/"ALL" không cho giáo viên biết điều gì
+ * sẽ xảy ra với học viên, và đó mới là thứ họ đang quyết định.
+ */
+export const EXAM_STREAM_SETUPS: ExamStreamSetupOption[] = [
+  {
+    hint: 'Học viên phải bật đồng thời camera và chia sẻ màn hình. Mức giám sát đầy đủ nhất.',
+    label: 'Bắt buộc cả camera và màn hình',
+    value: 'BOTH_REQUIRED',
+  },
+  {
+    hint: 'Chỉ ghi camera. Không có bằng chứng về những gì diễn ra trên màn hình học viên.',
+    label: 'Chỉ camera',
+    value: 'CAMERA_ONLY',
+  },
+  {
+    hint: 'Chỉ ghi màn hình. Không xác thực được ai đang ngồi trước máy.',
+    label: 'Chỉ màn hình',
+    value: 'SCREEN_ONLY',
+  },
+  {
+    // Ứng dụng thi trên máy học viên hiện luôn bật cả hai (ExamSessionBootstrapService không gửi
+    // loại ưu tiên), nên lựa chọn này tạm thời cho ra kết quả giống "bắt buộc cả hai". Nói thẳng
+    // trong UI thay vì để nó hứa một điều hệ thống chưa làm được.
+    hint: 'Học viên tự chọn camera hoặc màn hình. Chưa có hiệu lực: ứng dụng thi hiện vẫn bật cả hai.',
+    label: 'Cho học viên tự chọn',
+    value: 'BOTH_STUDENT_CHOICE',
+  },
+  {
+    hint: 'Tắt hoàn toàn giám sát cho bài này. Không có bản ghi nào và giám thị không mở được màn hình theo dõi.',
+    label: 'Không giám sát',
+    tone: 'warning',
+    value: 'NO_MONITORING',
+  },
+]
+
 export type ExamSecurePoolStatus = 'SEALED' | 'RELEASED'
 
 export type Paged<T> = {

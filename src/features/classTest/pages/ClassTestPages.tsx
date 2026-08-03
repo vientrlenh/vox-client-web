@@ -91,7 +91,12 @@ import {
   useUpdateClassTestQuestionsMutation,
   useUpdateClassTestStatusMutation,
 } from '../api/useClassTestMutations'
-import { getClassTestStatusDisplay, type ExamStreamType, type ExamStreamTypePermission } from '../types'
+import {
+  EXAM_STREAM_SETUP_PAYLOAD,
+  EXAM_STREAM_SETUPS,
+  getClassTestStatusDisplay,
+  type ExamStreamSetup,
+} from '../types'
 
 const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
   { label: 'Tất cả', value: '' },
@@ -452,9 +457,7 @@ type ClassTestCreateDraft = {
   selectedBlueprint: ExamBlueprintDto | null
   selectedVersion: ExamBlueprintVersionDto | null
   selectionAssignments: Record<string, QuestionDto>
-  streamCamera: boolean
-  streamPermission: ExamStreamTypePermission
-  streamScreen: boolean
+  streamSetup: ExamStreamSetup
 }
 
 type ClassTestCreateLocationState = {
@@ -489,9 +492,9 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   const [deliveryMode, setDeliveryMode] = useState<ExamDeliveryMode>(draft?.deliveryMode ?? 'DEVICE')
   const [schoolRoom, setSchoolRoom] = useState<SchoolRoomLite | null>(draft?.schoolRoom ?? null)
   const [showRoomPicker, setShowRoomPicker] = useState(false)
-  const [streamCamera, setStreamCamera] = useState(draft?.streamCamera ?? false)
-  const [streamScreen, setStreamScreen] = useState(draft?.streamScreen ?? false)
-  const [streamPermission, setStreamPermission] = useState<ExamStreamTypePermission>(draft?.streamPermission ?? 'ALL')
+  // Mặc định mức giám sát đầy đủ, không phải "không giám sát": lựa chọn này không sửa được sau khi
+  // tạo bài, và bỏ trống nghĩa là học sinh không vào thi được nếu ứng dụng thi vẫn xin stream token.
+  const [streamSetup, setStreamSetup] = useState<ExamStreamSetup>(draft?.streamSetup ?? 'BOTH_REQUIRED')
   const [requiresOtp, setRequiresOtp] = useState(draft?.requiresOtp ?? false)
   const [sections, setSections] = useState<ClassTestSectionDraft[]>(draft?.sections ?? [newClassTestSection(1)])
   const [pickerForSectionKey, setPickerForSectionKey] = useState<string | null>(null)
@@ -553,9 +556,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
           selectedBlueprint,
           selectedVersion,
           selectionAssignments,
-          streamCamera,
-          streamPermission,
-          streamScreen,
+          streamSetup,
         } satisfies ClassTestCreateDraft,
         returnTo: '/teacher/class-tests/create',
       },
@@ -671,11 +672,6 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
     setSelectionPickerSlotId(null)
   }
 
-  const requestedStreamTypes: ExamStreamType[] = [
-    ...(streamCamera ? (['CAMERA'] as const) : []),
-    ...(streamScreen ? (['SCREEN'] as const) : []),
-  ]
-
   async function handleSubmit() {
     setErrorMessage(null)
     const parsedSectionWeights = creationMode === 'questions' ? sections.map((section) => parseOptionalSectionWeight(section.weight)) : []
@@ -755,12 +751,12 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
           maxAttempt: Number(maxAttempt) || 1,
           name,
           openAt: openAtIso,
-          requiredStreamTypes: requestedStreamTypes.length > 0 ? requestedStreamTypes : null,
           requiresOtp,
           resultDecisionMethod,
-          // BE chỉ chấp nhận quyền stream khi yêu cầu đồng thời cả hai loại.
           schoolRoomId: schoolRoom?.id ?? null,
-          streamTypePermission: requestedStreamTypes.length === 2 ? streamPermission : null,
+          // Qua bảng map, không gán tay hai trường: server chỉ nhận đúng 5 tổ hợp và mọi tổ hợp
+          // khác trả về 400.
+          ...EXAM_STREAM_SETUP_PAYLOAD[streamSetup],
           schoolClassId,
           sections:
             creationMode === 'blueprint'
@@ -947,35 +943,45 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
             </p>
           </div>
 
-          <div className="grid gap-1.5">
-            <span className="text-[13px] font-bold text-slate-700">Giám sát bằng camera / màn hình</span>
-            <div className="flex flex-wrap gap-4">
-              <label className="inline-flex items-center gap-2 text-[13px] font-medium text-slate-700">
-                <input checked={streamCamera} onChange={(event) => setStreamCamera(event.target.checked)} type="checkbox" />
-                Camera
-              </label>
-              <label className="inline-flex items-center gap-2 text-[13px] font-medium text-slate-700">
-                <input checked={streamScreen} onChange={(event) => setStreamScreen(event.target.checked)} type="checkbox" />
-                Màn hình
-              </label>
-            </div>
-            {requestedStreamTypes.length === 2 ? (
-              <label className="mt-1 grid w-fit gap-1.5 text-[13px] font-bold text-slate-700">
-                Yêu cầu với hai luồng
-                <select
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-900"
-                  onChange={(event) => setStreamPermission(event.target.value as ExamStreamTypePermission)}
-                  value={streamPermission}
-                >
-                  <option value="ALL">Bắt buộc bật cả camera và màn hình</option>
-                  <option value="ANY">Học sinh chọn một trong hai</option>
-                </select>
-              </label>
-            ) : null}
+          <fieldset className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <legend className="text-sm font-bold text-slate-700">Giám sát thi</legend>
             <p className="text-xs text-slate-500">
-              Bỏ trống cả hai nếu không cần giám sát. Khi đó bài cũng không mở được màn hình theo dõi trực tiếp.
+              Quyết định học sinh phải chia sẻ những gì trong lúc làm bài.{' '}
+              <b className="text-slate-700">Không sửa được sau khi tạo bài.</b>
             </p>
-          </div>
+
+            <div className="mt-1.5 grid gap-2">
+              {EXAM_STREAM_SETUPS.map((option) => {
+                const isSelected = streamSetup === option.value
+                const isWarning = option.tone === 'warning'
+                return (
+                  <label
+                    className={`grid cursor-pointer grid-cols-[auto_1fr] items-start gap-2.5 rounded-lg border bg-white p-3 transition ${
+                      isSelected
+                        ? isWarning
+                          ? 'border-amber-300 ring-2 ring-amber-100'
+                          : 'border-indigo-300 ring-2 ring-indigo-100'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                    key={option.value}
+                  >
+                    <input
+                      checked={isSelected}
+                      className="mt-0.5 accent-indigo-600"
+                      name="streamSetup"
+                      onChange={() => setStreamSetup(option.value)}
+                      type="radio"
+                      value={option.value}
+                    />
+                    <span className="grid gap-0.5">
+                      <span className="text-[13px] font-bold text-slate-900">{option.label}</span>
+                      <span className={`text-xs ${isWarning ? 'text-amber-700' : 'text-slate-500'}`}>{option.hint}</span>
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+          </fieldset>
 
           <label className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-slate-700">
             <input checked={requiresOtp} onChange={(event) => setRequiresOtp(event.target.checked)} type="checkbox" />

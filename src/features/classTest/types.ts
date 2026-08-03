@@ -1,11 +1,21 @@
 import type { StatusTone } from '@/shared/ui/StatusBadge'
-import type { ExamDto, ExamStatus, ResultDecisionMethod } from '@/features/examCore/types'
+import type {
+  ExamDto,
+  ExamStatus,
+  ExamStreamType,
+  ExamStreamTypePermission,
+  ResultDecisionMethod,
+} from '@/features/examCore/types'
 
-/** Loại stream giám sát BE chấp nhận. Gửi cả hai thì bắt buộc kèm `streamTypePermission`. */
-export type ExamStreamType = 'CAMERA' | 'SCREEN'
-
-/** ALL = phải bật đủ cả hai luồng; ANY = học sinh chọn một trong hai. */
-export type ExamStreamTypePermission = 'ALL' | 'ANY'
+// Bài kiểm tra trên lớp đi qua đúng validator stream của server như kỳ thi tập trung
+// (ExamStreamConfigResolver), nên dùng chung một mô hình ở `examCore` thay vì tự khai lại.
+export {
+  EXAM_STREAM_SETUP_PAYLOAD,
+  EXAM_STREAM_SETUPS,
+  type ExamStreamSetup,
+  type ExamStreamType,
+  type ExamStreamTypePermission,
+} from '@/features/examCore/types'
 
 export type ClassTestSectionQuestionInput = {
   questionId: string
@@ -30,8 +40,14 @@ export type CreateClassTestRequest = {
   maxAttempt?: number | null
   name: string
   openAt?: string | null
-  /** Bỏ trống = không giám sát bằng stream; khi đó bài cũng không mở được màn hình theo dõi. */
-  requiredStreamTypes?: ExamStreamType[] | null
+  /**
+   * Bắt buộc (không optional) dù server chấp nhận null, y hệt `CreateExamRequest`: cấu hình giám
+   * sát không sửa được sau khi tạo, và bỏ trống nghĩa là học sinh KHÔNG vào thi được nếu ứng dụng
+   * thi vẫn xin stream token.
+   *
+   * <p>Đừng gán trực tiếp: dùng {@link EXAM_STREAM_SETUP_PAYLOAD}.
+   */
+  requiredStreamTypes: ExamStreamType[] | null
   requiresOtp?: boolean | null
   resultDecisionMethod?: ResultDecisionMethod | null
   /** Có thể bỏ trống lúc tạo rồi chọn sau ở tab Xếp lịch, nhưng phải có trước khi lên lịch. */
@@ -39,7 +55,7 @@ export type CreateClassTestRequest = {
   sections?: ClassTestSectionInput[] | null
   schoolClassId: string
   /** Chỉ có tác dụng khi `requiredStreamTypes` gồm cả CAMERA lẫn SCREEN. */
-  streamTypePermission?: ExamStreamTypePermission | null
+  streamTypePermission: ExamStreamTypePermission | null
 }
 
 export type UpdateClassTestQuestionsRequest = {
