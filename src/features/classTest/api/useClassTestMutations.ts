@@ -48,8 +48,20 @@ export function useUpdateClassTestQuestionsMutation() {
 
 export function useCreateClassTestSectionMutation() {
   return useMutation({
-    mutationFn: async ({ examId, payload }: { examId: string; payload: ClassTestSectionInput }) => {
-      const response = await apiClient.post<ApiResponse<ExamDto>>(`/v1/class-tests/${examId}/sections`, payload)
+    mutationFn: async ({
+      examId,
+      paperId,
+      payload,
+    }: {
+      examId: string
+      /** Bỏ trống chỉ hợp lệ khi bài có đúng một mã đề. */
+      paperId?: string | null
+      payload: ClassTestSectionInput
+    }) => {
+      const response = await apiClient.post<ApiResponse<ExamDto>>(`/v1/class-tests/${examId}/sections`, {
+        ...payload,
+        paperId: paperId ?? null,
+      })
       return unwrap(response)
     },
   })

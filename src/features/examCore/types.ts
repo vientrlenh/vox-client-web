@@ -18,7 +18,8 @@ export type ExamBlueprintVersionStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 
 export type ExamBlueprintSlotType = 'FIXED' | 'SELECTION'
 
-export type CreateExamPaperSource = 'blueprint' | 'copy'
+/** `questions` = soạn câu hỏi trực tiếp, chỉ bài kiểm tra trên lớp chưa gắn blueprint mới dùng được. */
+export type CreateExamPaperSource = 'blueprint' | 'copy' | 'questions'
 
 export type ExamCandidateStatus = 'ASSIGNED' | 'ATTENDED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
 
@@ -463,7 +464,21 @@ export type CreateExamBlueprintRequest = {
 
 export type CreateExamPaperRequest = {
   copyFromPaperId?: string | null
+  /** Chỉ gửi kèm `source: 'questions'`. */
+  sections?: ExamPaperSectionInput[] | null
   source?: CreateExamPaperSource | null
+}
+
+export type ExamPaperQuestionInput = {
+  questionId: string
+  weight: number
+}
+
+export type ExamPaperSectionInput = {
+  instruction?: string | null
+  questions: ExamPaperQuestionInput[]
+  title: string
+  weight?: number | null
 }
 
 export type UpdateExamPaperItemRequest = {

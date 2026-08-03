@@ -29,14 +29,16 @@ export type ClassTestSectionInput = {
   weight?: number | null
 }
 
+/**
+ * Chỉ là "vỏ" bài kiểm tra: soạn đề (câu hỏi trực tiếp / blueprint / sao chép) là bước riêng ở
+ * trang chi tiết, qua `POST /v1/exams/:examId/papers` — giống hệt kỳ thi tập trung.
+ */
 export type CreateClassTestRequest = {
   assessmentPolicyId?: string | null
   closeAt?: string | null
   /** Giá trị enum của BE (`STUDENT_DEVICE` | `LAB`), không phải alias `DEVICE` dùng trong UI. */
   deliveryMode?: 'LAB' | 'STUDENT_DEVICE' | null
   description?: string | null
-  existingBlueprintId?: string | null
-  existingBlueprintVersionId?: string | null
   maxAttempt?: number | null
   name: string
   openAt?: string | null
@@ -52,13 +54,14 @@ export type CreateClassTestRequest = {
   resultDecisionMethod?: ResultDecisionMethod | null
   /** Có thể bỏ trống lúc tạo rồi chọn sau ở tab Xếp lịch, nhưng phải có trước khi lên lịch. */
   schoolRoomId?: string | null
-  sections?: ClassTestSectionInput[] | null
   schoolClassId: string
   /** Chỉ có tác dụng khi `requiredStreamTypes` gồm cả CAMERA lẫn SCREEN. */
   streamTypePermission: ExamStreamTypePermission | null
 }
 
 export type UpdateClassTestQuestionsRequest = {
+  /** Mã đề được thay toàn bộ nội dung. Bỏ trống chỉ hợp lệ khi bài có đúng một mã đề. */
+  paperId?: string | null
   sections: ClassTestSectionInput[]
 }
 
@@ -70,7 +73,6 @@ export type ChangeClassTestBlueprintRequest = {
 export type CreateClassTestResponse = {
   candidateCount: number
   exam: ExamDto
-  paperId: string
 }
 
 export function getClassTestStatusDisplay(status?: ExamStatus | string | null): { tone: StatusTone; label: string } {
