@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, CheckSquare, KeyRound, UserRound, Video } from 'lucide-react'
-import { Link, useLocation } from 'react-router'
+import { KeyRound, UserRound, Video } from 'lucide-react'
+import { Link, useLocation, useParams } from 'react-router'
 import {
   useFlagExamSessionMutation,
   useForceEndExamSessionMutation,
@@ -72,13 +72,13 @@ function formatCountdown(totalSeconds: number) {
   return `${hours}:${minutes}:${remainingSeconds}`
 }
 
-export function TeacherProctorAttendancePage() {
+export function ProctorAttendanceDetailPage() {
   const queryClient = useQueryClient()
   const location = useLocation()
   const isSchoolAdminView = location.pathname.startsWith('/school-admin')
+  const { scheduleId } = useParams()
   const schedulesQuery = useMyProctorSchedulesQuery()
   const schedules = useMemo(() => schedulesQuery.data ?? [], [schedulesQuery.data])
-  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null)
   const [selectedAttendedIds, setSelectedAttendedIds] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -92,7 +92,7 @@ export function TeacherProctorAttendancePage() {
   const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const unblockExamCandidateMutation = useUnblockExamCandidateMutation()
 
-  const activeScheduleId = selectedScheduleId ?? schedules[0]?.scheduleId ?? null
+  const activeScheduleId = scheduleId ?? null
   const selectedSchedule = schedules.find((schedule) => schedule.scheduleId === activeScheduleId) ?? null
   const candidatesQuery = useMyProctorScheduleCandidatesQuery(activeScheduleId)
   const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
@@ -116,10 +116,6 @@ export function TeacherProctorAttendancePage() {
   }, [clockNow, otpState])
 
   const attendanceDisabledReason = getDisabledReason(selectedSchedule?.startDate, selectedSchedule?.endDate)
-  const upcomingCount = useMemo(
-    () => schedules.filter((schedule) => schedule.startDate && new Date(schedule.startDate).getTime() > Date.now()).length,
-    [schedules],
-  )
   const absentCount = Math.max(0, candidates.length - selectedAttendedIds.size)
   const attendanceChanged = useMemo(
     () => candidates.some((candidate) => (candidate.status === 'ATTENDED') !== selectedAttendedIds.has(candidate.candidateId)),
@@ -336,22 +332,20 @@ export function TeacherProctorAttendancePage() {
 
       <div>
         <p className="text-sm font-black uppercase text-cyan-700">Điểm danh giám thị</p>
-        <h1 className="mt-2 text-3xl font-black tracking-0 text-slate-950">Ca thi được phân công</h1>
+        <Link className="text-sm font-bold text-cyan-700" to={isSchoolAdminView ? '/school-admin/proctor-attendance' : '/teacher/proctor-attendance'}>← Quay lại danh sách ca thi</Link>
+        <h1 className="mt-2 text-3xl font-black tracking-0 text-slate-950">Điểm danh ca thi</h1>
         <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-          Chọn ca thi, tick vắng mặt theo danh sách rồi lưu một lần. Bạn cũng có thể lấy OTP hiện tại và xử lý các
-          tình huống nghi vấn ngay trên cùng màn hình.
+          Tick vắng mặt theo danh sách rồi lưu một lần. Bạn cũng có thể lấy OTP hiện tại và xử lý các tình huống nghi vấn.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <StatCard icon={<CheckSquare size={19} />} iconTone="indigo" label="Tổng ca được gán" value={schedules.length} />
-        <StatCard icon={<CalendarClock size={19} />} iconTone="amber" label="Ca sắp tới" value={upcomingCount} />
-        <StatCard icon={<UserRound size={19} />} iconTone="emerald" label="Ca đang chọn" value={selectedSchedule ? 1 : 0} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatCard icon={<UserRound size={19} />} iconTone="emerald" label="Tổng thí sinh" value={candidates.length} />
         <StatCard icon={<UserRound size={19} />} iconTone="amber" label="Đang tick vắng mặt" value={absentCount} />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="grid gap-5">
+        {false ? <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="text-lg font-extrabold text-slate-900">Danh sách ca thi</h2>
           <div className="mt-4 grid gap-3">
             {schedulesQuery.isLoading ? (
@@ -373,10 +367,7 @@ export function TeacherProctorAttendancePage() {
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                     }`}
                     key={schedule.scheduleId}
-                    onClick={() => {
-                      setSelectedScheduleId(schedule.scheduleId)
-                      setOtpState(null)
-                    }}
+                    onClick={() => setOtpState(null)}
                     type="button"
                   >
                     <p className="text-sm font-bold text-slate-900">{schedule.examName ?? schedule.examId}</p>
@@ -388,7 +379,7 @@ export function TeacherProctorAttendancePage() {
               })
             )}
           </div>
-        </div>
+        </div> : null}
 
         <div className="grid gap-5">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">

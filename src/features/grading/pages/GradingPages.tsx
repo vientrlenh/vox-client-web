@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import { ExamPickerModal } from '@/features/examCore/components/ExamPickerModal'
+import { useExamQuery } from '@/features/examCore/api/queries'
 import type { ExamPickerOption } from '@/features/examCore/types'
 import { toApiError } from '@/shared/api'
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
@@ -224,7 +225,7 @@ function itemTabItems(items: GradingTaskItem[]): SegmentItem[] {
 
 // ============================= School Admin: Coordination board =============================
 
-export function SchoolAdminGradingPage() {
+export function SchoolAdminGradingPage({ fixedExamId, title = 'Điều phối chấm bài' }: { fixedExamId?: string; title?: string } = {}) {
   const [tab, setTab] = useState('board')
   // Giữ CẢ object thay vì mỗi id: danh sách kỳ thi giờ phân trang phía server nên không còn
   // mảng đầy đủ để tra ngược ra tên — mà tên thì cần cho tên file CSV và 3 dialog bên dưới.
@@ -249,8 +250,9 @@ export function SchoolAdminGradingPage() {
   const [finalizeOpen, setFinalizeOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-  const examId = selectedExam?.id ?? ''
-  const selectedExamName = selectedExam?.name
+  const fixedExamQuery = useExamQuery(fixedExamId ?? null)
+  const examId = fixedExamId ?? selectedExam?.id ?? ''
+  const selectedExamName = fixedExamQuery.data?.name ?? selectedExam?.name
 
   const debouncedSearch = useDebouncedValue(search, 350)
   const rowsQuery = useGradingAssignmentsQuery(page, PAGE_SIZE, {
@@ -502,7 +504,7 @@ export function SchoolAdminGradingPage() {
   return (
     <section className="mx-auto grid max-w-7xl gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <PageHeading eyebrow="Chấm điểm" title="Điều phối chấm bài">
+        <PageHeading eyebrow="Chấm điểm" title={title}>
           Giao bài cho giáo viên ở bốn vòng chấm:{' '}
           <b className="font-semibold text-slate-700">chấm thủ công</b> bài AI không đủ tự tin,{' '}
           <b className="font-semibold text-slate-700">hậu kiểm</b> bài đã công bố,{' '}
@@ -646,7 +648,7 @@ export function SchoolAdminGradingPage() {
 
           {/* Toàn bộ bộ lọc trong MỘT thanh: trước đây trải ra ba hàng với ba kiểu chip khác nhau. */}
           <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-3">
-            <div className="flex items-center gap-1">
+            {!fixedExamId ? <div className="flex items-center gap-1">
               <button
                 aria-label="Chọn kỳ thi"
                 className={`${FIELD_CLASS} inline-flex min-w-48 max-w-64 items-center gap-1.5 text-left`}
@@ -666,7 +668,7 @@ export function SchoolAdminGradingPage() {
                   <X aria-hidden="true" className="size-3.5" />
                 </button>
               ) : null}
-            </div>
+            </div> : <div className={`${FIELD_CLASS} min-w-48 font-bold text-slate-700`}>{selectedExamName ?? 'Bài trên lớp đã chọn'}</div>}
             <select
               aria-label="Lọc theo vòng chấm"
               className={`${FIELD_CLASS} min-w-40`}
@@ -1119,7 +1121,7 @@ export function SchoolAdminGradingPage() {
         />
       ) : null}
 
-      {examPickerOpen ? (
+      {examPickerOpen && !fixedExamId ? (
         <ExamPickerModal
           onClear={() => resetToFirstPage(setSelectedExam)(null)}
           onClose={() => setExamPickerOpen(false)}
@@ -1137,17 +1139,17 @@ export function SchoolAdminGradingPage() {
 
 // ============================= Teacher: Queue =============================
 
-export function TeacherGradingPage() {
+export function TeacherGradingPage({ fixedExamId, title = 'Bài cần chấm' }: { fixedExamId?: string; title?: string } = {}) {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<'' | GradingAssignmentStatus>('')
   const [roundType, setRoundType] = useState<'' | GradingRoundType>('')
-  const tasksQuery = useMyGradingTasksQuery(page, PAGE_SIZE, { roundType, status })
+  const tasksQuery = useMyGradingTasksQuery(page, PAGE_SIZE, { examId: fixedExamId, roundType, status })
 
   // Số cho thẻ thống kê là TỔNG toàn bộ (độc lập filter). Hai query size=1 chỉ để lấy
   // totalElements; enum chỉ có ASSIGNED/COMPLETED nên tổng được giao = pending + done.
-  const assignedCountQuery = useMyGradingTasksQuery(1, 1, { status: 'ASSIGNED' })
-  const completedCountQuery = useMyGradingTasksQuery(1, 1, { status: 'COMPLETED' })
+  const assignedCountQuery = useMyGradingTasksQuery(1, 1, { examId: fixedExamId, status: 'ASSIGNED' })
+  const completedCountQuery = useMyGradingTasksQuery(1, 1, { examId: fixedExamId, status: 'COMPLETED' })
 
   const pageData = tasksQuery.data
   const tasks = pageData?.content ?? []
@@ -1160,7 +1162,7 @@ export function TeacherGradingPage() {
 
   return (
     <section className="mx-auto grid max-w-300 gap-5">
-      <PageHeading eyebrow="Chấm điểm" title="Bài cần chấm">
+      <PageHeading eyebrow="Chấm điểm" title={title}>
         Một hàng đợi cho cả bốn vòng chấm. Bạn chấm ẩn danh — hệ thống không hiển thị thông tin học
         sinh.
       </PageHeading>
@@ -1360,6 +1362,16 @@ export function TeacherGradingPage() {
       </div>
     </section>
   )
+}
+
+export function TeacherClassTestGradingPage() {
+  const { examId } = useParams()
+  return <TeacherGradingPage fixedExamId={examId} title="Chấm bài trên lớp" />
+}
+
+export function SchoolAdminClassTestGradingPage() {
+  const { examId } = useParams()
+  return <SchoolAdminGradingPage fixedExamId={examId} title="Điều phối chấm bài trên lớp" />
 }
 
 // ============================= Teacher: Grade one submission =============================

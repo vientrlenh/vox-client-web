@@ -1882,7 +1882,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const statusDisplay = getClassTestStatusDisplay(exam.status)
   const { completedCount, steps } = getClassTestWorkflowSteps(exam)
   const unlockedSchedule = completedCount >= 2
-  const resultBasePath = canManage ? '/teacher/exam-results' : '/school-admin/exam-results'
+  const roleBasePath = canManage ? '/teacher' : '/school-admin'
   // Khớp rule backend: nội dung/ngày giờ chỉ khóa khi bài đã bắt đầu.
   const canEditContent = canManage && (exam.status === 'DRAFT' || exam.status === 'SCHEDULED')
   // Chỉ soạn câu hỏi trực tiếp được khi KHÔNG có blueprint dùng chung nào đang gắn (dùng "Đổi blueprint khác" nếu có).
@@ -1937,7 +1937,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           <>
             <button
               className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-              onClick={() => navigate(`${resultBasePath}?examId=${exam.id}`)}
+              onClick={() => navigate(`${roleBasePath}/class-tests/${exam.id}/results`)}
               type="button"
             >
               <ClipboardList aria-hidden="true" className="size-4" />
@@ -1945,6 +1945,14 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
             </button>
             {canManage ? (
               <>
+              <button
+                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => navigate(`/teacher/class-tests/${exam.id}/grading`)}
+                type="button"
+              >
+                <FilePenLine aria-hidden="true" className="size-4" />
+                Chấm bài
+              </button>
               <button
                 aria-label="Làm mới"
                 className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
@@ -2289,11 +2297,11 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               maxTimePerAttemptMin={maxTimePerAttemptMin}
               onOpen={() =>
                 navigate(
-                  canManage ? `/teacher/exam-papers/${paper.id}/edit` : `/school-admin/exam-papers/${paper.id}`,
+                  `${roleBasePath}/class-tests/${exam.id}/papers/${paper.id}`,
                   { state: { examId: exam.id, paperId: paper.id } },
                 )
               }
-              openLabel={canManage ? 'Soạn đề' : 'Xem đề'}
+              openLabel={canEditContent ? 'Soạn đề' : 'Xem đề'}
               paper={paper}
             />
           ))}
