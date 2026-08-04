@@ -22,12 +22,37 @@ const candidate = {
   studentId: 'student-1',
 }
 
-function mockGraphQL() {
+// Thí sinh vừa được thêm: chưa xếp ca, chưa có bài thi nào — đúng trạng thái mà nút "..." từng chết.
+const freshCandidate = {
+  assignedPaperId: null,
+  attempts: [],
+  blockedAt: null,
+  id: 'candidate-2',
+  scheduleId: null,
+  status: 'ASSIGNED',
+  student: { email: 'binh@example.com', fullName: 'Trần Văn Bình' },
+  studentId: 'student-2',
+}
+
+const schedule = {
+  candidateCount: 0,
+  endDate: '2026-08-05T03:00:00Z',
+  examId: 'exam-1',
+  id: 'schedule-1',
+  proctors: [],
+  requiredProctorCount: 1,
+  room: { code: 'P.101', id: 'room-1', name: 'Phòng máy 1' },
+  schoolRoomId: 'room-1',
+  startDate: '2026-08-05T01:00:00Z',
+  status: 'PUBLISHED',
+}
+
+function mockGraphQL(candidates: unknown[] = [candidate], schedules: unknown[] = []) {
   mockedPost.mockImplementation((_url, body) => {
     const { query } = body as GraphQLBody
     const payload = query.includes('examSchedules')
-      ? { examSchedules: [] }
-      : { examCandidates: [candidate] }
+      ? { examSchedules: schedules }
+      : { examCandidates: candidates }
     return Promise.resolve({ data: { data: payload } })
   })
 }
@@ -74,5 +99,54 @@ describe('CandidatesTab', () => {
 
     expect(await screen.findByRole('menuitem', { name: 'Buộc kết thúc' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Đánh dấu nghi vấn' })).toBeInTheDocument()
+  })
+
+  // Trước đây menu chỉ có thao tác giám thị, nên thí sinh chưa thi làm nút "..." rỗng → disabled,
+  // trông y hệt nút hỏng.
+  it('thí sinh chưa xếp ca: mở được menu với thao tác xếp ca và xóa', async () => {
+    const user = userEvent.setup()
+    mockGraphQL([freshCandidate], [schedule])
+    renderTab()
+
+    await user.click(await screen.findByRole('button', { name: 'Thao tác cho Trần Văn Bình' }))
+
+    expect(await screen.findByRole('menuitem', { name: 'Xếp ca thi' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Xóa khỏi kỳ thi' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Bỏ khỏi ca thi' })).not.toBeInTheDocument()
+  })
+
+  it('thí sinh chưa xếp ca: chọn "Xếp ca thi" mở danh sách ca khả dụng', async () => {
+    const user = userEvent.setup()
+    mockGraphQL([freshCandidate], [schedule])
+    renderTab()
+
+    await user.click(await screen.findByRole('button', { name: 'Thao tác cho Trần Văn Bình' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Xếp ca thi' }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /P\.101/ })).toBeInTheDocument()
+  })
+
+  it('bài đã bắt đầu: không cho sửa danh sách từ menu của thí sinh', async () => {
+    const user = userEvent.setup()
+    mockGraphQL([freshCandidate], [schedule])
+    renderTab({ locked: true })
+
+    const trigger = await screen.findByRole('button', { name: 'Thao tác cho Trần Văn Bình' })
+    expect(trigger).toBeDisabled()
+    expect(trigger).toHaveAttribute('title', expect.stringContaining('Kỳ thi đã bắt đầu'))
+
+    await user.click(trigger)
+    expect(screen.queryByRole('menuitem', { name: 'Xếp ca thi' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Xóa khỏi kỳ thi' })).not.toBeInTheDocument()
+  })
+
+  it('không có quyền quản lý: nút thao tác bị khóa và nói rõ lý do', async () => {
+    mockGraphQL([freshCandidate], [schedule])
+    renderTab({ canManage: false })
+
+    const trigger = await screen.findByRole('button', { name: 'Thao tác cho Trần Văn Bình' })
+    expect(trigger).toBeDisabled()
+    expect(trigger).toHaveAttribute('title', expect.stringContaining('không có quyền'))
   })
 })

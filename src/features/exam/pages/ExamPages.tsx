@@ -1097,7 +1097,15 @@ function ExamDetailPage({
       {tab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
 
       {tab === 'students' ? (
-        <CandidatesTab canManage={canManageSchedule && !examLocked} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
+        // `locked` chỉ khóa nhóm sửa danh sách; thao tác giám thị phải sống trong lúc thi nên
+        // không được gộp `examLocked` vào `canManage`.
+        <CandidatesTab
+          canManage={canManageSchedule}
+          examId={exam.id}
+          examKind={exam.kind}
+          locked={examLocked}
+          papers={exam.papers}
+        />
       ) : null}
 
       {tab === 'blueprint' ? (

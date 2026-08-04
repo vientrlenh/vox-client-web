@@ -12,10 +12,12 @@ import { examResultQueryKeys } from '@/features/exam-results/api/useExamResultQu
 import type { ExamDirectoryUser } from '../api/examDirectoryQueries'
 import {
   useAddCandidateMutation,
+  useAssignCandidateScheduleMutation,
   useFlagExamSessionMutation,
   useForceEndExamSessionMutation,
   useImportCandidatesByClassMutation,
   useImportCandidatesByGradeMutation,
+  useRemoveExamCandidateMutation,
   useUnblockExamCandidateMutation,
 } from '../api/mutations'
 import { examQueryKeys, useExamCandidatesQuery, useExamSchedulesQuery } from '../api/queries'
@@ -28,6 +30,7 @@ import {
   type ExamKind,
   type ExamPaperDto,
 } from '../types'
+import { AssignScheduleModal } from './AssignScheduleModal'
 import { ImportCandidatesModal } from './ImportCandidatesModal'
 import { StudentPickerModal } from './StudentPickerModal'
 
@@ -81,11 +84,14 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
   const flagExamSessionMutation = useFlagExamSessionMutation()
   const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const unblockExamCandidateMutation = useUnblockExamCandidateMutation()
+  const assignCandidateScheduleMutation = useAssignCandidateScheduleMutation()
+  const removeCandidateMutation = useRemoveExamCandidateMutation()
   const { confirm, confirmWithReason, dialog } = useConfirmationDialog()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showStudentPicker, setShowStudentPicker] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [assigningCandidate, setAssigningCandidate] = useState<ExamCandidateDto | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -158,6 +164,63 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
     } catch (error) {
       setErrorMessage(toApiError(error).message)
     }
+  }
+
+  async function handleAssignSchedule(scheduleId: string) {
+    if (!assigningCandidate) {
+      return
+    }
+    const candidateName = getCandidateName(assigningCandidate)
+    try {
+      await assignCandidateScheduleMutation.mutateAsync({ candidateId: assigningCandidate.id, examId, scheduleId })
+      await invalidateAll()
+      setAssigningCandidate(null)
+      setMessage(`Đã xếp ca thi cho ${candidateName}.`)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handleUnassignSchedule(candidate: ExamCandidateDto) {
+    const candidateName = getCandidateName(candidate)
+    try {
+      await assignCandidateScheduleMutation.mutateAsync({ candidateId: candidate.id, examId, scheduleId: null })
+      await invalidateAll()
+      setMessage(`Đã bỏ ${candidateName} khỏi ca thi.`)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  async function handleRemoveCandidate(candidate: ExamCandidateDto) {
+    const candidateName = getCandidateName(candidate)
+    if (
+      !(await confirm({
+        message: `Xóa ${candidateName} khỏi kỳ thi? Học sinh sẽ không còn trong danh sách thí sinh và phải thêm lại nếu muốn dự thi.`,
+        title: 'Xác nhận xóa thí sinh',
+      }))
+    ) {
+      return
+    }
+
+    try {
+      await removeCandidateMutation.mutateAsync({ candidateId: candidate.id, examId })
+      await invalidateAll()
+      setMessage(`Đã xóa ${candidateName} khỏi kỳ thi.`)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  /** Nút "..." bị khóa trông y hệt nút hỏng — nói rõ lý do qua tooltip thay vì để người dùng đoán. */
+  function getNoActionReason() {
+    if (!canManage) {
+      return 'Bạn không có quyền thao tác trên danh sách thí sinh của kỳ thi này'
+    }
+    if (locked) {
+      return 'Kỳ thi đã bắt đầu — chỉ còn thao tác giám thị khi học sinh đang làm bài'
+    }
+    return 'Chưa có thao tác khả dụng cho học sinh này'
   }
 
   function getCandidateActions(candidate: ExamCandidateDto): ActionMenuItem[] {
@@ -295,6 +358,31 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
       })
     }
 
+    // Thao tác sửa danh sách: backend chặn khi kỳ thi đã bắt đầu (ExamEditingGuard), và xoá thí sinh
+    // đã có bài thi cũng bị chặn — nên chỉ mở khi thí sinh chưa từng vào thi.
+    if (canEditRoster && (candidate.attempts?.length ?? 0) === 0) {
+      items.push({
+        id: `assign-schedule-${candidate.id}`,
+        label: candidate.scheduleId ? 'Đổi ca thi' : 'Xếp ca thi',
+        onSelect: () => setAssigningCandidate(candidate),
+      })
+
+      if (candidate.scheduleId) {
+        items.push({
+          id: `unassign-schedule-${candidate.id}`,
+          label: 'Bỏ khỏi ca thi',
+          onSelect: () => void handleUnassignSchedule(candidate),
+        })
+      }
+
+      items.push({
+        id: `remove-${candidate.id}`,
+        label: 'Xóa khỏi kỳ thi',
+        onSelect: () => void handleRemoveCandidate(candidate),
+        tone: 'danger',
+      })
+    }
+
     return items
   }
 
@@ -387,7 +475,11 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
                     <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
                   </span>
                   <span className="flex justify-end">
-                    <ActionMenuButton ariaLabel={`Thao tác cho ${getCandidateName(candidate)}`} items={actions} />
+                    <ActionMenuButton
+                      ariaLabel={`Thao tác cho ${getCandidateName(candidate)}`}
+                      items={actions}
+                      title={actions.length === 0 ? getNoActionReason() : undefined}
+                    />
                   </span>
                 </div>
               )
@@ -403,6 +495,16 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
           totalPages={totalPages}
         />
       </div>
+
+      {assigningCandidate ? (
+        <AssignScheduleModal
+          candidateName={getCandidateName(assigningCandidate)}
+          currentScheduleId={assigningCandidate.scheduleId}
+          onClose={() => setAssigningCandidate(null)}
+          onSelect={(scheduleId) => void handleAssignSchedule(scheduleId)}
+          schedules={schedulesQuery.data ?? []}
+        />
+      ) : null}
 
       {showStudentPicker ? (
         <StudentPickerModal

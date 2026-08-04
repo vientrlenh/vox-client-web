@@ -27,6 +27,8 @@ type ActionMenuButtonProps = {
   className?: string
   disabled?: boolean
   items: ActionMenuItem[]
+  /** Tooltip trên chính nút "..." — dùng để nói lý do khi nút bị khóa, tránh bị hiểu là nút hỏng. */
+  title?: string
 }
 
 const menuItemToneClassNames: Record<ActionMenuItemTone, string> = {
@@ -67,6 +69,7 @@ export function ActionMenuButton({
   className = '',
   disabled = false,
   items,
+  title,
 }: ActionMenuButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
@@ -205,6 +208,7 @@ export function ActionMenuButton({
         disabled={disabled || items.length === 0}
         onClick={handleTriggerClick}
         ref={triggerRef}
+        title={title}
         type="button"
       >
         <Ellipsis aria-hidden="true" className="size-5" />

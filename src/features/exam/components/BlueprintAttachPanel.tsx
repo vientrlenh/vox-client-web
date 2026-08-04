@@ -28,6 +28,20 @@ type BlueprintAttachPanelProps = {
 const PAPERS_EXIST_MESSAGE =
   'Kỳ thi đã có mã đề — phải xóa hết mã đề hiện có trước khi đổi blueprint hoặc chốt sang phiên bản khác.'
 
+/**
+ * Nút "Đổi blueprint khác" bị `disabled` trông gần như nút thường, nên lý do phải hiện thành chữ chứ
+ * không nấp trong tooltip. Quản trị trường lại không quản lý mã đề (`canManagePapers={false}` ở
+ * `SchoolAdminExamDetailPage`) nên phải nói rõ ai xóa được, tránh bế tắc không lối thoát.
+ */
+function BlueprintLockedByPapersHint() {
+  return (
+    <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-600">
+      {PAPERS_EXIST_MESSAGE} Quản trị trường không quản lý mã đề — nhờ giáo viên soạn đề hoặc chủ tịch
+      hội đồng xóa giúp ở tab <b className="text-slate-900">Mã đề</b>.
+    </p>
+  )
+}
+
 export function BlueprintAttachPanel({
   blueprintId,
   blueprintVersionId,
@@ -394,7 +408,7 @@ export function BlueprintAttachPanel({
             </button>
           ) : canAttach ? (
             <button
-              className="shrink-0 text-xs font-bold text-slate-400 underline-offset-2 hover:text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              className="shrink-0 text-xs font-bold text-slate-400 underline-offset-2 hover:text-red-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline disabled:hover:text-slate-300"
               disabled={hasPapers}
               onClick={() => setForceReselect(true)}
               title={hasPapers ? PAPERS_EXIST_MESSAGE : undefined}
@@ -572,7 +586,7 @@ export function BlueprintAttachPanel({
           ) : null}
           {canAttach ? (
             <button
-              className="text-xs font-bold text-slate-400 underline-offset-2 hover:text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              className="text-xs font-bold text-slate-400 underline-offset-2 hover:text-red-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline disabled:hover:text-slate-300"
               disabled={hasPapers}
               onClick={() => setForceReselect(true)}
               title={hasPapers ? PAPERS_EXIST_MESSAGE : undefined}
@@ -583,6 +597,7 @@ export function BlueprintAttachPanel({
           ) : null}
         </div>
       </div>
+      {canAttach && hasPapers ? <BlueprintLockedByPapersHint /> : null}
       {showNewerVersionHint ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5">
           <p className="text-[13px] text-amber-800">

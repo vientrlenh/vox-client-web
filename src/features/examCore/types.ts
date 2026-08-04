@@ -428,23 +428,32 @@ export type ExamDto = {
   openAt?: string | null
   papers: ExamPaperDto[]
   papersLocked?: boolean | null
+  // Cấu hình giám sát BE lưu thành 1 enum gộp; dùng toExamStreamSetup() để đưa về union 5 nhánh
+  // mà UI thao tác, đừng đọc thẳng hai trường này ra form.
+  requiredStreamType?: ExamRequiredStreamType | null
   requiresOtp: boolean
   resultDecisionMethod?: ResultDecisionMethod | null
   schoolClassId?: string | null
   schoolId: string
   securePool?: ExamSecurePoolDto | null
   status: ExamStatus
+  streamTypePermission?: ExamStreamTypePermission | null
   updatedAt?: string | null
 }
 
 export type UpdateExamRequest = {
+  assessmentPolicyId?: string | null
   closeAt?: string | null
   description?: string | null
   maxAttempt?: number | null
   name?: string
   openAt?: string | null
+  // Bỏ trống = giữ nguyên cấu hình giám sát; mảng RỖNG mới là tắt giám sát. Dùng
+  // toUpdateStreamPayload() thay vì tự ghép, EXAM_STREAM_SETUP_PAYLOAD dành cho luồng tạo.
+  requiredStreamTypes?: ExamStreamType[] | null
   requiresOtp?: boolean | null
   resultDecisionMethod?: ResultDecisionMethod | null
+  streamTypePermission?: ExamStreamTypePermission | null
 }
 
 export type UpdateExamStatusRequest = {
