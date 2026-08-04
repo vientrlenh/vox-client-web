@@ -15,10 +15,8 @@ import {
   LogOut,
   Menu,
   Search,
-  Settings,
   ShieldCheck,
   UserRound,
-  Users,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -72,11 +70,6 @@ const navigationItems: NavigationItem[] = [
     to: '/system-admin/frameworks',
   },
   {
-    icon: Users,
-    label: 'Quản lý người dùng',
-    to: '/system-admin/users',
-  },
-  {
     icon: Building2,
     label: 'Quản lý trường học',
     to: '/system-admin/schools',
@@ -100,11 +93,6 @@ const navigationItems: NavigationItem[] = [
     icon: CreditCard,
     label: 'Gói dịch vụ',
     to: '/system-admin/subscription',
-  },
-  {
-    icon: Settings,
-    label: 'Cài đặt hệ thống',
-    to: '/system-admin/settings',
   },
 ]
 
