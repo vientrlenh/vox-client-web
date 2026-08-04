@@ -493,6 +493,19 @@ export type ExamStatusCounts = {
   total: number
 }
 
+/**
+ * Dữ liệu tham chiếu dùng trong luồng soạn kỳ thi (rubric, chính sách đánh giá).
+ *
+ * Tách khỏi `examQueryKeys` vì đây KHÔNG phải dữ liệu kỳ thi: mọi mutation kỳ thi đều invalidate
+ * `examQueryKeys.all`, kéo theo refetch cả danh sách rubric và toàn bộ query phiên bản rubric — trong
+ * khi sửa kỳ thi không làm rubric đổi. Chiều ngược lại cũng không mất gì: CRUD rubric nằm ở
+ * `features/rubric_system` / `features/rubrics_school` với namespace key riêng
+ * (`searchRubricKeys`, `rubricVersionQueryKeys`), chưa bao giờ đụng tới `examQueryKeys`.
+ */
+export const examReferenceQueryKeys = {
+  all: ['exam-reference-data'] as const,
+}
+
 export const examQueryKeys = {
   all: ['exam-management'] as const,
   blueprint: (id: string | null) => [...examQueryKeys.all, 'blueprint', id] as const,

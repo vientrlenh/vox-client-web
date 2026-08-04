@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   BookOpenCheck,
@@ -28,6 +28,7 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { useMySchoolClassesQuery } from '@/features/classes/api/useMySchoolClassesQuery'
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery'
+import type { SchoolClass } from '@/features/classes/types'
 import type { QuestionDto } from '@/features/question/types'
 import { toApiError } from '@/shared/api'
 import { autoDistributeWeights } from '@/shared/weightDistribution'
@@ -70,6 +71,7 @@ import {
   getAssessmentPolicyStrictnessLabel,
   getExamChairName,
   getResultDecisionMethodDisplay,
+  isExamLockedForEditing,
   RESULT_DECISION_METHODS,
   toDateTimeLocalValue,
   toIsoDateTime,
@@ -112,7 +114,7 @@ const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
   { label: 'Đã lên lịch', value: 'SCHEDULED' },
   { label: 'Đang mở', value: 'IN_PROGRESS' },
   { label: 'Đã đóng', value: 'CLOSED' },
-  { label: 'Đã trả điểm', value: 'RESULTS_PUBLISHED' },
+  { label: 'Đã chốt kết quả', value: 'RESULTS_PUBLISHED' },
 ]
 
 /**
@@ -255,7 +257,7 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
         <StatCard icon={<NotebookPen size={19} />} iconTone="indigo" label="Tổng bài" value={statsQuery.data?.total ?? '-'} />
         <StatCard icon={<PlayCircle size={19} />} iconTone="violet" label="Đang mở" value={statsQuery.data?.open ?? '-'} />
         <StatCard icon={<BookOpenCheck size={19} />} iconTone="amber" label="Chờ chấm" value={statsQuery.data?.pendingGrade ?? '-'} />
-        <StatCard icon={<CheckCircle2 size={19} />} iconTone="emerald" label="Đã trả điểm" value={statsQuery.data?.graded ?? '-'} />
+        <StatCard icon={<CheckCircle2 size={19} />} iconTone="emerald" label="Đã chốt kết quả" value={statsQuery.data?.graded ?? '-'} />
       </div>
 
       <FilterChips
@@ -320,28 +322,25 @@ export function SchoolAdminClassTestsPage() {
 }
 
 function ClassPickerTable({
-  classesQuery,
+  classes,
+  emptyMessage,
   onChange,
+  onSearchChange,
   search,
-  setPage,
-  setSearch,
   value,
 }: {
-  classesQuery: ReturnType<typeof useSchoolClassesQuery>
+  classes: SchoolClass[]
+  emptyMessage: string
   onChange: (schoolClassId: string, schoolClassName: string) => void
+  onSearchChange: (s: string) => void
   search: string
-  setPage: (fn: (p: number) => number) => void
-  setSearch: (s: string) => void
   value: string
 }) {
   return (
     <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
       <input
         className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
-        onChange={(event) => {
-          setSearch(event.target.value)
-          setPage(() => 1)
-        }}
+        onChange={(event) => onSearchChange(event.target.value)}
         placeholder="Tìm lớp học"
         value={search}
       />
@@ -355,7 +354,14 @@ function ClassPickerTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {classesQuery.data?.content.map((schoolClass) => (
+            {classes.length === 0 ? (
+              <tr>
+                <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={3}>
+                  {emptyMessage}
+                </td>
+              </tr>
+            ) : null}
+            {classes.map((schoolClass) => (
               <tr className={value === schoolClass.id ? 'bg-indigo-50' : ''} key={schoolClass.id}>
                 <td className="px-4 py-2.5">
                   <button
@@ -382,12 +388,26 @@ function ClassPickerTable({
   )
 }
 
+/**
+ * `mySchoolClasses` không nhận tham số tìm kiếm ở BE và bảng này không có nút chuyển trang, nên nạp
+ * trọn một trang lớn rồi lọc tại chỗ. Trước đây nhánh giáo viên lấy 10 lớp/trang mà `setPage` chỉ
+ * được gọi để reset về 1 — giáo viên dạy hơn 10 lớp không có cách nào chọn lớp thứ 11 trở đi, và ô
+ * tìm kiếm thì không được truyền xuống query nên gõ vào không lọc gì cả.
+ */
+const TEACHER_CLASS_PAGE_SIZE = 100
+
 function ClassPicker({ onChange, value }: { onChange: (id: string, name: string) => void; value: string }) {
   const user = useAppSelector((state) => state.auth.user)
   const isTeacher = user?.roles.includes('TEACHER') ?? false
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const teacherClassesQuery = useMySchoolClassesQuery(page, 10, isTeacher ? user?.schoolId ?? '' : '', 'ACTIVE')
+  const teacherClassesQuery = useMySchoolClassesQuery(
+    1,
+    TEACHER_CLASS_PAGE_SIZE,
+    isTeacher ? user?.schoolId ?? '' : '',
+    'ACTIVE',
+  )
+  // Nhánh school-admin giữ nguyên tìm kiếm phía server (query này có nhận `search`).
   const adminClassesQuery = useSchoolClassesQuery(
     page,
     10,
@@ -395,13 +415,41 @@ function ClassPicker({ onChange, value }: { onChange: (id: string, name: string)
     { enabled: !isTeacher },
   )
 
+  const keyword = search.trim().toLowerCase()
+  const teacherClasses = useMemo(() => {
+    const all = teacherClassesQuery.data?.content ?? []
+    if (!keyword) {
+      return all
+    }
+    return all.filter(
+      (schoolClass) =>
+        schoolClass.name.toLowerCase().includes(keyword) || schoolClass.code.toLowerCase().includes(keyword),
+    )
+  }, [teacherClassesQuery.data, keyword])
+
+  const activeQuery = isTeacher ? teacherClassesQuery : adminClassesQuery
+  const classes = isTeacher ? teacherClasses : adminClassesQuery.data?.content ?? []
+
+  function handleSearchChange(next: string) {
+    setSearch(next)
+    if (!isTeacher) {
+      setPage(() => 1)
+    }
+  }
+
   return (
     <ClassPickerTable
-      classesQuery={isTeacher ? teacherClassesQuery : adminClassesQuery}
+      classes={classes}
+      emptyMessage={
+        activeQuery.isPending
+          ? 'Đang tải danh sách lớp…'
+          : keyword
+            ? 'Không có lớp nào khớp từ khoá.'
+            : 'Bạn chưa được phân vào lớp nào đang hoạt động.'
+      }
       onChange={onChange}
+      onSearchChange={handleSearchChange}
       search={search}
-      setPage={setPage}
-      setSearch={setSearch}
       value={value}
     />
   )
@@ -574,10 +622,16 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
         schoolClassName,
       })
 
-      await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
+      // Không await: kết quả refetch của trang danh sách bị vứt đi ngay khi điều hướng, await chỉ làm
+      // giáo viên chờ thêm một vòng mạng.
+      void queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
       // Vào thẳng trang chi tiết: bài vừa tạo chưa có mã đề nào, soạn đề là việc tiếp theo.
       navigate(`/teacher/class-tests/${created.exam.id}`, {
-        state: { successMessage: 'Đã tạo bài trên lớp. Bước tiếp theo: soạn mã đề ở tab Đề bài.' },
+        state: {
+          successMessage: created.candidateCount > 0
+            ? `Đã tạo bài trên lớp với ${created.candidateCount} học sinh. Bước tiếp theo: soạn mã đề ở tab Đề bài.`
+            : 'Đã tạo bài trên lớp. Lớp chưa có học sinh nào — thêm học sinh ở tab Học sinh trước khi lên lịch.',
+        },
       })
     } catch (error) {
       setErrorMessage(toApiError(error).message)
@@ -1480,6 +1534,18 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     ) {
       return
     }
+    // Điểm đã hiện cho học sinh ngay khi từng kết quả sang RELEASED ở bước "Chốt sổ" bên
+    // trang chấm bài — thao tác này KHÔNG trả điểm, mà chốt đậu/rớt và đóng bài vĩnh viễn.
+    if (
+      action === 'PUBLISH_RESULTS' &&
+      !(await confirm({
+        message:
+          'Chốt kết quả sẽ chốt đậu/rớt cho toàn bộ học sinh và đóng bài vĩnh viễn — sau đó không dỡ cấm, buộc kết thúc hay chấm lại được nữa. Điểm đã được trả cho học sinh từ lúc bấm "Chốt sổ" ở trang chấm bài, thao tác này không đổi điểm. Bạn có chắc muốn tiếp tục?',
+        title: 'Xác nhận chốt kết quả',
+      }))
+    ) {
+      return
+    }
     try {
       await updateStatusMutation.mutateAsync({ examId: exam.id, payload: { action } })
       await invalidate()
@@ -1487,7 +1553,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         {
           CANCEL: 'Đã hủy bài kiểm tra.',
           CLOSE: 'Đã đóng bài kiểm tra.',
-          PUBLISH_RESULTS: 'Đã trả điểm cho bài trên lớp.',
+          PUBLISH_RESULTS: 'Đã chốt kết quả bài trên lớp.',
           SCHEDULE: 'Đã lên lịch bài kiểm tra. Bài sẽ tự mở khi tới giờ bắt đầu.',
           START: 'Đã mở bài kiểm tra.',
         }[action],
@@ -1527,7 +1593,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       : exam.status === 'IN_PROGRESS'
           ? { action: 'CLOSE' as const, icon: <Lock aria-hidden="true" className="size-4.5" />, label: 'Đóng bài kiểm tra' }
           : exam.status === 'CLOSED'
-            ? { action: 'PUBLISH_RESULTS' as const, icon: <Megaphone aria-hidden="true" className="size-4.5" />, label: 'Trả điểm' }
+            ? { action: 'PUBLISH_RESULTS' as const, icon: <Megaphone aria-hidden="true" className="size-4.5" />, label: 'Chốt kết quả' }
             : null
 
   const nextAction =
@@ -2158,7 +2224,13 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       ) : null}
 
       {tab === 'students' ? (
-        <CandidatesTab canManage={canManage} examId={exam.id} examKind={exam.kind} papers={exam.papers} />
+        <CandidatesTab
+          canManage={canManage}
+          examId={exam.id}
+          examKind={exam.kind}
+          locked={isExamLockedForEditing(exam.status)}
+          papers={exam.papers}
+        />
       ) : null}
 
       {tab === 'blueprint' ? (

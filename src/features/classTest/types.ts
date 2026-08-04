@@ -86,7 +86,7 @@ export function getClassTestStatusDisplay(status?: ExamStatus | string | null): 
     case 'CLOSED':
       return { tone: 'neutral', label: 'Đã đóng' }
     case 'RESULTS_PUBLISHED':
-      return { tone: 'success', label: 'Đã trả điểm' }
+      return { tone: 'success', label: 'Đã chốt kết quả' }
     case 'CANCELLED':
       return { tone: 'danger', label: 'Đã hủy' }
     default:

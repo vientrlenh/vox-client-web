@@ -1,7 +1,7 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { graphQLRequest, requireSchoolId } from '@/shared/api'
 import type { Paged, RubricDto } from '../types'
-import { examQueryKeys } from './queries'
+import { examReferenceQueryKeys } from './queries'
 
 const RUBRIC_VERSION_FIELDS = `
   id
@@ -55,7 +55,7 @@ async function fetchSchoolRubricsWithPublishedVersions(filters: { keyword?: stri
 export function useSchoolRubricsWithPublishedVersionsQuery(filters: { keyword?: string; languageId?: string | null }) {
   return useQuery({
     queryFn: () => fetchSchoolRubricsWithPublishedVersions(filters),
-    queryKey: [...examQueryKeys.all, 'school-rubrics-published', filters],
+    queryKey: [...examReferenceQueryKeys.all, 'school-rubrics-published', filters],
   })
 }
 
@@ -92,7 +92,7 @@ async function fetchTeacherRubrics(filters: { keyword?: string; languageId?: str
 export function useTeacherRubricsQuery(filters: { keyword?: string; languageId?: string | null }) {
   return useQuery({
     queryFn: () => fetchTeacherRubrics(filters),
-    queryKey: [...examQueryKeys.all, 'teacher-rubrics', filters],
+    queryKey: [...examReferenceQueryKeys.all, 'teacher-rubrics', filters],
   })
 }
 
@@ -121,7 +121,7 @@ export function useTeacherRubricVersionsQueries(rubricIds: string[]) {
   return useQueries({
     queries: rubricIds.map((rubricId) => ({
       queryFn: () => fetchTeacherRubricVersions(rubricId),
-      queryKey: [...examQueryKeys.all, 'teacher-rubric-versions', rubricId],
+      queryKey: [...examReferenceQueryKeys.all, 'teacher-rubric-versions', rubricId],
     })),
   })
 }

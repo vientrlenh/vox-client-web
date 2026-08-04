@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest, requireSchoolId } from '@/shared/api'
 import type { AssessmentPolicyDto, Paged } from '../types'
-import { examQueryKeys } from './queries'
+import { examReferenceQueryKeys } from './queries'
 
 const ASSESSMENT_POLICY_FIELDS = `
   id
@@ -52,7 +52,7 @@ export function useMatchingSchoolAssessmentPoliciesQuery(filters: { languageId?:
         languageId: filters.languageId,
         rubricVersionId: filters.rubricVersionId as string,
       }),
-    queryKey: [...examQueryKeys.all, 'matching-assessment-policies', filters.languageId, filters.rubricVersionId],
+    queryKey: [...examReferenceQueryKeys.all, 'matching-assessment-policies', filters.languageId, filters.rubricVersionId],
   })
 }
 
@@ -83,6 +83,6 @@ export function useMatchingTeacherAssessmentPoliciesQuery(filters: { languageId?
         languageId: filters.languageId,
         rubricVersionId: filters.rubricVersionId as string,
       }),
-    queryKey: [...examQueryKeys.all, 'matching-teacher-assessment-policies', filters.languageId, filters.rubricVersionId],
+    queryKey: [...examReferenceQueryKeys.all, 'matching-teacher-assessment-policies', filters.languageId, filters.rubricVersionId],
   })
 }

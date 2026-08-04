@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { FileUp, Search, UserPlus } from 'lucide-react'
+import { FileUp, Lock, Search, UserPlus } from 'lucide-react'
 import { toApiError } from '@/shared/api'
 import { Pagination } from '@/shared/components/Pagination'
 import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
@@ -41,6 +41,10 @@ type CandidatesTabProps = {
   examId: string
   /** Quyết định có lối nhập theo niên khóa hay không — xem `ImportCandidatesModal`. */
   examKind: ExamKind
+  // Kỳ thi đã bắt đầu (IN_PROGRESS trở lên): backend khoá mọi thao tác sửa danh sách thí sinh
+  // (ExamEditingGuard.requireScheduleEditable), nên ẩn nút trước thay vì để bấm rồi ăn lỗi.
+  // Thao tác giám thị bên dưới vẫn mở vì đó là việc phải làm TRONG lúc thi.
+  locked?: boolean
   papers: ExamPaperDto[]
 }
 
@@ -67,7 +71,7 @@ function getCandidateBadge(candidate: ExamCandidateDto) {
   return getCandidateStatusDisplay(candidate.scheduleId ? candidate.status : undefined)
 }
 
-export function CandidatesTab({ canManage, examId, examKind, papers }: CandidatesTabProps) {
+export function CandidatesTab({ canManage, examId, examKind, locked = false, papers }: CandidatesTabProps) {
   const queryClient = useQueryClient()
   const candidatesQuery = useExamCandidatesQuery(examId)
   const schedulesQuery = useExamSchedulesQuery(examId)
@@ -85,6 +89,8 @@ export function CandidatesTab({ canManage, examId, examKind, papers }: Candidate
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  // Quyền sửa danh sách thí sinh = quyền quản lý + kỳ thi chưa bắt đầu.
+  const canEditRoster = canManage && !locked
   const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
   const scheduleLabelById = useMemo(
     () => new Map((schedulesQuery.data ?? []).map((schedule) => [schedule.id, getScheduleLabel(schedule)])),
@@ -298,6 +304,14 @@ export function CandidatesTab({ canManage, examId, examKind, papers }: Candidate
       <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
       {dialog}
 
+      {canManage && locked ? (
+        <div className="mb-3.5 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-semibold text-amber-800">
+          <Lock aria-hidden="true" className="size-4 shrink-0" />
+          Bài kiểm tra đã bắt đầu — không thể thêm hoặc nhập thêm học sinh. Vẫn có thể đánh dấu nghi
+          vấn, buộc kết thúc hoặc dỡ cấm.
+        </div>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-4">
         <StatCard icon={<UserPlus size={19} />} iconTone="indigo" label="Tổng thí sinh" value={candidates.length} />
         <StatCard icon={<UserPlus size={19} />} iconTone="emerald" label="Đã vào ca" value={assignedCount} />
@@ -308,7 +322,7 @@ export function CandidatesTab({ canManage, examId, examKind, papers }: Candidate
       <div className="mt-3.5 rounded-2xl border border-slate-200 bg-white p-5.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-[15px] font-extrabold text-slate-900">Danh sách thí sinh</h3>
-          {canManage ? (
+          {canEditRoster ? (
             <div className="flex flex-wrap gap-2">
               <button
                 className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50"

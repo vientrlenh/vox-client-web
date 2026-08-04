@@ -321,7 +321,8 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
         // trả về 400.
         ...EXAM_STREAM_SETUP_PAYLOAD[streamSetup],
       })
-      await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
+      // Không await: kết quả refetch bị vứt đi ngay khi điều hướng.
+      void queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
       navigate('/school-admin/exams')
     } catch (error) {
       setErrorMessage(toApiError(error).message)
