@@ -2,6 +2,7 @@ import {
   clampToCriterion,
   countSections,
   describeReclaimResult,
+  formatAttemptLabel,
   formatScore,
   formatScoreDelta,
   getResultStatusDisplay,
@@ -69,6 +70,8 @@ describe('grading helpers', () => {
       allowedOutcomes: ['UPHELD', 'REGRADED', 'INVALIDATED'],
       assignmentId: 'a1',
       assignmentStatus: 'ASSIGNED',
+      attemptCount: 1,
+      attemptNo: 1,
       candidateResultId: 'cr1',
       criteria: [
         criterion({ id: 'c1', required: true }),
@@ -162,6 +165,20 @@ describe('grading helpers', () => {
       expect(formatScore(6)).toBe('6.0')
       expect(formatScore(6.75)).toBe('6.75')
       expect(formatScore(null)).toBe('—')
+    })
+  })
+
+  describe('formatAttemptLabel', () => {
+    it('names which attempt a row belongs to when the student retook the exam', () => {
+      expect(formatAttemptLabel(2, 2)).toBe('Lượt 2/2')
+      expect(formatAttemptLabel(1, 3)).toBe('Lượt 1/3')
+    })
+
+    /** Gắn "Lượt 1/1" lên mọi dòng là thêm nhiễu vào đúng chỗ cần nhìn nhanh. */
+    it('is null for a single attempt or when the count is missing', () => {
+      expect(formatAttemptLabel(1, 1)).toBeNull()
+      expect(formatAttemptLabel(1, null)).toBeNull()
+      expect(formatAttemptLabel(null, 2)).toBeNull()
     })
   })
 

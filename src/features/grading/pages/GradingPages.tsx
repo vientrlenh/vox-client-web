@@ -32,7 +32,7 @@ import {
 import { useNavigate, useParams } from 'react-router'
 import { ExamPickerModal } from '@/features/examCore/components/ExamPickerModal'
 import { useExamQuery } from '@/features/examCore/api/queries'
-import type { ExamPickerOption } from '@/features/examCore/types'
+import type { ExamKind, ExamPickerOption } from '@/features/examCore/types'
 import { toApiError } from '@/shared/api'
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
 import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
@@ -85,6 +85,7 @@ import {
   avatarClasses,
   countSections,
   describeReclaimResult,
+  formatAttemptLabel,
   formatIsoDateTime,
   formatScore,
   getAssignmentStatusDisplay,
@@ -239,12 +240,17 @@ function itemTabItems(items: GradingTaskItem[]): SegmentItem[] {
  * `readOnly` dùng cho BÀI KIỂM TRA TRÊN LỚP: ở đó giáo viên tạo bài tự chấm hết, BE từ
  * chối mọi thao tác điều phối của nhà trường (`ExamGradingAccessService.rejectClassTestCoordination`).
  * Không ẩn nút thì admin bấm vào chỉ nhận 403.
+ *
+ * `kind` đi kèm `readOnly` và mặc định là kỳ thi tập trung: cùng màn này phục vụ hai loại
+ * bài, để trống là bảng liệt kê lẫn cả hai — chọn phải bài trên lớp rồi bấm gán thì cũng
+ * chỉ nhận 403.
  */
 export function SchoolAdminGradingPage({
   fixedExamId,
+  kind = 'CENTRALIZED',
   readOnly = false,
   title = 'Điều phối chấm bài',
-}: { fixedExamId?: string; readOnly?: boolean; title?: string } = {}) {
+}: { fixedExamId?: string; kind?: ExamKind; readOnly?: boolean; title?: string } = {}) {
   const [tab, setTab] = useState('board')
   // Giữ CẢ object thay vì mỗi id: danh sách kỳ thi giờ phân trang phía server nên không còn
   // mảng đầy đủ để tra ngược ra tên — mà tên thì cần cho tên file CSV và 3 dialog bên dưới.
@@ -277,6 +283,7 @@ export function SchoolAdminGradingPage({
   const rowsQuery = useGradingAssignmentsQuery(page, PAGE_SIZE, {
     examId,
     hasOpenAppeal: openAppealOnly,
+    kind,
     overdueOnly,
     resultStatus,
     roundType,
@@ -284,7 +291,7 @@ export function SchoolAdminGradingPage({
     status,
     unassignedOnly,
   })
-  const statsQuery = useGradingStatsQuery({ examId })
+  const statsQuery = useGradingStatsQuery({ examId, kind })
   const finalizePreviewQuery = useFinalizePreviewQuery(finalizeOpen && examId ? examId : null)
 
   const assignMutation = useAssignGradingMutation()
@@ -943,8 +950,17 @@ export function SchoolAdminGradingPage({
                                     </span>
                                   ) : null}
                                 </div>
-                                <div className="mt-1 truncate text-[13px] font-semibold text-slate-900">
-                                  {row.studentName ?? '—'}
+                                <div className="mt-1 flex items-center gap-1.5">
+                                  <span className="truncate text-[13px] font-semibold text-slate-900">
+                                    {row.studentName ?? '—'}
+                                  </span>
+                                  {/* Em nào thi lại thì có bấy nhiêu dòng trùng tên —
+                                      đây là thứ duy nhất phân biệt được chúng. */}
+                                  {formatAttemptLabel(row.attemptNo, row.attemptCount) ? (
+                                    <span className="shrink-0 rounded-md bg-cyan-50 px-1.5 py-0.5 text-[10.5px] font-bold text-cyan-700">
+                                      {formatAttemptLabel(row.attemptNo, row.attemptCount)}
+                                    </span>
+                                  ) : null}
                                 </div>
                                 <div className="truncate text-[11px] font-medium text-slate-400">
                                   {row.className ? `Lớp ${row.className}` : 'Chưa xếp lớp'}
@@ -1154,6 +1170,9 @@ export function SchoolAdminGradingPage({
 
       {examPickerOpen && !fixedExamId ? (
         <ExamPickerModal
+          // Cùng loại bài với bảng bên dưới: chọn được thứ bảng không hiện là chọn xong
+          // bảng rỗng.
+          kind={kind}
           onClear={() => resetToFirstPage(setSelectedExam)(null)}
           onClose={() => setExamPickerOpen(false)}
           // Qua `resetToFirstPage` chứ không set thẳng: đổi kỳ thi phải kéo bảng về trang 1
@@ -1309,6 +1328,13 @@ export function TeacherGradingPage({ title = 'Bài cần chấm' }: { title?: st
                         <div className="grid gap-1 leading-tight">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <ResultCode code={task.resultCode} />
+                            {/* Hàng đợi ẩn danh nên hai lượt của cùng một em chỉ khác
+                                mã bài — nhãn lượt là thứ đọc được bằng mắt. */}
+                            {formatAttemptLabel(task.attemptNo, task.attemptCount) ? (
+                              <span className="rounded-md bg-cyan-50 px-1.5 py-0.5 text-[10.5px] font-bold text-cyan-700">
+                                {formatAttemptLabel(task.attemptNo, task.attemptCount)}
+                              </span>
+                            ) : null}
                             {task.flagged ? (
                               <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
                                 <Flag className="size-3" />
@@ -1621,6 +1647,13 @@ export function GradingTaskDetailView({
             </h1>
             <RoundBadge roundType={detail.roundType} />
             <StatusBadge label={resultDisplay.label} tone={resultDisplay.tone} />
+            {/* Học sinh thi lại thì mỗi lượt là một bài chấm riêng, tên và tên kỳ thi
+                giống hệt nhau — thiếu nhãn này là chấm mà không biết chấm lượt nào. */}
+            {formatAttemptLabel(detail.attemptNo, detail.attemptCount) ? (
+              <span className="rounded-md bg-cyan-50 px-2 py-0.5 text-[11px] font-bold text-cyan-700">
+                {formatAttemptLabel(detail.attemptNo, detail.attemptCount)}
+              </span>
+            ) : null}
           </div>
           {/* Danh tính CHỈ hiện khi BE trả về — tức bài kiểm tra trên lớp. Kỳ thi tập
               trung trả null và chấm mù giữ nguyên. Đừng suy từ route. */}

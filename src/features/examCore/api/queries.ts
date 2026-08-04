@@ -5,6 +5,7 @@ import type {
   ExamBlueprintDto,
   ExamBlueprintVersionDto,
   ExamDto,
+  ExamKind,
   ExamPaperDto,
   ExamPickerOption,
   ExamScheduleDto,
@@ -731,8 +732,8 @@ export function useSchoolRoomsQuery(page: number, size: number, search: string) 
 // Chỉ những trường một danh sách chọn cần. Đừng thêm `papers`/`members`/`candidateCount`:
 // chúng chạy qua DataLoader nên mỗi field là thêm một loạt query cho mỗi dòng.
 const EXAM_PICKER_QUERY = `
-  query ExamPickerOptions($keyword: String, $status: ExamStatus, $page: Int!, $size: Int!) {
-    exams(keyword: $keyword, status: $status, page: $page, size: $size) {
+  query ExamPickerOptions($keyword: String, $status: ExamStatus, $kind: ExamKind, $page: Int!, $size: Int!) {
+    exams(keyword: $keyword, status: $status, kind: $kind, page: $page, size: $size) {
       content {
         id
         code
@@ -751,6 +752,12 @@ const EXAM_PICKER_QUERY = `
 
 export type FetchExamPickerOptionsInput = {
   keyword?: string
+  /**
+   * Loại bài. Bỏ trống là BE trả cả kỳ thi tập trung lẫn bài kiểm tra trên lớp — màn
+   * phân công chấm bài của nhà trường vì thế từng liệt kê cả bài trên lớp mà chọn vào
+   * là gán không được.
+   */
+  kind?: ExamKind
   page: number
   size: number
   status?: ExamStatus | ''
@@ -760,6 +767,7 @@ export type FetchExamPickerOptionsInput = {
 export async function fetchExamPickerOptions(input: FetchExamPickerOptionsInput) {
   const data = await graphQLRequest<{ exams: Paged<ExamPickerOption> }>(EXAM_PICKER_QUERY, {
     keyword: input.keyword?.trim() || null,
+    kind: input.kind ?? null,
     page: input.page - 1,
     size: input.size,
     status: input.status || null,

@@ -10,12 +10,16 @@ import { SchoolAdminGradingPage } from '@/features/grading'
  *
  * Vẫn giữ bảng, thống kê, tab chất lượng AI và xuất bảng điểm — nhà trường cần nhìn
  * được tiến độ, chỉ là không can thiệp.
+ *
+ * `kind` phải truyền tường minh: mặc định của màn dùng chung là kỳ thi tập trung, để
+ * trống ở đây là bảng rỗng dù `examId` đã đúng.
  */
 export function ClassTestGradingBoardPage() {
   const { examId } = useParams()
   return (
     <SchoolAdminGradingPage
       fixedExamId={examId}
+      kind="CLASS_TEST"
       readOnly
       title="Theo dõi chấm bài kiểm tra trên lớp"
     />

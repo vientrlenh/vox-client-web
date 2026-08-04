@@ -150,6 +150,11 @@ export type GradingTaskDetail = {
   // vì chấm ẩn danh là bảo đảm công bằng. Render có điều kiện, đừng suy từ route.
   studentName?: string | null
   className?: string | null
+  // Lượt thi đang chấm. Một em thi lại có nhiều lượt, mỗi lượt một bài chấm riêng —
+  // thiếu nhãn này thì người chấm không biết mình đang chấm lượt nào.
+  sessionId?: string | null
+  attemptNo: number
+  attemptCount: number
   items: GradingTaskItem[]
   criteria: GradingCriterionMeta[]
 }
@@ -180,9 +185,17 @@ export type GradingTask = {
   // vì chấm ẩn danh là bảo đảm công bằng. Render có điều kiện, đừng suy từ route.
   studentName?: string | null
   className?: string | null
+  // Lượt thi của dòng này. Một em thi lại sinh ra nhiều dòng cùng tên; đây là thứ duy
+  // nhất phân biệt được chúng.
+  sessionId?: string | null
+  attemptNo: number
+  attemptCount: number
 }
 
-/** Dòng bảng điều phối của admin. `assignmentId` null = bài chưa có phân công đang mở. */
+/**
+ * Dòng bảng điều phối của admin. `assignmentId` null = bài chưa có phân công đang mở.
+ * Một dòng là MỘT LƯỢT THI, không phải một học sinh.
+ */
 export type GradingAssignmentRow = {
   candidateResultId: string
   resultCode: string
@@ -204,6 +217,9 @@ export type GradingAssignmentRow = {
   overdue: boolean
   // Còn đơn phúc khảo chưa kết thúc — không nên giao vòng khác lúc này.
   hasOpenAppeal: boolean
+  sessionId?: string | null
+  attemptNo: number
+  attemptCount: number
 }
 
 /**
@@ -544,6 +560,20 @@ export function formatScore(n: number | null | undefined): string {
   }
   // 2 chữ số rồi bỏ số 0 thừa ở cuối: 6.50 -> "6.5", 6.75 giữ nguyên.
   return Number(n).toFixed(2).replace(/0$/, '')
+}
+
+/**
+ * Nhãn lượt thi: "Lượt 2/2". Trả `null` khi học sinh chỉ thi một lượt — gắn "Lượt 1/1"
+ * lên mọi dòng là thêm nhiễu vào đúng chỗ cần nhìn nhanh.
+ */
+export function formatAttemptLabel(
+  attemptNo: number | null | undefined,
+  attemptCount: number | null | undefined,
+): string | null {
+  if (attemptNo == null || attemptCount == null || attemptCount <= 1) {
+    return null
+  }
+  return `Lượt ${attemptNo}/${attemptCount}`
 }
 
 /** Chênh lệch có dấu: +0.5 / -1.0. Rỗng khi thiếu một trong hai đầu. */

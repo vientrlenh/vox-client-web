@@ -6,6 +6,7 @@ import {
   type ExamValidityDto,
 } from '@/shared/lib/aiEvaluation'
 import type { WordFeedback } from '@/shared/ui/WordFeedbackText'
+import type { ExamKind } from '@/features/examCore/types'
 import type {
   AiQualityReport,
   AssignableTeacher,
@@ -68,6 +69,7 @@ const GRADING_ASSIGNMENTS_QUERY = `
     $overdueOnly: Boolean
     $hasOpenAppeal: Boolean
     $search: String
+    $kind: ExamKind
     $page: Int
     $size: Int
   ) {
@@ -82,6 +84,7 @@ const GRADING_ASSIGNMENTS_QUERY = `
       overdueOnly: $overdueOnly
       hasOpenAppeal: $hasOpenAppeal
       search: $search
+      kind: $kind
       page: $page
       size: $size
     ) {
@@ -105,6 +108,9 @@ const GRADING_ASSIGNMENTS_QUERY = `
         deadlineAt
         overdue
         hasOpenAppeal
+        sessionId
+        attemptNo
+        attemptCount
       }
       page
       size
@@ -115,8 +121,8 @@ const GRADING_ASSIGNMENTS_QUERY = `
 `
 
 const GRADING_STATS_QUERY = `
-  query GradingStats($examId: ID, $scheduleId: ID) {
-    gradingStats(examId: $examId, scheduleId: $scheduleId) {
+  query GradingStats($examId: ID, $scheduleId: ID, $kind: ExamKind) {
+    gradingStats(examId: $examId, scheduleId: $scheduleId, kind: $kind) {
       total
       byResultStatus {
         status
@@ -142,6 +148,9 @@ const GRADING_STATS_QUERY = `
  * BE cũng không trả (chỉ bài kiểm tra trên lớp mới có), nên đây là tầng phòng thủ thứ
  * hai chứ không phải điều kiện đủ. Bài trên lớp dùng query riêng ở
  * `features/classTestGrading`.
+ *
+ * Không có tham số `kind`: BE khoá cứng hàng đợi này ở kỳ thi tập trung, không nhận lựa
+ * chọn từ client.
  */
 const MY_GRADING_TASKS_QUERY = `
   query MyGradingTasks(
@@ -165,6 +174,9 @@ const MY_GRADING_TASKS_QUERY = `
         assignedAt
         deadlineAt
         overdue
+        sessionId
+        attemptNo
+        attemptCount
       }
       page
       size
@@ -225,6 +237,9 @@ const GRADING_TASK_DETAIL_QUERY = `
       }
       studentName
       className
+      sessionId
+      attemptNo
+      attemptCount
     }
   }
 `
@@ -281,6 +296,11 @@ const AI_QUALITY_REPORT_QUERY = `
 export type FetchGradingAssignmentsInput = {
   examId?: string
   hasOpenAppeal?: boolean
+  /**
+   * Bỏ trống là BE hiểu CENTRALIZED. Màn theo dõi chấm bài kiểm tra trên lớp phải
+   * truyền `CLASS_TEST` tường minh.
+   */
+  kind?: ExamKind
   overdueOnly?: boolean
   page: number
   resultStatus?: '' | ExamCandidateResultStatus
@@ -302,6 +322,8 @@ export type FetchMyGradingTasksInput = {
 
 export type FetchGradingStatsInput = {
   examId?: string
+  /** Cùng luật với `FetchGradingAssignmentsInput.kind` — bảng và thẻ số phải cùng một tập. */
+  kind?: ExamKind
   scheduleId?: string
 }
 
@@ -331,6 +353,7 @@ export async function fetchGradingAssignments(input: FetchGradingAssignmentsInpu
     // Ba cờ boolean chỉ gửi khi BẬT: gửi `false` là một bộ lọc khác hẳn với "không lọc"
     // ở `hasOpenAppeal` (false = chỉ bài KHÔNG có đơn đang mở).
     hasOpenAppeal: input.hasOpenAppeal ? true : undefined,
+    kind: input.kind || undefined,
     overdueOnly: input.overdueOnly ? true : undefined,
     page: input.page,
     resultStatus: input.resultStatus || undefined,
@@ -348,6 +371,7 @@ export async function fetchGradingAssignments(input: FetchGradingAssignmentsInpu
 export async function fetchGradingStats(input: FetchGradingStatsInput) {
   const data = await graphQLRequest<{ gradingStats: GradingStats }>(GRADING_STATS_QUERY, {
     examId: input.examId || undefined,
+    kind: input.kind || undefined,
     scheduleId: input.scheduleId || undefined,
   })
   return data.gradingStats
@@ -432,6 +456,7 @@ export function useGradingAssignmentsQuery(
 export function useGradingStatsQuery(options?: FetchGradingStatsInput) {
   const input: FetchGradingStatsInput = {
     examId: options?.examId,
+    kind: options?.kind,
     scheduleId: options?.scheduleId,
   }
   return useQuery({

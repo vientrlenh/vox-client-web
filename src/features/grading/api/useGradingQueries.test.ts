@@ -93,6 +93,31 @@ describe('grading GraphQL queries', () => {
     expect(body.variables).toMatchObject({ examId: 'e1' })
   })
 
+  /**
+   * Bảng và thẻ số phải đếm trên cùng một tập bài, nên `kind` đi qua cả hai query. Bỏ
+   * trống thì BE hiểu là kỳ thi tập trung.
+   */
+  it('passes the exam kind through to both the board and the stat cards', async () => {
+    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+    mockedPost.mockResolvedValue({ data: { data: { gradingAssignments: page } } })
+    await fetchGradingAssignments({ kind: 'CLASS_TEST', page: 0, size: 20 })
+    expect(bodyOf().variables.kind).toBe('CLASS_TEST')
+
+    mockedPost.mockResolvedValue({ data: { data: { gradingStats: {} } } })
+    await fetchGradingStats({ examId: 'e1', kind: 'CLASS_TEST' })
+    expect(bodyOf(1).variables.kind).toBe('CLASS_TEST')
+  })
+
+  /** Số lượt thi là thứ duy nhất phân biệt hai dòng của cùng một em trên bảng. */
+  it('asks for the attempt fields on every grading list', async () => {
+    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+    mockedPost.mockResolvedValue({ data: { data: { gradingAssignments: page } } })
+    await fetchGradingAssignments({ page: 0, size: 20 })
+
+    expect(bodyOf().query).toContain('attemptNo')
+    expect(bodyOf().query).toContain('attemptCount')
+  })
+
   it('fetches my grading tasks without any student field (anonymous)', async () => {
     const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
     mockedPost.mockResolvedValue({ data: { data: { myGradingTasks: page } } })
