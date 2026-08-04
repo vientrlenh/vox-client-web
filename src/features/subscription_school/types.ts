@@ -45,6 +45,7 @@ export type SubscriptionPlan = {
   maxTimePerAttemptMin: number | null
   popular: boolean
   status: 'ACTIVE' | 'ARCHIVED'
+  replacedByPlanId: string | null
   quotas: PlanQuota[]
 }
 
@@ -54,6 +55,12 @@ export type SubscriptionPlanPage = {
   size: number
   totalElements: number
   totalPages: number
+}
+
+export type RenewalPreview = {
+  planChanged: boolean
+  currentPlan: SubscriptionPlan
+  renewalPlan: SubscriptionPlan
 }
 
 export type MySubscription = {
@@ -204,8 +211,18 @@ export function daysUntil(value?: string | null) {
 
 const EXPIRING_THRESHOLD_DAYS = 30
 
-export function getSubscriptionStatusDisplay(status: SubscriptionStatus, endDate?: string | null) {
+export function getSubscriptionStatusDisplay(
+  status: SubscriptionStatus,
+  endDate?: string | null,
+  cancelledAt?: string | null,
+) {
   if (status === 'ACTIVE') {
+    // Đã bấm Hủy nhưng gói không cắt ngay — dùng bình thường tới hết endDate (kiểu Claude), chỉ là
+    // sẽ không tự gia hạn nữa.
+    if (cancelledAt) {
+      return { label: 'Sẽ hết hạn (đã hủy)', tone: 'neutral' as const }
+    }
+
     const remaining = daysUntil(endDate)
 
     if (remaining !== null && remaining <= EXPIRING_THRESHOLD_DAYS && remaining >= 0) {

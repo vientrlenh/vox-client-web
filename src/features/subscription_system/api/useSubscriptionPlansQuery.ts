@@ -21,6 +21,8 @@ const PLAN_FIELDS = `
   version
   createdAt
   createdBy
+  replacedByPlanId
+  hasActiveSubscribers
   quotas {
     id
     quotaType

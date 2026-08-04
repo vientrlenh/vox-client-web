@@ -1,4 +1,4 @@
-import { Archive, Clock, Pencil, Star } from 'lucide-react'
+import { ArrowRight, Archive, Clock, Pencil, Star } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import {
   formatMinutes,
@@ -11,12 +11,13 @@ import {
 } from '../types'
 
 type PlanCardProps = {
+  getPlanName: (planId: string | null) => string
   onArchive: (plan: SubscriptionPlan) => void
   onEdit: (plan: SubscriptionPlan) => void
   plan: SubscriptionPlan
 }
 
-export function PlanCard({ onArchive, onEdit, plan }: PlanCardProps) {
+export function PlanCard({ getPlanName, onArchive, onEdit, plan }: PlanCardProps) {
   const statusDisplay = getPlanStatusDisplay(plan.status)
   const quotaByType = new Map(plan.quotas.map((quota) => [quota.quotaType, quota]))
 
@@ -41,17 +42,25 @@ export function PlanCard({ onArchive, onEdit, plan }: PlanCardProps) {
             <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
           </div>
           <p className="mt-1 max-w-52 text-[12.5px] text-slate-500">{plan.tagline ?? 'Chưa có mô tả'}</p>
+          {plan.status === 'ARCHIVED' && plan.replacedByPlanId ? (
+            <p className="mt-1.5 flex items-center gap-1 text-[12px] font-semibold text-indigo-600">
+              <ArrowRight aria-hidden="true" className="size-3.5" />
+              Thay thế bởi: {getPlanName(plan.replacedByPlanId)}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 gap-1.5">
-          <button
-            aria-label="Sửa gói"
-            className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-indigo-700 transition hover:bg-indigo-50"
-            onClick={() => onEdit(plan)}
-            type="button"
-          >
-            <Pencil aria-hidden="true" className="size-4" />
-          </button>
+          {!plan.hasActiveSubscribers ? (
+            <button
+              aria-label="Sửa gói"
+              className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-indigo-700 transition hover:bg-indigo-50"
+              onClick={() => onEdit(plan)}
+              type="button"
+            >
+              <Pencil aria-hidden="true" className="size-4" />
+            </button>
+          ) : null}
           {plan.status === 'ACTIVE' ? (
             <button
               aria-label="Lưu trữ gói"

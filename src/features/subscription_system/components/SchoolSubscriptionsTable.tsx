@@ -81,7 +81,11 @@ export function SchoolSubscriptionsTable({
             {!isLoading && !isError
               ? subscriptions.map((subscription) => {
                   const school = getSchool(subscription.schoolId)
-                  const statusDisplay = getSubscriptionStatusDisplay(subscription.status, subscription.endDate)
+                  const statusDisplay = getSubscriptionStatusDisplay(
+                    subscription.status,
+                    subscription.endDate,
+                    subscription.cancelledAt,
+                  )
 
                   return (
                     <tr className="border-b border-slate-100 align-top" key={subscription.id}>
@@ -121,7 +125,7 @@ export function SchoolSubscriptionsTable({
                             <RefreshCw aria-hidden="true" className="size-3.5" />
                             Gia hạn
                           </button>
-                          {subscription.status !== 'CANCELLED' ? (
+                          {subscription.status === 'ACTIVE' && !subscription.cancelledAt ? (
                             <button
                               className="inline-flex h-9 items-center rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                               disabled={isActionPending}

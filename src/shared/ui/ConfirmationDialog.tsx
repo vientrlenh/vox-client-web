@@ -1,5 +1,10 @@
 import { Check, CircleHelp, X } from 'lucide-react'
 
+type SelectOption = {
+  label: string
+  value: string
+}
+
 type ConfirmationDialogProps = {
   cancelLabel?: string
   confirmLabel?: string
@@ -8,10 +13,16 @@ type ConfirmationDialogProps = {
   onCancel: () => void
   onConfirm: () => void
   onReasonChange?: (value: string) => void
+  onSelectChange?: (value: string) => void
   reasonLabel?: string
   reasonPlaceholder?: string
   reasonValue?: string
+  selectLabel?: string
+  selectOptions?: SelectOption[]
+  selectPlaceholder?: string
+  selectValue?: string
   showReasonField?: boolean
+  showSelectField?: boolean
   title?: string
 }
 
@@ -23,10 +34,16 @@ export function ConfirmationDialog({
   onCancel,
   onConfirm,
   onReasonChange,
+  onSelectChange,
   reasonLabel = 'Lý do',
   reasonPlaceholder = 'Nhập lý do nếu cần...',
   reasonValue = '',
+  selectLabel = '',
+  selectOptions = [],
+  selectPlaceholder = '',
+  selectValue = '',
   showReasonField = false,
+  showSelectField = false,
   title = 'Xác nhận thao tác',
 }: ConfirmationDialogProps) {
   if (!isOpen) {
@@ -73,6 +90,26 @@ export function ConfirmationDialog({
                 placeholder={reasonPlaceholder}
                 value={reasonValue}
               />
+            </label>
+          </div>
+        ) : null}
+
+        {showSelectField ? (
+          <div className="px-6 pt-5">
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              <span>{selectLabel}</span>
+              <select
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                onChange={(event) => onSelectChange?.(event.target.value)}
+                value={selectValue}
+              >
+                <option value="">{selectPlaceholder}</option>
+                {selectOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
         ) : null}

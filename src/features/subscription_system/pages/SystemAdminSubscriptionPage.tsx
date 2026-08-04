@@ -7,7 +7,7 @@ import { Pagination } from '@/shared/components/Pagination'
 import { useSubscriptionPlansQuery } from '../api/useSubscriptionPlansQuery'
 import { useCreatePlanMutation, useUpdatePlanMutation, useArchivePlanMutation } from '../api/usePlanMutations'
 import { useSchoolSubscriptionsQuery } from '../api/useSchoolSubscriptionsQuery'
-import { useRenewSubscriptionMutation, useCancelSubscriptionMutation } from '../api/useSchoolSubscriptionMutations'
+import { useCancelSubscriptionMutation, useRenewSubscriptionMutation } from '../api/useSchoolSubscriptionMutations'
 import { useSubscriptionRequestsQuery } from '../api/useSubscriptionRequestsQuery'
 import { useCreatePaymentLinkForRequestMutation, useRejectRequestMutation } from '../api/useSubscriptionRequestMutations'
 import { useSchoolLookup } from '../api/useSchoolLookup'
@@ -18,6 +18,7 @@ import { SchoolSubscriptionsFiltersBar } from '../components/SchoolSubscriptions
 import { SchoolSubscriptionsTable } from '../components/SchoolSubscriptionsTable'
 import { SchoolSubscriptionDetailDrawer } from '../components/SchoolSubscriptionDetailDrawer'
 import { SubscriptionRequestsTable } from '../components/SubscriptionRequestsTable'
+import { formatVnd } from '../types'
 import type {
   CreatePlanPayload,
   RequestStatus,
@@ -57,7 +58,7 @@ export function SystemAdminSubscriptionPage() {
   const [requestsStatus, setRequestsStatus] = useState<RequestStatus>('PENDING')
   const [requestsPage, setRequestsPage] = useState(DEFAULT_PAGE)
 
-  const { confirm, dialog: confirmDialog } = useConfirmationDialog()
+  const { confirm, confirmWithSelection, dialog: confirmDialog } = useConfirmationDialog()
   const { getSchool, isLoading: isSchoolLookupLoading } = useSchoolLookup()
 
   const plansQuery = useSubscriptionPlansQuery(DEFAULT_PAGE, 50)
@@ -154,18 +155,25 @@ export function SystemAdminSubscriptionPage() {
   }
 
   async function handleArchivePlan(plan: SubscriptionPlan) {
-    const confirmed = await confirm({
+    const replacementOptions = activePlans
+      .filter((candidate) => candidate.id !== plan.id)
+      .map((candidate) => ({ label: `${candidate.name} — ${formatVnd(candidate.pricePerYear)}`, value: candidate.id }))
+
+    const result = await confirmWithSelection({
       confirmLabel: 'Lưu trữ',
-      message: `Gói "${plan.name}" sẽ được lưu trữ và không còn hiển thị cho trường đăng ký mới. Các trường đang dùng gói này không bị ảnh hưởng.`,
+      message: `Gói "${plan.name}" sẽ được lưu trữ và không còn hiển thị cho trường đăng ký mới. Các trường đang dùng gói này không bị ảnh hưởng ngay, nhưng nếu không chọn gói thay thế, các trường sẽ không gia hạn được cho tới khi có gói thay thế.`,
+      selectLabel: 'Gói thay thế khi trường gia hạn (không bắt buộc)',
+      selectOptions: replacementOptions,
+      selectPlaceholder: 'Không chọn — chặn gia hạn cho tới khi có gói thay thế',
       title: 'Lưu trữ gói dịch vụ',
     })
 
-    if (!confirmed) {
+    if (!result.confirmed) {
       return
     }
 
     try {
-      await archivePlanMutation.mutateAsync(plan.id)
+      await archivePlanMutation.mutateAsync({ id: plan.id, replacedByPlanId: result.selection || null })
       setToast({ text: 'Đã lưu trữ gói', tone: 'success' })
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể lưu trữ gói.', tone: 'error' })
@@ -306,7 +314,13 @@ export function SystemAdminSubscriptionPage() {
             <p className="text-sm font-semibold text-slate-500">Chưa có gói dịch vụ nào.</p>
           ) : null}
           {plans.map((plan) => (
-            <PlanCard key={plan.id} onArchive={handleArchivePlan} onEdit={openEditPlan} plan={plan} />
+            <PlanCard
+              getPlanName={getPlanName}
+              key={plan.id}
+              onArchive={handleArchivePlan}
+              onEdit={openEditPlan}
+              plan={plan}
+            />
           ))}
         </div>
       ) : null}

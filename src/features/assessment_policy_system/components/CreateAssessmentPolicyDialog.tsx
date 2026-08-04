@@ -21,6 +21,12 @@ const STRICTNESS_OPTIONS: { value: AssessmentPolicyStrictness; label: string }[]
   { value: 'STRICT', label: 'Chặt (STRICT)' },
 ];
 
+// Chuyển yyyy-MM-dd thành datetime kèm offset +07:00 để BE parse trực tiếp qua OffsetDateTime,
+// không phụ thuộc nhánh tương thích tạm thời (không offset) của DateMapper.
+function toBackendDate(value: string, endOfDay = false) {
+  return `${value}T${endOfDay ? '23:59:59' : '00:00:00'}+07:00`;
+}
+
 type PolicyFormState = {
   key: number;
   languageId: string;
@@ -336,8 +342,8 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, onSubmit, isPend
       rubricVersionIds: form.rubricVersionIds,
       languageId: form.languageId,
       targetFrameworkBandId: form.targetFrameworkBandId,
-      effectiveFrom: form.effectiveFrom,
-      effectiveTo: form.effectiveTo || undefined,
+      effectiveFrom: toBackendDate(form.effectiveFrom),
+      effectiveTo: form.effectiveTo ? toBackendDate(form.effectiveTo, true) : undefined,
       passingScore: form.passingScore ? Number(form.passingScore) : undefined,
       strictness: form.strictness || undefined,
     }));
