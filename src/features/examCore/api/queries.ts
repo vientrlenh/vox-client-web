@@ -55,6 +55,14 @@ const EXAM_PAPER_FIELDS = `
       questionId
       order
       weight
+      slotType
+      selectionSpec {
+        questionType
+        difficulty
+        targetBandLevel
+        skillCode
+        topicId
+      }
       question {
         id
         code

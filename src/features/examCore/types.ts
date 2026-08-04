@@ -161,6 +161,8 @@ export type ExamPaperItemDto = {
   } | null
   questionId?: string | null
   sectionId: string
+  selectionSpec?: QuestionSelectionSpec | null
+  slotType?: ExamBlueprintSlotType | null
   weight?: number | null
 }
 

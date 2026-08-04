@@ -2,17 +2,22 @@ import { useState } from 'react'
 import { Check, Eye, Search, X } from 'lucide-react'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
+import { useQuestionTopicQuery } from '@/features/question-topic/api/useQuestionTopicQuery'
 import {
   formatDuration,
   formatNullableText,
   getQuestionStatusDisplay,
   getQuestionTypeDisplay,
   type QuestionDto,
+  type QuestionType,
 } from '@/features/question/types'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 
 type QuestionPickerProps = {
   excludeQuestionIds?: string[]
+  /** Tiêu chí của ô SELECTION trong blueprint — lọc sẵn danh sách cho người ra đề. */
+  initialQuestionTopicId?: string | null
+  initialType?: QuestionType | null
   onClose: () => void
   onSelect: (question: QuestionDto) => void
   publishedOnly?: boolean
@@ -24,6 +29,8 @@ const PAGE_SIZE = 8
 
 export function QuestionPicker({
   excludeQuestionIds = [],
+  initialQuestionTopicId = null,
+  initialType = null,
   onClose,
   onSelect,
   publishedOnly = false,
@@ -32,13 +39,19 @@ export function QuestionPicker({
 }: QuestionPickerProps) {
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
+  // Tiêu chí có thể hẹp tới mức không còn câu nào khớp, nên phải cho bỏ lọc để thoát.
+  const [applySlotFilter, setApplySlotFilter] = useState(true)
+  const hasSlotFilter = Boolean(initialQuestionTopicId) || Boolean(initialType)
+  const filterActive = hasSlotFilter && applySlotFilter
+  const topicQuery = useQuestionTopicQuery(filterActive ? initialQuestionTopicId : null)
   const questionsQuery = useQuestionsQuery(scope, 'all', page, PAGE_SIZE, {
     keyword,
+    questionTopicId: filterActive ? (initialQuestionTopicId ?? undefined) : undefined,
     scope: '',
     sharing: '',
     status: publishedOnly ? 'PUBLISHED' : '',
     topicName: '',
-    type: '',
+    type: filterActive ? (initialType ?? '') : '',
   })
   const questions = questionsQuery.data?.content ?? []
 
@@ -63,6 +76,28 @@ export function QuestionPicker({
             <X aria-hidden="true" className="size-4" />
           </button>
         </div>
+
+        {hasSlotFilter ? (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-indigo-50/60 px-6 py-2.5 text-[11px] font-semibold text-indigo-900">
+            <span>
+              {filterActive
+                ? `Đang lọc theo tiêu chí của ô${initialType ? `: Loại = ${getQuestionTypeDisplay(initialType)}` : ''}${
+                    initialQuestionTopicId ? `${initialType ? ',' : ':'} Chủ đề = ${topicQuery.data?.topicName ?? '…'}` : ''
+                  }`
+                : 'Đã bỏ lọc theo tiêu chí của ô — câu hỏi không khớp tiêu chí sẽ bị từ chối khi gán.'}
+            </span>
+            <button
+              className="rounded-full border border-indigo-300 bg-white px-2.5 py-0.5 font-bold text-indigo-700 hover:bg-indigo-50"
+              onClick={() => {
+                setApplySlotFilter((current) => !current)
+                setPage(1)
+              }}
+              type="button"
+            >
+              {filterActive ? 'Bỏ lọc' : 'Lọc lại'}
+            </button>
+          </div>
+        ) : null}
 
         <div className="border-b border-slate-200 px-6 py-3.5">
           <div className="relative">
