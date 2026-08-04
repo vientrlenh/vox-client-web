@@ -42,7 +42,9 @@ import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
+import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
 import { QuestionPicker } from '@/features/examCore/components/QuestionPicker'
+import { RubricPolicyPicker, type RubricPolicySelection } from '@/features/examCore/components/RubricPolicyPicker'
 import { RoomPickerModal } from '@/features/examCore/components/schedule/RoomPickerModal'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
 import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
@@ -74,7 +76,9 @@ import {
   isExamLockedForEditing,
   RESULT_DECISION_METHODS,
   toDateTimeLocalValue,
+  toExamStreamSetup,
   toIsoDateTime,
+  toUpdateStreamPayload,
   type ExamBlueprintDto,
   type ExamCandidateDto,
   type ExamDeliveryMode,
@@ -94,12 +98,7 @@ import {
   useUpdateClassTestQuestionsMutation,
   useUpdateClassTestStatusMutation,
 } from '../api/useClassTestMutations'
-import {
-  EXAM_STREAM_SETUP_PAYLOAD,
-  EXAM_STREAM_SETUPS,
-  getClassTestStatusDisplay,
-  type ExamStreamSetup,
-} from '../types'
+import { EXAM_STREAM_SETUP_PAYLOAD, getClassTestStatusDisplay, type ExamStreamSetup } from '../types'
 import { ClassTestPaperAccordionItem } from '../components/ClassTestPaperAccordionItem'
 import { ClassTestPaperComposer } from '../components/ClassTestPaperComposer'
 import {
@@ -778,45 +777,11 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
             </p>
           </div>
 
-          <fieldset className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-            <legend className="text-sm font-bold text-slate-700">Giám sát thi</legend>
-            <p className="text-xs text-slate-500">
-              Quyết định học sinh phải chia sẻ những gì trong lúc làm bài.{' '}
-              <b className="text-slate-700">Không sửa được sau khi tạo bài.</b>
-            </p>
-
-            <div className="mt-1.5 grid gap-2">
-              {EXAM_STREAM_SETUPS.map((option) => {
-                const isSelected = streamSetup === option.value
-                const isWarning = option.tone === 'warning'
-                return (
-                  <label
-                    className={`grid cursor-pointer grid-cols-[auto_1fr] items-start gap-2.5 rounded-lg border bg-white p-3 transition ${
-                      isSelected
-                        ? isWarning
-                          ? 'border-amber-300 ring-2 ring-amber-100'
-                          : 'border-indigo-300 ring-2 ring-indigo-100'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                    key={option.value}
-                  >
-                    <input
-                      checked={isSelected}
-                      className="mt-0.5 accent-indigo-600"
-                      name="streamSetup"
-                      onChange={() => setStreamSetup(option.value)}
-                      type="radio"
-                      value={option.value}
-                    />
-                    <span className="grid gap-0.5">
-                      <span className="text-[13px] font-bold text-slate-900">{option.label}</span>
-                      <span className={`text-xs ${isWarning ? 'text-amber-700' : 'text-slate-500'}`}>{option.hint}</span>
-                    </span>
-                  </label>
-                )
-              })}
-            </div>
-          </fieldset>
+          <ExamStreamSetupField
+            description="Quyết định học sinh phải chia sẻ những gì trong lúc làm bài."
+            onChange={setStreamSetup}
+            value={streamSetup}
+          />
 
           <label className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-slate-700">
             <input checked={requiresOtp} onChange={(event) => setRequiresOtp(event.target.checked)} type="checkbox" />
@@ -1246,6 +1211,12 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const [editCloseAt, setEditCloseAt] = useState('')
   const [editMaxAttempt, setEditMaxAttempt] = useState('1')
   const [editResultDecisionMethod, setEditResultDecisionMethod] = useState<ResultDecisionMethod>('HIGHEST')
+  const [editRequiresOtp, setEditRequiresOtp] = useState(false)
+  const [editStreamSetup, setEditStreamSetup] = useState<ExamStreamSetup>('BOTH_REQUIRED')
+  const [editPolicySelection, setEditPolicySelection] = useState<RubricPolicySelection>({
+    assessmentPolicyId: null,
+    isBlocked: false,
+  })
   const [editingSectionIndex, setEditingSectionIndex] = useState<number | null>(null)
   const [editSectionTitle, setEditSectionTitle] = useState('')
   const [editSectionInstruction, setEditSectionInstruction] = useState('')
@@ -1309,6 +1280,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     setEditCloseAt(toDateTimeLocalValue(exam.closeAt))
     setEditMaxAttempt(String(exam.maxAttempt ?? 1))
     setEditResultDecisionMethod(exam.resultDecisionMethod ?? 'HIGHEST')
+    setEditRequiresOtp(exam.requiresOtp)
+    setEditStreamSetup(toExamStreamSetup(exam.requiredStreamType, exam.streamTypePermission))
+    setEditPolicySelection({ assessmentPolicyId: null, isBlocked: false })
     setShowEditInfo(true)
   }
 
@@ -1334,12 +1308,18 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       await updateExamMutation.mutateAsync({
         examId: exam.id,
         payload: {
+          // Không đổi chính sách thì bỏ hẳn field: API sửa hiểu vắng mặt là "giữ nguyên".
+          ...(editPolicySelection.assessmentPolicyId
+            ? { assessmentPolicyId: editPolicySelection.assessmentPolicyId }
+            : {}),
           closeAt: closeAtIso,
           description: editDescription.trim() || null,
           maxAttempt: Number(editMaxAttempt) || 1,
           name: editName.trim(),
           openAt: openAtIso,
+          requiresOtp: editRequiresOtp,
           resultDecisionMethod: editResultDecisionMethod,
+          ...toUpdateStreamPayload(editStreamSetup),
         },
       })
       await invalidate()
@@ -1803,11 +1783,31 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               </select>
             </label>
           </div>
+
+          <label className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-slate-700">
+            <input
+              checked={editRequiresOtp}
+              onChange={(event) => setEditRequiresOtp(event.target.checked)}
+              type="checkbox"
+            />
+            Bắt học sinh nhập mã OTP của ca thi khi vào bài
+          </label>
+
+          <ExamStreamSetupField
+            description="Quyết định học sinh phải chia sẻ những gì trong lúc làm bài."
+            name="editStreamSetup"
+            onChange={setEditStreamSetup}
+            value={editStreamSetup}
+          />
+
+          <RubricPolicyPicker languageId={exam.languageId} onChange={setEditPolicySelection} scope="teacher" />
+
           <div className="flex justify-end">
             <button
               className="inline-flex h-9.5 items-center justify-center rounded-full bg-indigo-600 px-4 text-xs font-bold text-white disabled:opacity-60"
-              disabled={updateExamMutation.isPending}
+              disabled={updateExamMutation.isPending || editPolicySelection.isBlocked}
               onClick={() => void handleSaveInfo()}
+              title={editPolicySelection.isBlocked ? 'Chọn một chính sách đánh giá phù hợp trước khi lưu' : undefined}
               type="button"
             >
               Lưu

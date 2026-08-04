@@ -127,6 +127,9 @@ const EXAM_SUMMARY_FIELDS = `
   deliveryMode
   maxAttempt
   resultDecisionMethod
+  requiresOtp
+  requiredStreamType
+  streamTypePermission
   securePool {
     id
     status
@@ -160,6 +163,9 @@ const EXAM_DETAIL_FIELDS = `
   maxAttempt
   examTimeDurationSecond
   resultDecisionMethod
+  requiresOtp
+  requiredStreamType
+  streamTypePermission
   securePool {
     id
     status

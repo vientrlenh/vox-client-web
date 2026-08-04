@@ -35,6 +35,9 @@ export type AssessmentPolicyStrictness = 'LENIENT' | 'STANDARD' | 'STRICT'
 
 export type ExamStreamType = 'CAMERA' | 'SCREEN'
 
+/** Dạng BE lưu trên exam: hai loại đồng thời gộp lại thành một nhánh riêng. */
+export type ExamRequiredStreamType = 'CAMERA' | 'CAMERA_AND_SCREEN' | 'SCREEN'
+
 export type ExamStreamTypePermission = 'ALL' | 'ANY'
 
 /**
@@ -68,6 +71,45 @@ export const EXAM_STREAM_SETUP_PAYLOAD: Record<ExamStreamSetup, ExamStreamSetupP
   CAMERA_ONLY: { requiredStreamTypes: ['CAMERA'], streamTypePermission: null },
   NO_MONITORING: { requiredStreamTypes: null, streamTypePermission: null },
   SCREEN_ONLY: { requiredStreamTypes: ['SCREEN'], streamTypePermission: null },
+}
+
+/**
+ * Chiều ngược của EXAM_STREAM_SETUP_PAYLOAD: đọc cấu hình đang lưu trên exam về lại union 5 nhánh
+ * để form sửa hiển thị đúng mức giám sát hiện tại.
+ *
+ * <p>Để ngay cạnh bảng map ghi, vì hai chiều phải luôn khớp nhau.
+ */
+export function toExamStreamSetup(
+  requiredStreamType?: ExamRequiredStreamType | null,
+  streamTypePermission?: ExamStreamTypePermission | null,
+): ExamStreamSetup {
+  if (!requiredStreamType) {
+    return 'NO_MONITORING'
+  }
+  if (requiredStreamType === 'CAMERA') {
+    return 'CAMERA_ONLY'
+  }
+  if (requiredStreamType === 'SCREEN') {
+    return 'SCREEN_ONLY'
+  }
+  // Dữ liệu cũ có thể thiếu permission dù yêu cầu cả hai loại; coi như mức chặt nhất.
+  return streamTypePermission === 'ANY' ? 'BOTH_STUDENT_CHOICE' : 'BOTH_REQUIRED'
+}
+
+/**
+ * Payload stream cho PUT (sửa), khác EXAM_STREAM_SETUP_PAYLOAD ở đúng một điểm: NO_MONITORING gửi
+ * mảng RỖNG chứ không phải null — trên API sửa, null nghĩa là "giữ nguyên", nên gửi null sẽ khiến
+ * "Không giám sát" im lặng không có tác dụng.
+ */
+export function toUpdateStreamPayload(setup: ExamStreamSetup): {
+  requiredStreamTypes: ExamStreamType[]
+  streamTypePermission: ExamStreamTypePermission | null
+} {
+  const payload = EXAM_STREAM_SETUP_PAYLOAD[setup]
+  return {
+    requiredStreamTypes: payload.requiredStreamTypes ?? [],
+    streamTypePermission: payload.streamTypePermission,
+  }
 }
 
 export type ExamStreamSetupOption = {

@@ -3,9 +3,13 @@ import {
   EXAM_STREAM_SETUPS,
   getMemberRoleDisplay,
   isExamLockedForEditing,
+  toExamStreamSetup,
+  toUpdateStreamPayload,
   type ExamMemberRole,
+  type ExamRequiredStreamType,
   type ExamStatus,
   type ExamStreamSetup,
+  type ExamStreamTypePermission,
 } from './types'
 
 // Vai trò hội đồng đề là thứ giáo viên nhìn để biết mình được làm gì; tên enum tiếng Anh lọt ra
@@ -98,6 +102,69 @@ describe('EXAM_STREAM_SETUP_PAYLOAD', () => {
     expect(entries).toHaveLength(5)
     const distinct = new Set(entries.map(([, payload]) => JSON.stringify(payload)))
     expect(distinct.size).toBe(5)
+  })
+})
+
+// Form sửa phải hiển thị đúng mức giám sát đang lưu. BE lưu 1 enum gộp còn UI dùng union 5 nhánh,
+// nên hai chiều đọc/ghi phải là nghịch đảo của nhau -- lệch một nhánh là người dùng mở form ra thấy
+// sai mức giám sát rồi vô tình lưu đè.
+describe('toExamStreamSetup', () => {
+  const cases: Array<[ExamRequiredStreamType | null, ExamStreamTypePermission | null, ExamStreamSetup]> = [
+    [null, null, 'NO_MONITORING'],
+    ['CAMERA', null, 'CAMERA_ONLY'],
+    ['SCREEN', null, 'SCREEN_ONLY'],
+    ['CAMERA_AND_SCREEN', 'ALL', 'BOTH_REQUIRED'],
+    ['CAMERA_AND_SCREEN', 'ANY', 'BOTH_STUDENT_CHOICE'],
+  ]
+
+  it.each(cases)('%s + %s -> %s', (requiredStreamType, streamTypePermission, expected) => {
+    expect(toExamStreamSetup(requiredStreamType, streamTypePermission)).toBe(expected)
+  })
+
+  it('đi vòng qua EXAM_STREAM_SETUP_PAYLOAD rồi quay về đúng nhánh cũ', () => {
+    for (const setup of Object.keys(EXAM_STREAM_SETUP_PAYLOAD) as ExamStreamSetup[]) {
+      const { requiredStreamTypes, streamTypePermission } = EXAM_STREAM_SETUP_PAYLOAD[setup]
+      const stored: ExamRequiredStreamType | null =
+        requiredStreamTypes === null || requiredStreamTypes.length === 0
+          ? null
+          : requiredStreamTypes.length === 2
+            ? 'CAMERA_AND_SCREEN'
+            : requiredStreamTypes[0]
+      expect(toExamStreamSetup(stored, streamTypePermission)).toBe(setup)
+    }
+  })
+
+  it('dữ liệu cũ thiếu permission thì coi như mức chặt nhất', () => {
+    expect(toExamStreamSetup('CAMERA_AND_SCREEN', null)).toBe('BOTH_REQUIRED')
+  })
+})
+
+// Trên API sửa, null nghĩa là "giữ nguyên" -- nên "Không giám sát" phải gửi mảng RỖNG, nếu không
+// việc tắt giám sát sẽ im lặng không có tác dụng.
+describe('toUpdateStreamPayload', () => {
+  it('tắt giám sát gửi mảng rỗng, không phải null', () => {
+    expect(toUpdateStreamPayload('NO_MONITORING')).toEqual({
+      requiredStreamTypes: [],
+      streamTypePermission: null,
+    })
+  })
+
+  it('các nhánh còn lại giữ nguyên payload của luồng tạo', () => {
+    for (const setup of Object.keys(EXAM_STREAM_SETUP_PAYLOAD) as ExamStreamSetup[]) {
+      if (setup === 'NO_MONITORING') {
+        continue
+      }
+      expect(toUpdateStreamPayload(setup)).toEqual(EXAM_STREAM_SETUP_PAYLOAD[setup])
+    }
+  })
+
+  it('không bao giờ gửi permission kèm một loại stream', () => {
+    for (const setup of Object.keys(EXAM_STREAM_SETUP_PAYLOAD) as ExamStreamSetup[]) {
+      const payload = toUpdateStreamPayload(setup)
+      if (payload.requiredStreamTypes.length !== 2) {
+        expect(payload.streamTypePermission).toBeNull()
+      }
+    }
   })
 })
 

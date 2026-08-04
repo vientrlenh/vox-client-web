@@ -32,6 +32,7 @@ import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
+import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
 import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
@@ -55,8 +56,6 @@ import {
   getResultDecisionMethodDisplay,
   isExamLockedForEditing,
   RESULT_DECISION_METHODS,
-  toDateTimeLocalValue,
-  toIsoDateTime,
   type ExamDeliveryMode,
   type ExamDto,
   type ExamPaperDto,
@@ -64,15 +63,11 @@ import {
   type ResultDecisionMethod,
 } from '@/features/examCore/types'
 import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
+import { EditExamModal } from '../components/EditExamModal'
 import { MembersTab } from '../components/MembersTab'
 import { useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
-import { useCreateExamMutation, useDeleteExamMutation, useUpdateExamMutation, useUpdateExamStatusMutation } from '../api/useExamMutations'
-import {
-  EXAM_STREAM_SETUP_PAYLOAD,
-  EXAM_STREAM_SETUPS,
-  getExamStatusDisplay,
-  type ExamStreamSetup,
-} from '../types'
+import { useCreateExamMutation, useDeleteExamMutation, useUpdateExamStatusMutation } from '../api/useExamMutations'
+import { EXAM_STREAM_SETUP_PAYLOAD, getExamStatusDisplay, type ExamStreamSetup } from '../types'
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
@@ -264,8 +259,8 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
     locationState?.selectedRubricVersion ?? null,
   )
   const [manualPolicyId, setManualPolicyId] = useState<string | null>(null)
-  // Mặc định mức giám sát đầy đủ, không phải "không giám sát": lựa chọn này không sửa được sau khi
-  // tạo kỳ thi, nên mặc định phải là phương án an toàn và việc hạ nó xuống phải là hành động có ý thức.
+  // Mặc định mức giám sát đầy đủ, không phải "không giám sát": mặc định phải là phương án an toàn
+  // và việc hạ nó xuống phải là hành động có ý thức.
   const [streamSetup, setStreamSetup] = useState<ExamStreamSetup>('BOTH_REQUIRED')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { confirm, dialog } = useConfirmationDialog()
@@ -392,51 +387,11 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
           </select>
         </label>
 
-        <fieldset className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-          <legend className="text-sm font-bold text-slate-700">Giám sát thi</legend>
-          <p className="text-xs text-slate-500">
-            Quyết định học viên phải chia sẻ những gì trong lúc thi.{' '}
-            <b className="text-slate-700">Không sửa được sau khi tạo kỳ thi.</b>
-          </p>
-
-          <div className="mt-1.5 grid gap-2">
-            {EXAM_STREAM_SETUPS.map((option) => {
-              const isSelected = streamSetup === option.value
-              const isWarning = option.tone === 'warning'
-              return (
-                <label
-                  className={`grid cursor-pointer grid-cols-[auto_1fr] items-start gap-2.5 rounded-lg border bg-white p-3 transition ${
-                    isSelected
-                      ? isWarning
-                        ? 'border-amber-300 ring-2 ring-amber-100'
-                        : 'border-indigo-300 ring-2 ring-indigo-100'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                  key={option.value}
-                >
-                  <input
-                    checked={isSelected}
-                    className="mt-0.5 accent-indigo-600"
-                    name="streamSetup"
-                    onChange={() => setStreamSetup(option.value)}
-                    type="radio"
-                    value={option.value}
-                  />
-                  <span className="grid gap-0.5">
-                    <span className="text-[13px] font-bold text-slate-900">{option.label}</span>
-                    <span
-                      className={`text-xs ${
-                        isWarning && isSelected ? 'font-semibold text-amber-700' : 'text-slate-500'
-                      }`}
-                    >
-                      {option.hint}
-                    </span>
-                  </span>
-                </label>
-              )
-            })}
-          </div>
-        </fieldset>
+        <ExamStreamSetupField
+          description="Quyết định học viên phải chia sẻ những gì trong lúc thi."
+          onChange={setStreamSetup}
+          value={streamSetup}
+        />
 
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
@@ -528,138 +483,6 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
         </div>
       </div>
     </section>
-  )
-}
-
-type EditExamModalProps = {
-  exam: ExamDto
-  onClose: () => void
-  onSaved: () => void
-}
-
-function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
-  const updateMutation = useUpdateExamMutation()
-  const [name, setName] = useState(exam.name)
-  const [description, setDescription] = useState(exam.description ?? '')
-  const [openAt, setOpenAt] = useState(toDateTimeLocalValue(exam.openAt))
-  const [closeAt, setCloseAt] = useState(toDateTimeLocalValue(exam.closeAt))
-  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
-    exam.resultDecisionMethod ?? 'HIGHEST',
-  )
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  async function handleSubmit() {
-    setErrorMessage(null)
-    if (!name.trim()) {
-      setErrorMessage('Vui lòng nhập tên kỳ thi.')
-      return
-    }
-    try {
-      await updateMutation.mutateAsync({
-        examId: exam.id,
-        payload: {
-          closeAt: toIsoDateTime(closeAt),
-          description: description || null,
-          // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
-          maxAttempt: 1,
-          name: name.trim(),
-          openAt: toIsoDateTime(openAt),
-          requiresOtp: true,
-          resultDecisionMethod,
-        },
-      })
-      onSaved()
-    } catch (error) {
-      setErrorMessage(toApiError(error).message)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
-      <section className="w-full max-w-md rounded-2xl bg-white shadow-2xl" role="dialog">
-        <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-          <h2 className="text-lg font-black text-slate-900">Sửa thông tin kỳ thi</h2>
-          <button
-            aria-label="Đóng"
-            className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
-            onClick={onClose}
-            type="button"
-          >
-            <X aria-hidden="true" className="size-4" />
-          </button>
-        </div>
-        <div className="grid gap-3.5 px-6 py-5">
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Tên kỳ thi
-            <input
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              onChange={(event) => setName(event.target.value)}
-              value={name}
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Mô tả
-            <textarea
-              className="min-h-20 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900"
-              onChange={(event) => setDescription(event.target.value)}
-              value={description}
-            />
-          </label>
-          <div className="grid gap-3.5 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              Mở lúc
-              <input
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-                onChange={(event) => setOpenAt(event.target.value)}
-                type="datetime-local"
-                value={openAt}
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              Đóng lúc
-              <input
-                className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-                onChange={(event) => setCloseAt(event.target.value)}
-                type="datetime-local"
-                value={closeAt}
-              />
-            </label>
-          </div>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Cách chốt điểm
-            <select
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
-              value={resultDecisionMethod}
-            >
-              {RESULT_DECISION_METHODS.map((method) => (
-                <option key={method} value={method}>
-                  {getResultDecisionMethodDisplay(method)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="flex justify-end gap-2.5 border-t border-slate-200 px-6 py-4">
-          <button
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            onClick={onClose}
-            type="button"
-          >
-            Hủy
-          </button>
-          <button
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white disabled:opacity-60"
-            disabled={updateMutation.isPending}
-            onClick={() => void handleSubmit()}
-            type="button"
-          >
-            Lưu
-          </button>
-        </div>
-      </section>
-    </div>
   )
 }
 

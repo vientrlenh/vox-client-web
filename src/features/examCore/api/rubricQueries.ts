@@ -52,8 +52,14 @@ async function fetchSchoolRubricsWithPublishedVersions(filters: { keyword?: stri
   return data.searchSchoolRubrics.content.map((rubric) => ({ ...rubric, versions: rubric.versions.content }))
 }
 
-export function useSchoolRubricsWithPublishedVersionsQuery(filters: { keyword?: string; languageId?: string | null }) {
+// `options.enabled` cho phép component dùng chung gọi cả hai scope (school/teacher) mà chỉ một
+// scope thực sự bắn request — query school-admin sẽ 403 nếu chạy dưới token giáo viên.
+export function useSchoolRubricsWithPublishedVersionsQuery(
+  filters: { keyword?: string; languageId?: string | null },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
+    enabled: options?.enabled ?? true,
     queryFn: () => fetchSchoolRubricsWithPublishedVersions(filters),
     queryKey: [...examReferenceQueryKeys.all, 'school-rubrics-published', filters],
   })
@@ -89,8 +95,12 @@ async function fetchTeacherRubrics(filters: { keyword?: string; languageId?: str
 }
 
 // Teacher scope: BE infers schoolId from the token, so no schoolId argument here (unlike the school-admin query above).
-export function useTeacherRubricsQuery(filters: { keyword?: string; languageId?: string | null }) {
+export function useTeacherRubricsQuery(
+  filters: { keyword?: string; languageId?: string | null },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
+    enabled: options?.enabled ?? true,
     queryFn: () => fetchTeacherRubrics(filters),
     queryKey: [...examReferenceQueryKeys.all, 'teacher-rubrics', filters],
   })
