@@ -14,6 +14,7 @@ import {
 import {
   useCreatePaymentLinkForRenewalMutation,
   useCreatePaymentLinkForTokenPurchaseMutation,
+  usePreviewRenewalMutation,
 } from '../api/usePaymentLinkMutations'
 import { useCancelMySubscriptionMutation } from '../api/useCancelMySubscriptionMutation'
 import { useInvoicesQuery } from '../api/useInvoicesQuery'
@@ -30,9 +31,17 @@ import { UsageBarsGrid } from '../components/UsageBarsGrid'
 import { PlanBrowseGrid } from '../components/PlanBrowseGrid'
 import { TokenTopUpPanel } from '../components/TokenTopUpPanel'
 import { PaymentConfirmDialog } from '../components/PaymentConfirmDialog'
+import { PlanChangeConfirmDialog } from '../components/PlanChangeConfirmDialog'
 import { InvoicesTable } from '../components/InvoicesTable'
 import { QuotaAllocationPanel } from '../components/QuotaAllocationPanel'
-import { minutesToSeconds, QUOTA_TYPES, type RequestType, type SubscriptionPlan, type TokenTopUpState } from '../types'
+import {
+  minutesToSeconds,
+  QUOTA_TYPES,
+  type RenewalPreview,
+  type RequestType,
+  type SubscriptionPlan,
+  type TokenTopUpState,
+} from '../types'
 
 type SchoolSubscriptionTab = 'plan' | 'browse' | 'quota' | 'invoices'
 type QuotaAllocationTab = 'teachers' | 'students'
@@ -55,6 +64,7 @@ export function SchoolAdminSubscriptionPage() {
   const [pendingSelection, setPendingSelection] = useState<{ plan: SubscriptionPlan; requestType: RequestType } | null>(
     null,
   )
+  const [renewalPreview, setRenewalPreview] = useState<RenewalPreview | null>(null)
   const [invoicesPage, setInvoicesPage] = useState(DEFAULT_PAGE)
 
   const { confirm, dialog: confirmDialog } = useConfirmationDialog()
@@ -68,6 +78,7 @@ export function SchoolAdminSubscriptionPage() {
 
   const submitRequestMutation = useSubmitSubscriptionRequestMutation()
   const requestPaymentLinkMutation = useCreatePaymentLinkForSubscriptionRequestMutation()
+  const previewRenewalMutation = usePreviewRenewalMutation()
   const renewPaymentLinkMutation = useCreatePaymentLinkForRenewalMutation()
   const tokenPaymentLinkMutation = useCreatePaymentLinkForTokenPurchaseMutation()
   const cancelMutation = useCancelMySubscriptionMutation()
@@ -88,10 +99,34 @@ export function SchoolAdminSubscriptionPage() {
     }
 
     try {
-      const result = await renewPaymentLinkMutation.mutateAsync(subscription.id)
+      const preview = await previewRenewalMutation.mutateAsync(subscription.id)
+
+      if (preview.data.planChanged) {
+        setRenewalPreview(preview.data)
+        return
+      }
+
+      const result = await renewPaymentLinkMutation.mutateAsync({ subscriptionId: subscription.id })
       window.location.href = result.data.checkoutUrl
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán gia hạn.', tone: 'error' })
+    }
+  }
+
+  async function handleConfirmPlanChange() {
+    if (!subscription || !renewalPreview) {
+      return
+    }
+
+    try {
+      const result = await renewPaymentLinkMutation.mutateAsync({
+        acceptedPlanId: renewalPreview.renewalPlan.id,
+        subscriptionId: subscription.id,
+      })
+      window.location.href = result.data.checkoutUrl
+    } catch (error) {
+      setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán gia hạn.', tone: 'error' })
+      setRenewalPreview(null)
     }
   }
 
@@ -209,7 +244,7 @@ export function SchoolAdminSubscriptionPage() {
           <MyPlanCard
             isCancelling={cancelMutation.isPending}
             isLoading={mySubscriptionQuery.isLoading}
-            isRenewing={renewPaymentLinkMutation.isPending}
+            isRenewing={previewRenewalMutation.isPending || renewPaymentLinkMutation.isPending}
             onCancel={() => void handleCancel()}
             onGoBrowse={() => setTab('browse')}
             onRenew={() => void handleRenew()}
@@ -307,6 +342,13 @@ export function SchoolAdminSubscriptionPage() {
         onConfirm={() => void handleConfirmSelection()}
         plan={pendingSelection?.plan ?? null}
         requestType={pendingSelection?.requestType ?? 'REGISTRATION'}
+      />
+
+      <PlanChangeConfirmDialog
+        isSubmitting={renewPaymentLinkMutation.isPending}
+        onCancel={() => setRenewalPreview(null)}
+        onConfirm={() => void handleConfirmPlanChange()}
+        preview={renewalPreview}
       />
 
       {confirmDialog}

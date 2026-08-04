@@ -29,7 +29,16 @@ function toDateInputValue(value?: string | null) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toISOString().slice(0, 10);
+  // Cộng 7 tiếng rồi đọc theo UTC để ra đúng ngày theo giờ VN (+07:00), bất kể múi giờ trình
+  // duyệt — toISOString() thẳng ở đây từng lùi mất 1 ngày với các mốc đầu ngày giờ VN.
+  const vnLocal = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+  return vnLocal.toISOString().slice(0, 10);
+}
+
+// Chuyển yyyy-MM-dd thành datetime kèm offset +07:00 để BE parse trực tiếp qua OffsetDateTime,
+// không phụ thuộc nhánh tương thích tạm thời (không offset) của DateMapper.
+function toBackendDate(value: string, endOfDay = false) {
+  return `${value}T${endOfDay ? '23:59:59' : '00:00:00'}+07:00`;
 }
 
 export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPending }: UpdateAssessmentPolicyDialogProps) {
@@ -74,8 +83,8 @@ export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPend
 
     const payload: UpdateAssessmentPolicyPayload = {
       targetFrameworkBandId: form.targetFrameworkBandId,
-      effectiveFrom: form.effectiveFrom,
-      effectiveTo: form.effectiveTo || undefined,
+      effectiveFrom: toBackendDate(form.effectiveFrom),
+      effectiveTo: form.effectiveTo ? toBackendDate(form.effectiveTo, true) : undefined,
       passingScore: form.passingScore ? Number(form.passingScore) : undefined,
       strictness: form.strictness || undefined,
     };

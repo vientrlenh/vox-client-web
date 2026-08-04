@@ -2,13 +2,26 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ClipboardCheck, Filter, Plus, RefreshCw, Upload } from 'lucide-react';
+import {
+  BookOpen,
+  Calendar,
+  ChevronDown,
+  ClipboardCheck,
+  Filter,
+  Languages,
+  Layers,
+  Plus,
+  RefreshCw,
+  SlidersHorizontal,
+  Upload,
+} from 'lucide-react';
 
 import { useSchoolAssessmentPoliciesQuery, type SchoolAssessmentPolicyFilter } from '../api/useSchoolAssessmentPoliciesQuery';
 import { useCreateSchoolAssessmentPolicyMutation } from '../api/useCreateSchoolAssessmentPolicyMutation';
 import { useDeleteSchoolAssessmentPolicyMutation } from '../api/useDeleteSchoolAssessmentPolicyMutation';
 import { useUpdateSchoolAssessmentPolicyMutation } from '../api/useUpdateSchoolAssessmentPolicyMutation';
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
+import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
 
 import { AssessmentPolicyTable } from '../components/AssessmentPolicyTable';
 import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPolicyDialog';
@@ -23,9 +36,46 @@ const DEFAULT_PAGE_SIZE = 10;
 
 const STATUS_OPTIONS = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
 
+// Dùng +07:00 (múi giờ nghiệp vụ) chứ không phải Z (UTC) — nếu không, "từ/đến ngày X" sẽ lệch
+// 7 tiếng so với ngày người dùng chọn.
 function toOffsetDateTime(dateInputValue: string, endOfDay: boolean) {
   if (!dateInputValue) return null;
-  return `${dateInputValue}T${endOfDay ? '23:59:59' : '00:00:00'}Z`;
+  return `${dateInputValue}T${endOfDay ? '23:59:59' : '00:00:00'}+07:00`;
+}
+
+type FilterSelectProps = {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  disabled?: boolean;
+  placeholder: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+};
+
+// Select filter dùng chung: label phía trên + icon minh hoạ bên trái + chevron bên phải,
+// để 4 dropdown (Trạng thái/Ngôn ngữ/Rubric/Phiên bản) đồng bộ nhau thay vì lặp lại JSX 4 lần.
+function FilterSelect({ id, icon: Icon, label, value, disabled, placeholder, options, onChange }: FilterSelectProps) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-semibold text-slate-500" htmlFor={id}>{label}</label>
+      <div className="relative">
+        <Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <select
+          id={id}
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-400"
+        >
+          <option value="">{placeholder}</option>
+          {options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+      </div>
+    </div>
+  );
 }
 
 export function SchoolAdminAssessmentPoliciesPage() {
@@ -38,6 +88,8 @@ export function SchoolAdminAssessmentPoliciesPage() {
 
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedLanguageId, setSelectedLanguageId] = useState('');
+  const [selectedRubricId, setSelectedRubricId] = useState('');
+  const [selectedRubricVersionId, setSelectedRubricVersionId] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [effectiveTo, setEffectiveTo] = useState('');
 
@@ -46,19 +98,26 @@ export function SchoolAdminAssessmentPoliciesPage() {
   const [viewingRubricVersionPolicy, setViewingRubricVersionPolicy] = useState<AssessmentPolicy | null>(null);
 
   const { data: languages } = useLanguageOptionsQuery();
+  const { data: rubrics } = useRubricSearchOptionsQuery(schoolId, selectedLanguageId || undefined);
+  const { data: rubricVersions } = useRubricVersionOptionsQuery(schoolId, selectedRubricId || undefined);
 
   const filter: SchoolAssessmentPolicyFilter = {
     status: selectedStatus || null,
     languageId: selectedLanguageId || null,
+    rubricVersionId: selectedRubricVersionId || null,
     effectiveFrom: toOffsetDateTime(effectiveFrom, false),
     effectiveTo: toOffsetDateTime(effectiveTo, true),
   };
 
-  const hasActiveFilters = Boolean(selectedStatus || selectedLanguageId || effectiveFrom || effectiveTo);
+  const hasActiveFilters = Boolean(
+    selectedStatus || selectedLanguageId || selectedRubricVersionId || effectiveFrom || effectiveTo
+  );
 
   const handleResetFilters = () => {
     setSelectedStatus('');
     setSelectedLanguageId('');
+    setSelectedRubricId('');
+    setSelectedRubricVersionId('');
     setEffectiveFrom('');
     setEffectiveTo('');
     setPage(1);
@@ -157,69 +216,11 @@ export function SchoolAdminAssessmentPoliciesPage() {
       </div>
 
       {/* FILTER BAR */}
-      <div className="relative rounded-[14px] border border-slate-200 bg-white p-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="relative min-w-52">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-              <Filter className="size-4 text-slate-400" />
-            </div>
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value);
-                setPage(1);
-              }}
-              className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-            >
-              <option value="">Tất cả trạng thái</option>
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
-          </div>
-          <div className="relative min-w-52">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-              <Filter className="size-4 text-slate-400" />
-            </div>
-            <select
-              value={selectedLanguageId}
-              onChange={(e) => {
-                setSelectedLanguageId(e.target.value);
-                setPage(1);
-              }}
-              className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-            >
-              <option value="">Tất cả ngôn ngữ</option>
-              {languages?.map((lang) => <option key={lang.id} value={lang.id}>{lang.name}</option>)}
-            </select>
-          </div>
+      <div className="relative rounded-[14px] border border-slate-200 bg-white p-5">
+        <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <label className="text-sm text-slate-500" htmlFor="effectiveFromFilter">Hiệu lực từ</label>
-            <input
-              id="effectiveFromFilter"
-              type="date"
-              value={effectiveFrom}
-              max={effectiveTo || undefined}
-              onChange={(e) => {
-                setEffectiveFrom(e.target.value);
-                setPage(1);
-              }}
-              className="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-slate-500" htmlFor="effectiveToFilter">đến</label>
-            <input
-              id="effectiveToFilter"
-              type="date"
-              value={effectiveTo}
-              min={effectiveFrom || undefined}
-              onChange={(e) => {
-                setEffectiveTo(e.target.value);
-                setPage(1);
-              }}
-              className="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-            />
+            <SlidersHorizontal className="size-4 text-indigo-600" />
+            <span className="text-sm font-bold text-slate-800">Bộ lọc</span>
           </div>
           {hasActiveFilters && (
             <button
@@ -230,6 +231,99 @@ export function SchoolAdminAssessmentPoliciesPage() {
               Xóa bộ lọc
             </button>
           )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <FilterSelect
+            id="statusFilter"
+            icon={Filter}
+            label="Trạng thái"
+            placeholder="Tất cả trạng thái"
+            value={selectedStatus}
+            options={STATUS_OPTIONS.map((status) => ({ value: status, label: status }))}
+            onChange={(value) => {
+              setSelectedStatus(value);
+              setPage(1);
+            }}
+          />
+          <FilterSelect
+            id="languageFilter"
+            icon={Languages}
+            label="Ngôn ngữ"
+            placeholder="Tất cả ngôn ngữ"
+            value={selectedLanguageId}
+            options={languages?.map((lang) => ({ value: lang.id, label: lang.name })) ?? []}
+            onChange={(value) => {
+              setSelectedLanguageId(value);
+              setSelectedRubricId('');
+              setSelectedRubricVersionId('');
+              setPage(1);
+            }}
+          />
+          <FilterSelect
+            id="rubricFilter"
+            icon={BookOpen}
+            label="Rubric"
+            placeholder={selectedLanguageId ? 'Tất cả rubric' : 'Chọn ngôn ngữ trước'}
+            value={selectedRubricId}
+            disabled={!selectedLanguageId}
+            options={rubrics?.map((rubric) => ({ value: rubric.id, label: `${rubric.code} - ${rubric.name}` })) ?? []}
+            onChange={(value) => {
+              setSelectedRubricId(value);
+              setSelectedRubricVersionId('');
+              setPage(1);
+            }}
+          />
+          <FilterSelect
+            id="rubricVersionFilter"
+            icon={Layers}
+            label="Phiên bản"
+            placeholder={selectedRubricId ? 'Tất cả phiên bản' : 'Chọn rubric trước'}
+            value={selectedRubricVersionId}
+            disabled={!selectedRubricId}
+            options={rubricVersions?.map((rv) => ({
+              value: rv.id,
+              label: `${rv.code} - ${rv.name} (v${rv.version}) · ${rv.status}`,
+            })) ?? []}
+            onChange={(value) => {
+              setSelectedRubricVersionId(value);
+              setPage(1);
+            }}
+          />
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-500" htmlFor="effectiveFromFilter">Hiệu lực từ</label>
+            <div className="relative">
+              <Calendar className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="effectiveFromFilter"
+                type="date"
+                value={effectiveFrom}
+                max={effectiveTo || undefined}
+                onChange={(e) => {
+                  setEffectiveFrom(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full rounded-[10px] border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-500" htmlFor="effectiveToFilter">Hiệu lực đến</label>
+            <div className="relative">
+              <Calendar className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="effectiveToFilter"
+                type="date"
+                value={effectiveTo}
+                min={effectiveFrom || undefined}
+                onChange={(e) => {
+                  setEffectiveTo(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full rounded-[10px] border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+              />
+            </div>
+          </div>
         </div>
       </div>
 

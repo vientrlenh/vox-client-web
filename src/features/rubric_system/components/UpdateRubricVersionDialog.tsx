@@ -36,11 +36,13 @@ const toDateInputValue = (value?: string) => {
   return '';
 };
 
-const toBackendDate = (value?: string) => {
+// Chuyển yyyy-MM-dd thành datetime kèm offset +07:00 để BE parse trực tiếp qua OffsetDateTime,
+// không phụ thuộc nhánh tương thích tạm thời (không offset) của DateMapper.
+const toBackendDate = (value?: string, endOfDay = false) => {
   if (!value) return undefined;
   const [year, month, day] = value.split('-');
   if (!year || !month || !day) return undefined;
-  return `${day}.${month}.${year}`;
+  return `${year}-${month}-${day}T${endOfDay ? '23:59:59' : '00:00:00'}+07:00`;
 };
 
 export function UpdateRubricVersionDialog({ isOpen, onClose, onSubmit, isPending, initialData }: Props) {
@@ -78,7 +80,7 @@ export function UpdateRubricVersionDialog({ isOpen, onClose, onSubmit, isPending
     const payload: UpdateRubricVersionPayload = {
       ...formData,
       effectiveFrom: toBackendDate(formData.effectiveFrom),
-      effectiveTo: formData.effectiveTo ? toBackendDate(formData.effectiveTo) : null,
+      effectiveTo: formData.effectiveTo ? toBackendDate(formData.effectiveTo, true) : null,
       scoringScaleMin: min,
       scoringScaleMax: max,
     };
