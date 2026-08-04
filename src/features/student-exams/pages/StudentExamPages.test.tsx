@@ -1,11 +1,13 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
+import { apiClient } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { StudentClassTestResultPage } from './StudentExamPages'
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
+const mockedRestPost = jest.spyOn(apiClient, 'post')
 
 type GraphQLBody = { query: string; variables: Record<string, unknown> }
 
@@ -69,7 +71,11 @@ function renderResultPage() {
 }
 
 describe('StudentClassTestResultPage', () => {
-  beforeEach(() => mockedPost.mockReset())
+  beforeEach(() => {
+    mockedPost.mockReset()
+    mockedRestPost.mockReset()
+    mockedRestPost.mockResolvedValue({ data: { data: 'ap-1', message: 'ok' } } as never)
+  })
 
   it('hiện điểm và chi tiết khi bài đã công bố', async () => {
     routeGraphql({ examSession: session, examSessionResult: result() })
@@ -128,6 +134,39 @@ describe('StudentClassTestResultPage', () => {
 
     // Che điểm chứ không chặn trang: chặn thì học sinh chỉ thấy "không tìm thấy".
     expect(await screen.findByText('Chờ soát điểm AI')).toBeInTheDocument()
+  })
+
+  /**
+   * Bước chọn câu đã bỏ: giám khảo phúc khảo bắt buộc chấm lại toàn bài rồi tính lại
+   * tổng điểm từ mọi câu, nên danh sách học sinh chọn không thu hẹp được gì.
+   */
+  it('form phúc khảo chỉ hỏi lý do — không chọn câu, không ghi chú', async () => {
+    routeGraphql({ examSession: session, examSessionResult: result() })
+    renderResultPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: /gửi đơn phúc khảo/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryAllByRole('checkbox')).toHaveLength(0)
+    expect(within(dialog).queryByText('Ghi chú')).not.toBeInTheDocument()
+    expect(dialog).toHaveTextContent(/toàn bộ bài làm/)
+  })
+
+  it('gửi đơn chỉ với kết quả và lý do', async () => {
+    routeGraphql({ examSession: session, examSessionResult: result() })
+    renderResultPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: /gửi đơn phúc khảo/i }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByRole('textbox'), 'Điểm chưa phản ánh đúng bài nói')
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Gửi đơn$/ }))
+
+    await waitFor(() =>
+      expect(mockedRestPost).toHaveBeenCalledWith('/v1/exam-appeals', {
+        candidateResultId: 'result-1',
+        reason: 'Điểm chưa phản ánh đúng bài nói',
+      }),
+    )
   })
 
   it('hiện phân tích của AI khi giáo viên đã chấm lại', async () => {

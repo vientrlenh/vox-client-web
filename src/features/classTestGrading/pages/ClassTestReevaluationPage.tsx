@@ -4,15 +4,15 @@ import { Check, ShieldAlert, X } from 'lucide-react'
 import { useAppSelector } from '@/app/store/hooks'
 import { useExamQuery } from '@/features/examCore/api/queries'
 import {
-  ApproveDialog,
+  APPEAL_SCOPE_TEXT,
   RejectDialog,
   getAppealStatusDisplay,
-  useApproveMutation,
+  useApproveAndClaimMutation,
   useAssignMutation,
   useRejectMutation,
   type AppealSummary,
 } from '@/features/reevaluation'
-import { formatIsoDateTime, formatScore } from '@/features/grading'
+import { ActionDialog, formatIsoDateTime, formatScore } from '@/features/grading'
 import { toApiError } from '@/shared/api'
 import { Pagination } from '@/shared/components/Pagination'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -25,8 +25,9 @@ const PAGE_SIZE = 20
 /**
  * Đơn phúc khảo của MỘT bài kiểm tra trên lớp — do chính giáo viên tạo bài xử lý.
  *
- * Không có bước chọn giám khảo: bài trên lớp chỉ có một người chấm được. Duyệt xong thì
- * tự nhận, rồi chấm ở màn chấm (vòng `APPEAL`) như ba vòng còn lại.
+ * Không có bước chọn giám khảo: bài trên lớp chỉ có một người chấm được, nên duyệt là
+ * nhận chấm luôn (một endpoint, một transaction ở BE). Đơn sang thẳng màn chấm bài của
+ * giáo viên ở vòng `APPEAL`, và ở đó phải chấm lại toàn bộ bài làm.
  */
 export function ClassTestReevaluationPage() {
   const { examId = '' } = useParams()
@@ -40,7 +41,7 @@ export function ClassTestReevaluationPage() {
 
   const examQuery = useExamQuery(examId || null)
   const appealsQuery = useClassTestAppealsQuery(examId, page, PAGE_SIZE)
-  const approveMutation = useApproveMutation()
+  const approveAndClaimMutation = useApproveAndClaimMutation()
   const rejectMutation = useRejectMutation()
   const assignMutation = useAssignMutation()
 
@@ -59,8 +60,8 @@ export function ClassTestReevaluationPage() {
           {examQuery.data?.name ?? 'Bài kiểm tra trên lớp'}
         </h1>
         <p className="mt-1.5 text-xs font-medium text-slate-500">
-          Bạn duyệt hoặc từ chối đơn của học sinh lớp mình. Duyệt xong, tự nhận chấm rồi chấm lại ở
-          màn chấm bài.
+          Bạn duyệt hoặc từ chối đơn của học sinh lớp mình. Duyệt là nhận chấm luôn — đơn sang thẳng
+          màn chấm bài của bạn, và bạn chấm lại toàn bộ bài làm.
         </p>
       </div>
 
@@ -70,7 +71,7 @@ export function ClassTestReevaluationPage() {
             <thead>
               <tr className="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <th className="px-4 py-2.5">Học sinh</th>
-                <th className="px-4 py-2.5">Phần phúc khảo</th>
+                <th className="px-4 py-2.5">Phạm vi</th>
                 <th className="px-4 py-2.5 text-right">Điểm cũ</th>
                 <th className="px-4 py-2.5">Trạng thái</th>
                 <th className="px-4 py-2.5">Nộp lúc</th>
@@ -109,7 +110,7 @@ export function ClassTestReevaluationPage() {
                         ) : null}
                       </td>
                       <td className="px-4 py-3 text-[13px] font-medium text-slate-600">
-                        {appeal.partLabels.join(', ') || '—'}
+                        {APPEAL_SCOPE_TEXT}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-extrabold tabular-nums text-slate-900">
                         {formatScore(appeal.originalScore)}
@@ -128,7 +129,12 @@ export function ClassTestReevaluationPage() {
                       <td className="px-4 py-3 text-right">
                         {/* Luật trạng thái của BE: duyệt/từ chối chỉ ở PENDING, giao
                             người chấm chỉ ở APPROVED. Hiện nút sai trạng thái chỉ dẫn
-                            tới một lỗi 4xx đọc không ra. */}
+                            tới một lỗi 4xx đọc không ra.
+
+                            Nhánh APPROVED vẫn giữ nút "Nhận chấm" dù luồng mới không
+                            còn đi qua đó: nó là cách duy nhất gỡ những đơn đã nằm ở
+                            APPROVED từ trước khi deploy, và vẫn đúng khi quản trị
+                            trường duyệt đơn bài trên lớp từ màn của họ. */}
                         {appeal.status === 'PENDING' ? (
                           <div className="flex justify-end gap-2">
                             <button
@@ -137,7 +143,7 @@ export function ClassTestReevaluationPage() {
                               type="button"
                             >
                               <Check className="size-4" />
-                              Duyệt
+                              Duyệt &amp; nhận chấm
                             </button>
                             <button
                               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 text-xs font-bold text-red-700 transition hover:bg-red-50"
@@ -178,22 +184,28 @@ export function ClassTestReevaluationPage() {
       </div>
 
       {approveTarget ? (
-        <ApproveDialog
-          isPending={approveMutation.isPending}
+        <ActionDialog
+          confirmLabel="Duyệt & nhận chấm"
+          icon={<Check className="size-5" />}
+          isPending={approveAndClaimMutation.isPending}
           onCancel={() => setApproveTarget(null)}
-          onConfirm={(deadline) =>
-            approveMutation.mutate(
-              { deadline, id: approveTarget.id },
-              {
-                onError: reportError,
-                onSuccess: () => {
-                  setApproveTarget(null)
-                  setMessage('Đã duyệt đơn phúc khảo.')
-                },
+          onConfirm={() =>
+            approveAndClaimMutation.mutate(approveTarget.id, {
+              onError: reportError,
+              onSuccess: () => {
+                setApproveTarget(null)
+                setMessage('Đã duyệt và nhận chấm. Mở màn chấm bài để chấm lại toàn bài.')
               },
-            )
+            })
           }
-        />
+          subtitle={`Đơn của ${approveTarget.studentName}`}
+          title="Duyệt & nhận chấm phúc khảo"
+          tone="emerald"
+        >
+          <p className="mt-4 text-[13px] leading-relaxed text-slate-600">
+            Đơn được duyệt và giao cho bạn chấm lại ngay, hạn xử lý mặc định 3 ngày.
+          </p>
+        </ActionDialog>
       ) : null}
 
       {rejectTarget ? (

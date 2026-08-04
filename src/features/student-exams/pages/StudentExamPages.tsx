@@ -251,29 +251,26 @@ function StudentQuestionEvaluation({ item, index }: { item: ExamResultItemDto; i
   )
 }
 
+/**
+ * Không có bước chọn câu: giám khảo phúc khảo bắt buộc chấm lại toàn bộ bài
+ * (`GradingItemScoreResolver` enforceFullCoverage) rồi tính lại tổng điểm từ mọi câu,
+ * nên danh sách học sinh chọn không hề thu hẹp phạm vi chấm — chỉ tạo thao tác thừa.
+ */
 function AppealForm({
-  items,
   onClose,
   onSuccess,
   resultId,
 }: {
-  items: ExamResultItemDto[]
   onClose: () => void
   onSuccess: () => void
   resultId: string
 }) {
   const mutation = useCreateStudentAppealMutation()
-  const [selectedIds, setSelectedIds] = useState(() => new Set<string>())
   const [reason, setReason] = useState('')
-  const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   async function submit() {
     const normalizedReason = reason.trim()
-    if (selectedIds.size === 0) {
-      setError('Vui lòng chọn ít nhất một câu cần phúc khảo.')
-      return
-    }
     if (!normalizedReason) {
       setError('Vui lòng nhập lý do phúc khảo.')
       return
@@ -282,8 +279,6 @@ function AppealForm({
       setError(null)
       await mutation.mutateAsync({
         candidateResultId: resultId,
-        notes: notes.trim() || undefined,
-        paperItemIds: [...selectedIds],
         reason: normalizedReason,
       })
       onSuccess()
@@ -296,9 +291,8 @@ function AppealForm({
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4">
       <div aria-modal="true" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-5 shadow-xl" role="dialog">
         <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-extrabold text-slate-900">Gửi đơn phúc khảo</h2><button aria-label="Đóng" className="inline-flex size-9 items-center justify-center rounded-lg hover:bg-slate-100" onClick={onClose} type="button"><X className="size-4" /></button></div>
-        <fieldset className="mt-5"><legend className="text-sm font-bold text-slate-800">Câu cần phúc khảo</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{items.map((item, index) => <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700" key={item.paperItemId}><input checked={selectedIds.has(item.paperItemId)} className="size-4 accent-cyan-600" onChange={(event) => setSelectedIds((current) => { const next = new Set(current); if (event.target.checked) next.add(item.paperItemId); else next.delete(item.paperItemId); return next })} type="checkbox" />Câu {index + 1}</label>)}</div></fieldset>
+        <p className="mt-4 rounded-lg bg-slate-50 px-3.5 py-3 text-[13px] leading-relaxed text-slate-600">Đơn phúc khảo áp dụng cho <strong className="font-bold text-slate-800">toàn bộ bài làm</strong> — giám khảo sẽ chấm lại tất cả các câu.</p>
         <label className="mt-5 block text-sm font-bold text-slate-800">Lý do<span className="text-red-600"> *</span><textarea className="mt-2 min-h-28 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100" maxLength={512} onChange={(event) => setReason(event.target.value)} value={reason} /></label>
-        <label className="mt-4 block text-sm font-bold text-slate-800">Ghi chú<textarea className="mt-2 min-h-20 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100" maxLength={512} onChange={(event) => setNotes(event.target.value)} value={notes} /></label>
         {error ? <p className="mt-3 text-sm font-semibold text-red-600">{error}</p> : null}
         <div className="mt-5 flex justify-end gap-3"><button className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700" onClick={onClose} type="button">Hủy</button><button className="inline-flex h-10 items-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white hover:bg-cyan-700 disabled:opacity-60" disabled={mutation.isPending} onClick={submit} type="button"><Send className="size-4" />{mutation.isPending ? 'Đang gửi...' : 'Gửi đơn'}</button></div>
       </div>
@@ -475,7 +469,7 @@ function StudentExamResultPageCore({ title }: { title: string }) {
         </div>
       ) : null}
 
-      {appealOpen && result ? <AppealForm items={result.items} onClose={() => setAppealOpen(false)} onSuccess={() => { setAppealOpen(false); setSuccessMessage('Đã gửi đơn phúc khảo.'); window.setTimeout(() => navigate('/student/appeals'), 500) }} resultId={result.id} /> : null}
+      {appealOpen && result ? <AppealForm onClose={() => setAppealOpen(false)} onSuccess={() => { setAppealOpen(false); setSuccessMessage('Đã gửi đơn phúc khảo.'); window.setTimeout(() => navigate('/student/appeals'), 500) }} resultId={result.id} /> : null}
       <FeedbackToast message={successMessage} onClose={() => setSuccessMessage(null)} tone="success" />
     </section>
   )

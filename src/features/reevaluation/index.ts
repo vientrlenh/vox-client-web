@@ -16,6 +16,7 @@ export {
   useAppealReviewersQuery,
 } from './api/useReevaluationQueries'
 export {
+  useApproveAndClaimMutation,
   useApproveMutation,
   useAssignMutation,
   useRejectMutation,

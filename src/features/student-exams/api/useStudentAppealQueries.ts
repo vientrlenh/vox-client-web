@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, graphQLRequest } from '@/shared/api'
 
 export type StudentAppealSummary = {
@@ -95,16 +95,24 @@ export function useMyAppealQuery(id: string | null) {
   })
 }
 
+/**
+ * `paperItemIds` bỏ trống = phúc khảo toàn bài (BE tự điền mọi câu có câu trả lời).
+ * Form của học sinh không còn bước chọn câu, nhưng kiểu vẫn nhận danh sách để chỗ gọi
+ * khác — nếu sau này có — không phải đổi.
+ */
 export function useCreateStudentAppealMutation() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (input: {
       candidateResultId: string
-      paperItemIds: string[]
+      paperItemIds?: string[]
       reason: string
       notes?: string
     }) => {
       const response = await apiClient.post('/v1/exam-appeals', input)
       return response.data
     },
+    // Thiếu bước này thì danh sách đơn của học sinh không hiện đơn vừa gửi cho tới khi F5.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: studentAppealQueryKeys.all }),
   })
 }
