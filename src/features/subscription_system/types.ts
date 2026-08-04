@@ -204,6 +204,8 @@ export function formatNullableText(value?: string | null) {
   return value?.trim() ? value : '-'
 }
 
+const VN_TIMEZONE_OFFSET_MS = 7 * 60 * 60 * 1000
+
 export function daysUntil(value?: string | null) {
   if (!value) {
     return null
@@ -215,8 +217,15 @@ export function daysUntil(value?: string | null) {
     return null
   }
 
-  const diffMs = end.getTime() - Date.now()
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+  // "end" là LocalDate "yyyy-MM-dd" từ BE nên new Date() parse ra đúng UTC midnight của ngày đó.
+  // Phải quy "hôm nay" về cùng kiểu neo (UTC midnight của ngày lịch theo giờ VN) trước khi trừ —
+  // nếu trừ thẳng với Date.now() (thời điểm thực), quanh ranh giới nửa đêm giờ VN kết quả có thể
+  // lệch tới 7 tiếng so với số ngày thực tế còn lại theo lịch VN.
+  const nowVn = new Date(Date.now() + VN_TIMEZONE_OFFSET_MS)
+  const todayVnAsUtcMidnight = Date.UTC(nowVn.getUTCFullYear(), nowVn.getUTCMonth(), nowVn.getUTCDate())
+
+  const diffMs = end.getTime() - todayVnAsUtcMidnight
+  return Math.round(diffMs / (1000 * 60 * 60 * 24))
 }
 
 const EXPIRING_THRESHOLD_DAYS = 30
