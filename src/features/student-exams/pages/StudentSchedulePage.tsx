@@ -1,13 +1,12 @@
 import { CalendarDays } from 'lucide-react'
 import { useMemo } from 'react'
-import { useMyExamsQuery } from '@/features/exam-results/api/useExamResultQueries'
 import { ScheduleCalendar } from '@/shared/ui/ScheduleCalendar'
 import { StatusBadge, type StatusTone } from '@/shared/ui/StatusBadge'
 import { useStudentScheduleQuery } from '../api/useStudentScheduleQuery'
 
+// BE chỉ trả về ca PUBLISHED/COMPLETED/CANCELLED cho học sinh — ca nháp và ca đã dời đã bị lọc.
 function scheduleStatus(status: string): { label: string; tone: StatusTone } {
   switch (status) {
-    case 'ONGOING': return { label: 'Đang diễn ra', tone: 'success' }
     case 'COMPLETED': return { label: 'Đã kết thúc', tone: 'neutral' }
     case 'CANCELLED': return { label: 'Đã hủy', tone: 'danger' }
     default: return { label: 'Sắp diễn ra', tone: 'info' }
@@ -16,26 +15,23 @@ function scheduleStatus(status: string): { label: string; tone: StatusTone } {
 
 export function StudentSchedulePage() {
   const schedulesQuery = useStudentScheduleQuery()
-  const examsQuery = useMyExamsQuery()
-  const examById = useMemo(() => new Map((examsQuery.data ?? []).map((exam) => [exam.id, exam])), [examsQuery.data])
   const events = useMemo(() => (schedulesQuery.data ?? []).map((schedule) => {
-    const exam = examById.get(schedule.examId)
     const status = scheduleStatus(schedule.status)
-    const kind = exam?.kind === 'CLASS_TEST' ? 'Bài tập' : 'Bài kiểm tra'
+    const isClassTest = schedule.exam?.kind === 'CLASS_TEST'
     return {
       id: schedule.id,
-      title: exam?.title ?? `Kỳ thi ${schedule.examId}`,
+      title: schedule.exam?.name ?? `Kỳ thi ${schedule.examId}`,
       startDate: schedule.startDate,
       endDate: schedule.endDate,
       roomLabel: schedule.room?.name,
       badges: (
         <>
-          <StatusBadge label={kind} tone={exam?.kind === 'CLASS_TEST' ? 'violet' : 'info'} />
+          <StatusBadge label={isClassTest ? 'Bài tập' : 'Bài kiểm tra'} tone={isClassTest ? 'violet' : 'info'} />
           <StatusBadge label={status.label} tone={status.tone} />
         </>
       ),
     }
-  }), [examById, schedulesQuery.data])
+  }), [schedulesQuery.data])
 
   return (
     <section className="mx-auto max-w-220">
@@ -46,7 +42,7 @@ export function StudentSchedulePage() {
           <p className="mt-1 text-sm text-slate-500">Các ca thi và bài tập đã được xếp cho bạn.</p>
         </div>
       </div>
-      {schedulesQuery.isLoading || examsQuery.isLoading ? (
+      {schedulesQuery.isLoading ? (
         <div className="mt-5 border-y border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">Đang tải lịch thi...</div>
       ) : (
         <ScheduleCalendar

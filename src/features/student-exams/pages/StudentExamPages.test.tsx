@@ -4,10 +4,11 @@ import { Route, Routes } from 'react-router'
 import { apiClient } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { StudentClassTestResultPage } from './StudentExamPages'
+import { StudentClassTestResultPage, StudentClassTestsPage, StudentExamsPage } from './StudentExamPages'
 
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
 const mockedRestPost = jest.spyOn(apiClient, 'post')
+const mockedRestGet = jest.spyOn(apiClient, 'get')
 
 type GraphQLBody = { query: string; variables: Record<string, unknown> }
 
@@ -236,5 +237,107 @@ describe('StudentClassTestResultPage', () => {
     expect(screen.getByText('AI: còn ngập ngừng ở đoạn giữa')).toBeInTheDocument()
     // Điểm tiêu chí vẫn là của giáo viên.
     expect(screen.getByText('GV: trôi chảy')).toBeInTheDocument()
+  })
+})
+
+function examSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    attemptsUsed: 0,
+    canEnter: false,
+    description: null,
+    duration: 45,
+    entryMessage: null,
+    examDate: '2026-09-01T01:00:00Z',
+    id: 'exam-1',
+    kind: 'CENTRALIZED',
+    maxAttempt: 1,
+    requiresOtp: false,
+    sessions: [],
+    status: 'upcoming',
+    subject: 'CENTRALIZED',
+    title: 'Kỳ thi cuối kỳ',
+    ...overrides,
+  }
+}
+
+function mockExamPage(content: Array<Record<string, unknown>>, totalElements = content.length) {
+  mockedRestGet.mockResolvedValue({
+    data: {
+      data: { content, page: 0, size: 20, totalElements, totalPages: Math.max(1, Math.ceil(totalElements / 20)) },
+      message: 'ok',
+    },
+  } as never)
+}
+
+/**
+ * BE đã đổi `GET /v1/exams` sang PageResult và nhận `kind`/`status`/`page`: hai màn này phải gọi
+ * đúng tham số thay vì tải hết rồi lọc trong bộ nhớ.
+ */
+describe('StudentExamsPageCore', () => {
+  beforeEach(() => {
+    mockedRestGet.mockReset()
+  })
+
+  it('gọi API kèm kind của từng màn, trang đầu là 0 ở server', async () => {
+    mockExamPage([examSummary()])
+
+    renderWithProviders(<StudentExamsPage />)
+
+    await waitFor(() =>
+      expect(mockedRestGet).toHaveBeenCalledWith('/v1/exams', {
+        params: { kind: 'CENTRALIZED', page: 0, size: 20, status: undefined },
+      }),
+    )
+    expect(await screen.findByText('Kỳ thi cuối kỳ')).toBeInTheDocument()
+  })
+
+  it('màn bài tập gọi API với kind CLASS_TEST', async () => {
+    mockExamPage([examSummary({ kind: 'CLASS_TEST', title: 'Bài tập tuần 3' })])
+
+    renderWithProviders(<StudentClassTestsPage />)
+
+    await waitFor(() =>
+      expect(mockedRestGet).toHaveBeenCalledWith('/v1/exams', {
+        params: { kind: 'CLASS_TEST', page: 0, size: 20, status: undefined },
+      }),
+    )
+  })
+
+  it('bấm chip trạng thái thì lọc ở server và quay về trang đầu', async () => {
+    mockExamPage([examSummary()])
+    renderWithProviders(<StudentExamsPage />)
+    await screen.findByText('Kỳ thi cuối kỳ')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Đã kết thúc' }))
+
+    await waitFor(() =>
+      expect(mockedRestGet).toHaveBeenCalledWith('/v1/exams', {
+        params: { kind: 'CENTRALIZED', page: 0, size: 20, status: 'completed' },
+      }),
+    )
+  })
+
+  it('chuyển trang gửi page 0-based xuống server', async () => {
+    mockExamPage([examSummary()], 45)
+    renderWithProviders(<StudentExamsPage />)
+    await screen.findByText('Kỳ thi cuối kỳ')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Trang tiếp theo' }))
+
+    await waitFor(() =>
+      expect(mockedRestGet).toHaveBeenCalledWith('/v1/exams', {
+        params: { kind: 'CENTRALIZED', page: 1, size: 20, status: undefined },
+      }),
+    )
+  })
+
+  it('tổng bài thi lấy từ totalElements chứ không phải số dòng của trang', async () => {
+    mockExamPage([examSummary()], 45)
+
+    renderWithProviders(<StudentExamsPage />)
+
+    // "Tổng bài thi" xuất hiện cả ở thẻ số lẫn dòng tổng của thanh phân trang — lấy thẻ số.
+    const [statLabel] = await screen.findAllByText('Tổng bài thi')
+    expect(statLabel.closest('.rounded-2xl')).toHaveTextContent('45')
   })
 })

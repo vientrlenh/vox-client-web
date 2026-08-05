@@ -10,8 +10,11 @@ import {
   getHiddenResultNotice,
   getStudentExamStatusDisplay,
   type ExamResultItemDto,
+  type StudentExamKind,
   type StudentExamSessionSummaryDto,
+  type StudentExamStatusFilter,
 } from '@/features/exam-results/types'
+import { Pagination } from '@/shared/components/Pagination'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { formatPublishedResult } from '@/shared/lib/resultScore'
 import { StatCard } from '@/shared/ui/StatCard'
@@ -20,7 +23,14 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { toApiError } from '@/shared/api'
 import { useCreateStudentAppealMutation } from '../api/useStudentAppealQueries'
 
-type StudentExamKind = 'CENTRALIZED' | 'CLASS_TEST'
+const PAGE_SIZE = 20
+
+const STATUS_FILTERS: Array<{ label: string; value: StudentExamStatusFilter | '' }> = [
+  { label: 'Tất cả', value: '' },
+  { label: getStudentExamStatusDisplay('upcoming').label, value: 'upcoming' },
+  { label: getStudentExamStatusDisplay('in_progress').label, value: 'in_progress' },
+  { label: getStudentExamStatusDisplay('completed').label, value: 'completed' },
+]
 
 function formatDate(value?: string | null) {
   if (!value) {
@@ -91,11 +101,16 @@ function StudentExamsPageCore({
   title: string
 }) {
   const navigate = useNavigate()
-  const examsQuery = useMyExamsQuery()
+  const [page, setPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState<StudentExamStatusFilter | ''>('')
+  const examsQuery = useMyExamsQuery({ kind, page, size: PAGE_SIZE, status: statusFilter })
   const [expandedExamIds, setExpandedExamIds] = useState<Record<string, boolean>>({})
-  const exams = useMemo(() => (examsQuery.data ?? []).filter((exam) => exam.kind === kind), [examsQuery.data, kind])
-  const completedCount = exams.filter((exam) => exam.status === 'completed').length
-  const attemptCount = exams.reduce((sum, exam) => sum + exam.sessions.length, 0)
+  const exams = examsQuery.data?.content ?? []
+
+  function changeStatusFilter(value: StudentExamStatusFilter | '') {
+    setStatusFilter(value)
+    setPage(1)
+  }
 
   if (examsQuery.isLoading) {
     return (
@@ -116,10 +131,33 @@ function StudentExamsPageCore({
         </p>
       </div>
 
+      {/* Chỉ còn một số đếm: hai thẻ cũ ("Đã kết thúc", "Tổng lượt đã tạo") gộp từ dữ liệu trong
+          bộ nhớ nên khi phân trang chúng chỉ đếm được trang hiện tại. Số bài đã kết thúc giờ xem
+          bằng cách bấm chip lọc tương ứng. */}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <StatCard icon={<BookOpenCheck size={19} />} iconTone="indigo" label="Tổng bài thi" value={exams.length} />
-        <StatCard icon={<Clock3 size={19} />} iconTone="amber" label="Đã kết thúc" value={completedCount} />
-        <StatCard icon={<Target size={19} />} iconTone="emerald" label="Tổng lượt đã tạo" value={attemptCount} />
+        <StatCard
+          icon={<BookOpenCheck size={19} />}
+          iconTone="indigo"
+          label="Tổng bài thi"
+          value={examsQuery.data?.totalElements ?? 0}
+        />
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {STATUS_FILTERS.map((filter) => (
+          <button
+            className={`inline-flex h-9 items-center rounded-full border px-4 text-xs font-bold transition ${
+              statusFilter === filter.value
+                ? 'border-indigo-600 bg-indigo-600 text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+            key={filter.value || 'all'}
+            onClick={() => changeStatusFilter(filter.value)}
+            type="button"
+          >
+            {filter.label}
+          </button>
+        ))}
       </div>
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -131,7 +169,9 @@ function StudentExamsPageCore({
         </div>
 
         {exams.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-slate-400">Chưa có bài thi nào được giao cho bạn.</div>
+          <div className="px-4 py-8 text-center text-sm text-slate-400">
+            {statusFilter ? 'Không có bài thi nào ở trạng thái này.' : 'Chưa có bài thi nào được giao cho bạn.'}
+          </div>
         ) : (
           exams.map((exam) => {
             const statusDisplay = getStudentExamStatusDisplay(exam.status)
@@ -196,6 +236,16 @@ function StudentExamsPageCore({
             )
           })
         )}
+
+        {examsQuery.data ? (
+          <Pagination
+            currentPage={examsQuery.data.page}
+            itemName="bài thi"
+            onPageChange={setPage}
+            totalElements={examsQuery.data.totalElements}
+            totalPages={examsQuery.data.totalPages}
+          />
+        ) : null}
       </div>
     </section>
   )

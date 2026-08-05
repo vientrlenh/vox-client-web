@@ -5,7 +5,9 @@ import type {
   ExamCandidateResultDto,
   ExamItemEvaluationDto,
   ExamValidityDto,
-  StudentExamSummaryDto,
+  StudentExamKind,
+  StudentExamPage,
+  StudentExamStatusFilter,
   WordFeedbackDto,
 } from '../types'
 
@@ -176,19 +178,35 @@ const EXAM_ITEM_RESPONSE_EVALUATION_QUERY = `
 export const examResultQueryKeys = {
   all: ['exam-results'] as const,
   evaluation: (answerId: string | null) => [...examResultQueryKeys.all, 'evaluation', answerId] as const,
-  myExams: () => [...examResultQueryKeys.all, 'my-exams'] as const,
+  myExams: (filters: StudentExamFilters) => [...examResultQueryKeys.all, 'my-exams', filters] as const,
   session: (sessionId: string | null) => [...examResultQueryKeys.all, 'session', sessionId] as const,
 }
 
-export async function fetchMyExams() {
-  const response = await apiClient.get<ApiEnvelope<StudentExamSummaryDto[]>>('/v1/exams')
+export type StudentExamFilters = {
+  kind: StudentExamKind
+  page: number
+  size: number
+  status?: StudentExamStatusFilter | ''
+}
+
+export async function fetchMyExams(filters: StudentExamFilters) {
+  // Phân trang 0-based ở server, UI 1-based: -1 khi query, +1 ở `select`.
+  const response = await apiClient.get<ApiEnvelope<StudentExamPage>>('/v1/exams', {
+    params: {
+      kind: filters.kind,
+      page: filters.page - 1,
+      size: filters.size,
+      status: filters.status || undefined,
+    },
+  })
   return response.data.data
 }
 
-export function useMyExamsQuery() {
+export function useMyExamsQuery(filters: StudentExamFilters) {
   return useQuery({
-    queryFn: fetchMyExams,
-    queryKey: examResultQueryKeys.myExams(),
+    queryFn: () => fetchMyExams(filters),
+    queryKey: examResultQueryKeys.myExams(filters),
+    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 

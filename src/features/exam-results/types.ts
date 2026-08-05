@@ -25,6 +25,19 @@ export type StudentExamSessionSummaryDto = {
   status: string
 }
 
+export type StudentExamKind = 'CENTRALIZED' | 'CLASS_TEST'
+
+/** Đúng bộ giá trị mà BE suy ra cho `status` của mỗi bài thi — dùng luôn làm bộ lọc. */
+export type StudentExamStatusFilter = 'completed' | 'in_progress' | 'upcoming'
+
+export type StudentExamPage = {
+  content: StudentExamSummaryDto[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
 export type ExamResultSectionDto = {
   score: number
   sectionId: string
