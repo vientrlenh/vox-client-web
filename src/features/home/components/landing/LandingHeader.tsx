@@ -36,7 +36,7 @@ export function LandingHeader() {
               className="inline-flex min-h-11 items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-indigo-700 shadow-xl shadow-cyan-500/20 transition hover:-translate-y-0.5 hover:shadow-cyan-500/30"
               to={routeLinks.register}
             >
-              Dùng thử miễn phí
+              Đăng ký
             </Link>
           </div>
 
@@ -82,7 +82,7 @@ export function LandingHeader() {
                 onClick={() => setIsMenuOpen(false)}
                 to={routeLinks.register}
               >
-                Dùng thử miễn phí
+                Đăng ký
               </Link>
             </div>
           </div>

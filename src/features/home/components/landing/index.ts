@@ -1,3 +1,4 @@
+export { AIPlansSection } from './AIPlansSection'
 export { AudienceSection } from './AudienceSection'
 export { BenefitSection } from './BenefitSection'
 export { CTASection } from './CTASection'
