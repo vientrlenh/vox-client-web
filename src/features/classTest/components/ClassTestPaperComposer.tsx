@@ -431,6 +431,7 @@ export function ClassTestPaperComposer({ examId, onClose, onCreated }: ClassTest
             .flatMap((section) => section.questions.map((question) => question.id))}
           onClose={() => setPickerForSectionKey(null)}
           onSelect={(question) => addQuestionToSection(pickerSection.key, question)}
+          questionDetailBasePath="/teacher"
           scope="teacher"
           selectedQuestionIds={pickerSection.questions.map((question) => question.id)}
         />

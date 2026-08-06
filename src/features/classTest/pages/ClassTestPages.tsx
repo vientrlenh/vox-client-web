@@ -2214,6 +2214,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           }
           onClose={() => setPickerMode(null)}
           onSelect={(question) => void handlePickQuestion(question)}
+          questionDetailBasePath={roleBasePath}
           scope="teacher"
           selectedQuestionIds={
             pickerMode.kind === 'existing'

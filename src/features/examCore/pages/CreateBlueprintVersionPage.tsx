@@ -574,6 +574,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
           onClose={() => setPickerForSlotKey(null)}
           onSelect={(question) => handleSelectFixedQuestion(activeSlot.section.key, activeSlot.slot.key, question)}
           publishedOnly
+          questionDetailBasePath={basePath.replace(/\/blueprints$/, '')}
           scope="teacher"
           selectedQuestionIds={activeSlot.slot.fixedQuestion ? [activeSlot.slot.fixedQuestion.id] : []}
         />

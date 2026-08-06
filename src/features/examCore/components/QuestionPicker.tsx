@@ -14,6 +14,8 @@ import {
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 
 type QuestionPickerProps = {
+  /** Tiền tố route theo vai trò hiện tại (VD: "/teacher", "/school-admin") — dùng để mở đúng trang chi tiết câu hỏi. */
+  questionDetailBasePath: string
   excludeQuestionIds?: string[]
   /** Tiêu chí của ô SELECTION trong blueprint — lọc sẵn danh sách cho người ra đề. */
   initialQuestionTopicId?: string | null
@@ -28,6 +30,7 @@ type QuestionPickerProps = {
 const PAGE_SIZE = 8
 
 export function QuestionPicker({
+  questionDetailBasePath,
   excludeQuestionIds = [],
   initialQuestionTopicId = null,
   initialType = null,
@@ -186,7 +189,7 @@ export function QuestionPicker({
                     <a
                       aria-label={`Xem chi tiết ${question.code}`}
                       className="inline-flex size-8 shrink-0 items-center justify-center self-start rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                      href={`/teacher/questions/${question.id}`}
+                      href={`${questionDetailBasePath}/questions/${question.id}`}
                       onClick={(event) => event.stopPropagation()}
                       rel="noopener noreferrer"
                       target="_blank"

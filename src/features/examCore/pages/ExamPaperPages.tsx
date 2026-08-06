@@ -488,6 +488,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
               .catch((error) => setErrorMessage(toApiError(error).message))
           }}
           publishedOnly={exam?.kind === 'CENTRALIZED' || Boolean(pickerCurrentItem?.slotType)}
+          questionDetailBasePath={canManage ? '/teacher' : '/school-admin'}
           scope="teacher"
           selectedQuestionIds={pickerCurrentItem?.questionId ? [pickerCurrentItem.questionId] : []}
         />
