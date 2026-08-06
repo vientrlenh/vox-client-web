@@ -46,6 +46,22 @@ describe('fetchExamPickerOptions', () => {
     expect(bodyOf().variables.status).toBe('RESULTS_PUBLISHED')
   })
 
+  /**
+   * Bỏ trống `kind` là server trả cả kỳ thi tập trung lẫn bài kiểm tra trên lớp — màn
+   * phân công chấm bài của nhà trường vì thế từng liệt kê cả bài trên lớp mà gán không được.
+   */
+  it('passes the exam kind through so a picker can show one kind only', async () => {
+    await fetchExamPickerOptions({ kind: 'CENTRALIZED', page: 1, size: 8 })
+
+    expect(bodyOf().variables.kind).toBe('CENTRALIZED')
+  })
+
+  it('sends a null kind when the caller does not narrow by kind', async () => {
+    await fetchExamPickerOptions({ page: 1, size: 8 })
+
+    expect(bodyOf().variables.kind).toBeNull()
+  })
+
   it('asks only for the light fields a picker needs', async () => {
     await fetchExamPickerOptions({ page: 1, size: 8 })
 

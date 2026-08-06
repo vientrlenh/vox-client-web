@@ -7,7 +7,8 @@ type SubmitGradingDialogProps = {
   isPending?: boolean
   onCancel: () => void
   onConfirm: () => void
-  partCount: number
+  // Số CÂU sẽ được nộp — một phần thi có thể gồm nhiều câu.
+  questionCount: number
   resultBandName?: string | null
   resultCode: string
   roundType: GradingRoundType
@@ -42,7 +43,7 @@ export function SubmitGradingDialog({
   isPending,
   onCancel,
   onConfirm,
-  partCount,
+  questionCount,
   resultBandName,
   resultCode,
   roundType,
@@ -61,7 +62,7 @@ export function SubmitGradingDialog({
       onConfirm={onConfirm}
       subtitle={
         <>
-          Bài <b className="text-slate-700">#{resultCode}</b> · {partCount} phần thi
+          Bài <b className="text-slate-700">#{resultCode}</b> · {questionCount} câu
         </>
       }
       title="Nộp điểm &amp; chốt kết quả"

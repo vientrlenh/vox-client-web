@@ -1,5 +1,21 @@
 import type { StatusTone } from '@/shared/ui/StatusBadge'
-import type { ExamDto, ExamStatus, ResultDecisionMethod } from '@/features/examCore/types'
+import type {
+  ExamDto,
+  ExamStatus,
+  ExamStreamType,
+  ExamStreamTypePermission,
+  ResultDecisionMethod,
+} from '@/features/examCore/types'
+
+// Bài kiểm tra trên lớp đi qua đúng validator stream của server như kỳ thi tập trung
+// (ExamStreamConfigResolver), nên dùng chung một mô hình ở `examCore` thay vì tự khai lại.
+export {
+  EXAM_STREAM_SETUP_PAYLOAD,
+  EXAM_STREAM_SETUPS,
+  type ExamStreamSetup,
+  type ExamStreamType,
+  type ExamStreamTypePermission,
+} from '@/features/examCore/types'
 
 export type ClassTestSectionQuestionInput = {
   questionId: string
@@ -13,21 +29,39 @@ export type ClassTestSectionInput = {
   weight?: number | null
 }
 
+/**
+ * Chỉ là "vỏ" bài kiểm tra: soạn đề (câu hỏi trực tiếp / blueprint / sao chép) là bước riêng ở
+ * trang chi tiết, qua `POST /v1/exams/:examId/papers` — giống hệt kỳ thi tập trung.
+ */
 export type CreateClassTestRequest = {
   assessmentPolicyId?: string | null
   closeAt?: string | null
+  /** Giá trị enum của BE (`STUDENT_DEVICE` | `LAB`), không phải alias `DEVICE` dùng trong UI. */
+  deliveryMode?: 'LAB' | 'STUDENT_DEVICE' | null
   description?: string | null
-  existingBlueprintId?: string | null
-  existingBlueprintVersionId?: string | null
   maxAttempt?: number | null
   name: string
   openAt?: string | null
+  /**
+   * Bắt buộc (không optional) dù server chấp nhận null, y hệt `CreateExamRequest`: cấu hình giám
+   * sát không sửa được sau khi tạo, và bỏ trống nghĩa là học sinh KHÔNG vào thi được nếu ứng dụng
+   * thi vẫn xin stream token.
+   *
+   * <p>Đừng gán trực tiếp: dùng {@link EXAM_STREAM_SETUP_PAYLOAD}.
+   */
+  requiredStreamTypes: ExamStreamType[] | null
+  requiresOtp?: boolean | null
   resultDecisionMethod?: ResultDecisionMethod | null
-  sections?: ClassTestSectionInput[] | null
+  /** Có thể bỏ trống lúc tạo rồi chọn sau ở tab Xếp lịch, nhưng phải có trước khi lên lịch. */
+  schoolRoomId?: string | null
   schoolClassId: string
+  /** Chỉ có tác dụng khi `requiredStreamTypes` gồm cả CAMERA lẫn SCREEN. */
+  streamTypePermission: ExamStreamTypePermission | null
 }
 
 export type UpdateClassTestQuestionsRequest = {
+  /** Mã đề được thay toàn bộ nội dung. Bỏ trống chỉ hợp lệ khi bài có đúng một mã đề. */
+  paperId?: string | null
   sections: ClassTestSectionInput[]
 }
 
@@ -39,7 +73,6 @@ export type ChangeClassTestBlueprintRequest = {
 export type CreateClassTestResponse = {
   candidateCount: number
   exam: ExamDto
-  paperId: string
 }
 
 export function getClassTestStatusDisplay(status?: ExamStatus | string | null): { tone: StatusTone; label: string } {
@@ -53,7 +86,7 @@ export function getClassTestStatusDisplay(status?: ExamStatus | string | null): 
     case 'CLOSED':
       return { tone: 'neutral', label: 'Đã đóng' }
     case 'RESULTS_PUBLISHED':
-      return { tone: 'success', label: 'Đã trả điểm' }
+      return { tone: 'success', label: 'Đã chốt kết quả' }
     case 'CANCELLED':
       return { tone: 'danger', label: 'Đã hủy' }
     default:

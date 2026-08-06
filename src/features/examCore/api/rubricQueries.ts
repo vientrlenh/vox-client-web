@@ -1,7 +1,7 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { graphQLRequest, requireSchoolId } from '@/shared/api'
 import type { Paged, RubricDto } from '../types'
-import { examQueryKeys } from './queries'
+import { examReferenceQueryKeys } from './queries'
 
 const RUBRIC_VERSION_FIELDS = `
   id
@@ -52,10 +52,16 @@ async function fetchSchoolRubricsWithPublishedVersions(filters: { keyword?: stri
   return data.searchSchoolRubrics.content.map((rubric) => ({ ...rubric, versions: rubric.versions.content }))
 }
 
-export function useSchoolRubricsWithPublishedVersionsQuery(filters: { keyword?: string; languageId?: string | null }) {
+// `options.enabled` cho phép component dùng chung gọi cả hai scope (school/teacher) mà chỉ một
+// scope thực sự bắn request — query school-admin sẽ 403 nếu chạy dưới token giáo viên.
+export function useSchoolRubricsWithPublishedVersionsQuery(
+  filters: { keyword?: string; languageId?: string | null },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
+    enabled: options?.enabled ?? true,
     queryFn: () => fetchSchoolRubricsWithPublishedVersions(filters),
-    queryKey: [...examQueryKeys.all, 'school-rubrics-published', filters],
+    queryKey: [...examReferenceQueryKeys.all, 'school-rubrics-published', filters],
   })
 }
 
@@ -89,10 +95,14 @@ async function fetchTeacherRubrics(filters: { keyword?: string; languageId?: str
 }
 
 // Teacher scope: BE infers schoolId from the token, so no schoolId argument here (unlike the school-admin query above).
-export function useTeacherRubricsQuery(filters: { keyword?: string; languageId?: string | null }) {
+export function useTeacherRubricsQuery(
+  filters: { keyword?: string; languageId?: string | null },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
+    enabled: options?.enabled ?? true,
     queryFn: () => fetchTeacherRubrics(filters),
-    queryKey: [...examQueryKeys.all, 'teacher-rubrics', filters],
+    queryKey: [...examReferenceQueryKeys.all, 'teacher-rubrics', filters],
   })
 }
 
@@ -121,7 +131,7 @@ export function useTeacherRubricVersionsQueries(rubricIds: string[]) {
   return useQueries({
     queries: rubricIds.map((rubricId) => ({
       queryFn: () => fetchTeacherRubricVersions(rubricId),
-      queryKey: [...examQueryKeys.all, 'teacher-rubric-versions', rubricId],
+      queryKey: [...examReferenceQueryKeys.all, 'teacher-rubric-versions', rubricId],
     })),
   })
 }

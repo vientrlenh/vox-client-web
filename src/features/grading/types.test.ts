@@ -1,16 +1,20 @@
 import {
   clampToCriterion,
+  countSections,
   describeReclaimResult,
+  formatAttemptLabel,
   formatScore,
   formatScoreDelta,
   getResultStatusDisplay,
   getRoundTypeDisplay,
   isEveryRequiredCriterionFilled,
+  itemLabel,
   localDateTimeToIso,
   stepForCriterion,
   suggestedRoundFor,
   type GradingCriterionMeta,
   type GradingTaskDetail,
+  type GradingTaskItem,
 } from './types'
 
 function criterion(overrides: Partial<GradingCriterionMeta> = {}): GradingCriterionMeta {
@@ -19,6 +23,21 @@ function criterion(overrides: Partial<GradingCriterionMeta> = {}): GradingCriter
     maxScore: 9,
     minScore: 0,
     required: true,
+    ...overrides,
+  }
+}
+
+function item(overrides: Partial<GradingTaskItem> = {}): GradingTaskItem {
+  return {
+    aiMarkedInvalid: false,
+    aiRequiresHumanReview: false,
+    aiRequiresRetake: false,
+    aiScores: [],
+    currentScores: [],
+    orderInSection: 1,
+    paperItemId: 'p1',
+    responseId: 'r1',
+    turns: [],
     ...overrides,
   }
 }
@@ -51,6 +70,8 @@ describe('grading helpers', () => {
       allowedOutcomes: ['UPHELD', 'REGRADED', 'INVALIDATED'],
       assignmentId: 'a1',
       assignmentStatus: 'ASSIGNED',
+      attemptCount: 1,
+      attemptNo: 1,
       candidateResultId: 'cr1',
       criteria: [
         criterion({ id: 'c1', required: true }),
@@ -62,8 +83,8 @@ describe('grading helpers', () => {
       flagReason: null,
       flagged: false,
       items: [
-        { currentScores: [], paperItemId: 'p1', responseId: 'r1', turns: [] },
-        { currentScores: [], paperItemId: 'p2', responseId: 'r2', turns: [] },
+        item({ paperItemId: 'p1', responseId: 'r1' }),
+        item({ paperItemId: 'p2', responseId: 'r2' }),
       ],
       overdue: false,
       resultCode: 'A2041F3C',
@@ -91,11 +112,73 @@ describe('grading helpers', () => {
     })
   })
 
+  describe('itemLabel', () => {
+    it('đánh số câu khi một phần thi có nhiều câu', () => {
+      // Chính là ca gây bug: hai câu cùng Part 1 từng hiện hai tab đều tên "Part 1".
+      const items = [
+        item({ orderInSection: 1, paperItemId: 'p1', partLabel: 'Part 1', sectionId: 's1' }),
+        item({ orderInSection: 2, paperItemId: 'p2', partLabel: 'Part 1', sectionId: 's1' }),
+        item({ orderInSection: 1, paperItemId: 'p3', partLabel: 'Part 2', sectionId: 's2' }),
+      ]
+
+      expect(items.map((one) => itemLabel(one, items))).toEqual([
+        'Part 1 · Câu 1',
+        'Part 1 · Câu 2',
+        'Part 2',
+      ])
+    })
+
+    it('không gộp hai phần thi trùng tiêu đề', () => {
+      // Gộp theo tên sẽ đánh số xuyên qua ranh giới phần; phải gộp theo sectionId.
+      const items = [
+        item({ orderInSection: 1, paperItemId: 'p1', partLabel: 'Part 1', sectionId: 's1' }),
+        item({ orderInSection: 1, paperItemId: 'p2', partLabel: 'Part 1', sectionId: 's2' }),
+      ]
+
+      expect(items.map((one) => itemLabel(one, items))).toEqual(['Part 1', 'Part 1'])
+    })
+
+    it('lùi về "Phần N" khi bài không có tiêu đề section', () => {
+      const items = [
+        item({ paperItemId: 'p1', partLabel: null }),
+        item({ paperItemId: 'p2', partLabel: null }),
+      ]
+
+      expect(items.map((one) => itemLabel(one, items))).toEqual(['Phần 1', 'Phần 2'])
+    })
+  })
+
+  describe('countSections', () => {
+    it('đếm phần thi chứ không đếm câu', () => {
+      expect(
+        countSections([
+          item({ paperItemId: 'p1', sectionId: 's1' }),
+          item({ paperItemId: 'p2', sectionId: 's1' }),
+          item({ paperItemId: 'p3', sectionId: 's2' }),
+        ]),
+      ).toBe(2)
+    })
+  })
+
   describe('formatScore', () => {
     it('formats whole numbers with one decimal and drops trailing zeroes', () => {
       expect(formatScore(6)).toBe('6.0')
       expect(formatScore(6.75)).toBe('6.75')
       expect(formatScore(null)).toBe('—')
+    })
+  })
+
+  describe('formatAttemptLabel', () => {
+    it('names which attempt a row belongs to when the student retook the exam', () => {
+      expect(formatAttemptLabel(2, 2)).toBe('Lượt 2/2')
+      expect(formatAttemptLabel(1, 3)).toBe('Lượt 1/3')
+    })
+
+    /** Gắn "Lượt 1/1" lên mọi dòng là thêm nhiễu vào đúng chỗ cần nhìn nhanh. */
+    it('is null for a single attempt or when the count is missing', () => {
+      expect(formatAttemptLabel(1, 1)).toBeNull()
+      expect(formatAttemptLabel(1, null)).toBeNull()
+      expect(formatAttemptLabel(null, 2)).toBeNull()
     })
   })
 

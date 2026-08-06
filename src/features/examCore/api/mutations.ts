@@ -369,6 +369,14 @@ export function useAssignCandidateScheduleMutation() {
   })
 }
 
+export function useRemoveExamCandidateMutation() {
+  return useMutation({
+    mutationFn: async ({ candidateId, examId }: { candidateId: string; examId: string }) => {
+      await apiClient.delete<ApiResponse<void>>(`/v1/exams/${examId}/candidates/${candidateId}`)
+    },
+  })
+}
+
 export function useApplyPaperAssignmentsMutation() {
   return useMutation({
     mutationFn: async ({

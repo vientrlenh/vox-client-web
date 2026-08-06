@@ -1,5 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
+import {
+  parseJsonField,
+  type ExamEvaluationSignalsDto,
+  type ExamValidityDto,
+} from '@/shared/lib/aiEvaluation'
+import type { WordFeedback } from '@/shared/ui/WordFeedbackText'
+import type { ExamKind } from '@/features/examCore/types'
 import type {
   AiQualityReport,
   AssignableTeacher,
@@ -11,8 +18,22 @@ import type {
   GradingStats,
   GradingTask,
   GradingTaskDetail,
+  GradingTaskItem,
+  GradingTurn,
   ResultStatusHistoryEntry,
 } from '../types'
+
+/** Hình dạng thô trên dây: mấy trường JSON còn là chuỗi. */
+type RawGradingTaskDetail = Omit<GradingTaskDetail, 'items'> & {
+  items: (Omit<GradingTaskItem, 'aiSignals' | 'aiValidity' | 'turns'> & {
+    aiSignals?: string | null
+    aiValidity?: string | null
+    turns: (Omit<GradingTurn, 'pronunciationOverall' | 'wordFeedback'> & {
+      pronunciationOverall?: string | null
+      wordFeedback?: string | null
+    })[]
+  })[]
+}
 
 const CRITERION_SCORE_FIELDS = `
   criterionId
@@ -30,6 +51,10 @@ const TURN_FIELDS = `
   audioUrl
   transcript
   durationSeconds
+  wordCount
+  asrConfidence
+  pronunciationOverall
+  wordFeedback
 `
 
 const GRADING_ASSIGNMENTS_QUERY = `
@@ -44,6 +69,7 @@ const GRADING_ASSIGNMENTS_QUERY = `
     $overdueOnly: Boolean
     $hasOpenAppeal: Boolean
     $search: String
+    $kind: ExamKind
     $page: Int
     $size: Int
   ) {
@@ -58,6 +84,7 @@ const GRADING_ASSIGNMENTS_QUERY = `
       overdueOnly: $overdueOnly
       hasOpenAppeal: $hasOpenAppeal
       search: $search
+      kind: $kind
       page: $page
       size: $size
     ) {
@@ -81,6 +108,9 @@ const GRADING_ASSIGNMENTS_QUERY = `
         deadlineAt
         overdue
         hasOpenAppeal
+        sessionId
+        attemptNo
+        attemptCount
       }
       page
       size
@@ -91,8 +121,8 @@ const GRADING_ASSIGNMENTS_QUERY = `
 `
 
 const GRADING_STATS_QUERY = `
-  query GradingStats($examId: ID, $scheduleId: ID) {
-    gradingStats(examId: $examId, scheduleId: $scheduleId) {
+  query GradingStats($examId: ID, $scheduleId: ID, $kind: ExamKind) {
+    gradingStats(examId: $examId, scheduleId: $scheduleId, kind: $kind) {
       total
       byResultStatus {
         status
@@ -112,6 +142,16 @@ const GRADING_STATS_QUERY = `
   }
 `
 
+/**
+ * Hàng đợi kỳ thi TẬP TRUNG — cố ý KHÔNG hỏi `studentName`/`className`.
+ *
+ * BE cũng không trả (chỉ bài kiểm tra trên lớp mới có), nên đây là tầng phòng thủ thứ
+ * hai chứ không phải điều kiện đủ. Bài trên lớp dùng query riêng ở
+ * `features/classTestGrading`.
+ *
+ * Không có tham số `kind`: BE khoá cứng hàng đợi này ở kỳ thi tập trung, không nhận lựa
+ * chọn từ client.
+ */
 const MY_GRADING_TASKS_QUERY = `
   query MyGradingTasks(
     $status: GradingAssignmentStatus
@@ -134,6 +174,9 @@ const MY_GRADING_TASKS_QUERY = `
         assignedAt
         deadlineAt
         overdue
+        sessionId
+        attemptNo
+        attemptCount
       }
       page
       size
@@ -142,10 +185,6 @@ const MY_GRADING_TASKS_QUERY = `
     }
   }
 `
-
-const MY_CLASS_TEST_GRADING_TASKS_QUERY = MY_GRADING_TASKS_QUERY
-  .replace('query MyGradingTasks(', 'query MyClassTestGradingTasks($examId: ID!,')
-  .replace('myGradingTasks(', 'myClassTestGradingTasks(examId: $examId,')
 
 const GRADING_TASK_DETAIL_QUERY = `
   query GradingTaskDetail($assignmentId: ID!) {
@@ -170,10 +209,21 @@ const GRADING_TASK_DETAIL_QUERY = `
         paperItemId
         responseId
         partLabel
+        sectionId
+        orderInSection
         currentItemScore
         currentFeedbackSummary
         currentScores { ${CRITERION_SCORE_FIELDS} }
         turns { ${TURN_FIELDS} }
+        aiScores { ${CRITERION_SCORE_FIELDS} }
+        aiOverallConfidence
+        aiFeedbackSummary
+        aiRequiresHumanReview
+        aiReviewReasonCode
+        aiMarkedInvalid
+        aiRequiresRetake
+        aiSignals
+        aiValidity
       }
       criteria {
         id
@@ -185,6 +235,11 @@ const GRADING_TASK_DETAIL_QUERY = `
         weight
         required
       }
+      studentName
+      className
+      sessionId
+      attemptNo
+      attemptCount
     }
   }
 `
@@ -241,6 +296,11 @@ const AI_QUALITY_REPORT_QUERY = `
 export type FetchGradingAssignmentsInput = {
   examId?: string
   hasOpenAppeal?: boolean
+  /**
+   * Bỏ trống là BE hiểu CENTRALIZED. Màn theo dõi chấm bài kiểm tra trên lớp phải
+   * truyền `CLASS_TEST` tường minh.
+   */
+  kind?: ExamKind
   overdueOnly?: boolean
   page: number
   resultStatus?: '' | ExamCandidateResultStatus
@@ -254,7 +314,6 @@ export type FetchGradingAssignmentsInput = {
 }
 
 export type FetchMyGradingTasksInput = {
-  examId?: string
   page: number
   roundType?: '' | GradingRoundType
   size: number
@@ -263,6 +322,8 @@ export type FetchMyGradingTasksInput = {
 
 export type FetchGradingStatsInput = {
   examId?: string
+  /** Cùng luật với `FetchGradingAssignmentsInput.kind` — bảng và thẻ số phải cùng một tập. */
+  kind?: ExamKind
   scheduleId?: string
 }
 
@@ -292,6 +353,7 @@ export async function fetchGradingAssignments(input: FetchGradingAssignmentsInpu
     // Ba cờ boolean chỉ gửi khi BẬT: gửi `false` là một bộ lọc khác hẳn với "không lọc"
     // ở `hasOpenAppeal` (false = chỉ bài KHÔNG có đơn đang mở).
     hasOpenAppeal: input.hasOpenAppeal ? true : undefined,
+    kind: input.kind || undefined,
     overdueOnly: input.overdueOnly ? true : undefined,
     page: input.page,
     resultStatus: input.resultStatus || undefined,
@@ -309,28 +371,13 @@ export async function fetchGradingAssignments(input: FetchGradingAssignmentsInpu
 export async function fetchGradingStats(input: FetchGradingStatsInput) {
   const data = await graphQLRequest<{ gradingStats: GradingStats }>(GRADING_STATS_QUERY, {
     examId: input.examId || undefined,
+    kind: input.kind || undefined,
     scheduleId: input.scheduleId || undefined,
   })
   return data.gradingStats
 }
 
 export async function fetchMyGradingTasks(input: FetchMyGradingTasksInput) {
-  if (input.examId) {
-    const data = await graphQLRequest<{
-      myClassTestGradingTasks: GradingPage<GradingTask>
-    }>(
-      MY_CLASS_TEST_GRADING_TASKS_QUERY,
-      {
-        examId: input.examId,
-        page: input.page,
-        roundType: input.roundType || undefined,
-        size: input.size,
-        status: input.status || undefined,
-      },
-    )
-    return data.myClassTestGradingTasks
-  }
-
   const data = await graphQLRequest<{ myGradingTasks: GradingPage<GradingTask> }>(
     MY_GRADING_TASKS_QUERY,
     {
@@ -343,12 +390,30 @@ export async function fetchMyGradingTasks(input: FetchMyGradingTasksInput) {
   return data.myGradingTasks
 }
 
-export async function fetchGradingTaskDetail(assignmentId: string) {
-  const data = await graphQLRequest<{ gradingTaskDetail: GradingTaskDetail }>(
+/**
+ * BE trả signals/validity/wordFeedback dưới dạng chuỗi JSON (cùng quy ước với
+ * `examItemResponseEvaluation`), nên parse ngay tại tầng fetch — component không phải
+ * biết là dữ liệu từng đi qua dây dưới dạng chuỗi.
+ */
+export async function fetchGradingTaskDetail(assignmentId: string): Promise<GradingTaskDetail> {
+  const data = await graphQLRequest<{ gradingTaskDetail: RawGradingTaskDetail }>(
     GRADING_TASK_DETAIL_QUERY,
     { assignmentId },
   )
-  return data.gradingTaskDetail
+  const detail = data.gradingTaskDetail
+  return {
+    ...detail,
+    items: detail.items.map((item) => ({
+      ...item,
+      aiSignals: parseJsonField<ExamEvaluationSignalsDto>(item.aiSignals),
+      aiValidity: parseJsonField<ExamValidityDto>(item.aiValidity),
+      turns: item.turns.map((turn) => ({
+        ...turn,
+        pronunciationOverall: parseJsonField(turn.pronunciationOverall),
+        wordFeedback: parseJsonField<WordFeedback[]>(turn.wordFeedback),
+      })),
+    })),
+  }
 }
 
 export async function fetchAssignableTeachers(search?: string) {
@@ -391,6 +456,7 @@ export function useGradingAssignmentsQuery(
 export function useGradingStatsQuery(options?: FetchGradingStatsInput) {
   const input: FetchGradingStatsInput = {
     examId: options?.examId,
+    kind: options?.kind,
     scheduleId: options?.scheduleId,
   }
   return useQuery({

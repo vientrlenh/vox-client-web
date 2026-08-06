@@ -1,3 +1,4 @@
+import { Bot } from 'lucide-react'
 import {
   clampToCriterion,
   formatScore,
@@ -6,6 +7,9 @@ import {
 } from '../types'
 
 type CriterionScoreCardProps = {
+  // Lập luận của AI cho ĐÚNG tiêu chí này. Lấy từ bản AI nên còn nguyên ở vòng phúc
+  // khảo, khác `currentValue` vốn nhảy sang bản chấm tay sau lần nộp đầu.
+  aiRationale?: string | null
   criterion: GradingCriterionMeta
   currentValue: number | null
   onChange: (value: number | null) => void
@@ -18,6 +22,7 @@ type CriterionScoreCardProps = {
  * (`minScore`/`maxScore`) — KHÔNG hardcode 0–9, mỗi trường một thang khác nhau.
  */
 export function CriterionScoreCard({
+  aiRationale,
   criterion,
   currentValue,
   onChange,
@@ -95,6 +100,15 @@ export function CriterionScoreCard({
           Bản chấm hiện tại {formatScore(currentValue)}
         </span>
       </div>
+      {aiRationale ? (
+        <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-violet-700">
+            <Bot className="size-3.5" />
+            Nhận xét của AI
+          </div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-violet-900">{aiRationale}</p>
+        </div>
+      ) : null}
     </div>
   )
 }

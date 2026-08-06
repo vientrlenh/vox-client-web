@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { Check, X } from 'lucide-react'
+import { AlertTriangle, Check } from 'lucide-react'
 import type {
   CreateFrameworkRequest,
   Framework,
@@ -16,21 +16,19 @@ type FrameworkFormDialogProps = {
   isSubmitting: boolean
   mode: FrameworkFormMode
   onClose: () => void
-  onCreate: (payload: CreateFrameworkRequest, isActive: boolean) => void
+  onCreate: (payload: CreateFrameworkRequest) => void
   onUpdate: (id: string, payload: UpdateFrameworkRequest) => void
 }
 
 type FormState = {
   code: string
   description: string
-  isActive: boolean
   name: string
 }
 
 const emptyForm: FormState = {
   code: '',
   description: '',
-  isActive: false,
   name: '',
 }
 
@@ -42,7 +40,6 @@ function createFormState(framework: Framework | null): FormState {
   return {
     code: '',
     description: framework.description ?? '',
-    isActive: framework.isActive,
     name: framework.name,
   }
 }
@@ -51,7 +48,6 @@ function trimFormState(state: FormState): FormState {
   return {
     code: state.code.trim().toUpperCase(),
     description: state.description.trim(),
-    isActive: state.isActive,
     name: state.name.trim(),
   }
 }
@@ -98,7 +94,12 @@ export function FrameworkFormDialog({
 }: FrameworkFormDialogProps) {
   const [form, setForm] = useState<FormState>(() => createFormState(framework))
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [showCancelWarning, setShowCancelWarning] = useState(false)
   const isEditMode = mode === 'edit'
+  const initialForm = createFormState(framework)
+  const hasChanges = (Object.keys(form) as Array<keyof FormState>).some(
+    (field) => form[field] !== initialForm[field],
+  )
 
   if (!isOpen) {
     return null
@@ -110,6 +111,20 @@ export function FrameworkFormDialog({
       [name]: value,
     }))
     setFieldErrors((current) => ({ ...current, [name]: undefined }))
+  }
+
+  function handleCancel() {
+    if (hasChanges) {
+      setShowCancelWarning(true)
+      return
+    }
+
+    onClose()
+  }
+
+  function handleDiscardChanges() {
+    setShowCancelWarning(false)
+    onClose()
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -137,10 +152,7 @@ export function FrameworkFormDialog({
       return
     }
 
-    onCreate(
-      { code: values.code, description, name: values.name },
-      values.isActive,
-    )
+    onCreate({ code: values.code, description, name: values.name })
   }
 
   const title = isEditMode ? 'Cập nhật khung đánh giá năng lực' : 'Tạo khung đánh giá năng lực'
@@ -157,7 +169,7 @@ export function FrameworkFormDialog({
         className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
         role="dialog"
       >
-        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+        <header className="border-b border-slate-200 px-6 py-5">
           <div className="min-w-0">
             <h2
               className="text-lg font-black text-blue-950"
@@ -169,15 +181,6 @@ export function FrameworkFormDialog({
               {description}
             </p>
           </div>
-          <button
-            aria-label="Đóng biểu mẫu khung đánh giá năng lực"
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-            onClick={onClose}
-            type="button"
-          >
-            <X aria-hidden="true" className="size-4" />
-          </button>
         </header>
 
         <div className="min-h-0 overflow-y-auto px-6 py-5">
@@ -246,28 +249,6 @@ export function FrameworkFormDialog({
               ) : null}
             </label>
 
-            {!isEditMode ? (
-              <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
-                <span className="min-w-0">
-                  <span className="block text-sm font-black text-blue-950">
-                    Đang hoạt động
-                  </span>
-                  <span className="mt-1 block text-xs font-medium text-slate-500">
-                    Khung đánh giá năng lực không hoạt động sẽ không xuất hiện trong đánh giá.
-                  </span>
-                </span>
-                <input
-                  aria-label="Trạng thái đang hoạt động"
-                  checked={form.isActive}
-                  className="size-5 accent-indigo-600"
-                  disabled={isSubmitting}
-                  onChange={(event) =>
-                    updateField('isActive', event.target.checked)
-                  }
-                  type="checkbox"
-                />
-              </label>
-            ) : null}
 
             {errorMessage ? (
               <div
@@ -282,7 +263,7 @@ export function FrameworkFormDialog({
               <button
                 className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isSubmitting}
-                onClick={onClose}
+                onClick={handleCancel}
                 type="button"
               >
                 Hủy
@@ -299,6 +280,55 @@ export function FrameworkFormDialog({
           </form>
         </div>
       </section>
+
+      {showCancelWarning ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 px-4">
+          <section
+            aria-describedby="cancel-warning-description"
+            aria-labelledby="cancel-warning-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl"
+            role="alertdialog"
+          >
+            <div className="flex items-start gap-4">
+              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <AlertTriangle aria-hidden="true" className="size-5" />
+              </span>
+              <div>
+                <h3
+                  className="text-lg font-black text-blue-950"
+                  id="cancel-warning-title"
+                >
+                  Hủy các thay đổi?
+                </h3>
+                <p
+                  className="mt-2 text-sm font-medium text-slate-600"
+                  id="cancel-warning-description"
+                >
+                  Những thay đổi bạn đã thực hiện chưa được lưu và sẽ bị mất.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => setShowCancelWarning(false)}
+                type="button"
+              >
+                Tiếp tục chỉnh sửa
+              </button>
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 focus:ring-4 focus:ring-red-100"
+                onClick={handleDiscardChanges}
+                type="button"
+              >
+                Hủy thay đổi
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

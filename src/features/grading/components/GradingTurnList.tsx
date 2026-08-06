@@ -1,4 +1,5 @@
 import { MessageSquare, Mic } from 'lucide-react'
+import { WordFeedbackText } from '@/shared/ui/WordFeedbackText'
 import { formatDuration, type GradingTurn } from '../types'
 
 type GradingTurnListProps = {
@@ -54,10 +55,16 @@ export function GradingTurnList({ turns }: GradingTurnListProps) {
             </div>
           )}
 
-          {turn.transcript ? (
-            <p className="mt-2.5 rounded-lg bg-white px-3 py-2 text-[12.5px] leading-relaxed text-slate-600">
-              {turn.transcript}
-            </p>
+          {/* Chip từng chữ thay cho transcript thuần: bấm vào một từ đỏ là ra chi tiết
+              phoneme, tức giáo viên nghe được AI trừ điểm phát âm ở đâu thay vì chỉ
+              thấy con số tổng. Không có word feedback thì component tự lùi về transcript. */}
+          {turn.transcript || turn.wordFeedback?.length ? (
+            <div className="mt-2.5 rounded-lg bg-white px-3 py-2.5">
+              <WordFeedbackText
+                fallbackTranscript={turn.transcript}
+                words={turn.wordFeedback ?? []}
+              />
+            </div>
           ) : null}
         </div>
       ))}

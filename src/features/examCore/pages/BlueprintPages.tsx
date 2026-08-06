@@ -173,7 +173,7 @@ function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
         </button>
       ) : (
         <p className="mt-5 text-[13px] text-slate-400">
-          Giáo viên tạo blueprint mới ngay trong lúc gắn vào kỳ thi (tab Blueprint của kỳ thi bạn là AUTHOR).
+          Giáo viên tạo blueprint mới ngay trong lúc gắn vào kỳ thi (tab Blueprint của kỳ thi bạn là người ra đề).
         </p>
       )}
 

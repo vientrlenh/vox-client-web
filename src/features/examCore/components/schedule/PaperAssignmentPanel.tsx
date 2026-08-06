@@ -58,6 +58,8 @@ function computeAssignments(
 }
 
 type PaperAssignmentPanelProps = {
+  // Chỉ CHAIR/quản trị trường mới phân đề được (khớp rule backend); vai trò khác chỉ xem bảng.
+  canManage: boolean
   candidates: ExamCandidateDto[]
   examId: string
   onApplied?: () => void
@@ -65,7 +67,14 @@ type PaperAssignmentPanelProps = {
   schedules: ExamScheduleDto[]
 }
 
-export function PaperAssignmentPanel({ candidates, examId, onApplied, papers, schedules }: PaperAssignmentPanelProps) {
+export function PaperAssignmentPanel({
+  canManage,
+  candidates,
+  examId,
+  onApplied,
+  papers,
+  schedules,
+}: PaperAssignmentPanelProps) {
   const lockedPapers = useMemo(() => papers.filter((paper) => paper.status === 'LOCKED'), [papers])
   const bySchedule = schedules.length > 0
   const eligibleCandidates = useMemo(
@@ -180,25 +189,27 @@ export function PaperAssignmentPanel({ candidates, examId, onApplied, papers, sc
           <p className="text-[13px] text-slate-500">
             {filteredCandidates.length}/{sortedCandidates.length} học sinh · chọn mã đề để chỉnh tay
           </p>
-          <div className="flex gap-2">
-            <button
-              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-              onClick={handleShuffle}
-              type="button"
-            >
-              <RefreshCw aria-hidden="true" className="size-3.5" />
-              Chạy lại
-            </button>
-            <button
-              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
-              disabled={applyMutation.isPending}
-              onClick={() => void handleApply()}
-              type="button"
-            >
-              <Check aria-hidden="true" className="size-3.5" />
-              Áp dụng phân đề
-            </button>
-          </div>
+          {canManage ? (
+            <div className="flex gap-2">
+              <button
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                onClick={handleShuffle}
+                type="button"
+              >
+                <RefreshCw aria-hidden="true" className="size-3.5" />
+                Chạy lại
+              </button>
+              <button
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                disabled={applyMutation.isPending}
+                onClick={() => void handleApply()}
+                type="button"
+              >
+                <Check aria-hidden="true" className="size-3.5" />
+                Áp dụng phân đề
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {applied ? (
@@ -251,7 +262,8 @@ export function PaperAssignmentPanel({ candidates, examId, onApplied, papers, sc
                 <div className="flex items-center gap-2 justify-self-start">
                   <span className={['size-2.5 rounded-full', color ? color.dot : 'bg-slate-300'].join(' ')} />
                   <select
-                    className="h-8 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400"
+                    className="h-8 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={!canManage}
                     onChange={(event) => handleSelectPaper(candidate.id, event.target.value)}
                     value={paperId ?? ''}
                   >

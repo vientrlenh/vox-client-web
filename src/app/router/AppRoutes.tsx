@@ -492,11 +492,22 @@ const SchoolAdminGradingPage = lazy(() =>
 const TeacherGradingPage = lazy(() =>
   import("@/features/grading").then((m) => ({ default: m.TeacherGradingPage })),
 );
-const TeacherClassTestGradingPage = lazy(() =>
-  import("@/features/grading").then((m) => ({ default: m.TeacherClassTestGradingPage })),
+// Chấm bài kiểm tra trên lớp là feature RIÊNG: giáo viên tạo bài chấm hết, thấy tên học
+// sinh, và mọi điều hướng bám theo :examId thay vì hàng đợi toàn trường.
+const ClassTestGradingListPage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestGradingListPage })),
 );
-const SchoolAdminClassTestGradingPage = lazy(() =>
-  import("@/features/grading").then((m) => ({ default: m.SchoolAdminClassTestGradingPage })),
+const ClassTestGradingQueuePage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestGradingQueuePage })),
+);
+const ClassTestGradingTaskPage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestGradingTaskPage })),
+);
+const ClassTestGradingBoardPage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestGradingBoardPage })),
+);
+const ClassTestReevaluationPage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestReevaluationPage })),
 );
 const TeacherGradingTaskPage = lazy(() =>
   import("@/features/grading").then((m) => ({ default: m.TeacherGradingTaskPage })),
@@ -969,7 +980,7 @@ export function AppRoutes() {
             <Route path="school-admin/class-tests/:examId/results/:sessionId" element={<SchoolAdminClassTestResultDetailPage />} />
             <Route path="school-admin/class-tests/:examId/results" element={<SchoolAdminClassTestResultsListPage />} />
             <Route path="school-admin/class-tests/:examId/papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
-            <Route path="school-admin/class-tests/:examId/grading" element={<SchoolAdminClassTestGradingPage />} />
+            <Route path="school-admin/class-tests/:examId/grading" element={<ClassTestGradingBoardPage />} />
             <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
             <Route path="school-admin/exam-papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
@@ -1099,7 +1110,11 @@ export function AppRoutes() {
             <Route path="teacher/class-tests/:examId/results/:sessionId" element={<TeacherClassTestResultDetailPage />} />
             <Route path="teacher/class-tests/:examId/results" element={<TeacherClassTestResultsListPage />} />
             <Route path="teacher/class-tests/:examId/papers/:paperId" element={<TeacherExamPaperEditPage />} />
-            <Route path="teacher/class-tests/:examId/grading" element={<TeacherClassTestGradingPage />} />
+            <Route path="teacher/class-test-grading" element={<ClassTestGradingListPage />} />
+            {/* Đặt route con TRƯỚC route cha: react-router v7 khớp theo thứ tự khai báo. */}
+            <Route path="teacher/class-tests/:examId/grading/:assignmentId" element={<ClassTestGradingTaskPage />} />
+            <Route path="teacher/class-tests/:examId/grading" element={<ClassTestGradingQueuePage />} />
+            <Route path="teacher/class-tests/:examId/reevaluation" element={<ClassTestReevaluationPage />} />
             <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
             <Route path="teacher/exam-papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
             <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />

@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { Check, X } from 'lucide-react'
+import { AlertTriangle, Check } from 'lucide-react'
 import type { UpdateFrameworkVersionRequest } from '../types'
 
 type FrameworkVersionEditFormDialogProps = {
@@ -12,7 +12,7 @@ type FrameworkVersionEditFormDialogProps = {
   onSubmit: (payload: UpdateFrameworkVersionRequest) => void
 }
 
-function toDateInputValue(value?: string | null) {
+function toDateTimeInputValue(value?: string | null) {
   if (!value) {
     return ''
   }
@@ -23,7 +23,9 @@ function toDateInputValue(value?: string | null) {
     return ''
   }
 
-  return date.toISOString().slice(0, 10)
+  const pad = (n: number) => String(n).padStart(2, '0')
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 export function FrameworkVersionEditFormDialog({
@@ -40,17 +42,38 @@ export function FrameworkVersionEditFormDialog({
     initialValues.description ?? '',
   )
   const [effectiveFrom, setEffectiveFrom] = useState(
-    toDateInputValue(initialValues.effectiveFrom),
+    toDateTimeInputValue(initialValues.effectiveFrom),
   )
   const [effectiveTo, setEffectiveTo] = useState(
-    toDateInputValue(initialValues.effectiveTo),
+    toDateTimeInputValue(initialValues.effectiveTo),
   )
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<'code' | 'effectiveFrom' | 'effectiveTo' | 'name', string>>
   >({})
+  const [showCancelWarning, setShowCancelWarning] = useState(false)
+  const hasChanges =
+    code !== initialValues.code ||
+    name !== initialValues.name ||
+    description !== (initialValues.description ?? '') ||
+    effectiveFrom !== toDateTimeInputValue(initialValues.effectiveFrom) ||
+    effectiveTo !== toDateTimeInputValue(initialValues.effectiveTo)
 
   if (!isOpen) {
     return null
+  }
+
+  function handleCancel() {
+    if (hasChanges) {
+      setShowCancelWarning(true)
+      return
+    }
+
+    onClose()
+  }
+
+  function handleDiscardChanges() {
+    setShowCancelWarning(false)
+    onClose()
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -100,22 +123,13 @@ export function FrameworkVersionEditFormDialog({
         className="flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
         role="dialog"
       >
-        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+        <header className="border-b border-slate-200 px-6 py-5">
           <h2
             className="text-lg font-black text-blue-950"
             id="framework-version-edit-form-title"
           >
             Sửa phiên bản
           </h2>
-          <button
-            aria-label="Đóng biểu mẫu phiên bản"
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-            onClick={onClose}
-            type="button"
-          >
-            <X aria-hidden="true" className="size-4" />
-          </button>
         </header>
 
         <div className="min-h-0 overflow-y-auto px-6 py-5">
@@ -173,7 +187,7 @@ export function FrameworkVersionEditFormDialog({
             </label>
 
             <label className="grid gap-2 text-sm font-bold text-blue-950">
-              <span className="whitespace-nowrap">Ngày hiệu lực bắt đầu <span className="text-red-500">*</span></span>
+              <span className="whitespace-nowrap">Thời điểm hiệu lực bắt đầu <span className="text-red-500">*</span></span>
               <input
                 className={`h-11 rounded-lg border px-3 text-sm font-medium text-blue-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50 ${fieldErrors.effectiveFrom ? 'border-red-500' : 'border-slate-200'}`}
                 disabled={isSubmitting}
@@ -185,7 +199,7 @@ export function FrameworkVersionEditFormDialog({
                   }))
                 }}
                 required
-                type="date"
+                type="datetime-local"
                 value={effectiveFrom}
               />
               {fieldErrors.effectiveFrom ? (
@@ -196,7 +210,7 @@ export function FrameworkVersionEditFormDialog({
             </label>
 
             <label className="grid gap-2 text-sm font-bold text-blue-950">
-              Ngày hiệu lực kết thúc
+              Thời điểm hiệu lực kết thúc
               <input
                 className={`h-11 rounded-lg border px-3 text-sm font-medium text-blue-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50 ${fieldErrors.effectiveTo ? 'border-red-500' : 'border-slate-200'}`}
                 disabled={isSubmitting}
@@ -207,7 +221,7 @@ export function FrameworkVersionEditFormDialog({
                     effectiveTo: undefined,
                   }))
                 }}
-                type="date"
+                type="datetime-local"
                 value={effectiveTo}
               />
               {fieldErrors.effectiveTo ? (
@@ -230,7 +244,7 @@ export function FrameworkVersionEditFormDialog({
               <button
                 className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isSubmitting}
-                onClick={onClose}
+                onClick={handleCancel}
                 type="button"
               >
                 Hủy
@@ -247,6 +261,55 @@ export function FrameworkVersionEditFormDialog({
           </form>
         </div>
       </section>
+
+      {showCancelWarning ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 px-4">
+          <section
+            aria-describedby="framework-version-cancel-warning-description"
+            aria-labelledby="framework-version-cancel-warning-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl"
+            role="alertdialog"
+          >
+            <div className="flex items-start gap-4">
+              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <AlertTriangle aria-hidden="true" className="size-5" />
+              </span>
+              <div>
+                <h3
+                  className="text-lg font-black text-blue-950"
+                  id="framework-version-cancel-warning-title"
+                >
+                  Hủy các thay đổi?
+                </h3>
+                <p
+                  className="mt-2 text-sm font-medium text-slate-600"
+                  id="framework-version-cancel-warning-description"
+                >
+                  Những thay đổi bạn đã thực hiện chưa được lưu và sẽ bị mất.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => setShowCancelWarning(false)}
+                type="button"
+              >
+                Tiếp tục chỉnh sửa
+              </button>
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 focus:ring-4 focus:ring-red-100"
+                onClick={handleDiscardChanges}
+                type="button"
+              >
+                Hủy thay đổi
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }
