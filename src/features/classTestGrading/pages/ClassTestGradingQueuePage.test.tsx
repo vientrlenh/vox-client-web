@@ -1,12 +1,18 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
+import { setAuthenticatedUser } from '@/app/store/authSlice'
+import { configureAppStore } from '@/app/store/store'
+import { apiClient } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { GradingAssignmentRow, GradingTask } from '@/features/grading'
 import { ClassTestGradingQueuePage } from './ClassTestGradingQueuePage'
 
+const TEACHER_ID = '6f1b8a2e-2c4d-4f9a-9b3e-1d7c5a8e0f42'
+
 const mockedPost = jest.spyOn(graphqlApiClient, 'post')
+const mockedGet = jest.spyOn(apiClient, 'get')
 
 function task(overrides: Partial<GradingTask> = {}): GradingTask {
   return {
@@ -95,12 +101,29 @@ function givenData(rows: GradingAssignmentRow[], tasks: GradingTask[] = []) {
   })
 }
 
-function renderPage() {
+/**
+ * `signedIn` bơm sẵn giáo viên đang đăng nhập: nút xuất Excel đọc `state.auth.user.userId`
+ * để lọc "bài tôi đang chấm", và store mặc định của test là ẩn danh.
+ */
+function renderPage({ signedIn = false }: { signedIn?: boolean } = {}) {
+  const store = configureAppStore()
+  if (signedIn) {
+    store.dispatch(
+      setAuthenticatedUser({
+        email: 'gv@example.com',
+        // Hết hạn nằm ở tương lai, nếu không reducer tự đá về trạng thái ẩn danh.
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        roles: ['TEACHER'],
+        schoolId: 's1',
+        userId: TEACHER_ID,
+      }),
+    )
+  }
   renderWithProviders(
     <Routes>
       <Route element={<ClassTestGradingQueuePage />} path="/teacher/class-tests/:examId/grading" />
     </Routes>,
-    { route: '/teacher/class-tests/e1/grading' },
+    { route: '/teacher/class-tests/e1/grading', store },
   )
 }
 
@@ -197,5 +220,70 @@ describe('ClassTestGradingQueuePage', () => {
 
     expect(await screen.findByText('Trần Quang Thiên')).toBeInTheDocument()
     expect(screen.queryByText('Lê Văn Việt')).not.toBeInTheDocument()
+  })
+
+  describe('xuất bảng điểm Excel', () => {
+    beforeEach(() => {
+      mockedGet.mockReset()
+      mockedGet.mockResolvedValue({ data: new Blob(['xlsx']), headers: {} } as never)
+      URL.createObjectURL = jest.fn(() => 'blob:fake')
+      URL.revokeObjectURL = jest.fn()
+      jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    })
+
+    async function exportParams() {
+      await waitFor(() => expect(mockedGet).toHaveBeenCalled())
+      const call = mockedGet.mock.calls.find(([url]) => String(url).includes('/export/excel'))
+      return (call?.[1] as { params: Record<string, unknown> }).params
+    }
+
+    /**
+     * Không gửi `kind` thì BE hiểu là kỳ thi TẬP TRUNG và giáo viên tải về một file rỗng —
+     * đây là chốt chặn duy nhất giữ nút này đúng loại bài.
+     */
+    it('gửi kind CLASS_TEST kèm đúng bài kiểm tra', async () => {
+      givenData([result()])
+      renderPage()
+
+      await screen.findByText('Trần Quang Thiên')
+      await userEvent.click(screen.getByRole('button', { name: /Xuất Excel/ }))
+
+      expect(await exportParams()).toMatchObject({ examId: 'e1', kind: 'CLASS_TEST' })
+    })
+
+    /** Nhãn nút nói "bài tôi đang chấm" thì file cũng phải chỉ có bài của người đó. */
+    it('kèm teacherId khi đang xem chế độ Bài tôi đang chấm', async () => {
+      givenData([result({ studentName: 'Lê Văn Việt' })], [task()])
+      renderPage({ signedIn: true })
+
+      await screen.findByText('Lê Văn Việt')
+      await userEvent.click(screen.getByRole('tab', { name: 'Bài tôi đang chấm' }))
+      await screen.findByText('Trần Quang Thiên')
+      await userEvent.click(screen.getByRole('button', { name: /Xuất Excel/ }))
+
+      expect(await exportParams()).toMatchObject({ teacherId: TEACHER_ID })
+    })
+
+    /** Chế độ "Tất cả bài" là bảng điểm cả lớp — kèm teacherId là cắt mất dữ liệu. */
+    it('không kèm teacherId ở chế độ Tất cả bài', async () => {
+      givenData([result()])
+      renderPage()
+
+      await screen.findByText('Trần Quang Thiên')
+      await userEvent.click(screen.getByRole('button', { name: /Xuất Excel/ }))
+
+      expect((await exportParams()).teacherId).toBeUndefined()
+    })
+
+    it('mang theo bộ lọc "chỉ bài chưa nhận chấm" đang bật', async () => {
+      givenData([result()])
+      renderPage()
+
+      await screen.findByText('Trần Quang Thiên')
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Chỉ bài chưa nhận chấm' }))
+      await userEvent.click(screen.getByRole('button', { name: /Xuất Excel/ }))
+
+      expect(await exportParams()).toMatchObject({ unassignedOnly: true })
+    })
   })
 })

@@ -297,6 +297,7 @@ function StudentQuestionEvaluation({ item, index }: { item: ExamResultItemDto; i
       open={open}
       questionCode={`Câu ${index + 1}`}
       questionText={prompt ?? (open && evaluationQuery.isLoading ? 'Đang tải chi tiết câu hỏi...' : undefined)}
+      variant="student"
     />
   )
 }

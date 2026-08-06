@@ -1,6 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { CircleCheck, ClipboardList, Lock, Mic, TimerReset, UserPlus } from 'lucide-react'
+import {
+  CircleCheck,
+  ClipboardList,
+  FileSpreadsheet,
+  Lock,
+  Mic,
+  TimerReset,
+  UserPlus,
+} from 'lucide-react'
+import { useAppSelector } from '@/app/store/hooks'
 import { useExamQuery } from '@/features/examCore/api/queries'
 import {
   FinalizeExamDialog,
@@ -11,6 +20,7 @@ import {
   getResultStatusDisplay,
   initials,
   avatarClasses,
+  useExportExamScoresExcelMutation,
   useFinalizeExamResultsMutation,
   useFinalizePreviewQuery,
   type GradingAssignmentRow,
@@ -126,6 +136,8 @@ export function ClassTestGradingQueuePage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const currentUserId = useAppSelector((state) => state.auth.user?.userId)
+
   const examQuery = useExamQuery(examId || null)
   const resultsQuery = useClassTestGradingResultsQuery(examId, page, PAGE_SIZE, { unassignedOnly })
   const tasksQuery = useClassTestGradingTasksQuery(examId, page, PAGE_SIZE, { roundType, status })
@@ -133,6 +145,7 @@ export function ClassTestGradingQueuePage() {
   const finalizePreviewQuery = useFinalizePreviewQuery(finalizeOpen && examId ? examId : null)
   const claimMutation = useClaimClassTestGradingMutation()
   const finalizeMutation = useFinalizeExamResultsMutation()
+  const exportExcelMutation = useExportExamScoresExcelMutation()
 
   const activeQuery = mode === 'all' ? resultsQuery : tasksQuery
   const pageData = activeQuery.data
@@ -182,6 +195,31 @@ export function ClassTestGradingQueuePage() {
     )
   }
 
+  /**
+   * File xuất ra bám theo chế độ đang xem, không phải lúc nào cũng là toàn bộ bài.
+   *
+   * `kind: 'CLASS_TEST'` là bắt buộc: bỏ trống thì BE hiểu là kỳ thi tập trung và file về
+   * rỗng. Ở chế độ "Bài tôi đang chấm" phải kèm `teacherId` — không có nó thì nhãn nút nói
+   * một đằng còn file lại là bảng điểm của cả lớp.
+   */
+  function doExportExcel() {
+    exportExcelMutation.mutate(
+      {
+        assignmentStatus: mode === 'mine' ? status : '',
+        examId,
+        examName: examQuery.data?.name,
+        kind: 'CLASS_TEST',
+        roundType: mode === 'mine' ? roundType : '',
+        teacherId: mode === 'mine' ? currentUserId : undefined,
+        unassignedOnly: mode === 'all' && unassignedOnly,
+      },
+      {
+        onError: reportError,
+        onSuccess: () => setMessage('Đã tải bảng điểm Excel.'),
+      },
+    )
+  }
+
   function doFinalize(releasePendingWithAiScores: boolean) {
     finalizeMutation.mutate(
       { examId, releasePendingWithAiScores },
@@ -220,6 +258,15 @@ export function ClassTestGradingQueuePage() {
           >
             <UserPlus className="size-4" />
             Nhận chấm
+          </button>
+          <button
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-[13px] font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+            disabled={!examId || exportExcelMutation.isPending}
+            onClick={doExportExcel}
+            type="button"
+          >
+            <FileSpreadsheet className="size-4" />
+            {exportExcelMutation.isPending ? 'Đang xuất…' : 'Xuất Excel'}
           </button>
           <button
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-amber-600 px-4 text-[13px] font-bold text-white transition hover:bg-amber-700"
