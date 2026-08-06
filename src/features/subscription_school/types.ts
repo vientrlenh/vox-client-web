@@ -105,12 +105,10 @@ export type InvoicePage = {
   totalPages: number
 }
 
-export type PaymentLink = {
-  invoiceId: string
-  orderCode: number
-  paymentLinkId: string
-  checkoutUrl: string
-}
+// Hình dạng của link thanh toán do @/shared/payment định nghĩa vì cả subscription_school và
+// subscription_system đều dùng chung, và vì cách mở trang thanh toán (redirect hay POST form) có
+// ràng buộc chữ ký không được phép mỗi nơi tự hiểu một kiểu.
+export type { PaymentLink, PaymentMethod } from '@/shared/payment/types'
 
 export type TokenTopUpState = Record<QuotaType, number>
 

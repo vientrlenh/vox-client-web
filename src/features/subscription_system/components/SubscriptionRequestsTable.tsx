@@ -57,7 +57,7 @@ export function SubscriptionRequestsTable({
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-left">
+          <table className="w-full min-w-225 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold text-blue-950">
                 <th className="px-6 py-3.5">Trường</th>
@@ -133,7 +133,7 @@ export function SubscriptionRequestsTable({
                                 type="button"
                               >
                                 <CreditCard aria-hidden="true" className="size-3.5" />
-                                Thanh toán PayOS
+                                Thanh toán
                               </button>
                               <button
                                 className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"

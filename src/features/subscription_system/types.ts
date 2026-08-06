@@ -148,12 +148,9 @@ export type MutationResult<TData> = {
   message: string
 }
 
-export type PaymentLink = {
-  invoiceId: string
-  orderCode: number
-  paymentLinkId: string
-  checkoutUrl: string
-}
+// Xem ghi chú ở subscription_school/types.ts — hình dạng link thanh toán dùng chung cho cả hai
+// feature nên được định nghĩa một chỗ duy nhất.
+export type { PaymentLink, PaymentMethod } from '@/shared/payment/types'
 
 export function formatVnd(value?: number | null) {
   const amount = Number(value) || 0

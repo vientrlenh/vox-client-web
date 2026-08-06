@@ -91,7 +91,7 @@ export function MyPlanCard({
           type="button"
         >
           <RefreshCw aria-hidden="true" className="size-4" />
-          {isRenewing ? 'Đang chuyển đến PayOS...' : 'Gia hạn'}
+          {isRenewing ? 'Đang chuyển đến cổng thanh toán...' : 'Gia hạn'}
         </button>
         {isActive && !isCancelled ? (
           <button
