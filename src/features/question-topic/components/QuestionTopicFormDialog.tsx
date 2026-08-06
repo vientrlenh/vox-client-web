@@ -141,7 +141,7 @@ export function QuestionTopicFormDialog({
               ) : null}
 
               <Field
-                label="Ten chu de"
+                label="Tên chủ đề"
                 onChange={(value) => {
                   setForm((current) => ({ ...current, name: value }))
                   setValidationMessage(null)
@@ -151,7 +151,7 @@ export function QuestionTopicFormDialog({
               />
 
               <label className="grid gap-2 text-sm font-bold text-slate-700">
-                Mo ta
+                Mô tả
                 <textarea
                   className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   disabled={isSubmitting}
@@ -187,7 +187,7 @@ export function QuestionTopicFormDialog({
                   type="submit"
                 >
                   <Check className="size-4" />
-                  {isCreateMode ? 'Tiep tuc tao' : 'Tiep tuc cap nhat'}
+                  {isCreateMode ? 'Tiếp tục tạo' : 'Tiếp tục cập nhật'}
                 </button>
               </div>
             </form>
@@ -228,7 +228,11 @@ export function QuestionTopicFormDialog({
                   type="button"
                 >
                   <Check className="size-4" />
-                  {isSubmitting ? 'Dang xu ly...' : isCreateMode ? 'Xác nhận tạo' : 'Xác nhận cập nhật'}
+                  {isSubmitting
+                    ? 'Đang xử lý...'
+                    : isCreateMode
+                      ? 'Xác nhận tạo'
+                      : 'Xác nhận cập nhật'}
                 </button>
               </div>
             </div>

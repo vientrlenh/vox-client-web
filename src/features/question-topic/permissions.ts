@@ -1,3 +1,4 @@
+import { Archive, BadgeCheck } from 'lucide-react'
 import type { ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import type { RoleCode } from '@/features/auth/types'
 import type { QuestionTopicDto } from './types'
@@ -60,8 +61,9 @@ export function getQuestionTopicReviewActions(
 
   if (topic.status === 'DRAFT') {
     items.push({
+      icon: BadgeCheck,
       id: 'publish',
-      label: 'Publish',
+      label: 'Xuất bản',
       onSelect: handlers.onPublish,
       tone: 'success',
     })
@@ -69,8 +71,9 @@ export function getQuestionTopicReviewActions(
 
   if (topic.status !== 'ARCHIVED') {
     items.push({
+      icon: Archive,
       id: 'archive',
-      label: 'Archive',
+      label: 'Lưu trữ',
       onSelect: handlers.onArchive,
       tone: 'default',
     })

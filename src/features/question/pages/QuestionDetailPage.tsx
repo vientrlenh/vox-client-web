@@ -199,13 +199,19 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
               />
               <DetailItem label="Ngày tạo" value={formatQuestionDate(question.createdAt)} />
               <DetailItem label="Cập nhật" value={formatQuestionDate(question.updatedAt)} />
-              <DetailItem label="Created by" value={formatNullableText(question.createdBy)} />
+              <DetailItem label="Người tạo" value={formatNullableText(question.createdBy)} />
             </div>
 
             <DetailBlock label="Nội dung câu hỏi" value={question.questionText} />
-            <DetailBlock label="Instruction" value={question.instructionText} />
-            <DetailBlock label="Prompt" value={question.promptText} />
-            <DetailBlock label="Preparation" value={question.preparationText} />
+            <DetailBlock
+              label="Hướng dẫn làm bài"
+              value={question.instructionText}
+            />
+            <DetailBlock label="Đề bài" value={question.promptText} />
+            <DetailBlock
+              label="Nội dung chuẩn bị"
+              value={question.preparationText}
+            />
 
             <div className="grid gap-4 md:grid-cols-3">
               <DetailItem
@@ -269,29 +275,29 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
           question.evaluationGuide ? (
             <div className="grid gap-4">
               <DetailBlock
-                label="Expected content"
+                label="Nội dung kỳ vọng"
                 value={question.evaluationGuide.expectedContent}
               />
-              <DetailBlock label="Key points" value={question.evaluationGuide.keyPoints} />
+              <DetailBlock label="Ý chính" value={question.evaluationGuide.keyPoints} />
               <DetailBlock
-                label="Acceptable responses"
+                label="Phản hồi được chấp nhận"
                 value={question.evaluationGuide.acceptableResponses}
               />
               <DetailBlock
-                label="Off-topic examples"
+                label="Ví dụ lạc đề"
                 value={question.evaluationGuide.offTopicExamples}
               />
               <DetailBlock
-                label="Scoring hints"
+                label="Gợi ý chấm điểm"
                 value={question.evaluationGuide.scoringHints}
               />
               <DetailBlock
-                label="Common mistakes"
+                label="Lỗi thường gặp"
                 value={question.evaluationGuide.commonMistakes}
               />
             </div>
           ) : (
-            <EmptyState text="Chưa có evaluation guide cho câu hỏi này." />
+            <EmptyState text="Chưa có hướng dẫn chấm cho câu hỏi này." />
           )
         ) : null}
 

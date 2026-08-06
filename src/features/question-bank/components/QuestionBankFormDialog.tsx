@@ -59,12 +59,12 @@ export function QuestionBankFormDialog({
     const values = trimFormState(form)
 
     if (isCreateMode && !values.code) {
-      setValidationMessage('Ma ngan hang khong duoc de trong.')
+      setValidationMessage('Mã ngân hàng không được để trống.')
       return
     }
 
     if (!values.name) {
-      setValidationMessage('Ten ngan hang khong duoc de trong.')
+      setValidationMessage('Tên ngân hàng không được để trống.')
       return
     }
 
@@ -78,16 +78,18 @@ export function QuestionBankFormDialog({
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
           <div>
             <h2 className="text-lg font-black text-blue-950">
-              {isCreateMode ? 'Tao ngan hang cau hoi' : 'Chinh sua ngan hang cau hoi'}
+              {isCreateMode
+                ? 'Tạo ngân hàng câu hỏi'
+                : 'Chỉnh sửa ngân hàng câu hỏi'}
             </h2>
             <p className="mt-1 text-sm font-medium text-slate-500">
               {isCreateMode
-                ? 'Nhap thong tin ngan hang theo contract moi.'
-                : 'Chi cap nhat ten va mo ta khi bank dang o DRAFT.'}
+                ? 'Nhập thông tin cho ngân hàng câu hỏi mới.'
+                : 'Chỉ cập nhật được tên và mô tả khi ngân hàng đang ở trạng thái Bản nháp.'}
             </p>
           </div>
           <button
-            aria-label="Dong"
+            aria-label="Đóng"
             className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50"
             disabled={isSubmitting}
             onClick={onClose}
@@ -102,7 +104,7 @@ export function QuestionBankFormDialog({
             <form className="grid gap-5" onSubmit={handleSubmit}>
               {isCreateMode ? (
                 <Field
-                  label="Ma ngan hang"
+                  label="Mã ngân hàng"
                   onChange={(value) => {
                     setForm((current) => ({ ...current, code: value }))
                     setValidationMessage(null)
@@ -113,7 +115,7 @@ export function QuestionBankFormDialog({
               ) : null}
 
               <Field
-                label="Ten ngan hang"
+                label="Tên ngân hàng"
                 onChange={(value) => {
                   setForm((current) => ({ ...current, name: value }))
                   setValidationMessage(null)
@@ -123,7 +125,7 @@ export function QuestionBankFormDialog({
               />
 
               <label className="grid gap-2 text-sm font-bold text-slate-700">
-                Mo ta
+                Mô tả
                 <textarea
                   className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   disabled={isSubmitting}
@@ -151,7 +153,7 @@ export function QuestionBankFormDialog({
                   onClick={onClose}
                   type="button"
                 >
-                  Huy
+                  Hủy
                 </button>
                 <button
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-sm font-black text-white transition hover:opacity-90"
@@ -159,22 +161,22 @@ export function QuestionBankFormDialog({
                   type="submit"
                 >
                   <Check className="size-4" />
-                  {isCreateMode ? 'Tiep tuc tao' : 'Tiep tuc cap nhat'}
+                  {isCreateMode ? 'Tiếp tục tạo' : 'Tiếp tục cập nhật'}
                 </button>
               </div>
             </form>
           ) : (
             <div className="grid gap-5">
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                Vui long xac nhan thong tin truoc khi luu.
+                Vui lòng xác nhận thông tin trước khi lưu.
               </div>
 
               <dl className="grid gap-3 rounded-lg border border-slate-200 px-4 py-4">
                 {isCreateMode ? (
-                  <ConfirmItem label="Ma ngan hang" value={form.code || '-'} />
+                  <ConfirmItem label="Mã ngân hàng" value={form.code || '-'} />
                 ) : null}
-                <ConfirmItem label="Ten ngan hang" value={form.name || '-'} />
-                <ConfirmItem label="Mo ta" value={form.description || '-'} />
+                <ConfirmItem label="Tên ngân hàng" value={form.name || '-'} />
+                <ConfirmItem label="Mô tả" value={form.description || '-'} />
               </dl>
 
               {errorMessage ? (
@@ -191,7 +193,7 @@ export function QuestionBankFormDialog({
                   type="button"
                 >
                   <ChevronLeft className="size-4" />
-                  Quay lai
+                  Quay lại
                 </button>
                 <button
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-sm font-black text-white transition hover:opacity-90"
@@ -200,7 +202,11 @@ export function QuestionBankFormDialog({
                   type="button"
                 >
                   <Check className="size-4" />
-                  {isSubmitting ? 'Dang xu ly...' : isCreateMode ? 'Xac nhan tao' : 'Xac nhan cap nhat'}
+                  {isSubmitting
+                    ? 'Đang xử lý...'
+                    : isCreateMode
+                      ? 'Xác nhận tạo'
+                      : 'Xác nhận cập nhật'}
                 </button>
               </div>
             </div>

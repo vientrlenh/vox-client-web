@@ -897,11 +897,15 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     setSuccessMessage(null)
 
     if (!questionId || !workflowAction) {
-      setErrorMessage('Cần chọn hành động workflow trước khi gửi.')
+      setErrorMessage('Cần chọn thao tác trước khi gửi.')
       return
     }
 
-    if (!(await confirm({ message: 'Ban co chac muon gui workflow action nay khong?' }))) {
+    if (
+      !(await confirm({
+        message: 'Bạn có chắc muốn thực hiện thao tác duyệt này không?',
+      }))
+    ) {
       return
     }
 
@@ -932,15 +936,15 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             type="button"
           >
             <ArrowLeft aria-hidden="true" className="size-4" />
-            Quay lai
+            Quay lại
           </button>
           <h1 className="text-3xl font-black text-blue-950">
             {mode === 'create' ? 'Tạo câu hỏi mới' : 'Chỉnh sửa câu hỏi'}
           </h1>
           <p className="mt-2 text-sm font-medium text-slate-600">
             {mode === 'create'
-              ? 'Tạo nội dung, tài nguyên và hướng dẫn chấm theo contract mới.'
-              : 'Cập nhật nội dung, tài nguyên và workflow của câu hỏi.'}
+              ? 'Tạo nội dung, tài nguyên và hướng dẫn chấm cho câu hỏi mới.'
+              : 'Cập nhật nội dung, tài nguyên và quy trình duyệt của câu hỏi.'}
           </p>
         </div>
       </div>
@@ -965,8 +969,8 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             { id: 'guide', label: 'Hướng dẫn chấm' },
             ...(mode === 'edit'
               ? [
-                  { id: 'sharing', label: 'Assign collaborator' },
-                  { id: 'workflow', label: 'Workflow' },
+                  { id: 'sharing', label: 'Chia sẻ quyền' },
+                  { id: 'workflow', label: 'Quy trình duyệt' },
                 ]
               : []),
           ].map((tab) => (
@@ -995,7 +999,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
           {mode === 'create' ? (
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-bold text-slate-700">
-                Ngan hang
+                Ngân hàng câu hỏi
                 <select
                   className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
                   onChange={(event) => {
@@ -1092,21 +1096,21 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             value={form.questionText}
           />
           <TextareaField
-            label="Instruction"
+            label="Hướng dẫn làm bài"
             onChange={(value) =>
               setForm((current) => ({ ...current, instructionText: value }))
             }
             value={form.instructionText}
           />
           <TextareaField
-            label="Prompt"
+            label="Đề bài"
             onChange={(value) =>
               setForm((current) => ({ ...current, promptText: value }))
             }
             value={form.promptText}
           />
           <TextareaField
-            label="Preparation"
+            label="Nội dung chuẩn bị"
             onChange={(value) =>
               setForm((current) => ({ ...current, preparationText: value }))
             }
@@ -1115,7 +1119,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
 
           <div className="grid gap-4 md:grid-cols-3">
             <InputField
-              label="Preparation time"
+              label="Thời gian chuẩn bị"
               onChange={(value) =>
                 setForm((current) => ({
                   ...current,
@@ -1126,7 +1130,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
               value={form.preparationTimeSeconds}
             />
             <InputField
-              label="Min response"
+              label="Phản hồi tối thiểu"
               onChange={(value) =>
                 setForm((current) => ({ ...current, minResponseSeconds: value }))
               }
@@ -1134,7 +1138,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
               value={form.minResponseSeconds}
             />
             <InputField
-              label="Max response"
+              label="Phản hồi tối đa"
               onChange={(value) =>
                 setForm((current) => ({ ...current, maxResponseSeconds: value }))
               }
@@ -1355,14 +1359,14 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             value={guideForm.expectedContent}
           />
           <TextareaField
-            label="Key points"
+            label="Ý chính"
             onChange={(value) =>
               setGuideForm((current) => ({ ...current, keyPoints: value }))
             }
             value={guideForm.keyPoints}
           />
           <TextareaField
-            label="Acceptable responses"
+            label="Phản hồi được chấp nhận"
             onChange={(value) =>
               setGuideForm((current) => ({
                 ...current,
@@ -1372,7 +1376,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             value={guideForm.acceptableResponses}
           />
           <TextareaField
-            label="Off-topic examples"
+            label="Ví dụ lạc đề"
             onChange={(value) =>
               setGuideForm((current) => ({
                 ...current,
@@ -1382,14 +1386,14 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             value={guideForm.offTopicExamples}
           />
           <TextareaField
-            label="Scoring hints"
+            label="Gợi ý chấm điểm"
             onChange={(value) =>
               setGuideForm((current) => ({ ...current, scoringHints: value }))
             }
             value={guideForm.scoringHints}
           />
           <TextareaField
-            label="Common mistakes"
+            label="Lỗi thường gặp"
             onChange={(value) =>
               setGuideForm((current) => ({ ...current, commonMistakes: value }))
             }
@@ -1447,11 +1451,11 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
         >
           <div className="grid gap-4 md:grid-cols-2">
             <ReadOnlyItem
-              label="Trang thai hien tai"
+              label="Trạng thái hiện tại"
               value={formatNullableText(questionQuery.data?.status)}
             />
             <ReadOnlyItem
-              label="So action kha dung"
+              label="Số thao tác khả dụng"
               value={String(workflowActions.length)}
             />
           </div>
@@ -1473,14 +1477,14 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
           </label>
 
           <TextareaField
-            label="Note"
+            label="Ghi chú"
             onChange={setWorkflowNote}
             value={workflowNote}
           />
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             {workflowActions.find((item) => item.action === workflowAction)?.description ??
-              'Chọn một hành động workflow để xem mô tả.'}
+              'Chọn một thao tác để xem mô tả.'}
           </div>
 
           <div className="flex justify-end">
@@ -1489,7 +1493,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
               type="submit"
             >
               <Save aria-hidden="true" className="size-4" />
-              Gui workflow
+              Gửi thao tác
             </button>
           </div>
         </form>
