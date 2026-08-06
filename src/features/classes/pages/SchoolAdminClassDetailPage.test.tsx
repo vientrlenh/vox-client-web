@@ -265,13 +265,13 @@ function mockGraphQLSuccess({
 
 async function openUsersTab(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('heading', { name: /tiếng anh 6a/i })
-  await user.click(screen.getByRole('tab', { name: /học viên trong lớp/i }))
+  await user.click(screen.getByRole('tab', { name: /người dùng trong lớp/i }))
 }
 
 async function openUserActionMenu(user: ReturnType<typeof userEvent.setup>) {
   await user.click(
     screen.getByRole('button', {
-      name: /mở thao tác học viên nguyễn văn a/i,
+      name: /mở thao tác người dùng nguyễn văn a/i,
     }),
   )
 
@@ -497,7 +497,7 @@ describe('SchoolAdminClassDetailPage', () => {
     await openUsersTab(user)
 
     expect(
-      await screen.findByText(/chưa có học viên trong lớp/i),
+      await screen.findByText(/chưa có người dùng trong lớp/i),
     ).toBeInTheDocument()
     await waitFor(() => {
       const userRequests = mockedPost.mock.calls.filter((call) => {
@@ -521,7 +521,7 @@ describe('SchoolAdminClassDetailPage', () => {
           path="/school-admin/classes/:classId"
         />
         <Route
-          element={<h1>Import học viên route</h1>}
+          element={<h1>Import người dùng route</h1>}
           path="/school-admin/classes/:classId/users/import"
         />
       </Routes>,
@@ -531,10 +531,10 @@ describe('SchoolAdminClassDetailPage', () => {
       },
     )
     await openUsersTab(user)
-    await user.click(screen.getByRole('button', { name: /import học viên/i }))
+    await user.click(screen.getByRole('button', { name: /import người dùng/i }))
 
     expect(
-      await screen.findByRole('heading', { name: /import học viên route/i }),
+      await screen.findByRole('heading', { name: /import người dùng route/i }),
     ).toBeInTheDocument()
   })
 
@@ -583,10 +583,10 @@ describe('SchoolAdminClassDetailPage', () => {
 
     renderPage()
     await openUsersTab(user)
-    await user.click(screen.getByRole('button', { name: /thêm học viên/i }))
+    await user.click(screen.getByRole('button', { name: /thêm người dùng/i }))
 
     const dialog = await screen.findByRole('dialog', {
-      name: /thêm học viên vào lớp/i,
+      name: /thêm người dùng vào lớp/i,
     })
 
     await within(dialog).findByText('Trần Thị B')
@@ -622,10 +622,10 @@ describe('SchoolAdminClassDetailPage', () => {
 
     renderPage()
     await openUsersTab(user)
-    await user.click(screen.getByRole('button', { name: /thêm học viên/i }))
+    await user.click(screen.getByRole('button', { name: /thêm người dùng/i }))
 
     const dialog = await screen.findByRole('dialog', {
-      name: /thêm học viên vào lớp/i,
+      name: /thêm người dùng vào lớp/i,
     })
 
     await within(dialog).findByText('Trần Thị B')
@@ -677,7 +677,7 @@ describe('SchoolAdminClassDetailPage', () => {
     )
 
     const dialog = screen.getByRole('dialog', {
-      name: /xóa học viên khỏi lớp/i,
+      name: /xóa người dùng khỏi lớp/i,
     })
 
     await user.click(
@@ -698,10 +698,10 @@ describe('SchoolAdminClassDetailPage', () => {
 
     renderPage()
     await openUsersTab(user)
-    await user.click(screen.getByRole('button', { name: /thêm học viên/i }))
+    await user.click(screen.getByRole('button', { name: /thêm người dùng/i }))
 
     const dialog = await screen.findByRole('dialog', {
-      name: /thêm học viên vào lớp/i,
+      name: /thêm người dùng vào lớp/i,
     })
 
     expect(
