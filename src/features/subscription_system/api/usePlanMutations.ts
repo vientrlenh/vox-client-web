@@ -21,8 +21,16 @@ async function createPlan(payload: CreatePlanPayload): Promise<MutationResult<Su
   return response.data
 }
 
-async function archivePlan(id: string): Promise<MutationResult<SubscriptionPlan>> {
-  const response = await apiClient.delete<ApiResponse<SubscriptionPlan>>(`/v1/plans/${id}`)
+async function archivePlan({
+  id,
+  replacedByPlanId,
+}: {
+  id: string
+  replacedByPlanId: string | null
+}): Promise<MutationResult<SubscriptionPlan>> {
+  const response = await apiClient.delete<ApiResponse<SubscriptionPlan>>(`/v1/plans/${id}`, {
+    params: replacedByPlanId ? { replacedByPlanId } : undefined,
+  })
   return response.data
 }
 

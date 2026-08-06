@@ -4,10 +4,12 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { Pagination } from '@/shared/components/Pagination'
+import { goToCheckout } from '@/shared/payment/checkout'
+import { isPaymentMethod, PAYMENT_METHOD_OPTIONS } from '@/shared/payment/types'
 import { useSubscriptionPlansQuery } from '../api/useSubscriptionPlansQuery'
 import { useCreatePlanMutation, useUpdatePlanMutation, useArchivePlanMutation } from '../api/usePlanMutations'
 import { useSchoolSubscriptionsQuery } from '../api/useSchoolSubscriptionsQuery'
-import { useRenewSubscriptionMutation, useCancelSubscriptionMutation } from '../api/useSchoolSubscriptionMutations'
+import { useCancelSubscriptionMutation, useRenewSubscriptionMutation } from '../api/useSchoolSubscriptionMutations'
 import { useSubscriptionRequestsQuery } from '../api/useSubscriptionRequestsQuery'
 import { useCreatePaymentLinkForRequestMutation, useRejectRequestMutation } from '../api/useSubscriptionRequestMutations'
 import { useSchoolLookup } from '../api/useSchoolLookup'
@@ -18,6 +20,7 @@ import { SchoolSubscriptionsFiltersBar } from '../components/SchoolSubscriptions
 import { SchoolSubscriptionsTable } from '../components/SchoolSubscriptionsTable'
 import { SchoolSubscriptionDetailDrawer } from '../components/SchoolSubscriptionDetailDrawer'
 import { SubscriptionRequestsTable } from '../components/SubscriptionRequestsTable'
+import { formatVnd } from '../types'
 import type {
   CreatePlanPayload,
   RequestStatus,
@@ -57,7 +60,7 @@ export function SystemAdminSubscriptionPage() {
   const [requestsStatus, setRequestsStatus] = useState<RequestStatus>('PENDING')
   const [requestsPage, setRequestsPage] = useState(DEFAULT_PAGE)
 
-  const { confirm, dialog: confirmDialog } = useConfirmationDialog()
+  const { confirm, confirmWithSelection, dialog: confirmDialog } = useConfirmationDialog()
   const { getSchool, isLoading: isSchoolLookupLoading } = useSchoolLookup()
 
   const plansQuery = useSubscriptionPlansQuery(DEFAULT_PAGE, 50)
@@ -154,18 +157,25 @@ export function SystemAdminSubscriptionPage() {
   }
 
   async function handleArchivePlan(plan: SubscriptionPlan) {
-    const confirmed = await confirm({
+    const replacementOptions = activePlans
+      .filter((candidate) => candidate.id !== plan.id)
+      .map((candidate) => ({ label: `${candidate.name} — ${formatVnd(candidate.pricePerYear)}`, value: candidate.id }))
+
+    const result = await confirmWithSelection({
       confirmLabel: 'Lưu trữ',
-      message: `Gói "${plan.name}" sẽ được lưu trữ và không còn hiển thị cho trường đăng ký mới. Các trường đang dùng gói này không bị ảnh hưởng.`,
+      message: `Gói "${plan.name}" sẽ được lưu trữ và không còn hiển thị cho trường đăng ký mới. Các trường đang dùng gói này không bị ảnh hưởng ngay, nhưng nếu không chọn gói thay thế, các trường sẽ không gia hạn được cho tới khi có gói thay thế.`,
+      selectLabel: 'Gói thay thế khi trường gia hạn (không bắt buộc)',
+      selectOptions: replacementOptions,
+      selectPlaceholder: 'Không chọn — chặn gia hạn cho tới khi có gói thay thế',
       title: 'Lưu trữ gói dịch vụ',
     })
 
-    if (!confirmed) {
+    if (!result.confirmed) {
       return
     }
 
     try {
-      await archivePlanMutation.mutateAsync(plan.id)
+      await archivePlanMutation.mutateAsync({ id: plan.id, replacedByPlanId: result.selection || null })
       setToast({ text: 'Đã lưu trữ gói', tone: 'success' })
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể lưu trữ gói.', tone: 'error' })
@@ -214,19 +224,27 @@ export function SystemAdminSubscriptionPage() {
 
   async function handlePay(request: SubscriptionRequest) {
     const school = getSchool(request.schoolId)
-    const confirmed = await confirm({
+    const { confirmed, selection } = await confirmWithSelection({
       confirmLabel: 'Tiếp tục thanh toán',
-      message: `Bạn sẽ được chuyển đến cổng thanh toán PayOS để thanh toán gói "${getPlanName(request.requestedPlanId)}" cho trường "${school?.name ?? request.schoolId}". Gói được kích hoạt tự động ngay sau khi thanh toán thành công.`,
-      title: 'Thanh toán yêu cầu qua PayOS',
+      message: `Bạn sẽ được chuyển đến cổng thanh toán để thanh toán gói "${getPlanName(request.requestedPlanId)}" cho trường "${school?.name ?? request.schoolId}". Gói được kích hoạt tự động ngay sau khi thanh toán thành công.`,
+      selectLabel: 'Cổng thanh toán',
+      selectOptions: PAYMENT_METHOD_OPTIONS,
+      selectPlaceholder: 'Chọn cổng thanh toán',
+      title: 'Thanh toán yêu cầu',
     })
 
     if (!confirmed) {
       return
     }
 
+    if (!isPaymentMethod(selection)) {
+      setToast({ text: 'Chọn cổng thanh toán để tiếp tục.', tone: 'error' })
+      return
+    }
+
     try {
-      const result = await paymentLinkMutation.mutateAsync(request.id)
-      window.location.href = result.data.checkoutUrl
+      const result = await paymentLinkMutation.mutateAsync({ paymentMethod: selection, requestId: request.id })
+      goToCheckout(result.data)
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán.', tone: 'error' })
     }
@@ -306,7 +324,13 @@ export function SystemAdminSubscriptionPage() {
             <p className="text-sm font-semibold text-slate-500">Chưa có gói dịch vụ nào.</p>
           ) : null}
           {plans.map((plan) => (
-            <PlanCard key={plan.id} onArchive={handleArchivePlan} onEdit={openEditPlan} plan={plan} />
+            <PlanCard
+              getPlanName={getPlanName}
+              key={plan.id}
+              onArchive={handleArchivePlan}
+              onEdit={openEditPlan}
+              plan={plan}
+            />
           ))}
         </div>
       ) : null}

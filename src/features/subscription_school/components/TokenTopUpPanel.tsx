@@ -1,9 +1,11 @@
 import { ClipboardList, Coins, FileCheck2, Headphones, ShoppingCart } from 'lucide-react'
+import { PaymentMethodField } from '@/shared/payment/PaymentMethodField'
 import {
   formatPricePerMinute,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
+  type PaymentMethod,
   type QuotaType,
   type SubscriptionPlan,
   type TokenTopUpState,
@@ -21,12 +23,22 @@ const STEP_MINUTES = 5
 type TokenTopUpPanelProps = {
   isSubmitting: boolean
   onChange: (quotaType: QuotaType, minutes: number) => void
+  onPaymentMethodChange: (method: PaymentMethod) => void
   onSubmit: () => void
+  paymentMethod: PaymentMethod
   plan: SubscriptionPlan
   state: TokenTopUpState
 }
 
-export function TokenTopUpPanel({ isSubmitting, onChange, onSubmit, plan, state }: TokenTopUpPanelProps) {
+export function TokenTopUpPanel({
+  isSubmitting,
+  onChange,
+  onPaymentMethodChange,
+  onSubmit,
+  paymentMethod,
+  plan,
+  state,
+}: TokenTopUpPanelProps) {
   // plan.quotas[].tokenUnitPrice = giá VNĐ cho 1 GIÂY audio; slider ở đây thao tác theo PHÚT
   // cho dễ hiểu, nên quy đổi *60 khi tính giá và khi gửi API (xem handleBuyTokens ở trang cha).
   const pricePerSecondByType = new Map(plan.quotas.map((quota) => [quota.quotaType, quota.tokenUnitPrice]))
@@ -101,6 +113,14 @@ export function TokenTopUpPanel({ isSubmitting, onChange, onSubmit, plan, state 
               </div>
             ))}
           </div>
+          <div className="mt-5 border-t border-slate-200 pt-4">
+            <PaymentMethodField
+              disabled={isSubmitting}
+              name="token-purchase-payment-method"
+              onChange={onPaymentMethodChange}
+              value={paymentMethod}
+            />
+          </div>
           <button
             className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 text-sm font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSubmitting || total <= 0}
@@ -108,7 +128,7 @@ export function TokenTopUpPanel({ isSubmitting, onChange, onSubmit, plan, state 
             type="button"
           >
             <ShoppingCart aria-hidden="true" className="size-4.5" />
-            {isSubmitting ? 'Đang chuyển đến PayOS...' : 'Mua thêm'}
+            {isSubmitting ? 'Đang chuyển đến cổng thanh toán...' : 'Mua thêm'}
           </button>
         </div>
       </div>

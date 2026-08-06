@@ -47,8 +47,9 @@ export function MyPlanCard({
     )
   }
 
-  const statusDisplay = getSubscriptionStatusDisplay(subscription.status, subscription.endDate)
+  const statusDisplay = getSubscriptionStatusDisplay(subscription.status, subscription.endDate, subscription.cancelledAt)
   const isActive = subscription.status === 'ACTIVE'
+  const isCancelled = Boolean(subscription.cancelledAt)
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-linear-to-br from-cyan-950 via-blue-900 to-indigo-900 p-7 text-white">
@@ -57,6 +58,11 @@ export function MyPlanCard({
       <p className="mt-1.5 text-sm text-white/75">
         {formatDate(subscription.startDate)} – {formatDate(subscription.endDate)}
       </p>
+      {isCancelled ? (
+        <p className="mt-1.5 text-sm text-amber-200">
+          Bạn đã hủy — vẫn dùng bình thường tới hết {formatDate(subscription.endDate)}, sau đó sẽ không tự gia hạn.
+        </p>
+      ) : null}
       <p className="mt-2 flex items-center gap-1.5 text-sm text-white/85">
         <Clock aria-hidden="true" className="size-4" />
         Thời gian tối đa mỗi bài: {formatMinutes(subscription.plan.maxTimePerAttemptMin)}
@@ -85,9 +91,9 @@ export function MyPlanCard({
           type="button"
         >
           <RefreshCw aria-hidden="true" className="size-4" />
-          {isRenewing ? 'Đang chuyển đến PayOS...' : 'Gia hạn'}
+          {isRenewing ? 'Đang chuyển đến cổng thanh toán...' : 'Gia hạn'}
         </button>
-        {isActive ? (
+        {isActive && !isCancelled ? (
           <button
             className="inline-flex h-11 items-center rounded-lg border border-red-300/40 bg-red-500/10 px-4.5 text-sm font-bold text-red-100 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isCancelling}

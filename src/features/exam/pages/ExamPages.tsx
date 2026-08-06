@@ -275,7 +275,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   const isResolvingPolicy = Boolean(selectedRubricVersion) && matchingPoliciesQuery.isLoading
   const hasNoMatchingPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length === 0
   const hasAmbiguousPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length > 1 && !manualPolicyId
-  const canSubmit = !isResolvingPolicy && !hasAmbiguousPolicy
+  const canSubmit = Boolean(selectedRubricVersion) && !isResolvingPolicy && !hasAmbiguousPolicy
 
   function goToSelectRubricVersion() {
     navigate('/school-admin/rubric-versions/select', {
@@ -296,6 +296,10 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
     setErrorMessage(null)
     if (!name.trim() || !code.trim() || !languageId) {
       setErrorMessage('Vui lòng nhập tên, mã kỳ thi và ngôn ngữ.')
+      return
+    }
+    if (!selectedRubricVersion) {
+      setErrorMessage('Vui lòng chọn phiên bản thang đánh giá.')
       return
     }
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo kỳ thi này không?' }))) {
@@ -396,7 +400,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
           <p className="text-xs text-slate-500">
-            Không bắt buộc — chọn để tự động gắn chính sách đánh giá phù hợp cho kỳ thi.
+            Bắt buộc — chọn để tự động gắn chính sách đánh giá phù hợp cho kỳ thi.
           </p>
 
           {!selectedRubricVersion ? (
@@ -475,7 +479,13 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             className="inline-flex h-10.5 items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-60"
             disabled={createMutation.isPending || !canSubmit}
             onClick={() => void handleSubmit()}
-            title={hasAmbiguousPolicy ? 'Chọn một chính sách đánh giá phù hợp trước khi tạo' : undefined}
+            title={
+              !selectedRubricVersion
+                ? 'Chọn phiên bản thang đánh giá trước khi tạo'
+                : hasAmbiguousPolicy
+                  ? 'Chọn một chính sách đánh giá phù hợp trước khi tạo'
+                  : undefined
+            }
             type="button"
           >
             Tạo kỳ thi

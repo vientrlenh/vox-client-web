@@ -3,13 +3,25 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ClipboardCheck, Filter, Plus, RefreshCw, Upload } from 'lucide-react';
+import {
+  BookOpen,
+  ChevronDown,
+  ClipboardCheck,
+  Filter,
+  Languages,
+  Layers,
+  Plus,
+  RefreshCw,
+  SlidersHorizontal,
+  Upload,
+} from 'lucide-react';
 
 import { useSystemAssessmentPoliciesQuery, type SystemAssessmentPolicyFilter } from '../api/useSystemAssessmentPoliciesQuery';
 import { useCreateSystemAssessmentPolicyMutation } from '../api/useCreateSystemAssessmentPolicyMutation';
 import { useDeleteSystemAssessmentPolicyMutation } from '../api/useDeleteSystemAssessmentPolicyMutation';
 import { useUpdateSystemAssessmentPolicyMutation } from '../api/useUpdateSystemAssessmentPolicyMutation';
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
+import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
 
 import { AssessmentPolicyTable } from '../components/AssessmentPolicyTable';
 import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPolicyDialog';
@@ -23,6 +35,41 @@ const DEFAULT_PAGE_SIZE = 10;
 
 const STATUS_OPTIONS = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
 
+type FilterSelectProps = {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  disabled?: boolean;
+  placeholder: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+};
+
+// Select filter dùng chung: label phía trên + icon minh hoạ bên trái + chevron bên phải,
+// để 4 dropdown (Trạng thái/Ngôn ngữ/Rubric/Phiên bản) đồng bộ nhau thay vì lặp lại JSX 4 lần.
+function FilterSelect({ id, icon: Icon, label, value, disabled, placeholder, options, onChange }: FilterSelectProps) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-semibold text-slate-500" htmlFor={id}>{label}</label>
+      <div className="relative">
+        <Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <select
+          id={id}
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-400"
+        >
+          <option value="">{placeholder}</option>
+          {options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+      </div>
+    </div>
+  );
+}
+
 export function SystemAdminAssessmentPoliciesPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(DEFAULT_PAGE);
@@ -30,16 +77,31 @@ export function SystemAdminAssessmentPoliciesPage() {
 
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedLanguageId, setSelectedLanguageId] = useState('');
+  const [selectedRubricId, setSelectedRubricId] = useState('');
+  const [selectedRubricVersionId, setSelectedRubricVersionId] = useState('');
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<AssessmentPolicy | null>(null);
   const [viewingRubricVersionPolicy, setViewingRubricVersionPolicy] = useState<AssessmentPolicy | null>(null);
 
   const { data: languages } = useLanguageOptionsQuery();
+  const { data: rubrics } = useRubricSearchOptionsQuery(selectedLanguageId || undefined);
+  const { data: rubricVersions } = useRubricVersionOptionsQuery(selectedRubricId || undefined);
 
   const filter: SystemAssessmentPolicyFilter = {
     status: selectedStatus || null,
     languageId: selectedLanguageId || null,
+    rubricVersionId: selectedRubricVersionId || null,
+  };
+
+  const hasActiveFilters = Boolean(selectedStatus || selectedLanguageId || selectedRubricVersionId);
+
+  const handleResetFilters = () => {
+    setSelectedStatus('');
+    setSelectedLanguageId('');
+    setSelectedRubricId('');
+    setSelectedRubricVersionId('');
+    setPage(1);
   };
 
   const { data, isLoading, isError, refetch, isFetching } = useSystemAssessmentPoliciesQuery(filter, page, pageSize);
@@ -135,42 +197,80 @@ export function SystemAdminAssessmentPoliciesPage() {
       </div>
 
       {/* FILTER BAR */}
-      <div className="relative rounded-[14px] border border-slate-200 bg-white p-4">
-        <div className="flex flex-col gap-4 sm:flex-row">
-          <div className="relative min-w-52">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-              <Filter className="size-4 text-slate-400" />
-            </div>
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value);
-                setPage(1);
-              }}
-              className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-            >
-              <option value="">Tất cả trạng thái</option>
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
+      <div className="relative rounded-[14px] border border-slate-200 bg-white p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="size-4 text-indigo-600" />
+            <span className="text-sm font-bold text-slate-800">Bộ lọc</span>
           </div>
-          <div className="relative min-w-52">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-              <Filter className="size-4 text-slate-400" />
-            </div>
-            <select
-              value={selectedLanguageId}
-              onChange={(e) => {
-                setSelectedLanguageId(e.target.value);
-                setPage(1);
-              }}
-              className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="text-sm font-medium text-indigo-600 transition hover:text-indigo-700"
             >
-              <option value="">Tất cả ngôn ngữ</option>
-              {languages?.map((lang) => <option key={lang.id} value={lang.id}>{lang.name}</option>)}
-            </select>
-          </div>
+              Xóa bộ lọc
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <FilterSelect
+            id="statusFilter"
+            icon={Filter}
+            label="Trạng thái"
+            placeholder="Tất cả trạng thái"
+            value={selectedStatus}
+            options={STATUS_OPTIONS.map((status) => ({ value: status, label: status }))}
+            onChange={(value) => {
+              setSelectedStatus(value);
+              setPage(1);
+            }}
+          />
+          <FilterSelect
+            id="languageFilter"
+            icon={Languages}
+            label="Ngôn ngữ"
+            placeholder="Tất cả ngôn ngữ"
+            value={selectedLanguageId}
+            options={languages?.map((lang) => ({ value: lang.id, label: lang.name })) ?? []}
+            onChange={(value) => {
+              setSelectedLanguageId(value);
+              setSelectedRubricId('');
+              setSelectedRubricVersionId('');
+              setPage(1);
+            }}
+          />
+          <FilterSelect
+            id="rubricFilter"
+            icon={BookOpen}
+            label="Rubric"
+            placeholder={selectedLanguageId ? 'Tất cả rubric' : 'Chọn ngôn ngữ trước'}
+            value={selectedRubricId}
+            disabled={!selectedLanguageId}
+            options={rubrics?.map((rubric) => ({ value: rubric.id, label: `${rubric.code} - ${rubric.name}` })) ?? []}
+            onChange={(value) => {
+              setSelectedRubricId(value);
+              setSelectedRubricVersionId('');
+              setPage(1);
+            }}
+          />
+          <FilterSelect
+            id="rubricVersionFilter"
+            icon={Layers}
+            label="Phiên bản"
+            placeholder={selectedRubricId ? 'Tất cả phiên bản' : 'Chọn rubric trước'}
+            value={selectedRubricVersionId}
+            disabled={!selectedRubricId}
+            options={rubricVersions?.map((rv) => ({
+              value: rv.id,
+              label: `${rv.code} - ${rv.name} (v${rv.version}) · ${rv.status}`,
+            })) ?? []}
+            onChange={(value) => {
+              setSelectedRubricVersionId(value);
+              setPage(1);
+            }}
+          />
         </div>
       </div>
 

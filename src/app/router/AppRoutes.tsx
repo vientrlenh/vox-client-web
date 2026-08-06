@@ -719,6 +719,14 @@ const SchoolAdminSubscriptionPaymentResultPage = lazy(() =>
   })),
 );
 
+// Dùng cho ba route /payment/* mà SePay redirect người dùng về — không truyền backTo nên trang tự
+// suy đường quay lại từ role hiện tại.
+const PaymentResultPage = lazy(() =>
+  import("@/features/subscription_school").then((module) => ({
+    default: module.PaymentResultPage,
+  })),
+);
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -734,6 +742,22 @@ export function AppRoutes() {
               <Route
                 path="profile"
                 element={<ProfilePage/>}
+              />
+              {/* SePay redirect người dùng về đúng ba đường dẫn này: BE dựng success_url/error_url/
+                  cancel_url bằng SEPAY_RETURN_BASE_URL cộng path cố định. Không tách được theo role
+                  như PayOS (mỗi role một returnUrl riêng) vì SePay chỉ có một bộ URL cho cả cổng,
+                  nên đặt ngoài layout của role và để trang tự suy đường quay lại. */}
+              <Route
+                path="payment/success"
+                element={<PaymentResultPage/>}
+              />
+              <Route
+                path="payment/error"
+                element={<PaymentResultPage/>}
+              />
+              <Route
+                path="payment/cancel"
+                element={<PaymentResultPage/>}
               />
           </Route>
         </Route>

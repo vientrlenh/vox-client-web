@@ -45,6 +45,7 @@ export type SubscriptionPlan = {
   maxTimePerAttemptMin: number | null
   popular: boolean
   status: 'ACTIVE' | 'ARCHIVED'
+  replacedByPlanId: string | null
   quotas: PlanQuota[]
 }
 
@@ -54,6 +55,12 @@ export type SubscriptionPlanPage = {
   size: number
   totalElements: number
   totalPages: number
+}
+
+export type RenewalPreview = {
+  planChanged: boolean
+  currentPlan: SubscriptionPlan
+  renewalPlan: SubscriptionPlan
 }
 
 export type MySubscription = {
@@ -98,12 +105,10 @@ export type InvoicePage = {
   totalPages: number
 }
 
-export type PaymentLink = {
-  invoiceId: string
-  orderCode: number
-  paymentLinkId: string
-  checkoutUrl: string
-}
+// Hình dạng của link thanh toán do @/shared/payment định nghĩa vì cả subscription_school và
+// subscription_system đều dùng chung, và vì cách mở trang thanh toán (redirect hay POST form) có
+// ràng buộc chữ ký không được phép mỗi nơi tự hiểu một kiểu.
+export type { PaymentLink, PaymentMethod } from '@/shared/payment/types'
 
 export type TokenTopUpState = Record<QuotaType, number>
 
@@ -188,6 +193,8 @@ export function formatMinutes(minutes?: number | null) {
   return `${Math.round(minutes)} phút`
 }
 
+const VN_TIMEZONE_OFFSET_MS = 7 * 60 * 60 * 1000
+
 export function daysUntil(value?: string | null) {
   if (!value) {
     return null
@@ -199,13 +206,30 @@ export function daysUntil(value?: string | null) {
     return null
   }
 
-  return Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  // "end" là LocalDate "yyyy-MM-dd" từ BE nên new Date() parse ra đúng UTC midnight của ngày đó.
+  // Phải quy "hôm nay" về cùng kiểu neo (UTC midnight của ngày lịch theo giờ VN) trước khi trừ —
+  // nếu trừ thẳng với Date.now() (thời điểm thực), quanh ranh giới nửa đêm giờ VN kết quả có thể
+  // lệch tới 7 tiếng so với số ngày thực tế còn lại theo lịch VN.
+  const nowVn = new Date(Date.now() + VN_TIMEZONE_OFFSET_MS)
+  const todayVnAsUtcMidnight = Date.UTC(nowVn.getUTCFullYear(), nowVn.getUTCMonth(), nowVn.getUTCDate())
+
+  return Math.round((end.getTime() - todayVnAsUtcMidnight) / (1000 * 60 * 60 * 24))
 }
 
 const EXPIRING_THRESHOLD_DAYS = 30
 
-export function getSubscriptionStatusDisplay(status: SubscriptionStatus, endDate?: string | null) {
+export function getSubscriptionStatusDisplay(
+  status: SubscriptionStatus,
+  endDate?: string | null,
+  cancelledAt?: string | null,
+) {
   if (status === 'ACTIVE') {
+    // Đã bấm Hủy nhưng gói không cắt ngay — dùng bình thường tới hết endDate (kiểu Claude), chỉ là
+    // sẽ không tự gia hạn nữa.
+    if (cancelledAt) {
+      return { label: 'Sẽ hết hạn (đã hủy)', tone: 'neutral' as const }
+    }
+
     const remaining = daysUntil(endDate)
 
     if (remaining !== null && remaining <= EXPIRING_THRESHOLD_DAYS && remaining >= 0) {

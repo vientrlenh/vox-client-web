@@ -57,7 +57,7 @@ export function SchoolSubscriptionDetailDrawer({
     return null
   }
 
-  const statusDisplay = getSubscriptionStatusDisplay(subscription.status, subscription.endDate)
+  const statusDisplay = getSubscriptionStatusDisplay(subscription.status, subscription.endDate, subscription.cancelledAt)
   const usageByType = new Map((usageQuery.data ?? []).map((item) => [item.quotaType, item]))
   const quotaByType = new Map((subscription.plan?.quotas ?? []).map((quota) => [quota.quotaType, quota]))
 
