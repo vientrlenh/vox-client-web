@@ -2201,6 +2201,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
             await invalidate()
             setMessage('Đã tạo mã đề mới.')
           }}
+          questionDetailBasePath={roleBasePath}
         />
       ) : null}
 
