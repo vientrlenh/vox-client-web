@@ -333,7 +333,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const locationSuccessMessage =
     (location.state as { successMessage?: string } | null)?.successMessage ?? null
 
-  const [analysisPollingUntil, setAnalysisPollingUntil] = useState<number | null>(null)
+  const [isAnalysisPolling, setIsAnalysisPolling] = useState(false)
   const createMutation = useCreateQuestionMutation()
   const updateMutation = useUpdateQuestionMutation()
   const cloneMutation = useCloneQuestionMutation()
@@ -369,12 +369,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const { confirm, dialog } = useConfirmationDialog()
   const questionQuery = useQuestionQuery(mode === 'edit' ? questionId : null, {
     refetchInterval:
-      mode === 'edit' &&
-      questionId &&
-      analysisPollingUntil != null &&
-      analysisPollingUntil > Date.now()
-        ? ASSET_ANALYSIS_POLL_INTERVAL_MS
-        : false,
+      mode === 'edit' && questionId && isAnalysisPolling ? ASSET_ANALYSIS_POLL_INTERVAL_MS : false,
   })
 
   const actorRole = getQuestionActorRole(user?.roles)
@@ -492,9 +487,24 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
 
   useEffect(() => {
     if (!assetForm.some((asset) => hasPendingAnalysis(asset))) {
-      setAnalysisPollingUntil(null)
+      // stop polling as soon as every asset's analysis has resolved, rather than waiting
+      // out the full timeout window below
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsAnalysisPolling(false)
     }
   }, [assetForm])
+
+  useEffect(() => {
+    if (!isAnalysisPolling) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsAnalysisPolling(false)
+    }, ASSET_ANALYSIS_POLL_TIMEOUT_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isAnalysisPolling])
 
   async function refreshQuestionData(targetQuestionId?: string | null) {
     await queryClient.invalidateQueries({ queryKey: questionQueryKeys.all })
@@ -521,7 +531,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   }
 
   function startAnalysisPolling() {
-    setAnalysisPollingUntil(Date.now() + ASSET_ANALYSIS_POLL_TIMEOUT_MS)
+    setIsAnalysisPolling(true)
   }
 
   if (mode === 'create' && !canCreate) {
@@ -1300,7 +1310,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                 </>
               ) : null}
 
-              {analysisPollingUntil != null && analysisPollingUntil > Date.now() && hasPendingAnalysis(asset) ? (
+              {isAnalysisPolling && hasPendingAnalysis(asset) ? (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
                   Đang phân tích nội dung bằng AI...
                 </div>
@@ -1877,7 +1887,7 @@ function ReadOnlyItem({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 break-words text-sm font-bold text-slate-950">{value}</p>
+      <p className="mt-2 wrap-break-word text-sm font-bold text-slate-950">{value}</p>
     </div>
   )
 }

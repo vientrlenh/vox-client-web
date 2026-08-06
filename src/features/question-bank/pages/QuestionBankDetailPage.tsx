@@ -200,7 +200,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 break-words text-sm font-bold text-slate-950">{value}</p>
+      <p className="mt-2 wrap-break-word text-sm font-bold text-slate-950">{value}</p>
     </div>
   )
 }

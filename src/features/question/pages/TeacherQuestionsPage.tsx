@@ -301,12 +301,6 @@ function QuestionsPage({
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
   }, [flashMessage, location.pathname, location.search, navigate])
 
-  useEffect(() => {
-    if (!selectedBulkAction && bulkActionOptions.length > 0) {
-      setBulkAction(bulkActionOptions[0].action)
-    }
-  }, [bulkActionOptions, selectedBulkAction])
-
   const validBulkSelection = bulkSelection.filter((id) =>
     questionsQuery.data?.content.some((question) => question.id === id),
   )
