@@ -8,6 +8,7 @@ import {
   CircleCheck,
   ClipboardList,
   Download,
+  FileSpreadsheet,
   Flag,
   Gavel,
   Headphones,
@@ -41,6 +42,7 @@ import { PageLoader } from '@/shared/ui/PageLoader'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import {
+  useExportExamScoresExcelMutation,
   useExportExamScoresMutation,
   useFinalizeExamResultsMutation,
   useFinalizePreviewQuery,
@@ -302,6 +304,7 @@ export function SchoolAdminGradingPage({
   const reclaimMutation = useReclaimOverdueMutation()
   const finalizeMutation = useFinalizeExamResultsMutation()
   const exportMutation = useExportExamScoresMutation()
+  const exportExcelMutation = useExportExamScoresExcelMutation()
 
   const pageData = rowsQuery.data
   const rows = pageData?.content ?? []
@@ -498,10 +501,42 @@ export function SchoolAdminGradingPage({
 
   const assignPending = assignMutation.isPending || reassignMutation.isPending
 
+  /**
+   * File xuất ra phải là ĐÚNG cái đang hiển thị trên bảng, nên gửi kèm cả bộ lọc chứ không
+   * chỉ `examId`. `kind` là bắt buộc: thiếu nó thì BE hiểu là kỳ thi tập trung và màn theo dõi
+   * bài trên lớp sẽ tải về bảng điểm của loại bài kia.
+   */
+  const exportFilters = {
+    assignmentStatus: status,
+    examId: examId || undefined,
+    examName: selectedExamName,
+    hasOpenAppeal: openAppealOnly,
+    keyword: debouncedSearch,
+    kind,
+    overdueOnly,
+    resultStatus,
+    roundType,
+    unassignedOnly,
+  }
+
   // Chỉ `Phân công tự động` ở lại làm nút chính; ba hành động còn lại vào menu ⋯ để
   // header không còn là một hàng bốn nút cạnh nhau tranh nhau sự chú ý.
   const headerMenuItems: ActionMenuItem[] = [
     { icon: RefreshCw, id: 'refresh', label: 'Làm mới', onSelect: () => rowsQuery.refetch() },
+    {
+      // Xuất file là thao tác ĐỌC nên vẫn có mặt khi `readOnly` — nhà trường cần lấy được
+      // bảng điểm bài trên lớp dù không được can thiệp vào việc chấm.
+      disabled: !examId || exportExcelMutation.isPending,
+      disabledReason: 'Chọn kỳ thi trước khi xuất bảng điểm',
+      icon: FileSpreadsheet,
+      id: 'export-excel',
+      label: 'Xuất Excel',
+      onSelect: () =>
+        exportExcelMutation.mutate(exportFilters, {
+          onError: errorToast,
+          onSuccess: () => setMessage('Đã tải bảng điểm Excel.'),
+        }),
+    },
     {
       // BE bắt buộc phạm vi (examId hoặc scheduleId) — không chặn ở đây thì bấm vào
       // chỉ nhận về lỗi 400, cùng lý do với `finalize` ngay dưới.
@@ -509,12 +544,12 @@ export function SchoolAdminGradingPage({
       disabledReason: 'Chọn kỳ thi trước khi xuất bảng điểm',
       icon: Download,
       id: 'export',
-      label: 'Xuất bảng điểm',
+      label: 'Xuất CSV',
       onSelect: () =>
-        exportMutation.mutate(
-          { examId: examId || undefined, examName: selectedExamName },
-          { onError: errorToast, onSuccess: () => setMessage('Đã tải bảng điểm CSV.') },
-        ),
+        exportMutation.mutate(exportFilters, {
+          onError: errorToast,
+          onSuccess: () => setMessage('Đã tải bảng điểm CSV.'),
+        }),
     },
     // Chốt sổ là thao tác GHI — bài trên lớp do giáo viên tạo bài tự chốt.
     ...(readOnly
