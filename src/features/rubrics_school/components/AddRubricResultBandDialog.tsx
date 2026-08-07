@@ -9,6 +9,7 @@ type Props = {
   onClose: () => void;
   onSubmit: (data: AddRubricResultBandsPayload) => Promise<void>;
   isPending: boolean;
+  existingOrders?: number[];
 };
 
 type BandFormItem = RubricResultBandItemRequest;
@@ -17,8 +18,12 @@ function makeEmptyBand(order: number): BandFormItem {
   return { code: '', name: '', description: '', mappedScoreMin: 0, mappedScoreMax: 10, order };
 }
 
-export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending }: Props) {
-  const [bands, setBands] = useState<BandFormItem[]>([makeEmptyBand(1)]);
+function nextOrder(usedOrders: number[]): number {
+  return usedOrders.length > 0 ? Math.max(...usedOrders) + 1 : 1;
+}
+
+export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending, existingOrders = [] }: Props) {
+  const [bands, setBands] = useState<BandFormItem[]>(() => [makeEmptyBand(nextOrder(existingOrders))]);
 
   if (!isOpen) return null;
 
@@ -27,7 +32,7 @@ export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending
   };
 
   const addBand = () => {
-    setBands((prev) => [...prev, makeEmptyBand(prev.length + 1)]);
+    setBands((prev) => [...prev, makeEmptyBand(nextOrder([...existingOrders, ...prev.map((b) => Number(b.order))]))]);
   };
 
   const removeBand = (index: number) => {
@@ -37,6 +42,7 @@ export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const seenOrders = new Set<number>();
     for (const band of bands) {
       const min = Number(band.mappedScoreMin);
       const max = Number(band.mappedScoreMax);
@@ -44,6 +50,13 @@ export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending
         alert(`Lỗi: Ở thang điểm "${band.code || band.name || '(chưa đặt tên)'}", Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!`);
         return;
       }
+
+      const order = Number(band.order);
+      if (seenOrders.has(order) || existingOrders.includes(order)) {
+        alert(`Lỗi: Thứ tự (Order) ${order} bị trùng lặp (ở thang điểm "${band.code || band.name || '(chưa đặt tên)'}"). Vui lòng chọn thứ tự khác.`);
+        return;
+      }
+      seenOrders.add(order);
     }
 
     const payload: AddRubricResultBandsPayload = {

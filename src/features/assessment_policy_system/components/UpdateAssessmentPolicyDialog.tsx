@@ -9,7 +9,7 @@ import type { AssessmentPolicy, AssessmentPolicyStrictness, UpdateAssessmentPoli
 // lẫn AssessmentPolicyDetail (trang chi tiết) mà không quan tâm shape của các quan hệ nested.
 export type EditableAssessmentPolicy = Pick<
   AssessmentPolicy,
-  'id' | 'frameworkVersionId' | 'targetFrameworkBandId' | 'passingScore' | 'strictness' | 'effectiveFrom' | 'effectiveTo'
+  'id' | 'frameworkVersionId' | 'targetFrameworkBandId' | 'passingScore' | 'strictness' | 'effectiveFrom' | 'effectiveTo' | 'rubricVersion'
 >;
 
 type UpdateAssessmentPolicyDialogProps = {
@@ -66,6 +66,15 @@ export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPend
 
   if (!policy) return null;
 
+  const scoringScaleMin = policy.rubricVersion?.scoringScaleMin;
+  const scoringScaleMax = policy.rubricVersion?.scoringScaleMax;
+  const hasScoreRange = scoringScaleMin != null && scoringScaleMax != null;
+  const passingScoreValue = form.passingScore.trim() ? Number(form.passingScore) : null;
+  const passingScoreError =
+    passingScoreValue !== null && hasScoreRange && (passingScoreValue < scoringScaleMin! || passingScoreValue > scoringScaleMax!)
+      ? `Điểm đạt phải nằm trong thang điểm của Rubric Version (${scoringScaleMin} – ${scoringScaleMax})`
+      : null;
+
   const isMissingRequired = !form.targetFrameworkBandId || !form.effectiveFrom;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,6 +87,11 @@ export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPend
 
     if (form.effectiveTo && new Date(form.effectiveFrom) > new Date(form.effectiveTo)) {
       alert('Ngày kết thúc không được nhỏ hơn Ngày áp dụng!');
+      return;
+    }
+
+    if (passingScoreError) {
+      alert(`${passingScoreError}!`);
       return;
     }
 
@@ -126,10 +140,18 @@ export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPend
               <div>
                 <label className="mb-1 block text-sm font-bold text-slate-700">Điểm đạt (passingScore)</label>
                 <input
-                  type="number" step="0.1" min="0" value={form.passingScore}
+                  type="number" step="0.1"
+                  min={scoringScaleMin} max={scoringScaleMax}
+                  value={form.passingScore}
                   onChange={(e) => setForm({ ...form, passingScore: e.target.value })} disabled={isPending}
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+                  className={`w-full rounded-lg border px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50 ${passingScoreError ? 'border-red-400' : 'border-slate-300'}`}
+                  placeholder="Để trống nếu không áp dụng"
                 />
+                {passingScoreError ? (
+                  <p className="mt-1 text-xs font-semibold text-red-600">{passingScoreError}</p>
+                ) : hasScoreRange ? (
+                  <p className="mt-1 text-xs text-slate-400">Thang điểm: {scoringScaleMin} – {scoringScaleMax}</p>
+                ) : null}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-bold text-slate-700">Độ nghiêm ngặt</label>

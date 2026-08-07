@@ -3,10 +3,10 @@ import type { PaymentLink } from './types'
 /**
  * invoiceId của hóa đơn vừa được tạo link, lưu lại ngay trước khi rời trang sang cổng thanh toán.
  *
- * Phải tự lưu chứ không đọc lại được từ URL quay về: endpoint đối soát của BE định danh bằng
- * invoiceId, trong khi SePay redirect về success_url/error_url/cancel_url trần không kèm tham số
- * nào, còn PayOS chỉ gắn orderCode — mã riêng của PayOS, chỉ duy nhất trong phạm vi cổng đó nên
- * không tra ngược ra hóa đơn khi hệ thống có nhiều cổng.
+ * Phải tự lưu chứ không đọc lại được từ URL quay về: trang kết quả thanh toán cần invoiceId để đối
+ * chiếu với danh sách hóa đơn tải từ BE, trong khi SePay redirect về success_url/error_url/cancel_url
+ * trần không kèm tham số nào, còn PayOS chỉ gắn orderCode — mã riêng của PayOS, chỉ duy nhất trong
+ * phạm vi cổng đó nên không tra ngược ra hóa đơn khi hệ thống có nhiều cổng.
  *
  * sessionStorage chứ không phải state trong bộ nhớ: cả hai cổng đều điều hướng full-page ra khỏi
  * ứng dụng, nên mọi state React đều mất trước khi người dùng quay lại.

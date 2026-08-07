@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   FileQuestion,
+  Gauge,
   GraduationCap,
   LogOut,
   Menu,
@@ -62,6 +63,11 @@ const navigationItems = [
     icon: ClipboardList,
     label: 'Chấm bài kiểm tra trên lớp',
     to: '/teacher/class-test-grading',
+  },
+  {
+    icon: Gauge,
+    label: 'Hạn mức sử dụng',
+    to: '/teacher/quota-usage',
   },
 ]
 

@@ -21,8 +21,8 @@ export type CreatePaymentLinkForRequestPayload = {
 }
 
 // System Admin duyệt request bằng cách thanh toán qua cổng, giống hệt luồng School Admin — request
-// chỉ được kích hoạt sau khi cổng xác nhận thanh toán (qua webhook hoặc sync-status), không có
-// đường tắt approve-free nữa.
+// chỉ được kích hoạt sau khi cổng xác nhận thanh toán (qua webhook hoặc job đối soát định kỳ phía
+// BE), không có đường tắt approve-free nữa.
 async function createPaymentLinkForRequest({
   paymentMethod,
   requestId,
