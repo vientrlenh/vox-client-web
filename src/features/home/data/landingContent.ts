@@ -31,6 +31,7 @@ export const navItems = [
   { href: '#features', label: 'Tính năng' },
   { href: '#benefits', label: 'Lợi ích' },
   { href: '#audiences', label: 'Dành cho ai' },
+  { href: '#ai-plans', label: 'Gói AI' },
 ]
 
 export const heroHighlights = [

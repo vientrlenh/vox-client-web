@@ -343,6 +343,7 @@ export function SchoolAdminSubscriptionPage() {
               isError={classTestQuotaQuery.isError}
               isLoading={classTestQuotaQuery.isLoading}
               isSubmitting={allocateClassTestQuotaMutation.isPending}
+              key="teachers"
               onSubmit={(payload) => void handleAllocateClassTestQuota(payload)}
               summary={classTestQuotaQuery.data}
               userLabel="giáo viên"
@@ -353,6 +354,7 @@ export function SchoolAdminSubscriptionPage() {
               isError={practiceQuotaQuery.isError}
               isLoading={practiceQuotaQuery.isLoading}
               isSubmitting={allocatePracticeQuotaMutation.isPending}
+              key="students"
               onSubmit={(payload) => void handleAllocatePracticeQuota(payload)}
               summary={practiceQuotaQuery.data}
               userLabel="học sinh"

@@ -1,4 +1,5 @@
 import {
+  AIPlansSection,
   AudienceSection,
   BenefitSection,
   CTASection,
@@ -16,6 +17,7 @@ export function HomePage() {
       <FeatureSection />
       <AudienceSection />
       <BenefitSection />
+      <AIPlansSection />
       <CTASection />
       <LandingFooter />
     </main>
