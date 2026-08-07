@@ -19,6 +19,10 @@ export function AudioReplayButton({ audioUrl }: AudioReplayButtonProps) {
   useEffect(() => {
     audioRef.current?.pause()
     audioRef.current = null
+    // isPlaying mirrors the imperative Audio element above and must be reset in lockstep
+    // with tearing it down when the source changes, so this is synchronizing with an
+    // external system rather than deriving from props
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsPlaying(false)
   }, [audioUrl])
 

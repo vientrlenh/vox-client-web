@@ -78,7 +78,7 @@ export function QuestionTable({
       {isError ? (
         <div className="flex min-h-80 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
           <p className="text-sm font-bold text-red-600">
-            {errorMessage ?? 'Khong the tai danh sach cau hoi.'}
+            {errorMessage ?? 'Không thể tải danh sách câu hỏi.'}
           </p>
           <button
             className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
@@ -92,7 +92,7 @@ export function QuestionTable({
 
       {!isLoading && !isError && questions.length === 0 ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-                Chưa có câu hỏi nào
+          Chưa có câu hỏi nào
         </div>
       ) : null}
 
@@ -153,10 +153,10 @@ export function QuestionTable({
                           {formatNullableText(question.questionText)}
                         </span>
                         <span className="text-xs font-medium text-slate-500">
-                          Chu de: {formatNullableText(question.topic?.name)}
+                          Chủ đề: {formatNullableText(question.topic?.name)}
                         </span>
                         <span className="text-xs font-medium text-slate-500">
-                          Ngan hang: {formatNullableText(question.bank?.name)}
+                          Ngân hàng: {formatNullableText(question.bank?.name)}
                         </span>
                       </div>
                     </td>

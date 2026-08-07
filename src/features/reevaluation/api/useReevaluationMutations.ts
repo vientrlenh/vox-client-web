@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { classTestAppealKeys } from '@/features/classTestGrading/api/useClassTestAppealsQuery'
 import { gradingKeys } from '@/features/grading/api/useGradingQueries'
 import { apiClient } from '@/shared/api'
 import { reevaluationKeys } from './useReevaluationQueries'
@@ -31,6 +32,12 @@ export async function rejectAppeal(id: string, reason: string) {
   return response.data.message
 }
 
+/** Duyệt + tự nhận chấm trong MỘT giao dịch của BE. Trả id dòng phân công vừa mở. */
+export async function approveAndClaimAppeal(id: string) {
+  const response = await apiClient.post<ApiResponse<string>>(`${BASE}/${id}/approve-and-claim`)
+  return response.data.data
+}
+
 /** Trả về id của DÒNG PHÂN CÔNG vừa tạo, không phải id đơn. */
 export async function assignReviewer(id: string, input: AssignReviewerInput) {
   const response = await apiClient.post<ApiResponse<string>>(`${BASE}/${id}/reviewer`, {
@@ -48,6 +55,9 @@ function useInvalidateReevaluation() {
     // Giao giám khảo = mở một phân công chấm bài vòng APPEAL, nên hàng chờ bên
     // feature `grading` cũng đổi theo.
     await queryClient.invalidateQueries({ queryKey: gradingKeys.all })
+    // Màn phúc khảo của bài trên lớp đọc qua key riêng (`classTestAppeals`), nên
+    // reevaluationKeys không chạm tới — thiếu dòng này là bảng đứng im sau khi duyệt.
+    await queryClient.invalidateQueries({ queryKey: classTestAppealKeys.all })
   }
 }
 
@@ -57,6 +67,11 @@ export function useApproveMutation() {
     mutationFn: ({ id, deadline }: { id: string; deadline: string }) => approveAppeal(id, deadline),
     onSuccess: invalidate,
   })
+}
+
+export function useApproveAndClaimMutation() {
+  const invalidate = useInvalidateReevaluation()
+  return useMutation({ mutationFn: (id: string) => approveAndClaimAppeal(id), onSuccess: invalidate })
 }
 
 export function useRejectMutation() {

@@ -54,6 +54,7 @@ import { ProcessTimeline } from '../components/ProcessTimeline'
 import { RejectDialog } from '../components/RejectDialog'
 import { ReviewerPickerCard } from '../components/ReviewerPickerCard'
 import {
+  APPEAL_SCOPE_TEXT,
   avatarClasses,
   avgScore,
   bandRound,
@@ -71,18 +72,24 @@ import {
 
 const PAGE_SIZE = 20
 
-/** Tab theo từng phần thi: value là appealItemId, nhãn lấy partLabel (thiếu thì "Phần N"). */
+/**
+ * Tab theo từng câu: value là appealItemId.
+ *
+ * Nhãn phải kèm số thứ tự câu. `partLabel` là TIÊU ĐỀ PHẦN, không phải tên câu — từ khi
+ * đơn phủ toàn bài, một bài 10 câu cùng một phần sẽ ra 10 tab trùng y hệt tên nếu chỉ
+ * lấy mỗi partLabel.
+ */
 function itemTabItems(items: AppealItem[]): TabPillItem[] {
   return items.map((item, index) => ({
     value: item.appealItemId,
-    label: item.partLabel ?? `Phần ${index + 1}`,
+    label: item.partLabel ? `${item.partLabel} · Câu ${index + 1}` : `Câu ${index + 1}`,
   }))
 }
 
 const STATUS_FILTERS: Array<{ label: string; value: '' | AppealStatus }> = [
   { label: 'Tất cả', value: '' },
   { label: 'Chờ duyệt', value: 'PENDING' },
-  { label: 'Chờ phân công', value: 'APPROVED' },
+  { label: 'Đã duyệt', value: 'APPROVED' },
   { label: 'Đang chấm lại', value: 'GRADING' },
   { label: 'Đã công bố', value: 'PUBLISHED' },
   { label: 'Từ chối', value: 'REJECTED' },
@@ -269,7 +276,7 @@ export function SchoolAdminReevaluationPage() {
                           {request.examName}
                         </div>
                         <div className="mt-0.5 text-xs font-medium text-slate-400">
-                          {partLabelsText(request.partLabels)}
+                          {APPEAL_SCOPE_TEXT}
                         </div>
                       </td>
                       <td className="px-4 py-3.5">
@@ -482,9 +489,9 @@ function DetailPanel({
             <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
               <Info className="mt-0.5 size-4.5 shrink-0 text-amber-600" />
               <div className="text-[12.5px] font-medium leading-relaxed text-amber-800">
-                Giám khảo chỉ chấm lại <b>{partLabelsText(partLabels)}</b>. Còn{' '}
-                <b>{formatScore(detail.finalScore)}</b> ở trên là <b>điểm tổng của cả bài</b> sau
-                phúc khảo — hệ thống tính lại từ tất cả các phần, nên hai con số này không bằng nhau.
+                Giám khảo đã chấm lại <b>toàn bộ bài làm</b> ({detail.items.length} câu).{' '}
+                <b>{formatScore(detail.finalScore)}</b> ở trên là <b>điểm tổng cả bài</b> sau phúc
+                khảo — hệ thống tính lại từ tất cả các phần.
               </div>
             </div>
           ) : null}

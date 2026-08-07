@@ -10,6 +10,7 @@ import { QuestionPicker } from '../components/QuestionPicker'
 import { examQueryKeys, useExamMyRoleQuery, useExamPaperQuery, useExamQuery } from '../api/queries'
 import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '../utils/timeQuota'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
+import { getQuestionTypeDisplay, type QuestionType } from '@/features/question/types'
 import {
   useDeleteExamPaperMutation,
   useUpdateExamPaperItemMutation,
@@ -272,6 +273,11 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
             <div className="mt-3.5 grid gap-2.5">
               {section.items.map((item) => {
                 const isAssignedButHidden = !item.question && Boolean(item.questionId)
+                // Gate theo slotType chứ không theo blueprintSlotId: ô SELECTION ("chọn ngẫu nhiên")
+                // chỉ quy định tiêu chí nên người ra đề phải tự chọn câu. slotType null (câu soạn tay,
+                // hoặc slot đã bị xoá) cũng cho sửa — khớp đúng fail-open của backend.
+                const isFixedSlot = item.slotType === 'FIXED'
+                const isSelectionSlot = item.slotType === 'SELECTION'
                 return (
                   <div
                     className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5"
@@ -305,6 +311,34 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
                           </span>
                         </div>
                       ) : null}
+                      {isSelectionSlot && item.selectionSpec ? (
+                        <div
+                          className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-500"
+                          title="Tiêu chí tham khảo — hệ thống chưa lọc tự động theo mức độ/band/kỹ năng"
+                        >
+                          <span className="text-slate-400">Tiêu chí:</span>
+                          {item.selectionSpec.questionType ? (
+                            <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                              {getQuestionTypeDisplay(item.selectionSpec.questionType as QuestionType)}
+                            </span>
+                          ) : null}
+                          {item.selectionSpec.difficulty ? (
+                            <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                              Mức độ: {item.selectionSpec.difficulty}
+                            </span>
+                          ) : null}
+                          {item.selectionSpec.targetBandLevel ? (
+                            <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                              Band: {item.selectionSpec.targetBandLevel}
+                            </span>
+                          ) : null}
+                          {item.selectionSpec.skillCode ? (
+                            <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                              Kỹ năng: {item.selectionSpec.skillCode}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                     {item.question ? (
                       <a
@@ -318,15 +352,22 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
                         <Eye aria-hidden="true" className="size-4" />
                       </a>
                     ) : null}
-                    {item.blueprintSlotId ? (
+                    {isFixedSlot ? (
                       <span
                         className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600"
                         title="Câu hỏi này cố định theo blueprint, không đổi được ở đây"
                       >
                         Cố định theo blueprint
                       </span>
+                    ) : isSelectionSlot ? (
+                      <span
+                        className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700"
+                        title="Blueprint chỉ quy định tiêu chí cho ô này — bạn tự chọn câu hỏi phù hợp"
+                      >
+                        Chọn theo tiêu chí
+                      </span>
                     ) : null}
-                    {canEditPaperContent && !item.blueprintSlotId ? (
+                    {canEditPaperContent && !isFixedSlot ? (
                       <button
                         className="inline-flex h-8.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-indigo-600 hover:bg-slate-50"
                         onClick={() => setPickerItemId(item.id)}
@@ -372,7 +413,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
 
       {revisionNote !== null ? (
         <div className="mt-3.5 grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <label className="text-xs font-bold text-slate-700">Góp ý cho AUTHOR (bắt buộc)</label>
+          <label className="text-xs font-bold text-slate-700">Góp ý cho người ra đề (bắt buộc)</label>
           <textarea
             className="min-h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
             onChange={(event) => setRevisionNote(event.target.value)}
@@ -427,6 +468,8 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
       {pickerItemId ? (
         <QuestionPicker
           excludeQuestionIds={pickerExcludeQuestionIds}
+          initialQuestionTopicId={pickerCurrentItem?.selectionSpec?.topicId ?? null}
+          initialType={(pickerCurrentItem?.selectionSpec?.questionType as QuestionType | undefined) ?? null}
           onClose={() => setPickerItemId(null)}
           onSelect={(question) => {
             const candidateQuotaWarning = buildTimeQuotaWarning(
@@ -444,7 +487,8 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
               .then(() => setPickerItemId(null))
               .catch((error) => setErrorMessage(toApiError(error).message))
           }}
-          publishedOnly={exam?.kind === 'CENTRALIZED'}
+          publishedOnly={exam?.kind === 'CENTRALIZED' || Boolean(pickerCurrentItem?.slotType)}
+          questionDetailBasePath={canManage ? '/teacher' : '/school-admin'}
           scope="teacher"
           selectedQuestionIds={pickerCurrentItem?.questionId ? [pickerCurrentItem.questionId] : []}
         />

@@ -1,3 +1,4 @@
+import type { ExamEvaluationSignalsDto, ExamValidityDto } from '@/shared/lib/aiEvaluation'
 import type { StatusTone } from '@/shared/ui/StatusBadge'
 
 export type StudentExamSummaryDto = {
@@ -22,6 +23,19 @@ export type StudentExamSessionSummaryDto = {
   flagged: boolean
   sessionId: string
   status: string
+}
+
+export type StudentExamKind = 'CENTRALIZED' | 'CLASS_TEST'
+
+/** Đúng bộ giá trị mà BE suy ra cho `status` của mỗi bài thi — dùng luôn làm bộ lọc. */
+export type StudentExamStatusFilter = 'completed' | 'in_progress' | 'upcoming'
+
+export type StudentExamPage = {
+  content: StudentExamSummaryDto[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
 }
 
 export type ExamResultSectionDto = {
@@ -71,23 +85,12 @@ export type ExamItemCriterionScoreDto = {
   rubricCriterionId: string
 }
 
-export type ExamValidityRuleResultDto = {
-  action?: string | null
-  blocking?: boolean | null
-  category?: string | null
-  evidence?: Record<string, unknown> | null
-  message?: string | null
-  ruleId?: string | null
-  severity?: string | null
-  targetCriteria?: string[] | null
-}
-
-export type ExamValidityDto = {
-  action?: string | null
-  overallSeverity?: string | null
-  ruleResults?: ExamValidityRuleResultDto[] | null
-  validForScoring?: boolean | null
-}
+// Cách đọc kết quả AI dùng chung với màn chấm của giáo viên — xem `@/shared/lib/aiEvaluation`.
+export type {
+  ExamEvaluationSignalsDto,
+  ExamValidityDto,
+  ExamValidityRuleResultDto,
+} from '@/shared/lib/aiEvaluation'
 
 export type PhonemeFeedbackDto = {
   accuracyScore?: number | null
@@ -120,29 +123,32 @@ export type ExamItemEvaluationTurnDto = {
   wordFeedback?: WordFeedbackDto[] | null
 }
 
-export type ExamEvaluationSignalsDto = {
-  asrConfidenceAvg?: number | null
-  audioGateReasonCodes?: string[] | null
-  audioGateStatus?: 'HARD_FAIL' | 'PASS' | 'SOFT_WARN' | 'UNKNOWN' | null
-  audioQuality?: number | null
-  codeSwitchingRatio?: number | null
-  confidenceMode?: 'HIGH_STAKES' | 'MOCK_TEST' | 'PRACTICE' | null
-  durationSeconds?: number | null
-  evidenceReasonCodes?: string[] | null
-  evidenceStatus?: 'INSUFFICIENT_EVIDENCE' | 'SUFFICIENT' | null
-  expectedMinWords?: number | null
-  lengthRatio?: number | null
-  offTopicRatio?: number | null
-  sentenceCount?: number | null
-  silenceRatio?: number | null
-  speechRate?: number | null
-  topicRelevanceScore?: number | null
-  uncertaintyType?: 'INSUFFICIENT_EVIDENCE' | 'MIXED' | 'NONE' | 'SYSTEM_UNCERTAINTY' | null
-  wordCount?: number | null
+/**
+ * Bằng chứng của bản chấm AI, giữ lại kể cả khi giáo viên đã chấm lại. Điểm và rationale
+ * hiển thị vẫn là của bản đang hiệu lực ở cấp trên — khối này chỉ là ngữ cảnh.
+ */
+export type ExamItemAiEvaluationContextDto = {
+  engineType?: string | null
+  evaluatedAt?: string | null
+  evaluationId: string
+  feedbackSummary?: string | null
+  gradedByModel?: string | null
+  markedInvalid: boolean
+  overallConfidence?: number | null
+  promptVersion?: string | null
+  requiresHumanReview: boolean
+  requiresRetake: boolean
+  reviewReasonCode?: string | null
+  signals?: ExamEvaluationSignalsDto | null
+  suggestions?: unknown
+  validity?: ExamValidityDto | null
 }
 
 export type ExamItemEvaluationDto = {
+  /** Ngữ cảnh AI; `null` khi bài chưa từng có bản AI. */
+  ai?: ExamItemAiEvaluationContextDto | null
   criteria: ExamItemCriterionScoreDto[]
+  engineType?: string | null
   evaluatedAt?: string | null
   feedbackSummary?: string | null
   gradedByModel?: string | null
@@ -160,8 +166,32 @@ export type ExamItemEvaluationDto = {
   signals?: ExamEvaluationSignalsDto | null
   status: string
   suggestions?: unknown
+  /** Luôn đến từ bản AI — bản chấm tay không sinh lượt nói nào. */
   turns: ExamItemEvaluationTurnDto[]
   validity?: ExamValidityDto | null
+}
+
+/**
+ * Sau khi giáo viên chấm lại, bản hiệu lực là bản HUMAN: điểm và rationale là của giáo
+ * viên, còn phân tích của AI nằm ở khối `ai`. Gộp ở đúng một chỗ để màn học sinh và màn
+ * giáo viên không lệch nhau — và để mọi chỗ hiển thị biết con số đến từ bản nào.
+ */
+export function resolveEvaluationDisplay(evaluation: ExamItemEvaluationDto) {
+  const ai = evaluation.ai ?? null
+  const humanGraded = evaluation.engineType === 'HUMAN'
+  return {
+    aiEvaluatedAt: humanGraded ? ai?.evaluatedAt ?? null : null,
+    aiFeedbackSummary: humanGraded ? ai?.feedbackSummary ?? null : null,
+    humanGraded,
+    markedInvalid: evaluation.markedInvalid || Boolean(ai?.markedInvalid),
+    overallConfidence: evaluation.overallConfidence ?? ai?.overallConfidence ?? null,
+    requiresHumanReview: evaluation.requiresHumanReview || Boolean(ai?.requiresHumanReview),
+    requiresRetake: evaluation.requiresRetake || Boolean(ai?.requiresRetake),
+    reviewReasonCode: evaluation.reviewReasonCode ?? ai?.reviewReasonCode ?? null,
+    signals: evaluation.signals ?? ai?.signals ?? null,
+    suggestions: evaluation.suggestions ?? ai?.suggestions ?? null,
+    validity: evaluation.validity ?? ai?.validity ?? null,
+  }
 }
 
 export function formatScore(value?: number | null) {
@@ -199,6 +229,50 @@ export function getExamResultStatusDisplay(status?: string | null): { label: str
       return { label: 'Không đạt', tone: 'danger' }
     default:
       return { label: status ?? 'Chưa có kết quả', tone: 'neutral' }
+  }
+}
+
+/**
+ * Nội dung tấm chắn khi BE trả `scoreVisible: false`. Học sinh chỉ xem được bài đã có
+ * kết luận (RELEASED/FINAL/PASSED/FAILED/INVALID), nên bốn trạng thái còn lại cần lời
+ * giải thích khác nhau — nói "chờ giáo viên xem xét" cho một bài đang phúc khảo là sai.
+ *
+ * `ResultStatePanel` chỉ nhận ba tông danger/info/warning.
+ */
+export function getHiddenResultNotice(
+  status?: string | null,
+): { description: string; title: string; tone: 'danger' | 'info' | 'warning' } {
+  switch (status) {
+    case 'PENDING_REVIEW':
+      return {
+        description: 'Giáo viên đang soát lại bài của bạn. Điểm sẽ hiện ngay khi được công bố.',
+        title: 'Kết quả đang chờ công bố',
+        tone: 'warning',
+      }
+    case 'APPEALED':
+      return {
+        description: 'Đơn phúc khảo của bạn đang được xử lý. Kết quả sẽ cập nhật sau khi có quyết định.',
+        title: 'Đang xử lý phúc khảo',
+        tone: 'info',
+      }
+    case 'RE_GRADING':
+      return {
+        description: 'Bài của bạn đang được chấm lại. Vui lòng quay lại sau.',
+        title: 'Đang chấm lại',
+        tone: 'warning',
+      }
+    case 'RETAKE_REQUIRED':
+      return {
+        description: 'Bạn cần làm lại bài này. Vui lòng liên hệ giáo viên để được sắp lịch.',
+        title: 'Cần làm lại bài',
+        tone: 'danger',
+      }
+    default:
+      return {
+        description: 'Kết quả bài làm của bạn hiện chưa sẵn sàng để xem.',
+        title: 'Chưa có kết quả',
+        tone: 'info',
+      }
   }
 }
 

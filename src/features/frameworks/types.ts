@@ -31,9 +31,7 @@ export type UpdateFrameworkRequest = {
   name?: string
 }
 
-export type CreateFrameworkResponse = {
-  frameworkId: string
-}
+export type CreateFrameworkResponse = string
 
 export type UpdateFrameworkResponse = {
   frameworkId: string

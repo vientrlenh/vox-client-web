@@ -4,6 +4,8 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { Pagination } from '@/shared/components/Pagination'
+import { goToCheckout } from '@/shared/payment/checkout'
+import { isPaymentMethod, PAYMENT_METHOD_OPTIONS } from '@/shared/payment/types'
 import { useSubscriptionPlansQuery } from '../api/useSubscriptionPlansQuery'
 import { useCreatePlanMutation, useUpdatePlanMutation, useArchivePlanMutation } from '../api/usePlanMutations'
 import { useSchoolSubscriptionsQuery } from '../api/useSchoolSubscriptionsQuery'
@@ -222,19 +224,27 @@ export function SystemAdminSubscriptionPage() {
 
   async function handlePay(request: SubscriptionRequest) {
     const school = getSchool(request.schoolId)
-    const confirmed = await confirm({
+    const { confirmed, selection } = await confirmWithSelection({
       confirmLabel: 'Tiếp tục thanh toán',
-      message: `Bạn sẽ được chuyển đến cổng thanh toán PayOS để thanh toán gói "${getPlanName(request.requestedPlanId)}" cho trường "${school?.name ?? request.schoolId}". Gói được kích hoạt tự động ngay sau khi thanh toán thành công.`,
-      title: 'Thanh toán yêu cầu qua PayOS',
+      message: `Bạn sẽ được chuyển đến cổng thanh toán để thanh toán gói "${getPlanName(request.requestedPlanId)}" cho trường "${school?.name ?? request.schoolId}". Gói được kích hoạt tự động ngay sau khi thanh toán thành công.`,
+      selectLabel: 'Cổng thanh toán',
+      selectOptions: PAYMENT_METHOD_OPTIONS,
+      selectPlaceholder: 'Chọn cổng thanh toán',
+      title: 'Thanh toán yêu cầu',
     })
 
     if (!confirmed) {
       return
     }
 
+    if (!isPaymentMethod(selection)) {
+      setToast({ text: 'Chọn cổng thanh toán để tiếp tục.', tone: 'error' })
+      return
+    }
+
     try {
-      const result = await paymentLinkMutation.mutateAsync(request.id)
-      window.location.href = result.data.checkoutUrl
+      const result = await paymentLinkMutation.mutateAsync({ paymentMethod: selection, requestId: request.id })
+      goToCheckout(result.data)
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán.', tone: 'error' })
     }

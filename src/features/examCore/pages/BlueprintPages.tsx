@@ -75,7 +75,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <h2 className="text-lg font-black text-slate-900">Tạo blueprint mới</h2>
           <button
-            aria-label="Dong"
+            aria-label="Đóng"
             className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
             onClick={onClose}
             type="button"
@@ -85,7 +85,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
         </div>
         <div className="grid gap-3.5 px-6 py-5">
           <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Ten blueprint
+            Tên blueprint
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
               onChange={(event) => setName(event.target.value)}
@@ -93,7 +93,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
             />
           </label>
           <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Ma
+            Mã
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
               onChange={(event) => setCode(event.target.value)}
@@ -102,7 +102,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
             />
           </label>
           <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Mo ta
+            Mô tả
             <textarea
               className="min-h-20 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900"
               onChange={(event) => setDescription(event.target.value)}
@@ -110,13 +110,13 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
             />
           </label>
           <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Ngon ngu
+            Ngôn ngữ
             <select
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
               onChange={(event) => setLanguageId(event.target.value)}
               value={languageId}
             >
-              <option value="">Chon ngon ngu</option>
+              <option value="">Chọn ngôn ngữ</option>
               {languagesQuery.data?.content.map((language) => (
                 <option key={language.id} value={language.id}>
                   {language.name ?? language.code ?? language.id}
@@ -131,7 +131,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
             onClick={onClose}
             type="button"
           >
-            Huy
+            Hủy
           </button>
           <button
             className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white disabled:opacity-60"
@@ -173,7 +173,7 @@ function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
         </button>
       ) : (
         <p className="mt-5 text-[13px] text-slate-400">
-          Giáo viên tạo blueprint mới ngay trong lúc gắn vào kỳ thi (tab Blueprint của kỳ thi bạn là AUTHOR).
+          Giáo viên tạo blueprint mới ngay trong lúc gắn vào kỳ thi (tab Blueprint của kỳ thi bạn là người ra đề).
         </p>
       )}
 

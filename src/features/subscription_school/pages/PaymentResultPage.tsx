@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { CircleCheck, CircleX, Clock, Loader2 } from 'lucide-react'
+import { useAppSelector } from '@/app/store/hooks'
+import { clearPendingInvoice, readPendingInvoice } from '@/shared/payment/checkout'
 import { useSyncInvoicePaymentStatusMutation } from '../api/useSyncInvoicePaymentStatusMutation'
 import { invoiceQueryKeys } from '../api/useInvoicesQuery'
 import { mySubscriptionQueryKeys } from '../api/useMySubscriptionQuery'
 import { mySubscriptionUsageQueryKeys } from '../api/useMySubscriptionUsageQuery'
 import type { InvoiceStatus } from '../types'
 
-type Outcome = 'checking' | 'success' | 'cancelled' | 'failed' | 'pending'
+type Outcome = 'cancelled' | 'checking' | 'failed' | 'pending' | 'success'
 
 function outcomeFromInvoiceStatus(status: InvoiceStatus): Outcome {
   if (status === 'PAID') {
@@ -23,9 +25,24 @@ function outcomeFromInvoiceStatus(status: InvoiceStatus): Outcome {
   return 'pending'
 }
 
-// Dự phòng khi không đồng bộ được với BE (vd mất mạng, thiếu orderCode) — PayOS tự gắn thêm
-// query param status/cancel/code vào returnUrl/cancelUrl, đoán tạm từ đó để không hiện trắng trang.
-function resolveOutcomeFromUrl(searchParams: URLSearchParams): Outcome {
+// SePay không gắn tham số nào lên URL quay về mà phân biệt kết quả bằng chính đường dẫn: BE dựng
+// success_url/error_url/cancel_url từ SEPAY_RETURN_BASE_URL cộng đúng ba path này.
+const PATH_OUTCOMES: Record<string, Outcome> = {
+  '/payment/cancel': 'cancelled',
+  '/payment/error': 'failed',
+  '/payment/success': 'success',
+}
+
+// Dự phòng khi không đối soát được với BE (vd mất mạng, hoặc không lưu được invoiceId lúc rời
+// trang) — đoán tạm từ đường dẫn/query param để không hiện trắng trang. Kém tin cậy hơn hẳn
+// sync-status vì đây chỉ là thứ cổng thanh toán nói trên URL, chưa qua xác thực nào.
+function resolveOutcomeFromUrl(pathname: string, searchParams: URLSearchParams): Outcome {
+  const pathOutcome = PATH_OUTCOMES[pathname]
+  if (pathOutcome) {
+    return pathOutcome
+  }
+
+  // PayOS tự gắn thêm status/cancel/code vào returnUrl/cancelUrl.
   const status = searchParams.get('status')
   if (status === 'PAID') {
     return 'success'
@@ -56,13 +73,13 @@ const OUTCOME_DISPLAY: Record<Outcome, { icon: typeof CircleCheck; iconClass: st
   cancelled: {
     icon: CircleX,
     iconClass: 'bg-red-50 text-red-600',
-    message: 'Bạn đã hủy giao dịch trên PayOS. Gói / token chưa được kích hoạt hoặc cộng thêm.',
+    message: 'Bạn đã hủy giao dịch trên cổng thanh toán. Gói / token chưa được kích hoạt hoặc cộng thêm.',
     title: 'Đã hủy thanh toán',
   },
   checking: {
     icon: Loader2,
     iconClass: 'bg-slate-100 text-slate-500',
-    message: 'Đang xác nhận kết quả thanh toán với PayOS...',
+    message: 'Đang xác nhận kết quả thanh toán với cổng thanh toán...',
     title: 'Đang kiểm tra...',
   },
   failed: {
@@ -74,7 +91,8 @@ const OUTCOME_DISPLAY: Record<Outcome, { icon: typeof CircleCheck; iconClass: st
   pending: {
     icon: Clock,
     iconClass: 'bg-amber-50 text-amber-600',
-    message: 'Chúng tôi đang chờ xác nhận thanh toán từ PayOS. Vui lòng quay lại trang Gói dịch vụ sau ít phút để kiểm tra.',
+    message:
+      'Chúng tôi đang chờ xác nhận thanh toán từ cổng thanh toán. Vui lòng quay lại trang Gói dịch vụ sau ít phút để kiểm tra.',
     title: 'Đang xử lý thanh toán',
   },
   success: {
@@ -86,41 +104,51 @@ const OUTCOME_DISPLAY: Record<Outcome, { icon: typeof CircleCheck; iconClass: st
 }
 
 type PaymentResultPageProps = {
-  // Trang này dùng chung cho cả School Admin và System Admin (System Admin cũng thanh toán qua PayOS khi
-  // duyệt request) — mỗi route truyền đúng đường quay về theo layout/role của mình.
+  // Trang này dùng chung cho cả School Admin và System Admin (System Admin cũng thanh toán khi duyệt
+  // request). Route riêng theo role thì truyền sẵn đường quay về; ba route /payment/* của SePay thì
+  // không truyền được vì BE chỉ cấu hình được một bộ URL cho mọi role — khi đó suy từ role hiện tại.
   backTo?: string
 }
 
-const DEFAULT_BACK_TO = '/school-admin/subscription'
+const SYSTEM_ADMIN_BACK_TO = '/system-admin/subscription'
+const SCHOOL_ADMIN_BACK_TO = '/school-admin/subscription'
 
-export function PaymentResultPage({ backTo = DEFAULT_BACK_TO }: PaymentResultPageProps) {
+export function PaymentResultPage({ backTo }: PaymentResultPageProps) {
   const [searchParams] = useSearchParams()
+  const { pathname } = useLocation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const syncMutation = useSyncInvoicePaymentStatusMutation()
-  const orderCode = searchParams.get('orderCode')
+  const user = useAppSelector((state) => state.auth.user)
+
+  // Đọc một lần lúc mount: goToCheckout() đã lưu invoiceId vào sessionStorage ngay trước khi rời
+  // trang, và ta xóa nó sau khi đối soát xong nên lần đọc sau sẽ ra null.
+  const [pendingInvoiceId] = useState(() => readPendingInvoice())
   const [outcome, setOutcome] = useState<Outcome>(() =>
-    orderCode && !Number.isNaN(Number(orderCode)) ? 'checking' : resolveOutcomeFromUrl(searchParams),
+    pendingInvoiceId ? 'checking' : resolveOutcomeFromUrl(pathname, searchParams),
   )
   const [secondsLeft, setSecondsLeft] = useState(AUTO_REDIRECT_SECONDS)
   // Chặn gọi sync-status 2 lần khi React.StrictMode mount/unmount/mount lại effect ở dev mode.
-  const syncedOrderCodeRef = useRef<string | null>(null)
+  const syncedInvoiceIdRef = useRef<string | null>(null)
+
+  const resolvedBackTo =
+    backTo ?? (user?.roles.includes('SYSTEM_ADMIN') ? SYSTEM_ADMIN_BACK_TO : SCHOOL_ADMIN_BACK_TO)
 
   useEffect(() => {
-    if (!orderCode || Number.isNaN(Number(orderCode))) {
+    if (!pendingInvoiceId || syncedInvoiceIdRef.current === pendingInvoiceId) {
       return
     }
-    if (syncedOrderCodeRef.current === orderCode) {
-      return
-    }
-    syncedOrderCodeRef.current = orderCode
+    syncedInvoiceIdRef.current = pendingInvoiceId
 
     syncMutation
-      .mutateAsync(Number(orderCode))
+      .mutateAsync(pendingInvoiceId)
       .then((result) => setOutcome(outcomeFromInvoiceStatus(result.data.status)))
-      .catch(() => setOutcome(resolveOutcomeFromUrl(searchParams)))
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderCode])
+      .catch(() => setOutcome(resolveOutcomeFromUrl(pathname, searchParams)))
+      // Xóa dù thành công hay lỗi: giữ lại thì lần thanh toán sau vào trang này sẽ đối soát nhầm
+      // hóa đơn cũ.
+      .finally(() => clearPendingInvoice())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingInvoiceId])
 
   useEffect(() => {
     void queryClient.invalidateQueries({ queryKey: mySubscriptionQueryKeys.all })
@@ -140,9 +168,9 @@ export function PaymentResultPage({ backTo = DEFAULT_BACK_TO }: PaymentResultPag
 
   useEffect(() => {
     if (secondsLeft <= 0) {
-      navigate(backTo)
+      navigate(resolvedBackTo)
     }
-  }, [backTo, navigate, secondsLeft])
+  }, [navigate, resolvedBackTo, secondsLeft])
 
   const display = OUTCOME_DISPLAY[outcome]
   const Icon = display.icon
@@ -157,7 +185,7 @@ export function PaymentResultPage({ backTo = DEFAULT_BACK_TO }: PaymentResultPag
         <p className="mt-2 text-sm leading-6 text-slate-500">{display.message}</p>
         <button
           className="mt-6 inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-black text-white transition hover:bg-indigo-700"
-          onClick={() => navigate(backTo)}
+          onClick={() => navigate(resolvedBackTo)}
           type="button"
         >
           Quay lại Gói dịch vụ

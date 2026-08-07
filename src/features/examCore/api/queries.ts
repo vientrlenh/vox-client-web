@@ -5,6 +5,7 @@ import type {
   ExamBlueprintDto,
   ExamBlueprintVersionDto,
   ExamDto,
+  ExamKind,
   ExamPaperDto,
   ExamPickerOption,
   ExamScheduleDto,
@@ -54,6 +55,14 @@ const EXAM_PAPER_FIELDS = `
       questionId
       order
       weight
+      slotType
+      selectionSpec {
+        questionType
+        difficulty
+        targetBandLevel
+        skillCode
+        topicId
+      }
       question {
         id
         code
@@ -118,6 +127,9 @@ const EXAM_SUMMARY_FIELDS = `
   deliveryMode
   maxAttempt
   resultDecisionMethod
+  requiresOtp
+  requiredStreamType
+  streamTypePermission
   securePool {
     id
     status
@@ -151,6 +163,9 @@ const EXAM_DETAIL_FIELDS = `
   maxAttempt
   examTimeDurationSecond
   resultDecisionMethod
+  requiresOtp
+  requiredStreamType
+  streamTypePermission
   securePool {
     id
     status
@@ -492,6 +507,19 @@ export type ExamStatusCounts = {
   total: number
 }
 
+/**
+ * Dữ liệu tham chiếu dùng trong luồng soạn kỳ thi (rubric, chính sách đánh giá).
+ *
+ * Tách khỏi `examQueryKeys` vì đây KHÔNG phải dữ liệu kỳ thi: mọi mutation kỳ thi đều invalidate
+ * `examQueryKeys.all`, kéo theo refetch cả danh sách rubric và toàn bộ query phiên bản rubric — trong
+ * khi sửa kỳ thi không làm rubric đổi. Chiều ngược lại cũng không mất gì: CRUD rubric nằm ở
+ * `features/rubric_system` / `features/rubrics_school` với namespace key riêng
+ * (`searchRubricKeys`, `rubricVersionQueryKeys`), chưa bao giờ đụng tới `examQueryKeys`.
+ */
+export const examReferenceQueryKeys = {
+  all: ['exam-reference-data'] as const,
+}
+
 export const examQueryKeys = {
   all: ['exam-management'] as const,
   blueprint: (id: string | null) => [...examQueryKeys.all, 'blueprint', id] as const,
@@ -731,8 +759,8 @@ export function useSchoolRoomsQuery(page: number, size: number, search: string) 
 // Chỉ những trường một danh sách chọn cần. Đừng thêm `papers`/`members`/`candidateCount`:
 // chúng chạy qua DataLoader nên mỗi field là thêm một loạt query cho mỗi dòng.
 const EXAM_PICKER_QUERY = `
-  query ExamPickerOptions($keyword: String, $status: ExamStatus, $page: Int!, $size: Int!) {
-    exams(keyword: $keyword, status: $status, page: $page, size: $size) {
+  query ExamPickerOptions($keyword: String, $status: ExamStatus, $kind: ExamKind, $page: Int!, $size: Int!) {
+    exams(keyword: $keyword, status: $status, kind: $kind, page: $page, size: $size) {
       content {
         id
         code
@@ -751,6 +779,12 @@ const EXAM_PICKER_QUERY = `
 
 export type FetchExamPickerOptionsInput = {
   keyword?: string
+  /**
+   * Loại bài. Bỏ trống là BE trả cả kỳ thi tập trung lẫn bài kiểm tra trên lớp — màn
+   * phân công chấm bài của nhà trường vì thế từng liệt kê cả bài trên lớp mà chọn vào
+   * là gán không được.
+   */
+  kind?: ExamKind
   page: number
   size: number
   status?: ExamStatus | ''
@@ -760,6 +794,7 @@ export type FetchExamPickerOptionsInput = {
 export async function fetchExamPickerOptions(input: FetchExamPickerOptionsInput) {
   const data = await graphQLRequest<{ exams: Paged<ExamPickerOption> }>(EXAM_PICKER_QUERY, {
     keyword: input.keyword?.trim() || null,
+    kind: input.kind ?? null,
     page: input.page - 1,
     size: input.size,
     status: input.status || null,

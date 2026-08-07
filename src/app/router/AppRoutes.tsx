@@ -302,20 +302,11 @@ const SystemAdminQuestionBankDetailPage = lazy(() =>
 );
 
 // question-topic
-const TeacherQuestionTopicsPage = lazy(() =>
-  import("@/features/question-topic").then((m) => ({ default: m.TeacherQuestionTopicsPage })),
-);
 const TeacherQuestionTopicDetailPage = lazy(() =>
   import("@/features/question-topic").then((m) => ({ default: m.TeacherQuestionTopicDetailPage })),
 );
-const SchoolAdminQuestionTopicsPage = lazy(() =>
-  import("@/features/question-topic").then((m) => ({ default: m.SchoolAdminQuestionTopicsPage })),
-);
 const SchoolAdminQuestionTopicDetailPage = lazy(() =>
   import("@/features/question-topic").then((m) => ({ default: m.SchoolAdminQuestionTopicDetailPage })),
-);
-const SystemAdminQuestionTopicsPage = lazy(() =>
-  import("@/features/question-topic").then((m) => ({ default: m.SystemAdminQuestionTopicsPage })),
 );
 const SystemAdminQuestionTopicDetailPage = lazy(() =>
   import("@/features/question-topic").then((m) => ({ default: m.SystemAdminQuestionTopicDetailPage })),
@@ -492,11 +483,22 @@ const SchoolAdminGradingPage = lazy(() =>
 const TeacherGradingPage = lazy(() =>
   import("@/features/grading").then((m) => ({ default: m.TeacherGradingPage })),
 );
-const TeacherClassTestGradingPage = lazy(() =>
-  import("@/features/grading").then((m) => ({ default: m.TeacherClassTestGradingPage })),
+// Chấm bài kiểm tra trên lớp là feature RIÊNG: giáo viên tạo bài chấm hết, thấy tên học
+// sinh, và mọi điều hướng bám theo :examId thay vì hàng đợi toàn trường.
+const ClassTestGradingListPage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestGradingListPage })),
 );
-const SchoolAdminClassTestGradingPage = lazy(() =>
-  import("@/features/grading").then((m) => ({ default: m.SchoolAdminClassTestGradingPage })),
+const ClassTestGradingQueuePage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestGradingQueuePage })),
+);
+const ClassTestGradingTaskPage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestGradingTaskPage })),
+);
+const ClassTestGradingBoardPage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestGradingBoardPage })),
+);
+const ClassTestReevaluationPage = lazy(() =>
+  import("@/features/classTestGrading").then((m) => ({ default: m.ClassTestReevaluationPage })),
 );
 const TeacherGradingTaskPage = lazy(() =>
   import("@/features/grading").then((m) => ({ default: m.TeacherGradingTaskPage })),
@@ -708,6 +710,14 @@ const SchoolAdminSubscriptionPaymentResultPage = lazy(() =>
   })),
 );
 
+// Dùng cho ba route /payment/* mà SePay redirect người dùng về — không truyền backTo nên trang tự
+// suy đường quay lại từ role hiện tại.
+const PaymentResultPage = lazy(() =>
+  import("@/features/subscription_school").then((module) => ({
+    default: module.PaymentResultPage,
+  })),
+);
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -723,6 +733,22 @@ export function AppRoutes() {
               <Route
                 path="profile"
                 element={<ProfilePage/>}
+              />
+              {/* SePay redirect người dùng về đúng ba đường dẫn này: BE dựng success_url/error_url/
+                  cancel_url bằng SEPAY_RETURN_BASE_URL cộng path cố định. Không tách được theo role
+                  như PayOS (mỗi role một returnUrl riêng) vì SePay chỉ có một bộ URL cho cả cổng,
+                  nên đặt ngoài layout của role và để trang tự suy đường quay lại. */}
+              <Route
+                path="payment/success"
+                element={<PaymentResultPage/>}
+              />
+              <Route
+                path="payment/error"
+                element={<PaymentResultPage/>}
+              />
+              <Route
+                path="payment/cancel"
+                element={<PaymentResultPage/>}
               />
           </Route>
         </Route>
@@ -760,7 +786,6 @@ export function AppRoutes() {
             />
             <Route path="system-admin/question-banks" element={<SystemAdminQuestionBanksPage />} />
             <Route path="system-admin/question-banks/:bankId" element={<SystemAdminQuestionBankDetailPage />} />
-            <Route path="system-admin/question-topics" element={<SystemAdminQuestionTopicsPage />} />
             <Route path="system-admin/question-topics/:topicId" element={<SystemAdminQuestionTopicDetailPage />} />
             <Route path="system-admin/questions/all" element={<SystemAdminQuestionsPage />} />
             <Route path="system-admin/questions/review" element={<SystemAdminReviewQuestionsPage />} />
@@ -934,7 +959,6 @@ export function AppRoutes() {
             <Route path="school-admin/frameworks/:frameworkId/versions/:versionId" element={<SchoolAdminFrameworkVersionDetailPage />} />
             <Route path="school-admin/question-banks" element={<SchoolAdminQuestionBanksPage />} />
             <Route path="school-admin/question-banks/:bankId" element={<SchoolAdminQuestionBankDetailPage />} />
-            <Route path="school-admin/question-topics" element={<SchoolAdminQuestionTopicsPage />} />
             <Route path="school-admin/question-topics/:topicId" element={<SchoolAdminQuestionTopicDetailPage />} />
             <Route path="school-admin/questions/all" element={<SchoolAdminQuestionsPage />} />
             <Route path="school-admin/questions/review" element={<SchoolAdminReviewQuestionsPage />} />
@@ -945,7 +969,7 @@ export function AppRoutes() {
             <Route path="school-admin/class-tests/:examId/results/:sessionId" element={<SchoolAdminClassTestResultDetailPage />} />
             <Route path="school-admin/class-tests/:examId/results" element={<SchoolAdminClassTestResultsListPage />} />
             <Route path="school-admin/class-tests/:examId/papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
-            <Route path="school-admin/class-tests/:examId/grading" element={<SchoolAdminClassTestGradingPage />} />
+            <Route path="school-admin/class-tests/:examId/grading" element={<ClassTestGradingBoardPage />} />
             <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
             <Route path="school-admin/exam-papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
@@ -1057,7 +1081,6 @@ export function AppRoutes() {
             <Route path="teacher/classes" element={<TeacherMyClassesPage />} />
             <Route path="teacher/question-banks" element={<TeacherQuestionBanksPage />} />
             <Route path="teacher/question-banks/:bankId" element={<TeacherQuestionBankDetailPage />} />
-            <Route path="teacher/question-topics" element={<TeacherQuestionTopicsPage />} />
             <Route path="teacher/question-topics/:topicId" element={<TeacherQuestionTopicDetailPage />} />
             <Route path="teacher/questions/my" element={<TeacherMyQuestionsPage />} />
             <Route path="teacher/questions/all" element={<TeacherQuestionsPage />} />
@@ -1075,7 +1098,11 @@ export function AppRoutes() {
             <Route path="teacher/class-tests/:examId/results/:sessionId" element={<TeacherClassTestResultDetailPage />} />
             <Route path="teacher/class-tests/:examId/results" element={<TeacherClassTestResultsListPage />} />
             <Route path="teacher/class-tests/:examId/papers/:paperId" element={<TeacherExamPaperEditPage />} />
-            <Route path="teacher/class-tests/:examId/grading" element={<TeacherClassTestGradingPage />} />
+            <Route path="teacher/class-test-grading" element={<ClassTestGradingListPage />} />
+            {/* Đặt route con TRƯỚC route cha: react-router v7 khớp theo thứ tự khai báo. */}
+            <Route path="teacher/class-tests/:examId/grading/:assignmentId" element={<ClassTestGradingTaskPage />} />
+            <Route path="teacher/class-tests/:examId/grading" element={<ClassTestGradingQueuePage />} />
+            <Route path="teacher/class-tests/:examId/reevaluation" element={<ClassTestReevaluationPage />} />
             <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
             <Route path="teacher/exam-papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
             <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />

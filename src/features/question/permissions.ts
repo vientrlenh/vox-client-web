@@ -223,8 +223,8 @@ export function getQuestionReviewActions(
   ) {
     actions.push({
       action: 'SUBMIT',
-      description: 'Gui cau hoi vao hang doi duyet.',
-      title: 'Submit',
+      description: 'Gửi câu hỏi vào hàng đợi duyệt.',
+      title: 'Gửi duyệt',
     })
   }
 
@@ -236,20 +236,20 @@ export function getQuestionReviewActions(
     actions.push(
       {
         action: 'APPROVE',
-        description: 'Duyet cau hoi de chuyen sang approved.',
-        title: 'Approve',
+        description: 'Phê duyệt câu hỏi để chuyển sang trạng thái Đã duyệt.',
+        title: 'Phê duyệt',
       },
       {
         action: 'REQUEST_REVISION',
-        description: 'Yeu cau tac gia sua cau hoi.',
+        description: 'Yêu cầu tác giả chỉnh sửa câu hỏi.',
         requiresNote: true,
-        title: 'Request revision',
+        title: 'Yêu cầu chỉnh sửa',
       },
       {
         action: 'REJECT',
-        description: 'Tu choi cau hoi hien tai.',
+        description: 'Từ chối câu hỏi hiện tại.',
         requiresNote: true,
-        title: 'Reject',
+        title: 'Từ chối',
       },
     )
   }
@@ -260,8 +260,8 @@ export function getQuestionReviewActions(
   ) {
     actions.push({
       action: 'PUBLISH',
-      description: 'Xuat ban cau hoi da duyet de dua vao su dung ngay.',
-      title: 'Publish',
+      description: 'Xuất bản câu hỏi đã duyệt để đưa vào sử dụng ngay.',
+      title: 'Xuất bản',
     })
   }
 
@@ -271,8 +271,8 @@ export function getQuestionReviewActions(
   ) {
     actions.push({
       action: 'ARCHIVE',
-      description: 'Luu tru cau hoi da xuat ban khi tam ngung su dung.',
-      title: 'Archive',
+      description: 'Lưu trữ câu hỏi đã xuất bản khi tạm ngừng sử dụng.',
+      title: 'Lưu trữ',
     })
   }
 
@@ -282,8 +282,8 @@ export function getQuestionReviewActions(
   ) {
     actions.push({
       action: 'PUBLISH',
-      description: 'Xuat ban lai cau hoi tu trang thai luu tru.',
-      title: 'Republish',
+      description: 'Xuất bản lại câu hỏi từ trạng thái Lưu trữ.',
+      title: 'Xuất bản lại',
     })
   }
 
@@ -296,8 +296,8 @@ function getAdminActions(status?: QuestionStatus | null) {
   if (status && isEditableStatus(status)) {
     actions.push({
       action: 'SUBMIT',
-      description: 'Gui cau hoi vao hang doi duyet.',
-      title: 'Submit',
+      description: 'Gửi câu hỏi vào hàng đợi duyệt.',
+      title: 'Gửi duyệt',
     })
   }
 
@@ -305,20 +305,20 @@ function getAdminActions(status?: QuestionStatus | null) {
     actions.push(
       {
         action: 'APPROVE',
-        description: 'Duyet cau hoi.',
-        title: 'Approve',
+        description: 'Phê duyệt câu hỏi.',
+        title: 'Phê duyệt',
       },
       {
         action: 'REQUEST_REVISION',
-        description: 'Yeu cau chinh sua cau hoi.',
+        description: 'Yêu cầu chỉnh sửa câu hỏi.',
         requiresNote: true,
-        title: 'Request revision',
+        title: 'Yêu cầu chỉnh sửa',
       },
       {
         action: 'REJECT',
-        description: 'Tu choi cau hoi.',
+        description: 'Từ chối câu hỏi.',
         requiresNote: true,
-        title: 'Reject',
+        title: 'Từ chối',
       },
     )
   }
@@ -326,24 +326,24 @@ function getAdminActions(status?: QuestionStatus | null) {
   if (status === 'APPROVED') {
     actions.push({
       action: 'PUBLISH',
-      description: 'Xuat ban cau hoi.',
-      title: 'Publish',
+      description: 'Xuất bản câu hỏi.',
+      title: 'Xuất bản',
     })
   }
 
   if (status === 'PUBLISHED') {
     actions.push({
       action: 'ARCHIVE',
-      description: 'Ngung trien khai va dua cau hoi vao luu tru.',
-      title: 'Archive',
+      description: 'Ngừng triển khai và đưa câu hỏi vào lưu trữ.',
+      title: 'Lưu trữ',
     })
   }
 
   if (status === 'ARCHIVED') {
     actions.push({
       action: 'PUBLISH',
-      description: 'Mo lai cau hoi da luu tru de tiep tuc su dung.',
-      title: 'Republish',
+      description: 'Mở lại câu hỏi đã lưu trữ để tiếp tục sử dụng.',
+      title: 'Xuất bản lại',
     })
   }
 
@@ -357,20 +357,20 @@ function getSchoolAdminActions(status?: QuestionStatus | null) {
     actions.push(
       {
         action: 'APPROVE',
-        description: 'Duyet cau hoi.',
-        title: 'Approve',
+        description: 'Phê duyệt câu hỏi.',
+        title: 'Phê duyệt',
       },
       {
         action: 'REQUEST_REVISION',
-        description: 'Yeu cau chinh sua cau hoi.',
+        description: 'Yêu cầu chỉnh sửa câu hỏi.',
         requiresNote: true,
-        title: 'Request revision',
+        title: 'Yêu cầu chỉnh sửa',
       },
       {
         action: 'REJECT',
-        description: 'Tu choi cau hoi.',
+        description: 'Từ chối câu hỏi.',
         requiresNote: true,
-        title: 'Reject',
+        title: 'Từ chối',
       },
     )
   }
@@ -378,24 +378,24 @@ function getSchoolAdminActions(status?: QuestionStatus | null) {
   if (status === 'APPROVED') {
     actions.push({
       action: 'PUBLISH',
-      description: 'Xuat ban cau hoi da duyet.',
-      title: 'Publish',
+      description: 'Xuất bản câu hỏi đã duyệt.',
+      title: 'Xuất bản',
     })
   }
 
   if (status === 'PUBLISHED') {
     actions.push({
       action: 'ARCHIVE',
-      description: 'Luu tru cau hoi da trien khai.',
-      title: 'Archive',
+      description: 'Lưu trữ câu hỏi đã triển khai.',
+      title: 'Lưu trữ',
     })
   }
 
   if (status === 'ARCHIVED') {
     actions.push({
       action: 'PUBLISH',
-      description: 'Xuat ban lai cau hoi tu trang thai luu tru.',
-      title: 'Republish',
+      description: 'Xuất bản lại câu hỏi từ trạng thái Lưu trữ.',
+      title: 'Xuất bản lại',
     })
   }
 

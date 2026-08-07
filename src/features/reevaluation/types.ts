@@ -152,7 +152,7 @@ export type AppealStats = {
 }
 
 const STATUS_DISPLAY: Record<AppealStatus, { label: string; tone: StatusTone }> = {
-  APPROVED: { label: 'Chờ phân công', tone: 'info' },
+  APPROVED: { label: 'Đã duyệt', tone: 'info' },
   GRADING: { label: 'Đang chấm lại', tone: 'violet' },
   PENDING: { label: 'Chờ duyệt', tone: 'warning' },
   PUBLISHED: { label: 'Đã công bố', tone: 'success' },
@@ -176,6 +176,12 @@ export function avgScore(scores: AppealCriterionScore[]): number {
 export function partLabelsText(labels: string[]): string {
   return labels.length > 0 ? labels.join(' · ') : '—'
 }
+
+/**
+ * Đơn phúc khảo luôn phủ toàn bài: form của học sinh không còn bước chọn câu, và giám
+ * khảo bắt buộc chấm đủ mọi phần (`GradingItemScoreResolver` enforceFullCoverage).
+ */
+export const APPEAL_SCOPE_TEXT = 'Toàn bài'
 
 /**
  * Không có API timeline — FE tự ghép từ các mốc của đơn.

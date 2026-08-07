@@ -53,26 +53,26 @@ type BulkActionOption = {
 const QUESTION_STATUS_OPTIONS: Array<{ label: string; value: '' | QuestionStatus }> = [
   { label: 'Tất cả trạng thái', value: '' },
   { label: 'Bản nháp', value: 'DRAFT' },
-  { label: 'Submitted for review', value: 'SUBMITTED_FOR_REVIEW' },
-  { label: 'Revision requested', value: 'REVISION_REQUESTED' },
-  { label: 'Approved', value: 'APPROVED' },
-  { label: 'Rejected', value: 'REJECTED' },
-  { label: 'Published', value: 'PUBLISHED' },
-  { label: 'Archived', value: 'ARCHIVED' },
+  { label: 'Chờ duyệt', value: 'SUBMITTED_FOR_REVIEW' },
+  { label: 'Yêu cầu sửa', value: 'REVISION_REQUESTED' },
+  { label: 'Đã duyệt', value: 'APPROVED' },
+  { label: 'Bị từ chối', value: 'REJECTED' },
+  { label: 'Đã xuất bản', value: 'PUBLISHED' },
+  { label: 'Lưu trữ', value: 'ARCHIVED' },
 ]
 
 const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: '' | QuestionType }> = [
   { label: 'Tất cả loại', value: '' },
-  { label: 'Short answer', value: 'SHORT_ANSWER' },
-  { label: 'Long answer', value: 'LONG_ANSWER' },
-  { label: 'Opinion', value: 'OPINION' },
-  { label: 'Description', value: 'DESCRIPTION' },
+  { label: 'Trả lời ngắn', value: 'SHORT_ANSWER' },
+  { label: 'Trả lời dài', value: 'LONG_ANSWER' },
+  { label: 'Ý kiến', value: 'OPINION' },
+  { label: 'Mô tả', value: 'DESCRIPTION' },
 ]
 
 const QUESTION_SHARING_OPTIONS: Array<{ label: string; value: '' | QuestionSharing }> = [
   { label: 'Tất cả chia sẻ', value: '' },
-  { label: 'Private', value: 'PRIVATE' },
-  { label: 'School shared', value: 'SCHOOL_SHARED' },
+  { label: 'Riêng tư', value: 'PRIVATE' },
+  { label: 'Chia sẻ trong trường', value: 'SCHOOL_SHARED' },
 ]
 
 const BULK_ACTION_OPTIONS_BY_ROLE: Record<
@@ -301,12 +301,6 @@ function QuestionsPage({
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
   }, [flashMessage, location.pathname, location.search, navigate])
 
-  useEffect(() => {
-    if (!selectedBulkAction && bulkActionOptions.length > 0) {
-      setBulkAction(bulkActionOptions[0].action)
-    }
-  }, [bulkActionOptions, selectedBulkAction])
-
   const validBulkSelection = bulkSelection.filter((id) =>
     questionsQuery.data?.content.some((question) => question.id === id),
   )
@@ -359,7 +353,7 @@ function QuestionsPage({
 
     if (
       !(await confirm({
-        message: `Bạn có chắc muốn ${selectedBulkAction.confirmVerb} ${selectedQuestions.length} câu hỏi đã chọn không? Các câu không đúng quyền hoặc không đúng trạng thái sẽ bị backend bỏ qua.`,
+        message: `Bạn có chắc muốn ${selectedBulkAction.confirmVerb} ${selectedQuestions.length} câu hỏi đã chọn không? Các câu không đúng quyền hoặc không đúng trạng thái sẽ bị hệ thống bỏ qua.`,
       }))
     ) {
       return
@@ -397,6 +391,10 @@ function QuestionsPage({
             .join(' | '),
         )
       }
+    } catch (error) {
+      setExportError(
+        getErrorMessage(error) ?? 'Không thể cập nhật trạng thái hàng loạt. Vui lòng thử lại.',
+      )
     } finally {
       setIsBulkProcessing(false)
     }

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest, requireSchoolId } from '@/shared/api'
 import type { AssessmentPolicyDto, Paged } from '../types'
-import { examQueryKeys } from './queries'
+import { examReferenceQueryKeys } from './queries'
 
 const ASSESSMENT_POLICY_FIELDS = `
   id
@@ -44,15 +44,18 @@ async function fetchMatchingSchoolAssessmentPolicies(filters: { languageId?: str
 
 // languageId is optional: some creation flows (e.g. class tests) have no language field of their own,
 // so matching falls back to rubricVersionId alone.
-export function useMatchingSchoolAssessmentPoliciesQuery(filters: { languageId?: string | null; rubricVersionId?: string | null }) {
+export function useMatchingSchoolAssessmentPoliciesQuery(
+  filters: { languageId?: string | null; rubricVersionId?: string | null },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
-    enabled: Boolean(filters.rubricVersionId),
+    enabled: Boolean(filters.rubricVersionId) && (options?.enabled ?? true),
     queryFn: () =>
       fetchMatchingSchoolAssessmentPolicies({
         languageId: filters.languageId,
         rubricVersionId: filters.rubricVersionId as string,
       }),
-    queryKey: [...examQueryKeys.all, 'matching-assessment-policies', filters.languageId, filters.rubricVersionId],
+    queryKey: [...examReferenceQueryKeys.all, 'matching-assessment-policies', filters.languageId, filters.rubricVersionId],
   })
 }
 
@@ -75,14 +78,17 @@ async function fetchMatchingTeacherAssessmentPolicies(filters: { languageId?: st
 }
 
 // Teacher scope: BE infers schoolId from the token, so no schoolId argument here.
-export function useMatchingTeacherAssessmentPoliciesQuery(filters: { languageId?: string | null; rubricVersionId?: string | null }) {
+export function useMatchingTeacherAssessmentPoliciesQuery(
+  filters: { languageId?: string | null; rubricVersionId?: string | null },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
-    enabled: Boolean(filters.rubricVersionId),
+    enabled: Boolean(filters.rubricVersionId) && (options?.enabled ?? true),
     queryFn: () =>
       fetchMatchingTeacherAssessmentPolicies({
         languageId: filters.languageId,
         rubricVersionId: filters.rubricVersionId as string,
       }),
-    queryKey: [...examQueryKeys.all, 'matching-teacher-assessment-policies', filters.languageId, filters.rubricVersionId],
+    queryKey: [...examReferenceQueryKeys.all, 'matching-teacher-assessment-policies', filters.languageId, filters.rubricVersionId],
   })
 }

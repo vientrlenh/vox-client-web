@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useAppSelector } from '@/app/store/hooks'
 import { useQuestionTopicQuery } from '../api/useQuestionTopicQuery'
@@ -14,11 +15,10 @@ import {
   useReviewQuestionTopicMutation,
   useUpdateQuestionTopicMutation,
 } from '../api/useQuestionTopicMutations'
-import { QuestionTopicFormDialog } from '../components/QuestionTopicFormDialog'
-import type { QuestionTopicFormMode } from '../components/QuestionTopicFormDialog'
-import { QuestionTopicPageHeader } from '../components/QuestionTopicPageHeader'
-import { QuestionTopicPagination } from '../components/QuestionTopicPagination'
-import { QuestionTopicTable } from '../components/QuestionTopicTable'
+import { QuestionTopicFormDialog } from './QuestionTopicFormDialog'
+import type { QuestionTopicFormMode } from './QuestionTopicFormDialog'
+import { QuestionTopicPagination } from './QuestionTopicPagination'
+import { QuestionTopicTable } from './QuestionTopicTable'
 import {
   canDeleteQuestionTopic,
   canEditQuestionTopic,
@@ -48,23 +48,22 @@ function getErrorMessage(error: unknown) {
   return undefined
 }
 
-type QuestionTopicsPageProps = {
+type QuestionTopicsPanelProps = {
+  bankId: string
+  bankName?: string
   basePath: string
   scope: QuestionModuleScope
-  title?: string
 }
 
-function QuestionTopicsPage({
+export function QuestionTopicsPanel({
+  bankId,
+  bankName,
   basePath,
   scope,
-  title = 'Chủ đề câu hỏi',
-}: QuestionTopicsPageProps) {
+}: QuestionTopicsPanelProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const user = useAppSelector((state) => state.auth.user)
-  const [searchParams] = useSearchParams()
-  const bankId = searchParams.get('bankId') ?? ''
-  const bankName = searchParams.get('bankName') ?? ''
   const [page, setPage] = useState(DEFAULT_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -98,25 +97,6 @@ function QuestionTopicsPage({
     await queryClient.invalidateQueries({ queryKey: questionTopicQueryKeys.all })
   }
 
-  if (!bankId) {
-    return (
-      <section className="grid gap-6">
-        <div className="flex min-h-80 flex-col items-center justify-center px-6 py-12 text-center">
-          <p className="text-sm font-bold text-red-600">
-            Không tìm thấy ngân hàng câu hỏi. Vui lòng chọn một ngân hàng trước.
-          </p>
-          <button
-            className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
-            onClick={() => navigate(`${basePath}/question-banks`)}
-            type="button"
-          >
-            Quay lại danh sách ngân hàng
-          </button>
-        </div>
-      </section>
-    )
-  }
-
   async function handleSubmit(
     mode: QuestionTopicFormMode,
     payload: CreateQuestionTopicRequest | UpdateQuestionTopicRequest,
@@ -147,24 +127,60 @@ function QuestionTopicsPage({
       setPageMessage(message)
     } catch (error) {
       setDialogError(
-        getErrorMessage(error) ?? 'không thể lưu question topic. Vui lòng thử lại.',
+        getErrorMessage(error) ??
+          'Không thể lưu chủ đề câu hỏi. Vui lòng thử lại.',
       )
     }
   }
 
   return (
-    <section aria-labelledby="teacher-question-topics-title" className="grid gap-6">
-      <QuestionTopicPageHeader
-        bankName={bankName}
-        description="Danh sách chủ đề thuộc ngân hàng câu hỏi theo quyền của bạn."
-        isRefreshing={questionTopicsQuery.isFetching}
-        onBack={() => navigate(`${basePath}/question-banks`)}
-        onCreate={canManage ? () => setDialogMode('create') : undefined}
-        onRefresh={() => {
-          void questionTopicsQuery.refetch()
-        }}
-        title={title}
-      />
+    <section aria-labelledby="question-topics-panel-title" className="grid gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2
+            className="text-lg font-black text-blue-950"
+            id="question-topics-panel-title"
+          >
+            Chủ đề
+          </h2>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            {bankName
+              ? `Danh sách chủ đề thuộc ngân hàng: ${bankName}`
+              : 'Danh sách chủ đề thuộc ngân hàng câu hỏi này.'}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-wait disabled:opacity-70"
+            disabled={questionTopicsQuery.isFetching}
+            onClick={() => {
+              void questionTopicsQuery.refetch()
+            }}
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={[
+                'size-4',
+                questionTopicsQuery.isFetching ? 'animate-spin' : '',
+              ].join(' ')}
+            />
+            Làm mới
+          </button>
+
+          {canManage ? (
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-bold text-white transition hover:opacity-90"
+              onClick={() => setDialogMode('create')}
+              type="button"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              Tạo chủ đề
+            </button>
+          ) : null}
+        </div>
+      </div>
 
       {pageMessage ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
@@ -173,6 +189,7 @@ function QuestionTopicsPage({
       ) : null}
 
       <QuestionTopicTable
+        canEdit={(topic) => canEditQuestionTopic(topic, actorRole)}
         errorMessage={getErrorMessage(questionTopicsQuery.error)}
         footer={
           <QuestionTopicPagination
@@ -208,7 +225,7 @@ function QuestionTopicsPage({
                       } catch (error) {
                         setPageMessage(
                           getErrorMessage(error) ??
-                            'không thể cập nhật trạng thái question topic.',
+                            'Không thể cập nhật trạng thái chủ đề câu hỏi.',
                         )
                       }
                     })()
@@ -225,35 +242,34 @@ function QuestionTopicsPage({
                       } catch (error) {
                         setPageMessage(
                           getErrorMessage(error) ??
-                            'không thể cập nhật trạng thái question topic.',
+                            'Không thể cập nhật trạng thái chủ đề câu hỏi.',
                         )
                       }
                     })()
                   },
                 }),
-                ...(canDeleteQuestionTopic(topic, actorRole)
-                  ? [
-                      {
-                        id: `delete-${topic.id}`,
-                        label: 'Xóa',
-                        onSelect: () => {
-                          void (async () => {
-                            try {
-                              const message = await deleteMutation.mutateAsync(topic.id)
-                              await refreshTopics()
-                              setPageMessage(message)
-                            } catch (error) {
-                              setPageMessage(
-                                getErrorMessage(error) ??
-                                  'không thể xóa question topic.',
-                              )
-                            }
-                          })()
-                        },
-                        tone: 'danger' as const,
-                      },
-                    ]
-                  : []),
+                {
+                  disabled: !canDeleteQuestionTopic(topic, actorRole),
+                  disabledReason: 'Chỉ xóa được khi ở trạng thái Bản nháp',
+                  icon: Trash2,
+                  id: `delete-${topic.id}`,
+                  label: 'Xóa',
+                  onSelect: () => {
+                    void (async () => {
+                      try {
+                        const message = await deleteMutation.mutateAsync(topic.id)
+                        await refreshTopics()
+                        setPageMessage(message)
+                      } catch (error) {
+                        setPageMessage(
+                          getErrorMessage(error) ??
+                            'Không thể xóa chủ đề câu hỏi.',
+                        )
+                      }
+                    })()
+                  },
+                  tone: 'danger' as const,
+                },
               ]
             : undefined
         }
@@ -277,12 +293,7 @@ function QuestionTopicsPage({
         onSelect={(topicId) => {
           setSelectedId(topicId)
           navigate(
-            `${basePath}/question-topics/${topicId}?bankId=${bankId}&bankName=${encodeURIComponent(bankName)}`,
-          )
-        }}
-        onViewQuestions={(topic) => {
-          navigate(
-            `${basePath}/questions/all?bankId=${bankId}&topicId=${topic.id}&topicName=${encodeURIComponent(topic.name)}`,
+            `${basePath}/question-topics/${topicId}?bankId=${bankId}&bankName=${encodeURIComponent(bankName ?? '')}`,
           )
         }}
         questionTopics={questionTopics}
@@ -310,16 +321,4 @@ function QuestionTopicsPage({
       />
     </section>
   )
-}
-
-export function TeacherQuestionTopicsPage() {
-  return <QuestionTopicsPage basePath="/teacher" scope="teacher" />
-}
-
-export function SchoolAdminQuestionTopicsPage() {
-  return <QuestionTopicsPage basePath="/school-admin" scope="school" />
-}
-
-export function SystemAdminQuestionTopicsPage() {
-  return <QuestionTopicsPage basePath="/system-admin" scope="admin" />
 }

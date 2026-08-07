@@ -1,10 +1,13 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiClient, graphQLRequest } from '@/shared/api'
+import { parseJsonField } from '@/shared/lib/aiEvaluation'
 import type {
   ExamCandidateResultDto,
   ExamItemEvaluationDto,
   ExamValidityDto,
-  StudentExamSummaryDto,
+  StudentExamKind,
+  StudentExamPage,
+  StudentExamStatusFilter,
   WordFeedbackDto,
 } from '../types'
 
@@ -36,8 +39,17 @@ type GraphQlExamItemEvaluationTurn = Omit<ExamItemEvaluationDto['turns'][number]
   wordFeedback?: string | null
 }
 
+type GraphQlAiEvaluationContext = Omit<
+  NonNullable<ExamItemEvaluationDto['ai']>, 'signals' | 'suggestions' | 'validity'
+> & {
+  signals?: string | null
+  suggestions?: string | null
+  validity?: string | null
+}
+
 type GraphQlExamItemEvaluationResponse = {
-  examItemResponseEvaluation: (Omit<ExamItemEvaluationDto, 'signals' | 'suggestions' | 'validity' | 'turns'> & {
+  examItemResponseEvaluation: (Omit<ExamItemEvaluationDto, 'ai' | 'signals' | 'suggestions' | 'validity' | 'turns'> & {
+    ai?: GraphQlAiEvaluationContext | null
     signals?: string | null
     suggestions?: string | null
     validity?: string | null
@@ -143,6 +155,22 @@ const EXAM_ITEM_RESPONSE_EVALUATION_QUERY = `
         pronunciationOverall
         wordFeedback
       }
+      ai {
+        evaluationId
+        engineType
+        gradedByModel
+        promptVersion
+        overallConfidence
+        requiresHumanReview
+        reviewReasonCode
+        markedInvalid
+        requiresRetake
+        evaluatedAt
+        feedbackSummary
+        signals
+        validity
+        suggestions
+      }
     }
   }
 `
@@ -150,31 +178,35 @@ const EXAM_ITEM_RESPONSE_EVALUATION_QUERY = `
 export const examResultQueryKeys = {
   all: ['exam-results'] as const,
   evaluation: (answerId: string | null) => [...examResultQueryKeys.all, 'evaluation', answerId] as const,
-  myExams: () => [...examResultQueryKeys.all, 'my-exams'] as const,
+  myExams: (filters: StudentExamFilters) => [...examResultQueryKeys.all, 'my-exams', filters] as const,
   session: (sessionId: string | null) => [...examResultQueryKeys.all, 'session', sessionId] as const,
 }
 
-function parseJsonField<T>(value: string | null | undefined): T | null {
-  if (!value) {
-    return null
-  }
-
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return null
-  }
+export type StudentExamFilters = {
+  kind: StudentExamKind
+  page: number
+  size: number
+  status?: StudentExamStatusFilter | ''
 }
 
-export async function fetchMyExams() {
-  const response = await apiClient.get<ApiEnvelope<StudentExamSummaryDto[]>>('/v1/exams')
+export async function fetchMyExams(filters: StudentExamFilters) {
+  // Phân trang 0-based ở server, UI 1-based: -1 khi query, +1 ở `select`.
+  const response = await apiClient.get<ApiEnvelope<StudentExamPage>>('/v1/exams', {
+    params: {
+      kind: filters.kind,
+      page: filters.page - 1,
+      size: filters.size,
+      status: filters.status || undefined,
+    },
+  })
   return response.data.data
 }
 
-export function useMyExamsQuery() {
+export function useMyExamsQuery(filters: StudentExamFilters) {
   return useQuery({
-    queryFn: fetchMyExams,
-    queryKey: examResultQueryKeys.myExams(),
+    queryFn: () => fetchMyExams(filters),
+    queryKey: examResultQueryKeys.myExams(filters),
+    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 
@@ -215,6 +247,14 @@ export async function fetchExamItemEvaluation(answerId: string) {
 
   return {
     ...evaluation,
+    ai: evaluation.ai
+      ? {
+        ...evaluation.ai,
+        signals: parseJsonField(evaluation.ai.signals),
+        suggestions: parseJsonField(evaluation.ai.suggestions),
+        validity: parseJsonField<ExamValidityDto>(evaluation.ai.validity),
+      }
+      : null,
     signals: parseJsonField(evaluation.signals),
     suggestions: parseJsonField(evaluation.suggestions),
     turns: evaluation.turns.map((turn) => ({

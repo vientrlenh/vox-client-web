@@ -139,17 +139,10 @@ function FrameworksPage({ basePath }: { basePath: string }) {
     setDeleteError(null)
   }
 
-  async function handleCreateFramework(
-    payload: CreateFrameworkRequest,
-    isActive: boolean,
-  ) {
+  async function handleCreateFramework(payload: CreateFrameworkRequest) {
     try {
       setFormError(null)
       const result = await createMutation.mutateAsync({ payload })
-
-      if (isActive) {
-        await activateMutation.mutateAsync({ id: result.data.frameworkId })
-      }
 
       await queryClient.invalidateQueries({ queryKey: frameworkQueryKeys.all })
       setPageMessage({ text: result.message, tone: 'success' })
@@ -301,8 +294,8 @@ function FrameworksPage({ basePath }: { basePath: string }) {
         isSubmitting={isSaving}
         mode={formMode ?? 'create'}
         onClose={closeFormDialog}
-        onCreate={(payload, isActive) => {
-          void handleCreateFramework(payload, isActive)
+        onCreate={(payload) => {
+          void handleCreateFramework(payload)
         }}
         onUpdate={(id, payload) => {
           void handleUpdateFramework(id, payload)

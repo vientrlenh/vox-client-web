@@ -1,4 +1,6 @@
+import type { ExamEvaluationSignalsDto, ExamValidityDto } from '@/shared/lib/aiEvaluation'
 import type { StatusTone } from '@/shared/ui/StatusBadge'
+import type { WordFeedback } from '@/shared/ui/WordFeedbackText'
 
 // Enum BE dùng CHỮ HOA — dùng thẳng, không map qua chữ thường (chuẩn hoá tại một chỗ).
 // BE cố tình chỉ có 2 trạng thái: nộp cả bài trong một lần nên KHÔNG có IN_PROGRESS.
@@ -46,6 +48,8 @@ export type ExamCandidateResultStatus =
   | 'FAILED'
 
 // Một lượt hỏi-đáp. Một phần thi có NHIỀU lượt, mỗi lượt audio/transcript riêng.
+// `wordFeedback`/`pronunciationOverall` là JSON string trên dây, ĐÃ parse ở
+// `fetchGradingTaskDetail` — component nhận thẳng object.
 export type GradingTurn = {
   id: string
   turnOrder?: number | null
@@ -54,6 +58,10 @@ export type GradingTurn = {
   audioUrl?: string | null
   transcript?: string | null
   durationSeconds?: number | null
+  wordCount?: number | null
+  asrConfidence?: number | null
+  pronunciationOverall?: unknown
+  wordFeedback?: WordFeedback[] | null
 }
 
 export type GradingCriterionScore = {
@@ -81,15 +89,34 @@ export type GradingCriterionMeta = {
   required: boolean
 }
 
+/**
+ * MỘT CÂU HỎI cần chấm, không phải một phần thi — `partLabel` là tiêu đề section nên
+ * nhiều câu dùng chung một nhãn, `sectionId` + `orderInSection` mới phân biệt được.
+ *
+ * Các trường `ai*` lấy từ BẢN AI, không phải bản đang hiệu lực: sau khi chấm tay, bản
+ * hiệu lực là bản của giáo viên và không còn signals/turn/rationale của AI.
+ */
 export type GradingTaskItem = {
   paperItemId: string
   responseId: string
   partLabel?: string | null
+  sectionId?: string | null
+  orderInSection: number
   // Điểm của bản chấm đang có hiệu lực (lần đầu là bản AI) — mốc để đối chiếu.
   currentItemScore?: number | null
   currentFeedbackSummary?: string | null
   currentScores: GradingCriterionScore[]
   turns: GradingTurn[]
+  aiScores: GradingCriterionScore[]
+  aiOverallConfidence?: number | null
+  aiFeedbackSummary?: string | null
+  aiRequiresHumanReview: boolean
+  aiReviewReasonCode?: string | null
+  aiMarkedInvalid: boolean
+  aiRequiresRetake: boolean
+  // JSON string trên dây, ĐÃ parse ở `fetchGradingTaskDetail`.
+  aiSignals?: ExamEvaluationSignalsDto | null
+  aiValidity?: ExamValidityDto | null
 }
 
 /**
@@ -119,16 +146,31 @@ export type GradingTaskDetail = {
   allowedOutcomes: GradingOutcome[]
   // Chỉ có ở vòng APPEAL: lý do học sinh nêu trong đơn.
   appealReason?: string | null
+  // Tên học sinh + lớp. CHỈ có với bài kiểm tra trên lớp; kỳ thi tập trung luôn null
+  // vì chấm ẩn danh là bảo đảm công bằng. Render có điều kiện, đừng suy từ route.
+  studentName?: string | null
+  className?: string | null
+  // Lượt thi đang chấm. Một em thi lại có nhiều lượt, mỗi lượt một bài chấm riêng —
+  // thiếu nhãn này thì người chấm không biết mình đang chấm lượt nào.
+  sessionId?: string | null
+  attemptNo: number
+  attemptCount: number
   items: GradingTaskItem[]
   criteria: GradingCriterionMeta[]
 }
 
-/** Hàng đợi của giáo viên — MỘT danh sách cho cả bốn vòng. Ẩn danh. */
+/**
+ * Hàng đợi của giáo viên — MỘT danh sách cho cả bốn vòng.
+ *
+ * Kỳ thi tập trung chấm ẩn danh; bài kiểm tra trên lớp thì có tên học sinh + lớp.
+ */
 export type GradingTask = {
   assignmentId: string
   candidateResultId: string
   resultCode: string
   examName?: string | null
+  // Tên field theo BE, nhưng BE đếm số RESPONSE — tức số CÂU phải chấm, không phải
+  // số phần thi. Hiển thị là "câu".
   partCount: number
   roundType: GradingRoundType
   status: GradingAssignmentStatus
@@ -139,9 +181,21 @@ export type GradingTask = {
   assignedAt?: string | null
   deadlineAt?: string | null
   overdue: boolean
+  // Tên học sinh + lớp. CHỈ có với bài kiểm tra trên lớp; kỳ thi tập trung luôn null
+  // vì chấm ẩn danh là bảo đảm công bằng. Render có điều kiện, đừng suy từ route.
+  studentName?: string | null
+  className?: string | null
+  // Lượt thi của dòng này. Một em thi lại sinh ra nhiều dòng cùng tên; đây là thứ duy
+  // nhất phân biệt được chúng.
+  sessionId?: string | null
+  attemptNo: number
+  attemptCount: number
 }
 
-/** Dòng bảng điều phối của admin. `assignmentId` null = bài chưa có phân công đang mở. */
+/**
+ * Dòng bảng điều phối của admin. `assignmentId` null = bài chưa có phân công đang mở.
+ * Một dòng là MỘT LƯỢT THI, không phải một học sinh.
+ */
 export type GradingAssignmentRow = {
   candidateResultId: string
   resultCode: string
@@ -163,6 +217,9 @@ export type GradingAssignmentRow = {
   overdue: boolean
   // Còn đơn phúc khảo chưa kết thúc — không nên giao vòng khác lúc này.
   hasOpenAppeal: boolean
+  sessionId?: string | null
+  attemptNo: number
+  attemptCount: number
 }
 
 /**
@@ -440,6 +497,26 @@ export function suggestedRoundFor(
   }
 }
 
+/**
+ * Nhãn của MỘT câu: "Part 1 · Câu 2". Chỉ ghép số câu khi phần đó có nhiều hơn một
+ * câu — bài mỗi phần một câu thì thêm "· Câu 1" chỉ làm nhãn dài ra vô ích.
+ *
+ * Gộp theo `sectionId` chứ KHÔNG theo `partLabel`: hai section hoàn toàn có thể trùng
+ * tiêu đề, gộp theo tên sẽ đánh số câu xuyên qua ranh giới phần.
+ */
+export function itemLabel(item: GradingTaskItem, items: GradingTaskItem[]): string {
+  const fallbackIndex = items.indexOf(item)
+  const part = item.partLabel ?? `Phần ${fallbackIndex + 1}`
+  const sectionKey = item.sectionId ?? item.paperItemId
+  const siblings = items.filter((other) => (other.sectionId ?? other.paperItemId) === sectionKey)
+  return siblings.length > 1 ? `${part} · Câu ${item.orderInSection}` : part
+}
+
+/** Số phần thi thật sự (số section riêng biệt), khác `items.length` là số CÂU. */
+export function countSections(items: GradingTaskItem[]): number {
+  return new Set(items.map((item) => item.sectionId ?? item.paperItemId)).size
+}
+
 /** Đã nhập điểm cho MỌI tiêu chí bắt buộc của mọi phần thi hay chưa. */
 export function isEveryRequiredCriterionFilled(
   detail: GradingTaskDetail,
@@ -483,6 +560,20 @@ export function formatScore(n: number | null | undefined): string {
   }
   // 2 chữ số rồi bỏ số 0 thừa ở cuối: 6.50 -> "6.5", 6.75 giữ nguyên.
   return Number(n).toFixed(2).replace(/0$/, '')
+}
+
+/**
+ * Nhãn lượt thi: "Lượt 2/2". Trả `null` khi học sinh chỉ thi một lượt — gắn "Lượt 1/1"
+ * lên mọi dòng là thêm nhiễu vào đúng chỗ cần nhìn nhanh.
+ */
+export function formatAttemptLabel(
+  attemptNo: number | null | undefined,
+  attemptCount: number | null | undefined,
+): string | null {
+  if (attemptNo == null || attemptCount == null || attemptCount <= 1) {
+    return null
+  }
+  return `Lượt ${attemptNo}/${attemptCount}`
 }
 
 /** Chênh lệch có dấu: +0.5 / -1.0. Rỗng khi thiếu một trong hai đầu. */

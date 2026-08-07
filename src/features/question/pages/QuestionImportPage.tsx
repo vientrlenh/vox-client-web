@@ -357,7 +357,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
               }}
               type="button"
             >
-              {acceptMutation.isPending ? 'Dang gui...' : 'Xac nhan import'}
+              {acceptMutation.isPending ? 'Đang gửi...' : 'Xác nhận nhập'}
             </button>
           </div>
         </>

@@ -3,11 +3,22 @@ import { CalendarRange, Check, ListFilter, Search, X } from 'lucide-react'
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { useExamPickerOptionsQuery } from '../api/queries'
-import { formatDate, getExamStatusDisplay, type ExamPickerOption, type ExamStatus } from '../types'
+import {
+  formatDate,
+  getExamStatusDisplay,
+  type ExamKind,
+  type ExamPickerOption,
+  type ExamStatus,
+} from '../types'
 
 type ExamPickerModalProps = {
   /** Cho phép chọn "Tất cả kỳ thi" để bỏ lọc. Mặc định bật. */
   allowClear?: boolean
+  /**
+   * Loại bài được phép chọn. Bỏ trống là BE trả cả hai loại — màn nào cũng nên truyền,
+   * vì chọn nhầm bài kiểm tra trên lớp ở màn phân công của nhà trường thì gán không được.
+   */
+  kind?: ExamKind
   onClear?: () => void
   onClose: () => void
   onSelect: (exam: ExamPickerOption) => void
@@ -43,6 +54,7 @@ function examPeriod(exam: ExamPickerOption): string {
  */
 export function ExamPickerModal({
   allowClear = true,
+  kind,
   onClear,
   onClose,
   onSelect,
@@ -57,6 +69,7 @@ export function ExamPickerModal({
 
   const examsQuery = useExamPickerOptionsQuery({
     keyword: debouncedKeyword,
+    kind,
     page,
     size: PAGE_SIZE,
     status,

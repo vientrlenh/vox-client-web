@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, CalendarClock, FileText, Scale } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { formatScore } from '@/features/exam-results/types'
+import { APPEAL_SCOPE_TEXT } from '@/features/reevaluation'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { StatusBadge, type StatusTone } from '@/shared/ui/StatusBadge'
 import { useMyAppealQuery, useMyAppealsQuery } from '../api/useStudentAppealQueries'
@@ -36,7 +37,7 @@ export function StudentAppealsPage() {
             <Link className="flex flex-wrap items-center gap-4 px-4 py-4 transition hover:bg-slate-50 sm:px-5" key={appeal.id} to={`/student/appeals/${appeal.id}`}>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2"><p className="font-extrabold text-slate-900">{appeal.examName}</p><StatusBadge label={status.label} tone={status.tone} />{appeal.overdue ? <StatusBadge label="Quá hạn" tone="danger" /> : null}</div>
-                <p className="mt-1 text-sm text-slate-500">{appeal.className ?? 'Chưa có lớp'} · {appeal.partLabels.join(', ') || 'Toàn bài'}</p>
+                <p className="mt-1 text-sm text-slate-500">{appeal.className ?? 'Chưa có lớp'} · {APPEAL_SCOPE_TEXT}</p>
                 <p className="mt-1 text-xs text-slate-400">Gửi lúc {formatDate(appeal.requestedAt)}</p>
               </div>
               <div className="flex items-center gap-3"><span className="text-sm font-bold text-cyan-700">{formatScore(appeal.originalScore)}</span><ArrowRight className="size-4 text-slate-400" /></div>

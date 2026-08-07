@@ -18,7 +18,8 @@ export type ExamBlueprintVersionStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 
 export type ExamBlueprintSlotType = 'FIXED' | 'SELECTION'
 
-export type CreateExamPaperSource = 'blueprint' | 'copy'
+/** `questions` = soạn câu hỏi trực tiếp, chỉ bài kiểm tra trên lớp chưa gắn blueprint mới dùng được. */
+export type CreateExamPaperSource = 'blueprint' | 'copy' | 'questions'
 
 export type ExamCandidateStatus = 'ASSIGNED' | 'ATTENDED' | 'ABSENT' | 'COMPLETED' | 'EXEMPTED' | 'CANCELLED'
 
@@ -31,6 +32,130 @@ export type ResultDecisionMethod = 'HIGHEST' | 'LATEST' | 'AVERAGE' | 'FIRST' | 
 export const RESULT_DECISION_METHODS: ResultDecisionMethod[] = ['HIGHEST', 'LATEST', 'AVERAGE', 'FIRST', 'LOWEST']
 export type AssessmentPolicyStrictness = 'LENIENT' | 'STANDARD' | 'STRICT'
 
+
+export type ExamStreamType = 'CAMERA' | 'SCREEN'
+
+/** Dạng BE lưu trên exam: hai loại đồng thời gộp lại thành một nhánh riêng. */
+export type ExamRequiredStreamType = 'CAMERA' | 'CAMERA_AND_SCREEN' | 'SCREEN'
+
+export type ExamStreamTypePermission = 'ALL' | 'ANY'
+
+/**
+ * Cấu hình giám sát của kỳ thi, mô hình hoá thành MỘT giá trị thay vì hai trường rời.
+ *
+ * <p>Server (ExamStreamConfigResolver) chỉ nhận đúng 5 tổ hợp: permission phải vắng khi chỉ chọn
+ * một loại stream, và bắt buộc khi chọn cả hai. Cặp checkbox + dropdown riêng diễn đạt được 12 tổ
+ * hợp, trong đó 5 tổ hợp trả về 400 và 3 tổ hợp khác nhau lại cho cùng một kết quả - nên UI phải
+ * chọn 1 trong 5, không phải tự ghép.
+ *
+ * <p>Với một union 5 nhánh thì tổ hợp sai đơn giản là không biểu đạt được.
+ *
+ * <p>Dùng chung cho cả kỳ thi tập trung lẫn bài kiểm tra trên lớp: hai luồng tạo đi qua đúng một
+ * validator ở server, nên không có lý do gì để hai form diễn đạt nó theo hai cách khác nhau.
+ */
+export type ExamStreamSetup =
+  | 'BOTH_REQUIRED'
+  | 'BOTH_STUDENT_CHOICE'
+  | 'CAMERA_ONLY'
+  | 'NO_MONITORING'
+  | 'SCREEN_ONLY'
+
+export type ExamStreamSetupPayload = {
+  requiredStreamTypes: ExamStreamType[] | null
+  streamTypePermission: ExamStreamTypePermission | null
+}
+
+export const EXAM_STREAM_SETUP_PAYLOAD: Record<ExamStreamSetup, ExamStreamSetupPayload> = {
+  BOTH_REQUIRED: { requiredStreamTypes: ['CAMERA', 'SCREEN'], streamTypePermission: 'ALL' },
+  BOTH_STUDENT_CHOICE: { requiredStreamTypes: ['CAMERA', 'SCREEN'], streamTypePermission: 'ANY' },
+  CAMERA_ONLY: { requiredStreamTypes: ['CAMERA'], streamTypePermission: null },
+  NO_MONITORING: { requiredStreamTypes: null, streamTypePermission: null },
+  SCREEN_ONLY: { requiredStreamTypes: ['SCREEN'], streamTypePermission: null },
+}
+
+/**
+ * Chiều ngược của EXAM_STREAM_SETUP_PAYLOAD: đọc cấu hình đang lưu trên exam về lại union 5 nhánh
+ * để form sửa hiển thị đúng mức giám sát hiện tại.
+ *
+ * <p>Để ngay cạnh bảng map ghi, vì hai chiều phải luôn khớp nhau.
+ */
+export function toExamStreamSetup(
+  requiredStreamType?: ExamRequiredStreamType | null,
+  streamTypePermission?: ExamStreamTypePermission | null,
+): ExamStreamSetup {
+  if (!requiredStreamType) {
+    return 'NO_MONITORING'
+  }
+  if (requiredStreamType === 'CAMERA') {
+    return 'CAMERA_ONLY'
+  }
+  if (requiredStreamType === 'SCREEN') {
+    return 'SCREEN_ONLY'
+  }
+  // Dữ liệu cũ có thể thiếu permission dù yêu cầu cả hai loại; coi như mức chặt nhất.
+  return streamTypePermission === 'ANY' ? 'BOTH_STUDENT_CHOICE' : 'BOTH_REQUIRED'
+}
+
+/**
+ * Payload stream cho PUT (sửa), khác EXAM_STREAM_SETUP_PAYLOAD ở đúng một điểm: NO_MONITORING gửi
+ * mảng RỖNG chứ không phải null — trên API sửa, null nghĩa là "giữ nguyên", nên gửi null sẽ khiến
+ * "Không giám sát" im lặng không có tác dụng.
+ */
+export function toUpdateStreamPayload(setup: ExamStreamSetup): {
+  requiredStreamTypes: ExamStreamType[]
+  streamTypePermission: ExamStreamTypePermission | null
+} {
+  const payload = EXAM_STREAM_SETUP_PAYLOAD[setup]
+  return {
+    requiredStreamTypes: payload.requiredStreamTypes ?? [],
+    streamTypePermission: payload.streamTypePermission,
+  }
+}
+
+export type ExamStreamSetupOption = {
+  hint: string
+  label: string
+  tone?: 'warning'
+  value: ExamStreamSetup
+}
+
+/**
+ * Thứ tự hiển thị: an toàn nhất trước, phá hoại nhất sau cùng.
+ *
+ * <p>Nhãn nói theo **hệ quả** chứ không dùng tên enum: "ANY"/"ALL" không cho giáo viên biết điều gì
+ * sẽ xảy ra với học viên, và đó mới là thứ họ đang quyết định.
+ */
+export const EXAM_STREAM_SETUPS: ExamStreamSetupOption[] = [
+  {
+    hint: 'Học viên phải bật đồng thời camera và chia sẻ màn hình. Mức giám sát đầy đủ nhất.',
+    label: 'Bắt buộc cả camera và màn hình',
+    value: 'BOTH_REQUIRED',
+  },
+  {
+    hint: 'Chỉ ghi camera. Không có bằng chứng về những gì diễn ra trên màn hình học viên.',
+    label: 'Chỉ camera',
+    value: 'CAMERA_ONLY',
+  },
+  {
+    hint: 'Chỉ ghi màn hình. Không xác thực được ai đang ngồi trước máy.',
+    label: 'Chỉ màn hình',
+    value: 'SCREEN_ONLY',
+  },
+  {
+    // Ứng dụng thi trên máy học viên hiện luôn bật cả hai (ExamSessionBootstrapService không gửi
+    // loại ưu tiên), nên lựa chọn này tạm thời cho ra kết quả giống "bắt buộc cả hai". Nói thẳng
+    // trong UI thay vì để nó hứa một điều hệ thống chưa làm được.
+    hint: 'Học viên tự chọn camera hoặc màn hình. Chưa có hiệu lực: ứng dụng thi hiện vẫn bật cả hai.',
+    label: 'Cho học viên tự chọn',
+    value: 'BOTH_STUDENT_CHOICE',
+  },
+  {
+    hint: 'Tắt hoàn toàn giám sát cho bài này. Không có bản ghi nào và giám thị không mở được màn hình theo dõi.',
+    label: 'Không giám sát',
+    tone: 'warning',
+    value: 'NO_MONITORING',
+  },
+]
 
 export type ExamSecurePoolStatus = 'SEALED' | 'RELEASED'
 
@@ -78,6 +203,8 @@ export type ExamPaperItemDto = {
   } | null
   questionId?: string | null
   sectionId: string
+  selectionSpec?: QuestionSelectionSpec | null
+  slotType?: ExamBlueprintSlotType | null
   weight?: number | null
 }
 
@@ -343,23 +470,32 @@ export type ExamDto = {
   openAt?: string | null
   papers: ExamPaperDto[]
   papersLocked?: boolean | null
+  // Cấu hình giám sát BE lưu thành 1 enum gộp; dùng toExamStreamSetup() để đưa về union 5 nhánh
+  // mà UI thao tác, đừng đọc thẳng hai trường này ra form.
+  requiredStreamType?: ExamRequiredStreamType | null
   requiresOtp: boolean
   resultDecisionMethod?: ResultDecisionMethod | null
   schoolClassId?: string | null
   schoolId: string
   securePool?: ExamSecurePoolDto | null
   status: ExamStatus
+  streamTypePermission?: ExamStreamTypePermission | null
   updatedAt?: string | null
 }
 
 export type UpdateExamRequest = {
+  assessmentPolicyId?: string | null
   closeAt?: string | null
   description?: string | null
   maxAttempt?: number | null
   name?: string
   openAt?: string | null
+  // Bỏ trống = giữ nguyên cấu hình giám sát; mảng RỖNG mới là tắt giám sát. Dùng
+  // toUpdateStreamPayload() thay vì tự ghép, EXAM_STREAM_SETUP_PAYLOAD dành cho luồng tạo.
+  requiredStreamTypes?: ExamStreamType[] | null
   requiresOtp?: boolean | null
   resultDecisionMethod?: ResultDecisionMethod | null
+  streamTypePermission?: ExamStreamTypePermission | null
 }
 
 export type UpdateExamStatusRequest = {
@@ -381,7 +517,21 @@ export type CreateExamBlueprintRequest = {
 
 export type CreateExamPaperRequest = {
   copyFromPaperId?: string | null
+  /** Chỉ gửi kèm `source: 'questions'`. */
+  sections?: ExamPaperSectionInput[] | null
   source?: CreateExamPaperSource | null
+}
+
+export type ExamPaperQuestionInput = {
+  questionId: string
+  weight: number
+}
+
+export type ExamPaperSectionInput = {
+  instruction?: string | null
+  questions: ExamPaperQuestionInput[]
+  title: string
+  weight?: number | null
 }
 
 export type UpdateExamPaperItemRequest = {
@@ -496,11 +646,33 @@ export function getExamStatusDisplay(status?: ExamStatus | string | null): { ton
   }
 }
 
+/**
+ * Kỳ thi đã bắt đầu trở đi thì backend khóa chỉnh sửa thông tin kỳ thi và mọi thao tác xếp lịch
+ * (xem Exam.isLockedForEditing ở BE). Ẩn nút trước cho khớp thay vì để người dùng bấm rồi ăn lỗi.
+ */
+export function isExamLockedForEditing(status?: ExamStatus | string | null): boolean {
+  return status === 'IN_PROGRESS' || status === 'CLOSED' || status === 'RESULTS_PUBLISHED' || status === 'CANCELLED'
+}
+
+export function getMemberRoleDisplay(role?: ExamMemberRole | null) {
+  switch (role) {
+    case 'CHAIR':
+      return 'Chủ tịch hội đồng'
+    case 'AUTHOR':
+      return 'Ra đề'
+    case 'REVIEWER':
+      return 'Duyệt đề'
+    default:
+      return String(role ?? '-')
+  }
+}
+
 export function getExamPaperStatusDisplay(status?: string | null, examKind?: ExamKind): { tone: StatusTone; label: string } {
-  // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED làm mặc định (không dùng luồng duyệt như kỳ thi tập trung),
-  // nên với CLASS_TEST, LOCKED nghĩa là "sẵn sàng dùng", không phải "đã khóa không sửa được".
+  // Bài trên lớp không đi qua luồng duyệt của kỳ thi tập trung: giáo viên tự khoá mã đề một bước
+  // (DRAFT → LOCKED) để mở đường phân đề, và mở lại được bất cứ lúc nào. Nên LOCKED ở đây nghĩa là
+  // "sẵn sàng phân cho học sinh", không phải "đã chốt không đụng vào được nữa".
   if (status === 'LOCKED' && examKind === 'CLASS_TEST') {
-    return { tone: 'success', label: 'Sẵn sàng' }
+    return { tone: 'success', label: 'Sẵn sàng phân đề' }
   }
   switch (status) {
     case 'DRAFT':

@@ -118,7 +118,7 @@ export function FrameworkVersionFormDialog({
     const values = trimFormState(form)
 
     onCreate({
-      code: values.code,
+      code: values.code.trim().toUpperCase(),
       description: values.description || null,
       effectiveFrom: new Date(values.effectiveFrom).toISOString(),
       effectiveTo: values.effectiveTo
@@ -243,7 +243,7 @@ export function FrameworkVersionFormDialog({
             </label>
 
             <label className="grid gap-2 text-sm font-bold text-blue-950">
-              <span className="whitespace-nowrap">Ngày hiệu lực bắt đầu <span className="text-red-500">*</span></span>
+              <span className="whitespace-nowrap">Thời điểm hiệu lực bắt đầu <span className="text-red-500">*</span></span>
               <input
                 className={`h-11 rounded-lg border px-3 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50 ${fieldErrors.effectiveFrom ? 'border-red-500' : 'border-slate-200'}`}
                 disabled={isSubmitting}
@@ -251,7 +251,7 @@ export function FrameworkVersionFormDialog({
                   updateField('effectiveFrom', event.target.value)
                 }
                 required
-                type="date"
+                type="datetime-local"
                 value={form.effectiveFrom}
               />
               {fieldErrors.effectiveFrom ? (
@@ -262,14 +262,14 @@ export function FrameworkVersionFormDialog({
             </label>
 
             <label className="grid gap-2 text-sm font-bold text-blue-950">
-              Ngày hiệu lực kết thúc
+              Thời điểm hiệu lực kết thúc
               <input
                 className={`h-11 rounded-lg border px-3 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50 ${fieldErrors.effectiveTo ? 'border-red-500' : 'border-slate-200'}`}
                 disabled={isSubmitting}
                 onChange={(event) =>
                   updateField('effectiveTo', event.target.value)
                 }
-                type="date"
+                type="datetime-local"
                 value={form.effectiveTo}
               />
               {fieldErrors.effectiveTo ? (

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Eye, HelpCircle, Pencil } from 'lucide-react'
+import { Eye, Pencil } from 'lucide-react'
 import {
   ActionMenuButton,
   type ActionMenuItem,
@@ -11,6 +11,7 @@ import {
 } from '../types'
 
 type QuestionTopicTableProps = {
+  canEdit?: (topic: QuestionTopicDto) => boolean
   errorMessage?: string
   footer?: ReactNode
   getAdditionalActions?: (topic: QuestionTopicDto) => ActionMenuItem[]
@@ -19,12 +20,12 @@ type QuestionTopicTableProps = {
   onEdit?: (topic: QuestionTopicDto) => void
   onRetry: () => void
   onSelect: (id: string) => void
-  onViewQuestions: (topic: QuestionTopicDto) => void
   questionTopics: QuestionTopicDto[]
   selectedId: string | null
 }
 
 export function QuestionTopicTable({
+  canEdit,
   errorMessage,
   footer,
   getAdditionalActions,
@@ -33,7 +34,6 @@ export function QuestionTopicTable({
   onEdit,
   onRetry,
   onSelect,
-  onViewQuestions,
   questionTopics,
   selectedId,
 }: QuestionTopicTableProps) {
@@ -45,14 +45,14 @@ export function QuestionTopicTable({
 
       {isLoading ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-Đang tải danh sách chủ đề...
+          Đang tải danh sách chủ đề...
         </div>
       ) : null}
 
       {isError ? (
         <div className="flex min-h-80 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
           <p className="text-sm font-bold text-red-600">
-            {errorMessage ?? 'không thể tải danh sách chủ đề.'}
+            {errorMessage ?? 'Không thể tải danh sách chủ đề.'}
           </p>
           <button
             className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
@@ -123,16 +123,12 @@ export function QuestionTopicTable({
                               onSelect: () => onSelect(topic.id),
                               tone: 'primary',
                             },
-                            {
-                              icon: HelpCircle,
-                              id: 'questions',
-                              label: 'Xem câu hỏi',
-                              onSelect: () => onViewQuestions(topic),
-                              tone: 'default',
-                            },
                             ...(onEdit
                               ? [
                                   {
+                                    disabled: !(canEdit?.(topic) ?? true),
+                                    disabledReason:
+                                      'Chỉ chỉnh sửa được khi ở trạng thái Bản nháp',
                                     icon: Pencil,
                                     id: 'edit',
                                     label: 'Chỉnh sửa',

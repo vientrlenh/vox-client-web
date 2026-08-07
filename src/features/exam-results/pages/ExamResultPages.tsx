@@ -21,6 +21,18 @@ import { useForceEndExamSessionMutation } from '@/features/examCore/api/mutation
 import { examQueryKeys, useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
 import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
 import { Pagination } from '@/shared/components/Pagination'
+import {
+  buildValidityRulesForDisplay,
+  criterionScorePercentage,
+  formatConfidencePercent,
+  getAudioGateLabel,
+  getAudioGateTone,
+  getAudioReasonLabel,
+  getConfidenceModeLabel,
+  getEvidenceReasonLabel,
+  getResultScoreTone,
+  getReviewReasonLabel,
+} from '@/shared/lib/aiEvaluation'
 import { formatPublishedResult } from '@/shared/lib/resultScore'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -43,9 +55,9 @@ import {
   formatScore,
   getAttemptStatusDisplay,
   getExamResultStatusDisplay,
+  resolveEvaluationDisplay,
   type ExamCandidateResultDto,
   type ExamItemEvaluationDto,
-  type ExamValidityRuleResultDto,
 } from '../types'
 
 type ExamResultsUserRole = 'SCHOOL_ADMIN' | 'TEACHER'
@@ -81,43 +93,6 @@ function getPendingRowStatus(candidateStatus?: string | null) {
   }
 }
 
-function formatConfidencePercent(value?: number | null) {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return '-'
-  }
-
-  return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`
-}
-
-function getResultScoreTone(value?: number | null) {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return 'neutral' as const
-  }
-  if (value > 80) {
-    return 'success' as const
-  }
-  if (value >= 45) {
-    return 'warning' as const
-  }
-  return 'danger' as const
-}
-
-function criterionScorePercentage(
-  value?: number | null,
-  minScore?: number | null,
-  maxScore?: number | null,
-) {
-  if (
-    typeof value !== 'number'
-    || typeof minScore !== 'number'
-    || typeof maxScore !== 'number'
-    || maxScore <= minScore
-  ) {
-    return value
-  }
-  return ((value - minScore) / (maxScore - minScore)) * 100
-}
-
 function getResultScoreTextClass(value?: number | null) {
   const tone = getResultScoreTone(value)
   if (tone === 'success') {
@@ -130,150 +105,6 @@ function getResultScoreTextClass(value?: number | null) {
     return 'text-red-600'
   }
   return 'text-slate-400'
-}
-
-type DisplayValidityRule = ExamValidityRuleResultDto & {
-  occurrenceCount: number
-}
-
-function asFiniteNumber(value: unknown): number | null {
-  const number = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(number) ? number : null
-}
-
-function validitySeverityRank(value?: string | null) {
-  return {
-    none: 0,
-    low: 1,
-    medium: 2,
-    high: 3,
-    critical: 4,
-  }[String(value ?? 'none').toLowerCase()] ?? 0
-}
-
-function buildValidityRulesForDisplay(evaluation: ExamItemEvaluationDto): DisplayValidityRule[] {
-  const sourceRules = Array.isArray(evaluation.validity?.ruleResults)
-    ? evaluation.validity.ruleResults.filter((rule) => rule?.ruleId || rule?.message)
-    : []
-  const grouped = new Map<string, DisplayValidityRule>()
-
-  sourceRules.forEach((rule) => {
-    const key = rule.ruleId || rule.message || 'unknown-rule'
-    const existing = grouped.get(key)
-    if (!existing) {
-      grouped.set(key, { ...rule, occurrenceCount: 1 })
-      return
-    }
-
-    grouped.set(key, {
-      ...(validitySeverityRank(rule.severity) > validitySeverityRank(existing.severity)
-        ? rule
-        : existing),
-      occurrenceCount: existing.occurrenceCount + 1,
-    })
-  })
-
-  const wordCount = asFiniteNumber(evaluation.signals?.wordCount)
-  const expectedMinWords = asFiniteNumber(evaluation.signals?.expectedMinWords)
-  const totalDuration = asFiniteNumber(evaluation.signals?.durationSeconds)
-
-  return Array.from(grouped.values()).flatMap((rule) => {
-    if (rule.ruleId === 'answer_length.too_short' && wordCount !== null && expectedMinWords !== null) {
-      if (wordCount >= expectedMinWords) {
-        return []
-      }
-      return [{
-        ...rule,
-        message: `Toàn bộ câu trả lời có ${wordCount} từ, mức tối thiểu dự kiến là ${expectedMinWords} từ.`,
-      }]
-    }
-
-    if (rule.ruleId === 'answer_duration.too_short' && totalDuration !== null) {
-      const expectedDuration = asFiniteNumber(rule.evidence?.expectedMinResponseSeconds)
-      if (expectedDuration !== null) {
-        if (totalDuration >= expectedDuration * 0.5) {
-          return []
-        }
-        return [{
-          ...rule,
-          message: `Tổng thời gian nói là ${totalDuration} giây, thời gian tối thiểu dự kiến là ${expectedDuration} giây.`,
-        }]
-      }
-    }
-
-    return [rule]
-  })
-}
-
-function getReviewReasonLabel(code?: string | null) {
-  if (!code) {
-    return null
-  }
-
-  const labels: Record<string, string> = {
-    ALIGNMENT_COVERAGE_LOW: 'Độ phủ alignment thấp',
-    ALIGNMENT_MISCUE_HIGH: 'Alignment có nhiều miscue bất thường',
-    ALIGNMENT_TIMING_ANOMALY: 'Mốc thời gian alignment bất thường',
-    ASR_LOW_CONF: 'ASR chính có độ tin cậy thấp',
-    AUDIO_CLIPPING: 'Audio bị clipping nghiêm trọng',
-    AUDIO_QUALITY_LOW: 'Chất lượng audio thấp',
-    AUDIO_SNR_TOO_LOW: 'Tỷ lệ tín hiệu trên nhiễu quá thấp',
-    AUDIO_TOO_MUCH_SILENCE: 'Audio có quá ít lời nói hữu ích',
-    CONDUCT_VIOLATION: 'Có vi phạm trong quá trình làm bài',
-    LLM_UNSTABLE_DISCOURSE: 'Chấm coherence chưa ổn định',
-    LLM_UNSTABLE_COHERENCE: 'Chấm coherence chưa ổn định',
-    LLM_UNSTABLE_GRAMMAR: 'Chấm grammar chưa ổn định',
-    LLM_UNSTABLE_VOCABULARY: 'Chấm vocabulary chưa ổn định',
-    LOW_CONFIDENCE: 'Độ tin cậy AI thấp',
-    REFERENCE_DRIFT: 'Reference transcript chưa ổn định',
-    VALIDITY_FLAGGED: 'Có cảnh báo validity cần giáo viên xem lại',
-  }
-  return code.split(',').map((reason) => labels[reason] ?? reason).join(' · ')
-}
-
-function getEvidenceReasonLabel(code: string) {
-  switch (code) {
-    case 'ANSWER_TOO_SHORT':
-      return 'Câu trả lời quá ngắn so với yêu cầu'
-    case 'RESPONSE_DURATION_TOO_SHORT':
-      return 'Thời lượng trả lời quá ngắn so với yêu cầu'
-    case 'TARGET_LANGUAGE_EVIDENCE_TOO_LOW':
-      return 'Chưa có đủ nội dung bằng ngôn ngữ mục tiêu'
-    case 'SPEECH_EVIDENCE_TOO_LOW':
-      return 'Thời lượng lời nói hữu ích quá ít'
-    default:
-      return code
-  }
-}
-
-function getAudioGateLabel(status?: string | null) {
-  switch (status) {
-    case 'HARD_FAIL':
-      return 'Không đạt hard gate'
-    case 'SOFT_WARN':
-      return 'Chất lượng thấp'
-    case 'PASS':
-      return 'Đạt'
-    default:
-      return 'Chưa đủ dữ liệu'
-  }
-}
-
-function getConfidenceModeLabel(mode?: string | null) {
-  switch (mode) {
-    case 'HIGH_STAKES':
-      return 'Profile: High-stakes'
-    case 'MOCK_TEST':
-      return 'Profile: Mock test'
-    case 'PRACTICE':
-      return 'Profile: Practice'
-    default:
-      return null
-  }
-}
-
-function getAudioReasonLabel(code: string) {
-  return getReviewReasonLabel(code) ?? code
 }
 
 function StatePanel({
@@ -676,6 +507,7 @@ export function QuestionEvaluationCard({
   onToggle,
   questionCode,
   questionText,
+  variant = 'full',
 }: {
   evaluation: ExamItemEvaluationDto | null | undefined
   itemResult: ExamCandidateResultDto['items'][number] | undefined
@@ -683,8 +515,28 @@ export function QuestionEvaluationCard({
   open: boolean
   questionCode?: string | null
   questionText?: string | null
+  /**
+   * `student` giấu các tín hiệu vận hành (uncertainty, confidence profile, trạng thái
+   * bằng chứng, ruleId/severity/action) — học sinh không hành động được gì với chúng và
+   * chúng chỉ làm loãng phần thật sự cần đọc. `full` giữ nguyên cho giáo viên/nhà trường.
+   */
+  variant?: 'full' | 'student'
 }) {
-  const validityRules = evaluation ? buildValidityRulesForDisplay(evaluation) : []
+  // Sau khi giáo viên chấm lại, bằng chứng AI nằm ở khối `ai` chứ không còn ở bản hiệu
+  // lực. Đi qua một chỗ gộp duy nhất để màn học sinh và màn giáo viên không lệch nhau.
+  const display = evaluation ? resolveEvaluationDisplay(evaluation) : null
+  const validityRules = display ? buildValidityRulesForDisplay(display) : []
+  const isStudentView = variant === 'student'
+  // Học sinh chỉ đọc được thông điệp đã dịch; rule không có message thì không còn gì để hiện.
+  const visibleValidityRules = isStudentView ? validityRules.filter((rule) => rule.message) : validityRules
+  // Khi AI chấm và không ai chấm lại, hai trường này là cùng một câu — in hai lần chỉ
+  // làm người đọc tưởng có hai nhận xét khác nhau.
+  const aiFeedbackDiffers =
+    Boolean(display?.aiFeedbackSummary?.trim())
+    && display?.aiFeedbackSummary?.trim() !== (evaluation?.feedbackSummary?.trim() ?? '')
+  // Màn học sinh không phân biệt nguồn nhận xét: bản có hiệu lực là bản đáng đọc, và
+  // khi giáo viên chưa chấm lại thì bản đó vốn đã là của AI.
+  const studentFeedback = evaluation?.feedbackSummary?.trim() || display?.aiFeedbackSummary?.trim() || null
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white">
@@ -713,26 +565,39 @@ export function QuestionEvaluationCard({
 
       {open ? (
         <div className="border-t border-slate-100 px-4 py-4">
-          {!evaluation ? (
+          {!evaluation || !display ? (
             <p className="text-sm text-slate-400">Chưa có evaluation cho câu trả lời này.</p>
           ) : (
             <div className="grid gap-5">
+              {isStudentView ? (
+                studentFeedback ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm leading-6 text-slate-700">{studentFeedback}</p>
+                  </div>
+                ) : null
+              ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge label={getExamResultStatusDisplay(evaluation.status).label} tone={getExamResultStatusDisplay(evaluation.status).tone} />
-                  {evaluation.requiresRetake ? <StatusBadge label="Cần thi lại" tone="danger" /> : null}
-                  {evaluation.requiresHumanReview ? <StatusBadge label="Cần giáo viên duyệt lại" tone="warning" /> : null}
-                  {evaluation.signals?.uncertaintyType === 'SYSTEM_UNCERTAINTY' || evaluation.signals?.uncertaintyType === 'MIXED' ? (
+                  {display.humanGraded ? <StatusBadge label="Giáo viên chấm lại" tone="violet" /> : null}
+                  {display.requiresRetake ? <StatusBadge label="Cần thi lại" tone="danger" /> : null}
+                  {display.requiresHumanReview ? <StatusBadge label="Cần giáo viên duyệt lại" tone="warning" /> : null}
+                  {display.signals?.uncertaintyType === 'SYSTEM_UNCERTAINTY' || display.signals?.uncertaintyType === 'MIXED' ? (
                     <StatusBadge label="System uncertainty" tone="warning" />
                   ) : null}
-                  {evaluation.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
+                  {display.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
                     <StatusBadge label="Chưa đủ bằng chứng chấm điểm" tone="info" />
                   ) : null}
-                  {getConfidenceModeLabel(evaluation.signals?.confidenceMode) ? (
-                    <StatusBadge label={getConfidenceModeLabel(evaluation.signals?.confidenceMode) as string} tone="neutral" />
+                  {getConfidenceModeLabel(display.signals?.confidenceMode) ? (
+                    <StatusBadge label={getConfidenceModeLabel(display.signals?.confidenceMode) as string} tone="neutral" />
                   ) : null}
-                  {evaluation.markedInvalid ? <StatusBadge label="Đánh dấu không hợp lệ" tone="danger" /> : null}
+                  {display.markedInvalid ? <StatusBadge label="Đánh dấu không hợp lệ" tone="danger" /> : null}
                   <span className="text-xs text-slate-500">Chấm lúc {formatDateTime(evaluation.evaluatedAt)}</span>
+                  {/* Hai mốc thời gian khác nhau: phán quyết của giáo viên và lần AI phân
+                      tích. Gộp làm một là khẳng định sai về thời điểm. */}
+                  {display.aiEvaluatedAt ? (
+                    <span className="text-xs text-slate-500">· phân tích AI {formatDateTime(display.aiEvaluatedAt)}</span>
+                  ) : null}
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
@@ -740,7 +605,7 @@ export function QuestionEvaluationCard({
                       <Gauge aria-hidden="true" className="size-4" />
                       <span className="text-xs font-bold uppercase tracking-wide">Overall confidence</span>
                     </div>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.overallConfidence)}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(display.overallConfidence)}</p>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                     <div className="flex items-center gap-2 text-slate-500">
@@ -748,45 +613,55 @@ export function QuestionEvaluationCard({
                       <span className="text-xs font-bold uppercase tracking-wide">Audio quality</span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-bold text-slate-900">{formatConfidencePercent(evaluation.signals?.audioQuality)}</p>
+                      <p className="text-sm font-bold text-slate-900">{formatConfidencePercent(display.signals?.audioQuality)}</p>
                       <StatusBadge
-                        label={getAudioGateLabel(evaluation.signals?.audioGateStatus)}
-                        tone={evaluation.signals?.audioGateStatus === 'HARD_FAIL' ? 'danger' : evaluation.signals?.audioGateStatus === 'SOFT_WARN' ? 'warning' : 'neutral'}
+                        label={getAudioGateLabel(display.signals?.audioGateStatus)}
+                        tone={getAudioGateTone(display.signals?.audioGateStatus)}
                       />
                     </div>
-                    {evaluation.signals?.audioGateReasonCodes?.length ? (
+                    {display.signals?.audioGateReasonCodes?.length ? (
                       <p className="mt-1 text-xs text-slate-500">
-                        {evaluation.signals.audioGateReasonCodes.map(getAudioReasonLabel).join(' · ')}
+                        {display.signals.audioGateReasonCodes.map(getAudioReasonLabel).join(' · ')}
                       </p>
                     ) : null}
                   </div>
                 </div>
-                {evaluation.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
+                {display.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
                   <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-900">
                     <div className="flex items-start gap-2">
                       <FileText aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                       <div>
                         <p className="font-bold">Điểm thấp có thể hợp lệ vì chưa đủ bằng chứng.</p>
                         <p className="mt-1 text-sky-800">
-                          {(evaluation.signals.evidenceReasonCodes ?? []).map(getEvidenceReasonLabel).join(' · ')}
+                          {(display.signals.evidenceReasonCodes ?? []).map(getEvidenceReasonLabel).join(' · ')}
                         </p>
                         <p className="mt-1 text-xs text-sky-700">Cờ này không tự động được xem là lỗi hệ thống và không tự bật human review.</p>
                       </div>
                     </div>
                   </div>
                 ) : null}
-                {evaluation.requiresHumanReview || evaluation.reviewReasonCode ? (
+                {display.requiresHumanReview || display.reviewReasonCode ? (
                   <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
                     <div className="flex items-start gap-2">
                       <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                      <p>{getReviewReasonLabel(evaluation.reviewReasonCode) ?? 'Bài làm cần được giáo viên xem lại trước khi tin cậy hoàn toàn.'}</p>
+                      <p>{getReviewReasonLabel(display.reviewReasonCode) ?? 'Bài làm cần được giáo viên xem lại trước khi tin cậy hoàn toàn.'}</p>
                     </div>
                   </div>
                 ) : null}
                 {evaluation.feedbackSummary ? (
                   <p className="mt-3 text-sm leading-6 text-slate-700">{evaluation.feedbackSummary}</p>
                 ) : null}
+                {/* Nhận xét của AI để riêng, không trộn vào nhận xét của giáo viên: đây là
+                    hai người khác nhau nói về cùng một bài — nhưng chỉ khi họ thật sự nói
+                    khác nhau. */}
+                {aiFeedbackDiffers ? (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Nhận xét của AI (tham khảo)</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">{display.aiFeedbackSummary}</p>
+                  </div>
+                ) : null}
               </div>
+              )}
 
               <div className="grid gap-4">
                 {evaluation.turns.map((turn) => (
@@ -845,33 +720,35 @@ export function QuestionEvaluationCard({
                 ))}
               </div>
 
-              {validityRules && validityRules.length > 0 ? (
+              {visibleValidityRules.length > 0 ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <div className="flex items-center gap-2">
                     <AlertTriangle aria-hidden="true" className="size-4 text-amber-600" />
                     <p className="text-sm font-extrabold text-amber-800">Vi phạm quy tắc</p>
                   </div>
                   <div className="mt-3 grid gap-2">
-                    {validityRules.map((rule) => (
+                    {visibleValidityRules.map((rule) => (
                       <div className="rounded-lg border border-amber-200 bg-white px-3 py-2" key={rule.ruleId ?? rule.message ?? 'rule'}>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-bold text-slate-900">{rule.ruleId ?? 'Rule'}</p>
+                          {isStudentView ? null : <p className="text-sm font-bold text-slate-900">{rule.ruleId ?? 'Rule'}</p>}
                           {rule.occurrenceCount > 1 ? (
                             <StatusBadge label={`${rule.occurrenceCount} lượt`} tone="warning" />
                           ) : null}
                         </div>
-                        {rule?.message ? <p className="mt-1 text-sm leading-6 text-slate-600">{rule.message}</p> : null}
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                          {rule?.severity ? <span>Mức độ: {rule.severity}</span> : null}
-                          {rule?.action ? (
-                            <span>
-                              Hành động:{' '}
-                              {evaluation.validity?.validForScoring !== false && rule.action === 'reject_or_zero'
-                                ? 'chỉ áp dụng ở lượt bị gắn cờ; toàn bài vẫn được chấm'
-                                : rule.action}
-                            </span>
-                          ) : null}
-                        </div>
+                        {rule?.message ? <p className={`text-sm leading-6 text-slate-600 ${isStudentView && rule.occurrenceCount <= 1 ? '' : 'mt-1'}`}>{rule.message}</p> : null}
+                        {isStudentView ? null : (
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                            {rule?.severity ? <span>Mức độ: {rule.severity}</span> : null}
+                            {rule?.action ? (
+                              <span>
+                                Hành động:{' '}
+                                {display.validity?.validForScoring !== false && rule.action === 'reject_or_zero'
+                                  ? 'chỉ áp dụng ở lượt bị gắn cờ; toàn bài vẫn được chấm'
+                                  : rule.action}
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

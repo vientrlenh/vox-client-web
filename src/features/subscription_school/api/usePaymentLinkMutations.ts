@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient, requireSchoolId } from '@/shared/api'
-import type { MutationResult, PaymentLink, QuotaType, RenewalPreview } from '../types'
+import type { MutationResult, PaymentLink, PaymentMethod, QuotaType, RenewalPreview } from '../types'
 
 type ApiResponse<TData> = {
   data: TData
@@ -8,13 +8,15 @@ type ApiResponse<TData> = {
 }
 
 export type BuyTokensPayload = {
-  subscriptionId: string
   items: { quotaType: QuotaType; quantity: number }[]
+  paymentMethod: PaymentMethod
+  subscriptionId: string
 }
 
 export type CreatePaymentLinkForRenewalPayload = {
-  subscriptionId: string
   acceptedPlanId?: string
+  paymentMethod: PaymentMethod
+  subscriptionId: string
 }
 
 async function previewRenewal(subscriptionId: string): Promise<MutationResult<RenewalPreview>> {
@@ -26,13 +28,14 @@ async function previewRenewal(subscriptionId: string): Promise<MutationResult<Re
 }
 
 async function createPaymentLinkForRenewal({
-  subscriptionId,
   acceptedPlanId,
+  paymentMethod,
+  subscriptionId,
 }: CreatePaymentLinkForRenewalPayload): Promise<MutationResult<PaymentLink>> {
   const schoolId = requireSchoolId()
   const response = await apiClient.post<ApiResponse<PaymentLink>>(
     `/v1/schools/${schoolId}/subscriptions/${subscriptionId}/renew/payment-link`,
-    undefined,
+    { paymentMethod },
     { params: acceptedPlanId ? { acceptedPlanId } : undefined },
   )
   return response.data

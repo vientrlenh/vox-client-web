@@ -1,14 +1,32 @@
 import { ArrowRight, Sparkles } from 'lucide-react'
-import { formatMinutes, formatQuotaMinutes, formatVnd, QUOTA_LABELS, QUOTA_TYPES, type RenewalPreview } from '../types'
+import { PaymentMethodField } from '@/shared/payment/PaymentMethodField'
+import {
+  formatMinutes,
+  formatQuotaMinutes,
+  formatVnd,
+  QUOTA_LABELS,
+  QUOTA_TYPES,
+  type PaymentMethod,
+  type RenewalPreview,
+} from '../types'
 
 type PlanChangeConfirmDialogProps = {
   isSubmitting: boolean
   onCancel: () => void
   onConfirm: () => void
+  onPaymentMethodChange: (method: PaymentMethod) => void
+  paymentMethod: PaymentMethod
   preview: RenewalPreview | null
 }
 
-export function PlanChangeConfirmDialog({ isSubmitting, onCancel, onConfirm, preview }: PlanChangeConfirmDialogProps) {
+export function PlanChangeConfirmDialog({
+  isSubmitting,
+  onCancel,
+  onConfirm,
+  onPaymentMethodChange,
+  paymentMethod,
+  preview,
+}: PlanChangeConfirmDialogProps) {
   if (!preview) {
     return null
   }
@@ -82,6 +100,15 @@ export function PlanChangeConfirmDialog({ isSubmitting, onCancel, onConfirm, pre
           </div>
         </div>
 
+        <div className="mt-5">
+          <PaymentMethodField
+            disabled={isSubmitting}
+            name="renewal-payment-method"
+            onChange={onPaymentMethodChange}
+            value={paymentMethod}
+          />
+        </div>
+
         <div className="mt-5.5 flex gap-3">
           <button
             className="h-12 flex-1 rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -97,7 +124,7 @@ export function PlanChangeConfirmDialog({ isSubmitting, onCancel, onConfirm, pre
             onClick={onConfirm}
             type="button"
           >
-            {isSubmitting ? 'Đang chuyển đến PayOS...' : 'Đồng ý, tiếp tục gia hạn'}
+            {isSubmitting ? 'Đang chuyển đến cổng thanh toán...' : 'Đồng ý, tiếp tục gia hạn'}
           </button>
         </div>
       </section>

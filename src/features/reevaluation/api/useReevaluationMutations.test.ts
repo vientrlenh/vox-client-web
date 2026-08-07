@@ -1,5 +1,10 @@
 import { apiClient } from '@/shared/api'
-import { approveAppeal, assignReviewer, rejectAppeal } from './useReevaluationMutations'
+import {
+  approveAndClaimAppeal,
+  approveAppeal,
+  assignReviewer,
+  rejectAppeal,
+} from './useReevaluationMutations'
 
 const post = jest.spyOn(apiClient, 'post')
 
@@ -21,6 +26,15 @@ describe('reevaluation REST mutations', () => {
     expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/approve', {
       deadline: '2026-07-22T10:00:00.000Z',
     })
+  })
+
+  it('duyệt & nhận chấm bằng một request không body, trả id dòng phân công', async () => {
+    post.mockResolvedValue(okResponse('Đã duyệt và nhận chấm phúc khảo!', 'asg-9'))
+
+    // Không có tham số nào: hạn chót và lý do override do BE tự đặt, nên gửi kèm
+    // body là mở lại đúng hai câu hỏi mà luồng gộp này bỏ đi.
+    await expect(approveAndClaimAppeal('a1')).resolves.toBe('asg-9')
+    expect(post).toHaveBeenCalledWith('/v1/exam-appeals/a1/approve-and-claim')
   })
 
   it('rejects with a reason body', async () => {

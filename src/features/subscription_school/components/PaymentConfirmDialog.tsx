@@ -1,15 +1,35 @@
 import { CreditCard } from 'lucide-react'
-import { formatQuotaMinutes, formatVnd, QUOTA_LABELS, QUOTA_TYPES, type RequestType, type SubscriptionPlan } from '../types'
+import { PaymentMethodField } from '@/shared/payment/PaymentMethodField'
+import { PAYMENT_METHOD_LABELS } from '@/shared/payment/types'
+import {
+  formatQuotaMinutes,
+  formatVnd,
+  QUOTA_LABELS,
+  QUOTA_TYPES,
+  type PaymentMethod,
+  type RequestType,
+  type SubscriptionPlan,
+} from '../types'
 
 type PaymentConfirmDialogProps = {
   isSubmitting: boolean
   onCancel: () => void
   onConfirm: () => void
+  onPaymentMethodChange: (method: PaymentMethod) => void
+  paymentMethod: PaymentMethod
   plan: SubscriptionPlan | null
   requestType: RequestType
 }
 
-export function PaymentConfirmDialog({ isSubmitting, onCancel, onConfirm, plan, requestType }: PaymentConfirmDialogProps) {
+export function PaymentConfirmDialog({
+  isSubmitting,
+  onCancel,
+  onConfirm,
+  onPaymentMethodChange,
+  paymentMethod,
+  plan,
+  requestType,
+}: PaymentConfirmDialogProps) {
   if (!plan) {
     return null
   }
@@ -31,7 +51,7 @@ export function PaymentConfirmDialog({ isSubmitting, onCancel, onConfirm, plan, 
           Xác nhận {modeLabel}
         </h2>
         <p className="mt-1.5 text-sm leading-6 text-slate-500">
-          Bạn sẽ được chuyển đến cổng thanh toán PayOS. Gói được kích hoạt tự động ngay sau khi thanh toán thành công.
+          Bạn sẽ được chuyển đến cổng thanh toán đã chọn. Gói được kích hoạt tự động ngay sau khi thanh toán thành công.
         </p>
 
         <div className="mt-5 rounded-2xl border border-slate-200 p-4.5">
@@ -54,6 +74,15 @@ export function PaymentConfirmDialog({ isSubmitting, onCancel, onConfirm, plan, 
           </div>
         </div>
 
+        <div className="mt-5">
+          <PaymentMethodField
+            disabled={isSubmitting}
+            name="subscription-request-payment-method"
+            onChange={onPaymentMethodChange}
+            value={paymentMethod}
+          />
+        </div>
+
         <div className="mt-5.5 flex gap-3">
           <button
             className="h-12 flex-1 rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -70,7 +99,9 @@ export function PaymentConfirmDialog({ isSubmitting, onCancel, onConfirm, plan, 
             type="button"
           >
             <CreditCard aria-hidden="true" className="size-4.5" />
-            {isSubmitting ? 'Đang chuyển đến PayOS...' : 'Thanh toán với PayOS'}
+            {isSubmitting
+              ? 'Đang chuyển đến cổng thanh toán...'
+              : `Thanh toán với ${PAYMENT_METHOD_LABELS[paymentMethod]}`}
           </button>
         </div>
       </section>
