@@ -8,13 +8,6 @@ const EXAMS_QUERY = `
     exams(kind: $kind, status: $status, keyword: $keyword, page: $page, size: $size) {
       content {
         ${EXAM_LIST_FIELDS}
-        # Chỉ status, đủ cho bước "Xếp lịch" của thanh tiến độ. Chạy qua DataLoader
-        # examSchedulesByExamId nên cả trang chỉ tốn thêm một truy vấn gộp, không phải N+1.
-        # Không đưa vào EXAM_LIST_FIELDS vì trang bài kiểm tra trên lớp không dùng tới.
-        schedules {
-          id
-          status
-        }
       }
       page
       size

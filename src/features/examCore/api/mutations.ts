@@ -9,8 +9,6 @@ import type {
   ExamBlueprintSlotType,
   ExamBlueprintVersionDto,
   ExamCandidateDto,
-  ExamDeliveryMode,
-  ExamDto,
   ExamPaperDto,
   ExamPaperItemDto,
   ExamPaperSectionDto,
@@ -26,17 +24,6 @@ import type {
 
 export function unwrap<T>(response: { data: ApiResponse<T> }) {
   return response.data.data
-}
-
-export function useSetExamDeliveryModeMutation() {
-  return useMutation({
-    mutationFn: async ({ deliveryMode, examId }: { deliveryMode: ExamDeliveryMode; examId: string }) => {
-      const response = await apiClient.patch<ApiResponse<ExamDto>>(`/v1/exams/${examId}/delivery-mode`, {
-        deliveryMode: deliveryMode === 'DEVICE' ? 'STUDENT_DEVICE' : 'LAB',
-      })
-      return unwrap(response)
-    },
-  })
 }
 
 export function useReleaseSecurePoolMutation() {

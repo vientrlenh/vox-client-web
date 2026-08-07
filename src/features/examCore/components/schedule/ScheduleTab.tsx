@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, FileText, Laptop, Lock, Monitor, ShieldCheck, UserPlus } from 'lucide-react'
+import { CalendarClock, FileText, Lock, ShieldCheck, UserPlus } from 'lucide-react'
 import { toApiError } from '@/shared/api'
 import type { ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
@@ -20,7 +20,7 @@ import {
   useUpdateScheduleStatusMutation,
 } from '../../api/mutations'
 import { examQueryKeys, useExamCandidatesQuery, useExamSchedulesQuery } from '../../api/queries'
-import { getScheduleLabel, type ExamCandidateDto, type ExamDeliveryMode, type ExamPaperDto, type ExamScheduleDto } from '../../types'
+import { getScheduleLabel, type ExamCandidateDto, type ExamPaperDto, type ExamScheduleDto } from '../../types'
 import { AddStudentToRoomModal } from './AddStudentToRoomModal'
 import { CreateScheduleModal } from './CreateScheduleModal'
 import { ManageProctorsModal } from './ManageProctorsModal'
@@ -31,7 +31,6 @@ import { ScheduleSessionsCard } from './ScheduleSessionsCard'
 
 type ScheduleTabProps = {
   canManage: boolean
-  deliveryMode?: ExamDeliveryMode
   // Ba trường dưới đây chỉ để dựng ràng buộc khung giờ trong modal tạo/sửa ca thi —
   // xem CreateScheduleModal. Đều là dữ liệu chỉ đọc của kỳ thi.
   examCloseAt?: string | null
@@ -43,14 +42,12 @@ type ScheduleTabProps = {
   // công bố/hoàn thành/hủy ca vì đó là thao tác vận hành trong lúc thi.
   locked?: boolean
   onGoToPapers: () => void
-  onSetDeliveryMode?: (mode: ExamDeliveryMode) => void
   papers: ExamPaperDto[]
   unlocked: boolean
 }
 
 export function ScheduleTab({
   canManage,
-  deliveryMode,
   examCloseAt,
   examId,
   examOpenAt,
@@ -58,7 +55,6 @@ export function ScheduleTab({
   isClassTest,
   locked = false,
   onGoToPapers,
-  onSetDeliveryMode,
   papers,
   unlocked,
 }: ScheduleTabProps) {
@@ -96,7 +92,6 @@ export function ScheduleTab({
   const candidates = candidatesQuery.data ?? []
   // Quyền sửa lịch = quyền quản lý + kỳ thi chưa bắt đầu.
   const canEdit = canManage && !locked
-  const effectiveMode: ExamDeliveryMode = deliveryMode ?? (isClassTest ? 'DEVICE' : 'LAB')
 
   const totalProctors = schedules.reduce((sum, schedule) => sum + schedule.proctors.length, 0)
   const requiredProctors = schedules.reduce((sum, schedule) => sum + schedule.requiredProctorCount, 0)
@@ -180,6 +175,39 @@ export function ScheduleTab({
       setMessage('Đã cập nhật trạng thái ca thi.')
     } catch (error) {
       handleError(error)
+    }
+  }
+
+  /**
+   * Công bố hàng loạt các ca còn Bản nháp. Cả hai loại bài đều đòi mọi ca đã công bố mới lên lịch
+   * được (UpdateExamStatusUseCase), nên mở từng menu để bấm "Công bố" là việc lặp không cần thiết.
+   * Chạy tuần tự để lỗi của ca nào hiện đúng message của ca đó — ca thiếu giám thị sẽ bị BE từ chối.
+   */
+  async function handlePublishAllSchedules() {
+    const draftSchedules = schedules.filter((schedule) => schedule.status === 'DRAFT')
+    if (draftSchedules.length === 0) {
+      return
+    }
+    if (
+      !(await confirm({
+        message: `Công bố ${draftSchedules.length} ca thi? Học sinh và giám thị sẽ thấy các ca này, và không sửa được phòng/khung giờ nữa.`,
+        title: 'Công bố tất cả ca thi',
+      }))
+    ) {
+      return
+    }
+    let publishedCount = 0
+    try {
+      for (const schedule of draftSchedules) {
+        await updateStatusMutation.mutateAsync({ examId, payload: { action: 'PUBLISH' }, scheduleId: schedule.id })
+        publishedCount += 1
+      }
+      setMessage(`Đã công bố ${publishedCount} ca thi.`)
+    } catch (error) {
+      handleError(error)
+    } finally {
+      // Ca nào đã công bố xong vẫn phải hiện đúng trạng thái mới, kể cả khi ca sau ném lỗi.
+      await invalidate()
     }
   }
 
@@ -397,68 +425,6 @@ export function ScheduleTab({
     return items
   }
 
-  // Kỳ thi tập trung luôn thi trên máy nhà trường nên không có lựa chọn — chỉ bài trên lớp mới chọn.
-  const deviceModeSection = isClassTest && onSetDeliveryMode ? (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center rounded-[10px] bg-indigo-50 text-indigo-600">
-          <Monitor aria-hidden="true" className="size-4.5" />
-        </span>
-        <div>
-          <div className="text-sm font-extrabold text-slate-900">Hình thức làm bài</div>
-          <div className="text-xs text-slate-500">
-            Chọn máy thí sinh dùng để làm bài. Cả hai hình thức đều thi tại phòng, có ca thi và giám thị — không có
-            hình thức làm bài ở nhà.
-          </div>
-        </div>
-      </div>
-      <div className="mt-3.5 flex flex-wrap gap-2.5">
-        <button
-          className={[
-            'min-w-55 flex-1 rounded-xl border p-3.5 text-left transition',
-            effectiveMode === 'DEVICE' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
-          ].join(' ')}
-          onClick={() => onSetDeliveryMode('DEVICE')}
-          type="button"
-        >
-          <div className="flex items-center gap-2">
-            <Laptop aria-hidden="true" className="size-4.5 text-indigo-600" />
-            <span className="text-[13px] font-bold text-slate-900">Thiết bị học sinh</span>
-            {effectiveMode === 'DEVICE' ? (
-              <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
-                Đang chọn
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-1.5 text-xs leading-5 text-slate-600">
-            Thí sinh làm bài trên máy cá nhân mang tới phòng thi. Vẫn xếp ca thi, phòng và giám thị như thi tập trung.
-          </div>
-        </button>
-        <button
-          className={[
-            'min-w-55 flex-1 rounded-xl border p-3.5 text-left transition',
-            effectiveMode === 'LAB' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
-          ].join(' ')}
-          onClick={() => onSetDeliveryMode('LAB')}
-          type="button"
-        >
-          <div className="flex items-center gap-2">
-            <Monitor aria-hidden="true" className="size-4.5 text-slate-500" />
-            <span className="text-[13px] font-bold text-slate-900">Thiết bị nhà trường</span>
-            {effectiveMode === 'LAB' ? (
-              <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
-                Đang chọn
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-1.5 text-xs leading-5 text-slate-600">
-            Thí sinh làm bài trên máy vi tính tại phòng máy của trường. Xếp ca thi, phòng và giám thị.
-          </div>
-        </button>
-      </div>
-    </div>
-  ) : null
-
   const toasts = (
     <>
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
@@ -471,7 +437,6 @@ export function ScheduleTab({
     return (
       <div className="mt-4 grid gap-4">
         {toasts}
-        {deviceModeSection}
         <div className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-8 py-12 text-center">
           <span className="flex size-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
             <Lock aria-hidden="true" className="size-7" />
@@ -495,7 +460,6 @@ export function ScheduleTab({
   return (
     <div className="mt-4 grid gap-4">
       {toasts}
-      {deviceModeSection}
 
       <div className="grid gap-3 sm:grid-cols-4">
         <StatCard icon={<CalendarClock size={19} />} iconTone="indigo" label="Ca thi" value={schedules.length} />
@@ -529,6 +493,11 @@ export function ScheduleTab({
           canEdit && hasUnassignedCandidates ? () => void handleAutoFillAllSchedules() : undefined
         }
         onCreate={() => setShowCreateModal(true)}
+        onPublishAllSchedules={
+          canManage && schedules.some((schedule) => schedule.status === 'DRAFT')
+            ? () => void handlePublishAllSchedules()
+            : undefined
+        }
         onSearchChange={setScheduleSearch}
         onSelect={(scheduleId) => {
           setSelectedScheduleId(scheduleId)

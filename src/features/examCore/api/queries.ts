@@ -112,6 +112,12 @@ export const EXAM_LIST_FIELDS = `
   members {
     role
   }
+  # Chỉ status, đủ cho bước "Xếp lịch" của thanh tiến độ ở CẢ hai trang danh sách (kỳ thi tập trung
+  # và bài trên lớp). Cũng chạy qua DataLoader examSchedulesByExamId nên không phải N+1.
+  schedules {
+    id
+    status
+  }
 `
 
 const EXAM_SUMMARY_FIELDS = `

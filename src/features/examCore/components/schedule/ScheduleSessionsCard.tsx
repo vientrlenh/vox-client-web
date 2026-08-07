@@ -1,4 +1,4 @@
-import { Plus, Search, Sparkles, Wand2 } from 'lucide-react'
+import { Megaphone, Plus, Search, Sparkles, Wand2 } from 'lucide-react'
 import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { formatDateTime, getScheduleLabel, getScheduleStatusDisplay, type ExamScheduleDto } from '../../types'
@@ -12,6 +12,11 @@ type ScheduleSessionsCardProps = {
   /** Chỉ truyền khi còn học sinh chưa xếp ca — không có việc để làm thì không hiện nút. */
   onAutoFillAllSchedules?: () => void
   onCreate: () => void
+  /**
+   * Chỉ truyền khi còn ca ở trạng thái Bản nháp. Công bố là thao tác vận hành nên nút này KHÔNG
+   * nằm trong khối `canEdit` — kỳ thi đã bắt đầu vẫn phải công bố được ca còn sót.
+   */
+  onPublishAllSchedules?: () => void
   onSearchChange: (value: string) => void
   onSelect: (scheduleId: string) => void
   /** Lý do không phân đề được (chưa khóa hết mã đề) — có thì nút "Phân đề tự động" bị khóa kèm tooltip. */
@@ -28,6 +33,7 @@ export function ScheduleSessionsCard({
   onAutoAssignPapers,
   onAutoFillAllSchedules,
   onCreate,
+  onPublishAllSchedules,
   onSearchChange,
   onSelect,
   paperAssignmentBlockedReason,
@@ -40,9 +46,19 @@ export function ScheduleSessionsCard({
     <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-[15px] font-extrabold text-slate-900">Danh sách ca thi</h3>
-        {canEdit ? (
+        {canEdit || onPublishAllSchedules ? (
           <div className="flex flex-wrap gap-2">
-            {onAutoFillAllSchedules ? (
+            {onPublishAllSchedules ? (
+              <button
+                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-4 text-[13px] font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                onClick={onPublishAllSchedules}
+                type="button"
+              >
+                <Megaphone aria-hidden="true" className="size-4" />
+                Công bố tất cả ca thi
+              </button>
+            ) : null}
+            {canEdit && onAutoFillAllSchedules ? (
               <button
                 className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50"
                 onClick={onAutoFillAllSchedules}
@@ -52,7 +68,7 @@ export function ScheduleSessionsCard({
                 Chia đều vào tất cả ca
               </button>
             ) : null}
-            {onAutoAssignPapers ? (
+            {canEdit && onAutoAssignPapers ? (
               <button
                 className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={Boolean(paperAssignmentBlockedReason)}
@@ -64,14 +80,16 @@ export function ScheduleSessionsCard({
                 Phân đề tự động (tất cả ca)
               </button>
             ) : null}
-            <button
-              className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-4 text-[13px] font-semibold text-white transition hover:bg-indigo-700"
-              onClick={onCreate}
-              type="button"
-            >
-              <Plus aria-hidden="true" className="size-4" />
-              Thêm ca thi
-            </button>
+            {canEdit ? (
+              <button
+                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-4 text-[13px] font-semibold text-white transition hover:bg-indigo-700"
+                onClick={onCreate}
+                type="button"
+              >
+                <Plus aria-hidden="true" className="size-4" />
+                Thêm ca thi
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

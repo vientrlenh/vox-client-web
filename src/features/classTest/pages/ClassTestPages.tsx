@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   BookOpenCheck,
   Calendar,
-  Check,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -21,6 +20,7 @@ import {
   ScrollText,
   Timer,
   Trash2,
+  UserPlus,
   Users,
   NotebookPen,
 } from 'lucide-react'
@@ -37,7 +37,6 @@ import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { TabPillGroup } from '@/shared/ui/TabPill'
-import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
 import { WarningBanner } from '@/shared/ui/WarningBanner'
@@ -60,12 +59,16 @@ import {
 import {
   useCreateExamPaperMutation,
   useDeleteExamPaperMutation,
-  useSetExamDeliveryModeMutation,
   useUpdateExamPaperStatusMutation,
 } from '@/features/examCore/api/mutations'
 import { useMatchingTeacherAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
 import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '@/features/examCore/utils/timeQuota'
 import { buildClassTestQuotaWarning } from '@/features/classTest/utils/classTestTokenQuota'
+import {
+  getClassTestScheduleReadiness,
+  getClassTestWorkflowSteps,
+  type ClassTestDetailTab,
+} from '@/features/classTest/utils/classTestWorkflow'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useMySubscriptionUsageQuery } from '@/features/subscription_school/api/useMySubscriptionUsageQuery'
 import { useMyClassTestQuotaAllocationQuery } from '@/features/subscription_school/api/useMyClassTestQuotaAllocationQuery'
@@ -84,10 +87,7 @@ import {
   toIsoDateTime,
   toUpdateStreamPayload,
   type ExamBlueprintDto,
-  type ExamCandidateDto,
-  type ExamDeliveryMode,
   type ExamDto,
-  type ExamScheduleDto,
   type ExamStatus,
   type ResultDecisionMethod,
   type SchoolRoomLite,
@@ -126,100 +126,14 @@ const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
  */
 const GRADABLE_STATUSES: ExamStatus[] = ['IN_PROGRESS', 'CLOSED', 'RESULTS_PUBLISHED']
 
-function canStartClassTestManually(exam: ExamDto, nowMs: number) {
-  if (exam.status !== 'SCHEDULED') {
-    return false
-  }
+/**
+ * Backend từ chối action START sau giờ đóng bài (UpdateExamStatusUseCase.requireClassTestCanStart).
+ * Soi lại ở FE để hiện lý do ngay trên nút thay vì giấu nút đi — giấu là giáo viên mắc kẹt ở trạng
+ * thái SCHEDULED mà không biết phải làm gì.
+ */
+function isClassTestPastCloseAt(exam: ExamDto, nowMs: number) {
   const closeAtMs = exam.closeAt ? new Date(exam.closeAt).getTime() : Number.POSITIVE_INFINITY
-  return nowMs < closeAtMs
-}
-
-/**
- * Điều kiện backend chặn action SCHEDULE của bài trên lớp: mọi ca thi phải có phòng và giám khảo,
- * mọi học sinh phải đã được xếp ca và có đề. Tính lại ở FE để hiện lý do trước khi bấm, thay vì
- * để giáo viên ăn lỗi 400.
- */
-function getClassTestScheduleReadiness(schedules: ExamScheduleDto[], candidates: ExamCandidateDto[]) {
-  const missingRoom = schedules.filter((schedule) => !schedule.schoolRoomId).length
-  const missingProctor = schedules.filter((schedule) => schedule.proctors.length === 0).length
-  const unassignedCandidates = candidates.filter((candidate) => !candidate.scheduleId).length
-  const withoutPaper = candidates.filter((candidate) => !candidate.assignedPaperId).length
-
-  const blockingReason =
-    schedules.length === 0
-      ? 'Bài kiểm tra chưa có ca thi.'
-      : missingRoom > 0
-        ? 'Ca thi chưa được chọn phòng.'
-        : missingProctor > 0
-          ? 'Ca thi chưa có giám khảo.'
-          : unassignedCandidates > 0
-            ? `Còn ${unassignedCandidates} học sinh chưa được xếp vào ca thi.`
-            : withoutPaper > 0
-              ? `Còn ${withoutPaper} học sinh chưa được gán đề.`
-              : null
-
-  return { blockingReason, ready: blockingReason === null }
-}
-
-/**
- * `schedules`/`candidates` chỉ có ở trang chi tiết. Trang danh sách bỏ trống để khỏi phải gọi thêm
- * một cặp request cho mỗi dòng — khi đó suy bước "phòng thi & học sinh" từ trạng thái bài: backend
- * chặn SCHEDULE khi chưa đủ điều kiện, nên bài đã rời DRAFT chắc chắn đã qua bước này.
- */
-function getClassTestWorkflowSteps(
-  exam: ExamDto,
-  schedules?: ExamScheduleDto[],
-  candidates?: ExamCandidateDto[],
-): { completedCount: number; steps: WorkflowStep[] } {
-  // Bài trên lớp không còn tự gắn blueprint lúc tạo, và mã đề soạn tay cũng không sinh blueprint ẩn
-  // nào — nên exam.blueprintId không nói được đề đã có nội dung thật hay chưa. Đếm trên câu hỏi.
-  const papersWithQuestions = exam.papers.filter((paper) => paper.sections.some((section) => section.items.length > 0))
-  const hasQuestions = papersWithQuestions.length > 0
-  // Phân đề (nhiều mã đề) yêu cầu mọi mã đề đã khoá; một mã đề thì hệ thống tự gán, không cần khoá trước.
-  const unlockedPapers = exam.papers.filter((paper) => paper.status !== 'LOCKED').length
-  const isScheduled = exam.status !== 'DRAFT' && exam.status !== 'CANCELLED'
-  const readiness = schedules && candidates ? getClassTestScheduleReadiness(schedules, candidates) : null
-  const blockingReason = readiness?.blockingReason ?? null
-  const roomAndStudentsReady = readiness ? readiness.ready : isScheduled
-
-  const step1Done = hasQuestions
-  const step2Done = step1Done && roomAndStudentsReady
-  const step3Done = isScheduled
-
-  const assignedCandidates = (candidates ?? []).filter((candidate) => candidate.scheduleId).length
-
-  const steps: WorkflowStep[] = [
-    {
-      icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
-      label: 'Đề bài',
-      state: step1Done ? 'done' : 'current',
-      sublabel: !step1Done
-        ? 'Chưa có mã đề nào có câu hỏi'
-        : exam.papers.length > 1
-          ? unlockedPapers > 0
-            ? `${exam.papers.length} mã đề · còn ${unlockedPapers} mã đề chưa khoá để phân đề`
-            : `${exam.papers.length} mã đề đã khoá, sẵn sàng phân đề`
-          : 'Đã có câu hỏi trong đề',
-    },
-    {
-      icon: step2Done ? <Check size={26} /> : <FilePenLine size={24} />,
-      label: 'Phòng thi & học sinh',
-      state: !step1Done ? 'upcoming' : step2Done ? 'done' : 'current',
-      sublabel: step2Done
-        ? assignedCandidates > 0
-          ? `${assignedCandidates} học sinh đã xếp ca`
-          : 'Đã xếp phòng và học sinh'
-        : (blockingReason ?? 'Chọn phòng và xếp học sinh vào ca thi'),
-    },
-    {
-      icon: step3Done ? <Check size={26} /> : <PlayCircle size={24} />,
-      label: 'Lên lịch & chấm',
-      state: !step2Done ? 'upcoming' : step3Done ? 'done' : 'current',
-      sublabel: step3Done ? 'Đã lên lịch, bài tự mở khi tới giờ' : 'Bấm lên lịch để chốt ca thi',
-    },
-  ]
-
-  return { completedCount: [step1Done, step2Done, step3Done].filter(Boolean).length, steps }
+  return nowMs >= closeAtMs
 }
 
 type ClassTestListPageProps = {
@@ -280,19 +194,37 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
         ) : (
           classTestsQuery.data?.content.map((exam) => {
             const statusDisplay = getClassTestStatusDisplay(exam.status)
-            const { steps } = getClassTestWorkflowSteps(exam)
-            const hasContent = exam.papers.some((paper) => paper.sections.some((section) => section.items.length > 0))
+            const { completedCount, currentStep, done, steps, summary, totalCount } = getClassTestWorkflowSteps(exam)
             const metaItems = [
               { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
-              hasContent
+              done.papers
                 ? { icon: <LayoutList aria-hidden="true" className="size-3.5" />, label: formatNullableText(exam.description) }
                 : { icon: <Clock aria-hidden="true" className="size-3.5" />, label: 'Chưa soạn đề bài', tone: 'warning' as const },
+              { icon: <Users aria-hidden="true" className="size-3.5" />, label: `${summary.candidateCount ?? 0} học sinh` },
+              ...(summary.scheduleCount === null
+                ? []
+                : [
+                    {
+                      icon: <Calendar aria-hidden="true" className="size-3.5" />,
+                      label: `${summary.publishedScheduleCount}/${summary.scheduleCount} ca thi đã công bố`,
+                      tone:
+                        summary.publishedScheduleCount < summary.scheduleCount
+                          ? ('warning' as const)
+                          : ('default' as const),
+                    },
+                  ]),
             ]
             return (
               <ExamListRow
                 key={exam.id}
                 metaItems={metaItems}
                 onClick={() => navigate(`${basePath}/${exam.id}`)}
+                progress={{
+                  completedCount,
+                  currentLabel: currentStep?.label ?? null,
+                  currentSublabel: currentStep?.sublabel,
+                  totalCount,
+                }}
                 statusLabel={statusDisplay.label}
                 statusTone={statusDisplay.tone}
                 steps={steps}
@@ -463,7 +395,6 @@ type SelectedRubricVersion = { code: string; id: string; languageId: string; nam
 /** Chỉ metadata: soạn đề đã chuyển hẳn sang trang chi tiết nên không còn gì về đề để mang theo. */
 type ClassTestCreateDraft = {
   closeAt: string
-  deliveryMode: ExamDeliveryMode
   description: string
   maxAttempt: string
   name: string
@@ -503,9 +434,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   const [closeAt, setCloseAt] = useState(draft?.closeAt ?? '')
   const [maxAttempt, setMaxAttempt] = useState(draft?.maxAttempt ?? '1')
   const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(draft?.resultDecisionMethod ?? 'HIGHEST')
-  // Bài trên lớp cũng thi trong phòng: mặc định học sinh dùng máy của mình, trường nào thi ở
-  // phòng máy thì đổi sang LAB. Phòng có thể chọn sau ở tab Xếp lịch nhưng phải có trước khi lên lịch.
-  const [deliveryMode, setDeliveryMode] = useState<ExamDeliveryMode>(draft?.deliveryMode ?? 'DEVICE')
+  // Phòng có thể chọn sau ở tab Xếp lịch nhưng phải có trước khi lên lịch.
   const [schoolRoom, setSchoolRoom] = useState<SchoolRoomLite | null>(draft?.schoolRoom ?? null)
   const [showRoomPicker, setShowRoomPicker] = useState(false)
   // Mặc định mức giám sát đầy đủ, không phải "không giám sát": lựa chọn này không sửa được sau khi
@@ -538,7 +467,6 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
       state: {
         draft: {
           closeAt,
-          deliveryMode,
           description,
           maxAttempt,
           name,
@@ -609,7 +537,6 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
         payload: {
           assessmentPolicyId,
           closeAt: closeAtIso,
-          deliveryMode: deliveryMode === 'DEVICE' ? 'STUDENT_DEVICE' : 'LAB',
           description: description || null,
           maxAttempt: Number(maxAttempt) || 1,
           name,
@@ -721,34 +648,9 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
           <div>
             <span className="text-sm font-bold text-slate-700">Tổ chức thi</span>
             <p className="text-xs text-slate-500">
-              Bài trên lớp thi ngay tại phòng có giám khảo. Bạn là giám khảo mặc định của ca thi và có thể thêm
-              giáo viên khác sau ở tab Xếp lịch.
+              Bài trên lớp thi ngay tại phòng có giám khảo, học sinh làm bài trên máy cá nhân mang tới lớp. Bạn là
+              giám khảo mặc định của ca thi và có thể thêm giáo viên khác sau ở tab Xếp lịch.
             </p>
-          </div>
-
-          <div className="grid gap-1.5">
-            <span className="text-[13px] font-bold text-slate-700">Thiết bị làm bài</span>
-            <div className="flex flex-wrap gap-2.5">
-              {(
-                [
-                  { hint: 'Học sinh làm bài trên máy cá nhân mang tới lớp.', label: 'Thiết bị học sinh', value: 'DEVICE' },
-                  { hint: 'Học sinh làm bài trên máy của phòng máy nhà trường.', label: 'Thiết bị nhà trường', value: 'LAB' },
-                ] as const
-              ).map((option) => (
-                <button
-                  className={[
-                    'min-w-55 flex-1 rounded-xl border p-3.5 text-left transition',
-                    deliveryMode === option.value ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white hover:bg-slate-50',
-                  ].join(' ')}
-                  key={option.value}
-                  onClick={() => setDeliveryMode(option.value)}
-                  type="button"
-                >
-                  <span className="text-[13px] font-bold text-slate-900">{option.label}</span>
-                  <span className="mt-1 block text-xs leading-5 text-slate-600">{option.hint}</span>
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="grid gap-1.5">
@@ -1179,8 +1081,6 @@ type ClassTestDetailPageProps = {
   canManage: boolean
 }
 
-type DetailTab = 'blueprint' | 'papers' | 'schedule' | 'students'
-
 function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -1198,11 +1098,12 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const updateStatusMutation = useUpdateClassTestStatusMutation()
   const deleteMutation = useDeleteClassTestMutation()
   const deleteSectionMutation = useDeleteClassTestSectionMutation()
-  const setDeliveryModeMutation = useSetExamDeliveryModeMutation()
   const createPaperMutation = useCreateExamPaperMutation()
   const updatePaperStatusMutation = useUpdateExamPaperStatusMutation()
   const deletePaperMutation = useDeleteExamPaperMutation()
-  const [tab, setTab] = useState<DetailTab>('papers')
+  // null = chưa chọn tay; useEffect bên dưới sẽ mở tab của bước đang dở đúng một lần.
+  const [tab, setTab] = useState<ClassTestDetailTab | null>(null)
+  const autoTabAppliedRef = useRef(false)
   const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null)
   const [showPaperComposer, setShowPaperComposer] = useState(false)
   const [copyFromPaperId, setCopyFromPaperId] = useState('')
@@ -1239,6 +1140,27 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
+  }
+
+  // Truyền thẳng `.data` (undefined khi đang tải) chứ không phải `?? []` — mảng rỗng sẽ khiến tracker
+  // nháy "chưa có ca thi" trước khi dữ liệu về, còn undefined thì nó rơi về suy luận theo status.
+  const workflow = exam ? getClassTestWorkflowSteps(exam, schedulesQuery.data, candidatesQuery.data) : null
+  const dataReady = Boolean(exam && schedulesQuery.data && candidatesQuery.data)
+  const suggestedTab: ClassTestDetailTab = workflow?.currentStep?.tab ?? 'papers'
+
+  // Mở trang là nhảy thẳng vào tab của bước đang dở, nhưng chỉ đúng một lần: người dùng bấm tab khác
+  // trong lúc ca thi/học sinh còn đang tải thì không bị hất ngược lại.
+  useEffect(() => {
+    if (autoTabAppliedRef.current || !dataReady) {
+      return
+    }
+    autoTabAppliedRef.current = true
+    setTab(suggestedTab)
+  }, [dataReady, suggestedTab])
+
+  function selectTab(next: ClassTestDetailTab) {
+    autoTabAppliedRef.current = true
+    setTab(next)
   }
 
   // Bài trên lớp giờ có thể có nhiều mã đề. Trình soạn thảo bên dưới luôn thao tác trên đúng mã đề
@@ -1598,12 +1520,12 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
   }
 
-  if (!exam) {
+  if (!exam || !workflow) {
     return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy bài trên lớp.</section>
   }
 
+  const activeTab: ClassTestDetailTab = tab ?? 'papers'
   const statusDisplay = getClassTestStatusDisplay(exam.status)
-  const schedules = schedulesQuery.data ?? []
   const candidates = candidatesQuery.data ?? []
   // Cảnh báo chủ động trước khi BE chặn (ClassTestTokenQuotaGuardService) — không thay cho việc
   // BE thật sự chặn, chỉ để giáo viên biết trước thay vì bấm xong mới ăn lỗi.
@@ -1629,51 +1551,71 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     maxAttempt: Number(editMaxAttempt) || 1,
     personalAllocation: myClassTestQuotaAllocationQuery.data,
   })
-  const { completedCount, steps } = getClassTestWorkflowSteps(exam, schedules, candidates)
-  const scheduleReadiness = getClassTestScheduleReadiness(schedules, candidates)
+  const { completedCount, currentStep, steps } = workflow
+  const scheduleReadiness = getClassTestScheduleReadiness(schedulesQuery.data, candidatesQuery.data)
   // Tab Xếp lịch phải mở ngay khi đề đã có câu hỏi — đó chính là nơi giáo viên chọn phòng và xếp
   // học sinh, nên không thể chờ bước đó hoàn tất mới cho vào.
-  const unlockedSchedule = completedCount >= 1
+  const unlockedSchedule = workflow.done.papers
   const roleBasePath = canManage ? '/teacher' : '/school-admin'
   // Khớp rule backend: nội dung/ngày giờ chỉ khóa khi bài đã bắt đầu.
   const canEditContent = canManage && (exam.status === 'DRAFT' || exam.status === 'SCHEDULED')
   // Chỉ soạn câu hỏi trực tiếp được khi KHÔNG có blueprint dùng chung nào đang gắn (dùng "Đổi blueprint khác" nếu có).
   const canEditFreeQuestions = canEditContent && !exam.blueprintId
-  const canManualStart = canManage && canStartClassTestManually(exam, nowMs)
+  /**
+   * Nút bước kế LUÔN hiện theo trạng thái bài. Trước đây nó lặng lẽ biến mất khi bài còn DRAFT mà
+   * chưa đủ điều kiện, hoặc khi bài SCHEDULED đã quá giờ đóng — giáo viên không có nút nào để bấm
+   * và cũng không biết mình đang thiếu gì. Thà disable kèm lý do, đúng khuôn kỳ thi tập trung
+   * (ExamPages.tsx).
+   */
   const primaryStatusAction =
-    exam.status === 'DRAFT' && scheduleReadiness.ready
-      ? { action: 'SCHEDULE' as const, icon: <Calendar aria-hidden="true" className="size-4.5" />, label: 'Lên lịch bài kiểm tra' }
-      : canManualStart
-        ? { action: 'START' as const, icon: <PlayCircle aria-hidden="true" className="size-4.5" />, label: 'Mở bài ngay' }
-      : exam.status === 'IN_PROGRESS'
-          ? { action: 'CLOSE' as const, icon: <Lock aria-hidden="true" className="size-4.5" />, label: 'Đóng bài kiểm tra' }
+    exam.status === 'DRAFT'
+      ? {
+          action: 'SCHEDULE' as const,
+          disabledReason: scheduleReadiness.blockingReason,
+          icon: <Calendar aria-hidden="true" className="size-4.5" />,
+          label: 'Lên lịch bài kiểm tra',
+        }
+      : exam.status === 'SCHEDULED'
+        ? {
+            action: 'START' as const,
+            disabledReason: isClassTestPastCloseAt(exam, nowMs)
+              ? 'Đã quá thời gian đóng bài — sửa lại giờ đóng trước khi mở bài.'
+              : null,
+            icon: <PlayCircle aria-hidden="true" className="size-4.5" />,
+            label: 'Mở bài ngay',
+          }
+        : exam.status === 'IN_PROGRESS'
+          ? {
+              action: 'CLOSE' as const,
+              disabledReason: null,
+              icon: <Lock aria-hidden="true" className="size-4.5" />,
+              label: 'Đóng bài kiểm tra',
+            }
           : exam.status === 'CLOSED'
-            ? { action: 'PUBLISH_RESULTS' as const, icon: <Megaphone aria-hidden="true" className="size-4.5" />, label: 'Chốt kết quả' }
+            ? {
+                action: 'PUBLISH_RESULTS' as const,
+                disabledReason: null,
+                icon: <Megaphone aria-hidden="true" className="size-4.5" />,
+                label: 'Chốt kết quả',
+              }
             : null
 
-  const nextAction =
-    completedCount === 0
+  // Nhà trường chỉ theo dõi: CTA của họ chỉ được điều hướng tab, không bao giờ gọi mutation.
+  const nextAction = currentStep
+    ? {
+        ctaLabel: currentStep.cta,
+        description: currentStep.todo,
+        onClick: () => selectTab(currentStep.tab),
+        title: currentStep.label,
+      }
+    : canManage && exam.status === 'DRAFT' && scheduleReadiness.ready
       ? {
-          ctaLabel: 'Soạn đề bài',
-          description: 'Bấm "Thêm câu hỏi" ở tab Đề bài để soạn trực tiếp, hoặc gắn blueprint (không bắt buộc) ở tab Blueprint.',
-          onClick: () => setTab('papers'),
-          title: 'Chưa soạn đề bài',
+          ctaLabel: 'Lên lịch',
+          description: 'Phòng thi, giám khảo và danh sách học sinh đã đủ — bấm lên lịch để chốt ca thi.',
+          onClick: () => void handlePrimaryStatusAction('SCHEDULE'),
+          title: 'Sẵn sàng lên lịch',
         }
-      : !scheduleReadiness.ready
-        ? {
-            ctaLabel: 'Mở tab Xếp lịch',
-            description: `${scheduleReadiness.blockingReason} Vào tab Xếp lịch để chọn phòng, phân giám khảo và xếp học sinh vào ca.`,
-            onClick: () => setTab('schedule'),
-            title: 'Chuẩn bị phòng thi và xếp học sinh',
-          }
-        : exam.status === 'DRAFT'
-          ? {
-              ctaLabel: 'Lên lịch',
-              description: 'Phòng thi, giám khảo và danh sách học sinh đã đủ — bấm lên lịch để chốt ca thi.',
-              onClick: () => void handlePrimaryStatusAction('SCHEDULE'),
-              title: 'Sẵn sàng lên lịch',
-            }
-          : null
+      : null
 
   return (
     <section className="mx-auto max-w-260">
@@ -1755,8 +1697,10 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               </button>
               {primaryStatusAction ? (
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={Boolean(primaryStatusAction.disabledReason)}
                   onClick={() => void handlePrimaryStatusAction(primaryStatusAction.action)}
+                  title={primaryStatusAction.disabledReason ?? undefined}
                   type="button"
                 >
                   {primaryStatusAction.icon}
@@ -1786,6 +1730,13 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
       {(exam.status === 'DRAFT' || exam.status === 'SCHEDULED') && currentQuotaWarning ? (
         <WarningBanner className="mt-4" message={currentQuotaWarning} />
+      ) : null}
+
+      {/* Không gói trong `canManage`: nhà trường không bấm được nút nào nhưng vẫn cần biết bài đang kẹt ở đâu. */}
+      {exam.status === 'DRAFT' && scheduleReadiness.blockingReason ? (
+        <div className="mt-3.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-700">
+          Chưa lên lịch được bài kiểm tra: {scheduleReadiness.blockingReason}
+        </div>
       ) : null}
 
       {showEditInfo ? (
@@ -1902,23 +1853,24 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         heading="Quy trình bài trên lớp"
         nextAction={nextAction}
         steps={steps}
-        totalCount={3}
+        totalCount={workflow.totalCount}
       />
 
       <div className="mt-5.5">
         <TabPillGroup
+          // Cùng bộ icon với thanh quy trình (classTestWorkflow.tsx) để hai chỗ đọc ra một bước.
           items={[
-            { label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
-            { label: 'Đề bài', value: 'papers' },
-            { label: 'Học sinh', value: 'students' },
+            { icon: <LayoutList aria-hidden="true" className="size-4" />, label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
+            { icon: <FilePenLine aria-hidden="true" className="size-4" />, label: 'Đề bài', value: 'papers' },
+            { icon: <UserPlus aria-hidden="true" className="size-4" />, label: 'Học sinh', value: 'students' },
             { icon: <Calendar aria-hidden="true" className="size-4" />, label: 'Xếp lịch', value: 'schedule' },
           ]}
-          onChange={setTab}
-          value={tab}
+          onChange={(next) => selectTab(next as ClassTestDetailTab)}
+          value={activeTab}
         />
       </div>
 
-      {tab === 'papers' ? (
+      {activeTab === 'papers' ? (
         <div className="mt-4 grid gap-3.5">
           {canManage ? (
             <div
@@ -1958,7 +1910,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               {papers.length > 1 && unlockedPaperCount === 0 ? (
                 <button
                   className="mt-2 inline-flex h-8.5 items-center justify-center gap-1.5 rounded-full border border-emerald-300 bg-white px-3.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
-                  onClick={() => setTab('schedule')}
+                  onClick={() => selectTab('schedule')}
                   type="button"
                 >
                   <Calendar aria-hidden="true" className="size-3.5" />
@@ -2314,7 +2266,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {tab === 'students' ? (
+      {activeTab === 'students' ? (
         <CandidatesTab
           canManage={canManage}
           examId={exam.id}
@@ -2325,7 +2277,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {tab === 'blueprint' ? (
+      {activeTab === 'blueprint' ? (
         <ClassTestBlueprintTab
           blueprintId={exam.blueprintId}
           blueprintVersionId={exam.blueprintVersionId}
@@ -2336,22 +2288,16 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         />
       ) : null}
 
-      {tab === 'schedule' ? (
+      {activeTab === 'schedule' ? (
         <ScheduleTab
-          canManage={canEditContent}
-          deliveryMode={exam.deliveryMode}
+          canManage={canManage}
           examCloseAt={exam.closeAt}
           examId={exam.id}
           examOpenAt={exam.openAt}
           examTimeDurationSecond={exam.examTimeDurationSecond}
           isClassTest
-          onGoToPapers={() => setTab('papers')}
-          onSetDeliveryMode={
-            canEditContent
-              ? (mode: ExamDeliveryMode) =>
-                  void setDeliveryModeMutation.mutateAsync({ deliveryMode: mode, examId: exam.id }).then(invalidate)
-              : undefined
-          }
+          locked={isExamLockedForEditing(exam.status)}
+          onGoToPapers={() => selectTab('papers')}
           papers={exam.papers}
           unlocked={unlockedSchedule}
         />
