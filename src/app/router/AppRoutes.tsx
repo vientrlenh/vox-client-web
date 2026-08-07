@@ -302,20 +302,11 @@ const SystemAdminQuestionBankDetailPage = lazy(() =>
 );
 
 // question-topic
-const TeacherQuestionTopicsPage = lazy(() =>
-  import("@/features/question-topic").then((m) => ({ default: m.TeacherQuestionTopicsPage })),
-);
 const TeacherQuestionTopicDetailPage = lazy(() =>
   import("@/features/question-topic").then((m) => ({ default: m.TeacherQuestionTopicDetailPage })),
 );
-const SchoolAdminQuestionTopicsPage = lazy(() =>
-  import("@/features/question-topic").then((m) => ({ default: m.SchoolAdminQuestionTopicsPage })),
-);
 const SchoolAdminQuestionTopicDetailPage = lazy(() =>
   import("@/features/question-topic").then((m) => ({ default: m.SchoolAdminQuestionTopicDetailPage })),
-);
-const SystemAdminQuestionTopicsPage = lazy(() =>
-  import("@/features/question-topic").then((m) => ({ default: m.SystemAdminQuestionTopicsPage })),
 );
 const SystemAdminQuestionTopicDetailPage = lazy(() =>
   import("@/features/question-topic").then((m) => ({ default: m.SystemAdminQuestionTopicDetailPage })),
@@ -719,6 +710,18 @@ const SchoolAdminSubscriptionPaymentResultPage = lazy(() =>
   })),
 );
 
+const TeacherQuotaUsagePage = lazy(() =>
+  import("@/features/subscription_school").then((module) => ({
+    default: module.TeacherQuotaUsagePage,
+  })),
+);
+
+const StudentQuotaUsagePage = lazy(() =>
+  import("@/features/subscription_school").then((module) => ({
+    default: module.StudentQuotaUsagePage,
+  })),
+);
+
 // Dùng cho ba route /payment/* mà SePay redirect người dùng về — không truyền backTo nên trang tự
 // suy đường quay lại từ role hiện tại.
 const PaymentResultPage = lazy(() =>
@@ -795,7 +798,6 @@ export function AppRoutes() {
             />
             <Route path="system-admin/question-banks" element={<SystemAdminQuestionBanksPage />} />
             <Route path="system-admin/question-banks/:bankId" element={<SystemAdminQuestionBankDetailPage />} />
-            <Route path="system-admin/question-topics" element={<SystemAdminQuestionTopicsPage />} />
             <Route path="system-admin/question-topics/:topicId" element={<SystemAdminQuestionTopicDetailPage />} />
             <Route path="system-admin/questions/all" element={<SystemAdminQuestionsPage />} />
             <Route path="system-admin/questions/review" element={<SystemAdminReviewQuestionsPage />} />
@@ -969,7 +971,6 @@ export function AppRoutes() {
             <Route path="school-admin/frameworks/:frameworkId/versions/:versionId" element={<SchoolAdminFrameworkVersionDetailPage />} />
             <Route path="school-admin/question-banks" element={<SchoolAdminQuestionBanksPage />} />
             <Route path="school-admin/question-banks/:bankId" element={<SchoolAdminQuestionBankDetailPage />} />
-            <Route path="school-admin/question-topics" element={<SchoolAdminQuestionTopicsPage />} />
             <Route path="school-admin/question-topics/:topicId" element={<SchoolAdminQuestionTopicDetailPage />} />
             <Route path="school-admin/questions/all" element={<SchoolAdminQuestionsPage />} />
             <Route path="school-admin/questions/review" element={<SchoolAdminReviewQuestionsPage />} />
@@ -1072,6 +1073,10 @@ export function AppRoutes() {
               element={<TeacherDashboardPage/>}
             />
             <Route
+              path="teacher/quota-usage"
+              element={<TeacherQuotaUsagePage />}
+            />
+            <Route
               path="teacher/monitoring"
               element={<TeacherMonitoringRoomsPage />}
             />
@@ -1092,7 +1097,6 @@ export function AppRoutes() {
             <Route path="teacher/classes" element={<TeacherMyClassesPage />} />
             <Route path="teacher/question-banks" element={<TeacherQuestionBanksPage />} />
             <Route path="teacher/question-banks/:bankId" element={<TeacherQuestionBankDetailPage />} />
-            <Route path="teacher/question-topics" element={<TeacherQuestionTopicsPage />} />
             <Route path="teacher/question-topics/:topicId" element={<TeacherQuestionTopicDetailPage />} />
             <Route path="teacher/questions/my" element={<TeacherMyQuestionsPage />} />
             <Route path="teacher/questions/all" element={<TeacherQuestionsPage />} />
@@ -1134,6 +1138,7 @@ export function AppRoutes() {
         </Route>
         <Route element={<RequireRole role="STUDENT" />}>
           <Route element={<StudentLayout />}>
+            <Route path="student/quota-usage" element={<StudentQuotaUsagePage />} />
             <Route path="student/exams" element={<StudentExamsPage />} />
             <Route path="student/exams/:sessionId/result" element={<StudentExamResultPage />} />
             <Route path="student/class-tests" element={<StudentClassTestsPage />} />

@@ -20,6 +20,8 @@ type ClassTestPaperComposerProps = {
   examId: string
   onClose: () => void
   onCreated: () => void | Promise<void>
+  /** Tiền tố route theo vai trò hiện tại (VD: "/teacher") — dùng để mở đúng trang chi tiết câu hỏi. */
+  questionDetailBasePath: string
 }
 
 /**
@@ -28,7 +30,7 @@ type ClassTestPaperComposerProps = {
  * <p>Trước đây bước này nằm trong form tạo bài nên mỗi bài chỉ có đúng một đề. Giờ nó là hành động
  * lặp lại được ở trang chi tiết, để giáo viên soạn nhiều mã đề rồi phân đề cho học sinh.
  */
-export function ClassTestPaperComposer({ examId, onClose, onCreated }: ClassTestPaperComposerProps) {
+export function ClassTestPaperComposer({ examId, onClose, onCreated, questionDetailBasePath }: ClassTestPaperComposerProps) {
   const createPaperMutation = useCreateExamPaperMutation()
   const subscriptionQuery = useMySubscriptionQuery()
   const submitLockedRef = useRef(false)
@@ -354,7 +356,7 @@ export function ClassTestPaperComposer({ examId, onClose, onCreated }: ClassTest
                           <a
                             aria-label={`Xem chi tiết ${question.code}`}
                             className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
-                            href={`/teacher/questions/${question.id}`}
+                            href={`${questionDetailBasePath}/questions/${question.id}`}
                             rel="noopener noreferrer"
                             target="_blank"
                             title="Xem chi tiết câu hỏi"
@@ -431,6 +433,7 @@ export function ClassTestPaperComposer({ examId, onClose, onCreated }: ClassTest
             .flatMap((section) => section.questions.map((question) => question.id))}
           onClose={() => setPickerForSectionKey(null)}
           onSelect={(question) => addQuestionToSection(pickerSection.key, question)}
+          questionDetailBasePath={questionDetailBasePath}
           scope="teacher"
           selectedQuestionIds={pickerSection.questions.map((question) => question.id)}
         />

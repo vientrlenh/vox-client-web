@@ -28,7 +28,7 @@ export const IMPORT_TYPE_LABELS: Record<ImportTypeValue, string> = {
   RUBRIC_RESULT_BAND: 'Mức điểm kết quả',
   RUBRIC_VERSION: 'Phiên bản rubric',
   SCHOOL_CLASS: 'Lớp học',
-  SCHOOL_CLASS_USER: 'Học viên trong lớp',
+  SCHOOL_CLASS_USER: 'Người dùng trong lớp',
   SCHOOL_DIRECTORY: 'Danh mục trường',
   SCHOOL_GRADE: 'Năm học',
   SCHOOL_GRADE_LEVEL: 'Khối',

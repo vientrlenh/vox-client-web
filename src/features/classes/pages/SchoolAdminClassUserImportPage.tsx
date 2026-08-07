@@ -299,7 +299,7 @@ export function SchoolAdminClassUserImportPage() {
       setMessage({
         text:
           getErrorMessage(error) ??
-          'Không thể xác nhận import học viên. Vui lòng thử lại.',
+          'Không thể xác nhận import người dùng. Vui lòng thử lại.',
         tone: 'error',
       })
     }
@@ -329,17 +329,17 @@ export function SchoolAdminClassUserImportPage() {
               Chi tiết lớp học
             </Link>
             <span aria-hidden="true">/</span>
-            <span>Import học viên</span>
+            <span>Import người dùng</span>
           </nav>
           <h1
             className="mt-4 text-3xl font-black tracking-0 text-slate-950"
             id="school-class-user-import-title"
           >
-            Import học viên vào lớp
+            Import người dùng vào lớp
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-slate-600">
             Tải lên file CSV hoặc Excel, ghép cột email và mã lớp, sau đó xác
-            nhận import học viên vào lớp học.
+            nhận import người dùng vào lớp học.
           </p>
           {schoolClass ? (
             <p className="mt-3 text-sm font-bold text-cyan-700">
@@ -386,7 +386,7 @@ export function SchoolAdminClassUserImportPage() {
             Chọn file CSV hoặc Excel
           </span>
           <span className="text-xs font-semibold text-slate-500">
-            File cần có email học viên và mã lớp.
+            File cần có email người dùng và mã lớp.
           </span>
           <input
             accept=".csv,.xlsx,.xls"

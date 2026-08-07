@@ -413,6 +413,10 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             >
               Chọn phiên bản thang đánh giá
             </button>
+          ) : null}
+
+          {!selectedRubricVersion ? (
+            <p className="mt-1 text-xs font-semibold text-red-600">Bắt buộc phải chọn phiên bản thang đánh giá.</p>
           ) : (
             <div className="mt-1.5 grid gap-2 rounded-lg border border-indigo-200 bg-white p-3.5">
               <div className="flex items-center justify-between gap-3">

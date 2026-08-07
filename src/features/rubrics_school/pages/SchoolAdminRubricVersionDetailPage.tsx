@@ -105,6 +105,15 @@ export function SchoolAdminRubricVersionDetailPage() {
     refetch: refetchCriteria
   } = useSearchSchoolRubricCriteriaQuery(schoolId, versionId, criteriaFilter, criteriaPage, 10);
 
+  // Danh sách đầy đủ (không phân trang) chỉ để loại các framework criterion đã được thêm rồi
+  // khỏi dropdown "Framework Criterion" trong modal Thêm Tiêu chí, và để chống trùng order.
+  const { data: allCriteriaData } = useSearchSchoolRubricCriteriaQuery(schoolId, versionId, {}, 1, 500);
+  const usedFrameworkCriterionIds = allCriteriaData?.content.map((criterion) => criterion.frameworkCriterionId) ?? [];
+  const allCriteriaOrders = allCriteriaData?.content.map((criterion) => criterion.order) ?? [];
+  const siblingCriteriaOrders = allCriteriaData?.content
+    .filter((criterion) => criterion.id !== editingCriterion?.id)
+    .map((criterion) => criterion.order) ?? [];
+
   const bandsFilter: SearchRubricResultBandFilter = {
     keyword: debouncedBandsKeyword.trim() ? debouncedBandsKeyword : null,
   };
@@ -115,6 +124,13 @@ export function SchoolAdminRubricVersionDetailPage() {
     isError: bandsError,
     refetch: refetchBands
   } = useSearchSchoolRubricResultBandsQuery(schoolId, versionId, bandsFilter, bandsPage, 10);
+
+  // Danh sách đầy đủ (không phân trang) chỉ để chống trùng order khi thêm/sửa thang điểm.
+  const { data: allBandsData } = useSearchSchoolRubricResultBandsQuery(schoolId, versionId, {}, 1, 500);
+  const allBandsOrders = allBandsData?.content.map((band) => band.order) ?? [];
+  const siblingBandsOrders = allBandsData?.content
+    .filter((band) => band.id !== editingResultBand?.id)
+    .map((band) => band.order) ?? [];
 
 
   // --- 2. KHỞI TẠO CÁC API MUTATION (THÊM, SỬA, XÓA) ---
@@ -345,6 +361,13 @@ export function SchoolAdminRubricVersionDetailPage() {
               <span className="font-medium">Đến:</span> {version.effectiveTo ? new Date(version.effectiveTo).toLocaleDateString('vi-VN') : '—'}
             </p>
           </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Ngày tạo</p>
+            <p className="mt-2 text-sm text-slate-700">
+              {version.createdAt ? new Date(version.createdAt).toLocaleDateString('vi-VN') : '—'}
+            </p>
+          </div>
         </div>
 
         {/* KHU VỰC CÁC NÚT HÀNH ĐỘNG */}
@@ -552,6 +575,8 @@ export function SchoolAdminRubricVersionDetailPage() {
           frameworkId={rubric?.frameworkId}
           scoringScaleMin={version.scoringScaleMin}
           scoringScaleMax={version.scoringScaleMax}
+          usedFrameworkCriterionIds={usedFrameworkCriterionIds}
+          existingOrders={allCriteriaOrders}
         />
       )}
 
@@ -564,6 +589,7 @@ export function SchoolAdminRubricVersionDetailPage() {
           initialData={editingCriterion}
           scoringScaleMin={version.scoringScaleMin}
           scoringScaleMax={version.scoringScaleMax}
+          existingOrders={siblingCriteriaOrders}
         />
       )}
 
@@ -574,6 +600,7 @@ export function SchoolAdminRubricVersionDetailPage() {
           onClose={() => setIsAddResultBandModalOpen(false)}
           onSubmit={handleAddResultBand}
           isPending={isAddingResultBand}
+          existingOrders={allBandsOrders}
         />
       )}
 
@@ -584,6 +611,7 @@ export function SchoolAdminRubricVersionDetailPage() {
           onSubmit={handleUpdateResultBand}
           isPending={isUpdatingResultBand}
           initialData={editingResultBand}
+          existingOrders={siblingBandsOrders}
         />
       )}
 

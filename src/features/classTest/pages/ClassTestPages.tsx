@@ -40,6 +40,7 @@ import { TabPillGroup } from '@/shared/ui/TabPill'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { WarningBanner } from '@/shared/ui/WarningBanner'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
@@ -64,7 +65,10 @@ import {
 } from '@/features/examCore/api/mutations'
 import { useMatchingTeacherAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
 import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '@/features/examCore/utils/timeQuota'
+import { buildClassTestQuotaWarning } from '@/features/classTest/utils/classTestTokenQuota'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
+import { useMySubscriptionUsageQuery } from '@/features/subscription_school/api/useMySubscriptionUsageQuery'
+import { useMyClassTestQuotaAllocationQuery } from '@/features/subscription_school/api/useMyClassTestQuotaAllocationQuery'
 import {
   formatDate,
   formatDateTime,
@@ -1187,6 +1191,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const schedulesQuery = useExamSchedulesQuery(examId ?? null)
   const candidatesQuery = useExamCandidatesQuery(examId ?? null)
   const subscriptionQuery = useMySubscriptionQuery()
+  const subscriptionUsageQuery = useMySubscriptionUsageQuery()
+  const myClassTestQuotaAllocationQuery = useMyClassTestQuotaAllocationQuery()
   const updateQuestionsMutation = useUpdateClassTestQuestionsMutation()
   const updateExamMutation = useUpdateClassTestMutation()
   const updateStatusMutation = useUpdateClassTestStatusMutation()
@@ -1554,6 +1560,30 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const statusDisplay = getClassTestStatusDisplay(exam.status)
   const schedules = schedulesQuery.data ?? []
   const candidates = candidatesQuery.data ?? []
+  // Cảnh báo chủ động trước khi BE chặn (ClassTestTokenQuotaGuardService) — không thay cho việc
+  // BE thật sự chặn, chỉ để giáo viên biết trước thay vì bấm xong mới ăn lỗi.
+  const gradingQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'GRADING')
+  const classTestQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'CLASS_TEST')
+  const currentQuotaWarning = buildClassTestQuotaWarning({
+    candidateCount: candidates.length,
+    classTestQuota,
+    examName: exam.name,
+    examTimeDurationSecond: exam.examTimeDurationSecond,
+    gradingQuota,
+    maxAttempt: exam.maxAttempt,
+    personalAllocation: myClassTestQuotaAllocationQuery.data,
+  })
+  // Ước lượng "nếu lưu với giá trị đang sửa" trong modal — dùng editMaxAttempt thay vì exam.maxAttempt
+  // vì đây là số người dùng đang gõ, chưa lưu.
+  const editQuotaWarning = buildClassTestQuotaWarning({
+    candidateCount: candidates.length,
+    classTestQuota,
+    examName: exam.name,
+    examTimeDurationSecond: exam.examTimeDurationSecond,
+    gradingQuota,
+    maxAttempt: Number(editMaxAttempt) || 1,
+    personalAllocation: myClassTestQuotaAllocationQuery.data,
+  })
   const { completedCount, steps } = getClassTestWorkflowSteps(exam, schedules, candidates)
   const scheduleReadiness = getClassTestScheduleReadiness(schedules, candidates)
   // Tab Xếp lịch phải mở ngay khi đề đã có câu hỏi — đó chính là nơi giáo viên chọn phòng và xếp
@@ -1709,6 +1739,10 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         title={exam.name}
       />
 
+      {(exam.status === 'DRAFT' || exam.status === 'SCHEDULED') && currentQuotaWarning ? (
+        <WarningBanner className="mt-4" message={currentQuotaWarning} />
+      ) : null}
+
       {showEditInfo ? (
         <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-5.5">
           <div className="flex items-center justify-between">
@@ -1801,6 +1835,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           />
 
           <RubricPolicyPicker languageId={exam.languageId} onChange={setEditPolicySelection} scope="teacher" />
+
+          {exam.status === 'SCHEDULED' ? <WarningBanner message={editQuotaWarning} /> : null}
 
           <div className="flex justify-end">
             <button
@@ -2201,6 +2237,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
             await invalidate()
             setMessage('Đã tạo mã đề mới.')
           }}
+          questionDetailBasePath={roleBasePath}
         />
       ) : null}
 
@@ -2214,6 +2251,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           }
           onClose={() => setPickerMode(null)}
           onSelect={(question) => void handlePickQuestion(question)}
+          questionDetailBasePath={roleBasePath}
           scope="teacher"
           selectedQuestionIds={
             pickerMode.kind === 'existing'
@@ -2230,6 +2268,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           examKind={exam.kind}
           locked={isExamLockedForEditing(exam.status)}
           papers={exam.papers}
+          quotaWarning={exam.status === 'SCHEDULED' ? currentQuotaWarning : null}
         />
       ) : null}
 

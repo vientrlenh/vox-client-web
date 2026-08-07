@@ -1,19 +1,12 @@
-import { ClipboardList, FileCheck2, Headphones } from 'lucide-react'
 import {
   formatQuotaMinutes,
   getUsageBarColor,
   secondsToMinutes,
+  QUOTA_ICONS,
   QUOTA_LABELS,
   QUOTA_TYPES,
-  type QuotaType,
   type SubscriptionQuota,
 } from '../types'
-
-const QUOTA_ICONS: Record<QuotaType, typeof FileCheck2> = {
-  CLASS_TEST: ClipboardList,
-  GRADING: FileCheck2,
-  PRACTICE: Headphones,
-}
 
 type UsageBarsGridProps = {
   isLoading: boolean

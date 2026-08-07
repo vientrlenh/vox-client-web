@@ -40,6 +40,7 @@ export type RubricVersion = {
   scoringScaleMin: number;
   scoringScaleMax: number;
   totalScoreMethod: string;
+  createdAt?: string | null;
 };
 
 export type RubricVersionPage = {

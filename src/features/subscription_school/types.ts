@@ -1,3 +1,5 @@
+import { ClipboardList, FileCheck2, Headphones, type LucideIcon } from 'lucide-react'
+
 export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
 export type RequestType = 'REGISTRATION' | 'UPGRADE'
@@ -7,8 +9,14 @@ export const QUOTA_TYPES: QuotaType[] = ['GRADING', 'CLASS_TEST', 'PRACTICE']
 
 export const QUOTA_LABELS: Record<QuotaType, string> = {
   CLASS_TEST: 'Bài kiểm tra trên lớp',
-  GRADING: 'Bài thi cần chấm',
+  GRADING: 'Bài Kiểm Tra Tập Trung',
   PRACTICE: 'Lượt ôn luyện cá nhân',
+}
+
+export const QUOTA_ICONS: Record<QuotaType, LucideIcon> = {
+  CLASS_TEST: ClipboardList,
+  GRADING: FileCheck2,
+  PRACTICE: Headphones,
 }
 
 // includedQuantity / totalAllocated / usedQuantity đều tính bằng GIÂY audio xử lý —
@@ -86,7 +94,9 @@ export type SubscriptionQuota = {
 export type Invoice = {
   id: string
   invoiceNumber: string
-  subscriptionId: string
+  // Chỉ có giá trị sau khi thanh toán thành công — null với hóa đơn còn PENDING hoặc đã
+  // CANCELLED/FAILED mà chưa từng chốt.
+  subscriptionId: string | null
   sourceType: 'SUBSCRIPTION' | 'SUBSCRIPTION_REQUEST' | 'TOKEN_PURCHASE'
   sourceId: string
   issueDate: string | null

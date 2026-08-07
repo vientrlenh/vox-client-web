@@ -13,6 +13,8 @@ type Props = {
   frameworkId?: string;
   scoringScaleMin: number;
   scoringScaleMax: number;
+  usedFrameworkCriterionIds?: string[];
+  existingOrders?: number[];
 };
 
 // Cấu trúc thật của examplesJson trả về từ Backend: { "values": [{ transcript, explanation, expectedScore }] }
@@ -24,23 +26,23 @@ type ExampleItem = {
 
 const EMPTY_EXAMPLE: ExampleItem = { transcript: '', explanation: '', expectedScore: 0 };
 
-export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, frameworkId, scoringScaleMin, scoringScaleMax }: Props) {
-  const [formData, setFormData] = useState({
+export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, frameworkId, scoringScaleMin, scoringScaleMax, usedFrameworkCriterionIds = [], existingOrders = [] }: Props) {
+  const [formData, setFormData] = useState(() => ({
     frameworkCriterionId: '',
-    code: '',
     name: '',
     description: '',
     weight: 0,
-    minScore: scoringScaleMin,
-    maxScore: scoringScaleMax,
-    order: 1,
+    order: existingOrders.length > 0 ? Math.max(...existingOrders) + 1 : 1,
     isRequired: false,
-  });
+  }));
   const [examples, setExamples] = useState<ExampleItem[]>([EMPTY_EXAMPLE]);
   const [frameworkVersionId, setFrameworkVersionId] = useState('');
 
   const { data: frameworkVersions, isLoading: isLoadingVersions } = useFrameworkVersionsQuery(frameworkId);
-  const { data: frameworkCriteria, isLoading: isLoadingCriteria } = useFrameworkVersionCriteriaQuery(frameworkVersionId || undefined);
+  const { data: frameworkCriteriaAll, isLoading: isLoadingCriteria } = useFrameworkVersionCriteriaQuery(frameworkVersionId || undefined);
+  const frameworkCriteria = frameworkCriteriaAll?.filter((fc) => !usedFrameworkCriterionIds.includes(fc.id));
+  // Mã Code luôn theo đúng Framework Criterion đã chọn — không cho gõ tay để tránh lệch dữ liệu.
+  const selectedFrameworkCriterion = frameworkCriteria?.find((fc) => fc.id === formData.frameworkCriterionId);
 
   if (!isOpen) return null;
 
@@ -65,14 +67,8 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
       return;
     }
 
-    const min = Number(formData.minScore);
-    const max = Number(formData.maxScore);
-    if (min >= max) {
-      alert('Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!');
-      return;
-    }
-    if (min < scoringScaleMin || max > scoringScaleMax) {
-      alert(`Lỗi: Điểm tiêu chí phải nằm trong thang điểm tổng của Rubric Version (${scoringScaleMin} – ${scoringScaleMax})!`);
+    if (existingOrders.includes(Number(formData.order))) {
+      alert(`Lỗi: Thứ tự (Order) ${formData.order} đã được sử dụng bởi một tiêu chí khác trong phiên bản này. Vui lòng chọn thứ tự khác.`);
       return;
     }
 
@@ -87,13 +83,13 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
       criteria: [
         {
           frameworkCriterionId: formData.frameworkCriterionId.trim(),
-          code: formData.code,
+          code: (selectedFrameworkCriterion?.code ?? '').trim().toUpperCase(),
           name: formData.name,
           description: formData.description || undefined,
           examples: cleanedExamples.length > 0 ? cleanedExamples : undefined,
           weight: Number(formData.weight),
-          minScore: min,
-          maxScore: max,
+          minScore: scoringScaleMin,
+          maxScore: scoringScaleMax,
           order: Number(formData.order),
           isRequired: formData.isRequired,
         },
@@ -152,7 +148,15 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Mã Code</label>
-              <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <input
+                type="text"
+                value={selectedFrameworkCriterion?.code ?? ''}
+                placeholder="-- Chọn Framework Criterion trước --"
+                disabled
+                readOnly
+                className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-500 outline-none"
+              />
+              <p className="mt-1 text-xs text-slate-400">Tự động lấy theo Framework Criterion đã chọn, không thể chỉnh riêng</p>
             </div>
 
             <div>
@@ -235,13 +239,14 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối thiểu (Min)</label>
-              <input type="number" step="0.1" value={formData.minScore} onChange={(e) => setFormData({ ...formData, minScore: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <input type="number" value={scoringScaleMin} disabled className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-500 outline-none" readOnly />
+              <p className="mt-1 text-xs text-slate-400">Luôn theo thang điểm của phiên bản, không thể chỉnh riêng</p>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối đa (Max)</label>
-              <input type="number" step="0.1" value={formData.maxScore} onChange={(e) => setFormData({ ...formData, maxScore: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
-              <p className="mt-1 text-xs text-slate-400">Phải nằm trong thang điểm tổng: {scoringScaleMin} – {scoringScaleMax}</p>
+              <input type="number" value={scoringScaleMax} disabled className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-500 outline-none" readOnly />
+              <p className="mt-1 text-xs text-slate-400">Luôn theo thang điểm của phiên bản, không thể chỉnh riêng</p>
             </div>
 
             <div>

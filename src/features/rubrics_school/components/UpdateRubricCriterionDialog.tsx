@@ -13,6 +13,7 @@ type Props = {
   initialData: RubricCriterion;
   scoringScaleMin: number;
   scoringScaleMax: number;
+  existingOrders?: number[];
 };
 
 // Cấu trúc thật của examplesJson trả về từ Backend: { "values": [{ transcript, explanation, expectedScore }] }
@@ -53,13 +54,11 @@ function parseExamples(examplesJson?: string | null): ExampleItem[] {
   return [EMPTY_EXAMPLE];
 }
 
-export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, initialData, scoringScaleMin, scoringScaleMax }: Props) {
+export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, initialData, scoringScaleMin, scoringScaleMax, existingOrders = [] }: Props) {
   const [formData, setFormData] = useState(() => ({
     name: initialData.name,
     description: initialData.description ?? '',
     weight: initialData.weight,
-    minScore: initialData.minScore,
-    maxScore: initialData.maxScore,
     order: initialData.order,
     isRequired: initialData.isRequired,
   }));
@@ -78,14 +77,8 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const min = Number(formData.minScore);
-    const max = Number(formData.maxScore);
-    if (min >= max) {
-      alert('Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!');
-      return;
-    }
-    if (min < scoringScaleMin || max > scoringScaleMax) {
-      alert(`Lỗi: Điểm tiêu chí phải nằm trong thang điểm tổng của Rubric Version (${scoringScaleMin} – ${scoringScaleMax})!`);
+    if (existingOrders.includes(Number(formData.order))) {
+      alert(`Lỗi: Thứ tự (Order) ${formData.order} đã được sử dụng bởi một tiêu chí khác trong phiên bản này. Vui lòng chọn thứ tự khác.`);
       return;
     }
 
@@ -103,8 +96,8 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
       description: formData.description || undefined,
       examplesJson,
       weight: Number(formData.weight),
-      minScore: min,
-      maxScore: max,
+      minScore: scoringScaleMin,
+      maxScore: scoringScaleMax,
       order: Number(formData.order),
       isRequired: formData.isRequired,
     };
@@ -209,13 +202,14 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối thiểu (Min)</label>
-              <input type="number" step="0.1" value={formData.minScore} onChange={(e) => setFormData({ ...formData, minScore: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
+              <input type="number" value={scoringScaleMin} disabled className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-500 outline-none" readOnly />
+              <p className="mt-1 text-xs text-slate-400">Luôn theo thang điểm của phiên bản, không thể chỉnh riêng</p>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối đa (Max)</label>
-              <input type="number" step="0.1" value={formData.maxScore} onChange={(e) => setFormData({ ...formData, maxScore: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" />
-              <p className="mt-1 text-xs text-slate-400">Phải nằm trong thang điểm tổng: {scoringScaleMin} – {scoringScaleMax}</p>
+              <input type="number" value={scoringScaleMax} disabled className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-500 outline-none" readOnly />
+              <p className="mt-1 text-xs text-slate-400">Luôn theo thang điểm của phiên bản, không thể chỉnh riêng</p>
             </div>
 
             <div>

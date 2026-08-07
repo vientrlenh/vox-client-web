@@ -36,6 +36,8 @@ export type AssessmentPolicy = {
     status?: string;
     effectiveFrom?: string | null;
     effectiveTo?: string | null;
+    scoringScaleMin?: number;
+    scoringScaleMax?: number;
   } | null;
   targetFrameworkBand?: { code: string; label: string } | null;
   school?: { id: string; code?: string | null; name?: string | null } | null;
@@ -81,6 +83,8 @@ export type RubricVersionDetail = {
   status: string;
   effectiveFrom: string;
   effectiveTo?: string | null;
+  scoringScaleMin?: number;
+  scoringScaleMax?: number;
 };
 
 export type FrameworkResultBandDetail = {
@@ -157,6 +161,8 @@ export type RubricVersionOption = {
   name: string;
   version: number;
   status: string;
+  scoringScaleMin: number;
+  scoringScaleMax: number;
 };
 
 // ==========================================

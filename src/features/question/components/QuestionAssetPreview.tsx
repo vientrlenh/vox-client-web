@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { QuestionAssetType } from '../types'
 
 type QuestionAssetPreviewProps = {
@@ -32,10 +32,15 @@ export function QuestionAssetPreview({
   url,
 }: QuestionAssetPreviewProps) {
   const [loadFailed, setLoadFailed] = useState(false)
+  const [trackedSource, setTrackedSource] = useState({ type, url })
 
-  useEffect(() => {
+  // reset the failed-load flag when switching to a different asset, without a
+  // dedicated effect: this is the "adjust state while rendering" pattern React
+  // recommends for resetting state in response to a prop change
+  if (trackedSource.type !== type || trackedSource.url !== url) {
+    setTrackedSource({ type, url })
     setLoadFailed(false)
-  }, [type, url])
+  }
 
   if (type === 'TEXT_PASSAGE') {
     return (

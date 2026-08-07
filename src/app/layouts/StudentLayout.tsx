@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ClipboardList,
   FileText,
+  Gauge,
   LogOut,
   Menu,
   Search,
@@ -118,6 +119,16 @@ function StudentSidebar({
         >
           <FileText aria-hidden="true" className="size-5 shrink-0" />
           <span>Đơn phúc khảo</span>
+        </NavLink>
+        <NavLink
+          className={({ isActive }) =>
+            ['flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition', isActive ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-950/20' : 'text-cyan-50/90 hover:bg-white/10 hover:text-white'].join(' ')
+          }
+          onClick={onNavigate}
+          to="/student/quota-usage"
+        >
+          <Gauge aria-hidden="true" className="size-5 shrink-0" />
+          <span>Hạn mức sử dụng</span>
         </NavLink>
       </nav>
 

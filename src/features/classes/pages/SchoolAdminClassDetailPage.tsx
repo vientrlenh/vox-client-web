@@ -316,11 +316,11 @@ function UserPagination({
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 sm:flex-row sm:items-center sm:justify-between">
       <span>
-        {totalElements} học viên, trang {totalPages ? page : 0}/{totalPages}
+        {totalElements} người dùng, trang {totalPages ? page : 0}/{totalPages}
       </span>
       <div className="flex items-center gap-2">
         <select
-          aria-label="Số học viên mỗi trang"
+          aria-label="Số người dùng mỗi trang"
           className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700"
           disabled={isDisabled}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
@@ -412,7 +412,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
     } catch (error) {
       setPickerError(
         getClassErrorMessage(error) ??
-          'Không thể thêm học viên vào lớp. Vui lòng thử lại.',
+          'Không thể thêm người dùng vào lớp. Vui lòng thử lại.',
       )
     }
   }
@@ -432,7 +432,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
       setMessage({
         text:
           getClassErrorMessage(error) ??
-          'Không thể cập nhật trạng thái học viên. Vui lòng thử lại.',
+          'Không thể cập nhật trạng thái người dùng. Vui lòng thử lại.',
         tone: 'error',
       })
     }
@@ -456,7 +456,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
     } catch (error) {
       setRemoveError(
         getClassErrorMessage(error) ??
-          'Không thể xóa học viên khỏi lớp. Vui lòng thử lại.',
+          'Không thể xóa người dùng khỏi lớp. Vui lòng thử lại.',
       )
     }
   }
@@ -471,10 +471,10 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
             className="text-lg font-black text-slate-950"
             id="class-users-title"
           >
-            Học viên trong lớp
+            Người dùng trong lớp
           </h2>
           <p className="mt-1 text-sm font-medium text-slate-500">
-            Thêm, xóa và cập nhật trạng thái học viên đang tham gia lớp học.
+            Thêm, xóa và cập nhật trạng thái người dùng đang tham gia lớp học.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -484,7 +484,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
             type="button"
           >
             <Upload aria-hidden="true" className="size-4" />
-            Import học viên
+            Import người dùng
           </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
@@ -496,7 +496,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
             type="button"
           >
             <UserPlus aria-hidden="true" className="size-4" />
-            Thêm học viên
+            Thêm người dùng
           </button>
         </div>
       </div>
@@ -515,7 +515,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
           className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600"
           role="status"
         >
-          Đang tải danh sách học viên...
+          Đang tải danh sách người dùng...
         </div>
       ) : null}
 
@@ -526,7 +526,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
         >
           <span>
             {getClassErrorMessage(usersQuery.error) ??
-              'Không thể tải danh sách học viên.'}
+              'Không thể tải danh sách người dùng.'}
           </span>
           <button
             className="inline-flex h-10 w-fit items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-bold text-white"
@@ -543,10 +543,10 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
       {!usersQuery.isLoading && !usersQuery.isError && users.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
           <p className="text-base font-black text-slate-950">
-            Chưa có học viên trong lớp
+            Chưa có người dùng trong lớp
           </p>
           <p className="mt-2 text-sm font-medium text-slate-500">
-            Nhập ID học viên để thêm học viên vào lớp.
+            Thêm giáo viên hoặc học sinh vào lớp học này.
           </p>
         </div>
       ) : null}
@@ -603,7 +603,7 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
                       <td className="px-4 py-4">
                         <div className="flex justify-end">
                           <ActionMenuButton
-                            ariaLabel={`Mở thao tác học viên ${displayName}`}
+                            ariaLabel={`Mở thao tác người dùng ${displayName}`}
                             disabled={isActionPending}
                             items={[
                               {
@@ -676,10 +676,10 @@ function ClassUsersTab({ classId }: ClassUsersTabProps) {
                 className="text-xl font-black tracking-0 text-slate-950"
                 id="remove-class-user-title"
               >
-                Xóa học viên khỏi lớp
+                Xóa người dùng khỏi lớp
               </h2>
               <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-                Học viên {formatNullableText(removeTarget.user?.email)} sẽ
+                Người dùng {formatNullableText(removeTarget.user?.email)} sẽ
                 không còn nằm trong danh sách lớp học này.
               </p>
             </div>
@@ -984,7 +984,7 @@ export function SchoolAdminClassDetailPage() {
             role="tab"
             type="button"
           >
-            Học viên trong lớp
+            Người dùng trong lớp
           </button>
         </div>
       </div>

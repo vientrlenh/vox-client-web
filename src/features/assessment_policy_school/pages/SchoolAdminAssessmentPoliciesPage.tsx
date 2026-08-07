@@ -10,8 +10,10 @@ import {
   Filter,
   Languages,
   Layers,
+  Loader2,
   Plus,
   RefreshCw,
+  Rocket,
   SlidersHorizontal,
   Upload,
 } from 'lucide-react';
@@ -20,13 +22,14 @@ import { useSchoolAssessmentPoliciesQuery, type SchoolAssessmentPolicyFilter } f
 import { useCreateSchoolAssessmentPolicyMutation } from '../api/useCreateSchoolAssessmentPolicyMutation';
 import { useDeleteSchoolAssessmentPolicyMutation } from '../api/useDeleteSchoolAssessmentPolicyMutation';
 import { useUpdateSchoolAssessmentPolicyMutation } from '../api/useUpdateSchoolAssessmentPolicyMutation';
+import { usePublishSchoolAssessmentPoliciesByRubricVersionMutation } from '../api/usePublishSchoolAssessmentPoliciesByRubricVersionMutation';
+import { usePublishSchoolRubricVersionMutation } from '../api/usePublishSchoolRubricVersionMutation';
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
 
 import { AssessmentPolicyTable } from '../components/AssessmentPolicyTable';
 import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPolicyDialog';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
-import { RubricVersionPoliciesDialog } from '../components/RubricVersionPoliciesDialog';
 import { Pagination } from '@/shared/components/Pagination';
 import { useAppSelector } from '@/app/store/hooks';
 import type { AssessmentPolicy, CreateAssessmentPolicyPayload, UpdateAssessmentPolicyPayload } from '../types';
@@ -95,11 +98,21 @@ export function SchoolAdminAssessmentPoliciesPage() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<AssessmentPolicy | null>(null);
-  const [viewingRubricVersionPolicy, setViewingRubricVersionPolicy] = useState<AssessmentPolicy | null>(null);
 
   const { data: languages } = useLanguageOptionsQuery();
   const { data: rubrics } = useRubricSearchOptionsQuery(schoolId, selectedLanguageId || undefined);
   const { data: rubricVersions } = useRubricVersionOptionsQuery(schoolId, selectedRubricId || undefined);
+
+  // Dữ liệu riêng cho nút "Xuất bản" nhanh kế bên Import: chỉ fetch khi đã chọn Phiên bản ở bộ lọc
+  const selectedVersionOption = rubricVersions?.find((rv) => rv.id === selectedRubricVersionId);
+  const { data: selectedVersionPoliciesData } = useSchoolAssessmentPoliciesQuery(
+    selectedRubricVersionId ? schoolId : undefined,
+    { rubricVersionId: selectedRubricVersionId || null },
+    1,
+    100
+  );
+  const selectedVersionDraftCount = (selectedVersionPoliciesData?.content ?? []).filter((p) => p.status === 'DRAFT').length;
+  const canQuickPublish = Boolean(selectedRubricVersionId) && (selectedVersionDraftCount > 0 || selectedVersionOption?.status === 'DRAFT');
 
   const filter: SchoolAssessmentPolicyFilter = {
     status: selectedStatus || null,
@@ -132,6 +145,9 @@ export function SchoolAdminAssessmentPoliciesPage() {
   const { mutateAsync: createPolicy, isPending: isCreating } = useCreateSchoolAssessmentPolicyMutation(schoolId);
   const { mutateAsync: deletePolicy } = useDeleteSchoolAssessmentPolicyMutation(schoolId);
   const { mutateAsync: updatePolicy, isPending: isUpdating } = useUpdateSchoolAssessmentPolicyMutation(schoolId);
+  const { mutateAsync: publishPoliciesByVersion, isPending: isPublishingPolicies } = usePublishSchoolAssessmentPoliciesByRubricVersionMutation(schoolId);
+  const { mutateAsync: publishRubricVersion, isPending: isPublishingVersion } = usePublishSchoolRubricVersionMutation(schoolId);
+  const isQuickPublishing = isPublishingPolicies || isPublishingVersion;
 
   const handleCreatePolicy = async (formDataList: CreateAssessmentPolicyPayload[]) => {
     try {
@@ -153,6 +169,38 @@ export function SchoolAdminAssessmentPoliciesPage() {
     } catch (error) {
       const err = error as Error;
       alert(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
+    }
+  };
+
+  const handleQuickPublish = async () => {
+    if (!selectedRubricVersionId) return;
+
+    const versionLabel = selectedVersionOption
+      ? `${selectedVersionOption.code} (v${selectedVersionOption.version})`
+      : 'phiên bản đã chọn';
+    const willPublishVersion = selectedVersionOption?.status === 'DRAFT';
+
+    const confirmMessage =
+      selectedVersionDraftCount > 0
+        ? `Xuất bản hàng loạt ${selectedVersionDraftCount} Chính Sách Đánh Giá đang DRAFT của Rubric Version "${versionLabel}"${
+            willPublishVersion ? ' và cập nhật Rubric Version này sang PUBLISHED' : ''
+          }?`
+        : `Cập nhật Rubric Version "${versionLabel}" sang PUBLISHED?`;
+
+    const isConfirm = window.confirm(confirmMessage);
+    if (!isConfirm) return;
+
+    try {
+      if (selectedVersionDraftCount > 0) {
+        await publishPoliciesByVersion(selectedRubricVersionId);
+      }
+      if (willPublishVersion) {
+        await publishRubricVersion(selectedRubricVersionId);
+      }
+      alert('Đã xuất bản thành công.');
+    } catch (error) {
+      const err = error as Error;
+      alert(err.message || 'Có lỗi xảy ra khi xuất bản.');
     }
   };
 
@@ -203,6 +251,17 @@ export function SchoolAdminAssessmentPoliciesPage() {
             className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
           >
             <Upload className="size-4" /> Import Excel/CSV
+          </button>
+
+          <button
+            type="button"
+            onClick={handleQuickPublish}
+            disabled={!canQuickPublish || isQuickPublishing}
+            title={!selectedRubricVersionId ? 'Chọn Phiên bản ở Bộ lọc trước' : undefined}
+            className="inline-flex h-11 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-6 text-sm font-medium text-emerald-600 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            {isQuickPublishing ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+            Xuất bản
           </button>
 
           <button
@@ -337,7 +396,6 @@ export function SchoolAdminAssessmentPoliciesPage() {
           onViewDetails={(policy) => navigate(`/school-admin/assessment-policies/${policy.id}`)}
           onEdit={(policy) => setEditingPolicy(policy)}
           onDelete={handleDeletePolicy}
-          onViewRubricVersion={(policy) => setViewingRubricVersionPolicy(policy)}
         />
         {!isLoading && !isError && policies.length > 0 && (
           <Pagination currentPage={page} totalPages={totalPages} totalElements={totalElements} itemName="assessment policy" onPageChange={setPage} />
@@ -357,14 +415,6 @@ export function SchoolAdminAssessmentPoliciesPage() {
         onClose={() => setEditingPolicy(null)}
         onSubmit={handleUpdatePolicy}
         isPending={isUpdating}
-      />
-
-      <RubricVersionPoliciesDialog
-        isOpen={Boolean(viewingRubricVersionPolicy)}
-        onClose={() => setViewingRubricVersionPolicy(null)}
-        schoolId={schoolId}
-        rubricVersionId={viewingRubricVersionPolicy?.rubricVersionId}
-        rubricVersion={viewingRubricVersionPolicy?.rubricVersion}
       />
     </section>
   );

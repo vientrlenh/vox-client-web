@@ -17,6 +17,7 @@ export type RubricVersion = {
   scoringScaleMin: number;
   scoringScaleMax: number;
   totalScoreMethod: string;
+  createdAt?: string | null;
 };
 
 // Câu lệnh Query gọi thẳng vào viewSystemRubricVersion
@@ -35,6 +36,7 @@ const GET_SYSTEM_RUBRIC_VERSION = `
       scoringScaleMin
       scoringScaleMax
       totalScoreMethod
+      createdAt
     }
   }
 `;

@@ -1,5 +1,5 @@
 import { CalendarClock, CheckSquare, ArrowRight } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useMyProctorSchedulesQuery } from '@/features/examCore/api/queries'
 import { scheduleStatusView } from '@/shared/lib/scheduleStatus'
@@ -12,31 +12,24 @@ export function ProctorScheduleListPage() {
   const navigate = useNavigate()
   const schedulesQuery = useMyProctorSchedulesQuery()
   const schedules = useMemo(() => schedulesQuery.data ?? [], [schedulesQuery.data])
+  const [now] = useState(() => Date.now())
   const basePath = location.pathname.startsWith('/school-admin')
     ? '/school-admin/proctor-attendance'
     : '/teacher/proctor-attendance'
-  const upcomingCount = schedules.filter((schedule) => schedule.startDate && new Date(schedule.startDate).getTime() > Date.now()).length
-  const events = schedules.map((schedule) => {
-    // Trước đây in thẳng mã trạng thái (`PUBLISHED`) ra badge. Vừa là chữ kỹ thuật lộ ra
-    // giao diện, vừa sai nghĩa: không job nào chuyển ca sang COMPLETED khi hết giờ nên ca nào
-    // cũng PUBLISHED mãi, kể cả ca đã thi xong tuần trước.
-    const status = scheduleStatusView(schedule.status, schedule.startDate, schedule.endDate)
-    return {
-      id: schedule.scheduleId,
-      title: schedule.examName ?? schedule.examId,
-      startDate: schedule.startDate,
-      endDate: schedule.endDate,
-      roomLabel: schedule.roomName,
-      badges: <StatusBadge label={status.label} tone={status.tone} />,
-      // Nút KHÔNG khoá theo trạng thái: ca đã kết thúc thì giám thị và nhà trường vẫn phải
-      // mở lại được danh sách điểm danh để đối chiếu.
-      action: (
-        <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white hover:bg-cyan-700" onClick={() => navigate(`${basePath}/${schedule.scheduleId}`)} type="button">
-          Điểm danh<ArrowRight className="size-4" />
-        </button>
-      ),
-    }
-  })
+  const upcomingCount = schedules.filter((schedule) => schedule.startDate && new Date(schedule.startDate).getTime() > now).length
+  const events = schedules.map((schedule) => ({
+    id: schedule.scheduleId,
+    title: schedule.examName ?? schedule.examId,
+    startDate: schedule.startDate,
+    endDate: schedule.endDate,
+    roomLabel: schedule.roomName,
+    badges: <StatusBadge label={schedule.status ?? 'Đã phân công'} tone="info" />,
+    action: (
+      <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white hover:bg-cyan-700" onClick={() => navigate(`${basePath}/${schedule.scheduleId}`)} type="button">
+        Điểm danh<ArrowRight className="size-4" />
+      </button>
+    ),
+  }))
 
   return (
     <section className="grid gap-6">

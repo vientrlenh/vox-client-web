@@ -1,6 +1,6 @@
 // src/features/assessment_policy_school/components/CreateAssessmentPolicyDialog.tsx
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useAllFrameworkVersionsQuery, useFrameworkVersionCriteriaQuery } from '../api/useFrameworkVersionOptionsQuery';
@@ -9,6 +9,20 @@ import { useSchoolGradeLevelOptionsQuery, useSchoolGradeOptionsQuery } from '../
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery';
 import type { ClassFilters } from '@/features/classes/types';
 import type { AssessmentPolicyStrictness, CreateAssessmentPolicyPayload, RubricOption } from '../types';
+
+type ScoreRange = { min: number; max: number };
+
+// Thang điểm hợp lệ cho Điểm đạt = giao của thang điểm mọi Rubric Version đã chọn trong form
+// (vì 1 form có thể chọn Version từ nhiều Rubric khác nhau nhưng chỉ có 1 giá trị Điểm đạt chung).
+function getEffectiveScoreRange(rubricVersionIds: string[], scalesById: Record<string, ScoreRange>): ScoreRange | null {
+  const scales = rubricVersionIds.map((id) => scalesById[id]).filter((scale): scale is ScoreRange => Boolean(scale));
+  if (scales.length === 0) return null;
+
+  return {
+    max: Math.min(...scales.map((s) => s.max)),
+    min: Math.max(...scales.map((s) => s.min)),
+  };
+}
 
 type CreateAssessmentPolicyDialogProps = {
   isOpen: boolean;
@@ -38,6 +52,7 @@ type PolicyFormState = {
   frameworkVersionId: string;
   targetFrameworkBandId: string;
   rubricVersionIds: string[];
+  rubricVersionScales: Record<string, ScoreRange>;
   passingScore: string;
   strictness: AssessmentPolicyStrictness | '';
   effectiveFrom: string;
@@ -55,6 +70,7 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
     frameworkVersionId: '',
     targetFrameworkBandId: '',
     rubricVersionIds: [],
+    rubricVersionScales: {},
     passingScore: '',
     strictness: '',
     effectiveFrom: '',
@@ -74,11 +90,20 @@ type RubricVersionGroupProps = {
   rubric: RubricOption;
   selectedIds: string[];
   onToggle: (rubricVersionId: string) => void;
+  onVersionsLoaded: (scales: Record<string, ScoreRange>) => void;
   disabled: boolean;
 };
 
-function RubricVersionGroup({ schoolId, rubric, selectedIds, onToggle, disabled }: RubricVersionGroupProps) {
+function RubricVersionGroup({ schoolId, rubric, selectedIds, onToggle, onVersionsLoaded, disabled }: RubricVersionGroupProps) {
   const { data: versions, isLoading } = useRubricVersionOptionsQuery(schoolId, rubric.id);
+
+  useEffect(() => {
+    if (!versions?.length) return;
+    onVersionsLoaded(
+      Object.fromEntries(versions.map((v) => [v.id, { max: v.scoringScaleMax, min: v.scoringScaleMin }])),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions]);
 
   return (
     <div className="rounded-lg border border-slate-200 p-3">
@@ -146,6 +171,10 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
     });
   }
 
+  function handleVersionsLoaded(scales: Record<string, ScoreRange>) {
+    onChange({ rubricVersionScales: { ...form.rubricVersionScales, ...scales } });
+  }
+
   function handleToggleRubricVersion(rubricVersionId: string) {
     onChange({
       rubricVersionIds: form.rubricVersionIds.includes(rubricVersionId)
@@ -162,6 +191,13 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
   function handleGradeChange(schoolGradeId: string) {
     onChange({ schoolGradeId, schoolClassId: '' });
   }
+
+  const effectiveScoreRange = getEffectiveScoreRange(form.rubricVersionIds, form.rubricVersionScales);
+  const passingScoreValue = form.passingScore.trim() ? Number(form.passingScore) : null;
+  const passingScoreError =
+    passingScoreValue !== null && effectiveScoreRange && (passingScoreValue < effectiveScoreRange.min || passingScoreValue > effectiveScoreRange.max)
+      ? `Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${effectiveScoreRange.min} – ${effectiveScoreRange.max})`
+      : null;
 
   const isSecondaryPolicy = index > 0;
 
@@ -279,6 +315,7 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
                   rubric={rubric}
                   selectedIds={form.rubricVersionIds}
                   onToggle={handleToggleRubricVersion}
+                  onVersionsLoaded={handleVersionsLoaded}
                   disabled={isPending}
                 />
               ))}
@@ -323,11 +360,18 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
           <div>
             <label className="mb-1 block text-sm font-bold text-slate-700">Điểm đạt (passingScore)</label>
             <input
-              type="number" step="0.1" min="0" value={form.passingScore}
+              type="number" step="0.1"
+              min={effectiveScoreRange?.min} max={effectiveScoreRange?.max}
+              value={form.passingScore}
               onChange={(e) => onChange({ passingScore: e.target.value })} disabled={isPending}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-              placeholder="VD: 6.5"
+              className={`w-full rounded-lg border px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50 ${passingScoreError ? 'border-red-400' : 'border-slate-300'}`}
+              placeholder="VD: 6.5 (để trống nếu không áp dụng)"
             />
+            {passingScoreError ? (
+              <p className="mt-1 text-xs font-semibold text-red-600">{passingScoreError}</p>
+            ) : effectiveScoreRange ? (
+              <p className="mt-1 text-xs text-slate-400">Thang điểm: {effectiveScoreRange.min} – {effectiveScoreRange.max}</p>
+            ) : null}
           </div>
           <div>
             <label className="mb-1 block text-sm font-bold text-slate-700">Độ nghiêm ngặt</label>
@@ -416,6 +460,15 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
       if (form.effectiveTo && new Date(form.effectiveFrom) > new Date(form.effectiveTo)) {
         alert('Ngày kết thúc không được nhỏ hơn Ngày áp dụng!');
         return;
+      }
+
+      if (form.passingScore.trim()) {
+        const range = getEffectiveScoreRange(form.rubricVersionIds, form.rubricVersionScales);
+        const score = Number(form.passingScore);
+        if (range && (score < range.min || score > range.max)) {
+          alert(`Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${range.min} – ${range.max})!`);
+          return;
+        }
       }
     }
 

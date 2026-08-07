@@ -2,7 +2,13 @@
 
 import { RefreshCw, LayoutList, ChevronRight } from 'lucide-react';
 // Import type RubricVersion của ông vào đây (nếu khác thì ông tự đổi tên nhé)
-import type { RubricVersion } from '../types'; 
+import type { RubricVersion } from '../types';
+
+const STATUS_BADGE_CLASSNAMES: Record<string, string> = {
+  DRAFT: 'bg-yellow-50 text-yellow-800 ring-yellow-600/20',
+  PUBLISHED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  ARCHIVED: 'bg-slate-100 text-slate-600 ring-slate-500/20',
+};
 
 type RubricVersionTableProps = {
   versions: RubricVersion[];
@@ -74,7 +80,11 @@ export function RubricVersionTable({
               </td>
               <td className="px-4 py-3 font-medium text-slate-900">{v.name}</td>
               <td className="px-4 py-3">
-                <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10">
+                <span
+                  className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
+                    STATUS_BADGE_CLASSNAMES[v.status] ?? 'bg-slate-100 text-slate-600 ring-slate-500/10'
+                  }`}
+                >
                   {v.status}
                 </span>
               </td>

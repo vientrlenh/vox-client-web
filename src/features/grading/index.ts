@@ -51,6 +51,8 @@ export { useGradingPreviewQuery } from './api/useGradingPreviewQuery'
 
 export {
   downloadCsvBlob,
+  type ExportExamScoresInput,
+  useExportExamScoresExcelMutation,
   useExportExamScoresMutation,
   useFinalizeExamResultsMutation,
   useFinalizePreviewQuery,

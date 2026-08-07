@@ -8,6 +8,7 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
+import { WarningBanner } from '@/shared/ui/WarningBanner'
 import { examResultQueryKeys } from '@/features/exam-results/api/useExamResultQueries'
 import type { ExamDirectoryUser } from '../api/examDirectoryQueries'
 import {
@@ -49,6 +50,10 @@ type CandidatesTabProps = {
   // Thao tác giám thị bên dưới vẫn mở vì đó là việc phải làm TRONG lúc thi.
   locked?: boolean
   papers: ExamPaperDto[]
+  // Cảnh báo chủ động hạn mức token (chỉ bài trên lớp truyền xuống — ClassTestPages tính sẵn
+  // dựa trên số thí sinh HIỆN TẠI). null/undefined = không hiển thị (kỳ thi tập trung không có
+  // khái niệm hạn mức này, xem ClassTestTokenQuotaGuardService phía BE).
+  quotaWarning?: string | null
 }
 
 function getLatestAttemptByStatuses(
@@ -74,7 +79,7 @@ function getCandidateBadge(candidate: ExamCandidateDto) {
   return getCandidateStatusDisplay(candidate.scheduleId ? candidate.status : undefined)
 }
 
-export function CandidatesTab({ canManage, examId, examKind, locked = false, papers }: CandidatesTabProps) {
+export function CandidatesTab({ canManage, examId, examKind, locked = false, papers, quotaWarning }: CandidatesTabProps) {
   const queryClient = useQueryClient()
   const candidatesQuery = useExamCandidatesQuery(examId)
   const schedulesQuery = useExamSchedulesQuery(examId)
@@ -399,6 +404,8 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
           vấn, buộc kết thúc hoặc dỡ cấm.
         </div>
       ) : null}
+
+      {canEditRoster ? <WarningBanner className="mb-3.5" message={quotaWarning ?? null} /> : null}
 
       <div className="grid gap-3 sm:grid-cols-4">
         <StatCard icon={<UserPlus size={19} />} iconTone="indigo" label="Tổng thí sinh" value={candidates.length} />
