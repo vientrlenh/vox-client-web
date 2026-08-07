@@ -391,6 +391,10 @@ function QuestionsPage({
             .join(' | '),
         )
       }
+    } catch (error) {
+      setExportError(
+        getErrorMessage(error) ?? 'Không thể cập nhật trạng thái hàng loạt. Vui lòng thử lại.',
+      )
     } finally {
       setIsBulkProcessing(false)
     }
