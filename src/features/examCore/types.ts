@@ -359,6 +359,17 @@ export type ExamScheduleProctorDto = {
   } | null
 }
 
+/**
+ * Một giáo viên đang vướng lịch: đã gác ca `scheduleId` chạy [startDate, endDate).
+ * Chỉ dùng để làm mờ sẵn người bận ở màn chọn giám thị — luật chặn thật nằm ở backend.
+ */
+export type ProctorBusySlotDto = {
+  endDate?: string | null
+  scheduleId: string
+  startDate?: string | null
+  teacherId: string
+}
+
 export type ExamScheduleDto = {
   candidateCount: number
   endDate?: string | null

@@ -91,6 +91,7 @@ export function ManageProctorsModal({ examId, onAdd, onClose, onRemove, schedule
         <ProctorPickerModal
           examId={examId}
           excludeUserIds={schedule.proctors.map((proctor) => proctor.teacher?.id).filter(Boolean) as string[]}
+          scheduleId={schedule.id}
           onClose={() => setShowPicker(false)}
           onSelect={(teacher) => {
             onAdd(teacher)

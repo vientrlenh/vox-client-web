@@ -25,7 +25,7 @@ function schedule(id: string, status: string, overrides: Record<string, unknown>
 const candidates = [{ id: 'cand-1' }] as ExamCandidateDto[]
 
 describe('getExamWorkflowSteps — 5 bước theo đúng thứ tự tab', () => {
-  it('dựng đúng 5 bước theo thứ tự phân công → chốt phiên bản → đề bài → xếp học sinh → xếp lịch', () => {
+  it('dựng đúng 5 bước theo thứ tự phân công giáo viên → chốt khung đề → tạo mã đề → thêm thí sinh → xếp lịch', () => {
     const { steps } = getExamWorkflowSteps(exam(), [lockedPaper], [schedule('s1', 'PUBLISHED')], candidates)
 
     expect(steps.map((step) => step.tab)).toEqual(['people', 'blueprint', 'papers', 'students', 'schedule'])
@@ -38,7 +38,7 @@ describe('getExamWorkflowSteps — 5 bước theo đúng thứ tự tab', () => 
     expect(result.currentStep).toBeNull()
   })
 
-  it('thiếu người ra đề thì kẹt ở bước phân công', () => {
+  it('thiếu người ra đề thì kẹt ở bước phân công giáo viên', () => {
     const result = getExamWorkflowSteps(
       exam({ members: [{ id: 'm1', role: 'CHAIR' }] as ExamDto['members'] }),
       [lockedPaper],
@@ -70,14 +70,14 @@ describe('getExamWorkflowSteps — 5 bước theo đúng thứ tự tab', () => 
     expect(result.done.schedule).toBe(false)
   })
 
-  it('chưa có thí sinh thì kẹt ở bước xếp học sinh', () => {
+  it('chưa có thí sinh thì kẹt ở bước thêm thí sinh', () => {
     const result = getExamWorkflowSteps(exam(), [lockedPaper], [schedule('s1', 'PUBLISHED')], [])
 
     expect(result.done.students).toBe(false)
     expect(result.currentStep?.tab).toBe('students')
   })
 
-  it('còn mã đề chưa khóa thì kẹt ở bước đề bài', () => {
+  it('còn mã đề chưa khóa thì kẹt ở bước tạo mã đề', () => {
     const result = getExamWorkflowSteps(
       exam(),
       [lockedPaper, { id: 'paper-2', status: 'IN_REVIEW' } as ExamPaperDto],

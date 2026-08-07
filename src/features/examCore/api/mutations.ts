@@ -369,6 +369,31 @@ export function useAssignCandidateScheduleMutation() {
   })
 }
 
+/**
+ * Xếp/gỡ cả nhóm trong MỘT request. Không lặp endpoint xếp từng người: N request là N transaction
+ * rời rạc (hỏng giữa chừng để lại trạng thái dở dang) và N lần làm mới toàn bộ cây query.
+ * `scheduleId: null` = gỡ cả nhóm khỏi ca.
+ */
+export function useBulkAssignCandidateScheduleMutation() {
+  return useMutation({
+    mutationFn: async ({
+      candidateIds,
+      examId,
+      scheduleId,
+    }: {
+      candidateIds: string[]
+      examId: string
+      scheduleId: string | null
+    }) => {
+      const response = await apiClient.put<ApiResponse<ExamCandidateDto[]>>(
+        `/v1/exams/${examId}/candidates/schedule`,
+        { candidateIds, scheduleId },
+      )
+      return unwrap(response)
+    },
+  })
+}
+
 export function useRemoveExamCandidateMutation() {
   return useMutation({
     mutationFn: async ({ candidateId, examId }: { candidateId: string; examId: string }) => {

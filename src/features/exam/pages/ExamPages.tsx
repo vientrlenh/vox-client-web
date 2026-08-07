@@ -5,6 +5,7 @@ import {
   CircleCheck,
   ClipboardList,
   Clock4,
+  FilePenLine,
   Hash,
   Languages,
   LayoutList,
@@ -14,6 +15,8 @@ import {
   Plus,
   Timer,
   Trash2,
+  UserPlus,
+  Users,
   X,
 } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router'
@@ -55,9 +58,8 @@ import {
   getExamPaperStatusDisplay,
   getResultDecisionMethodDisplay,
   isExamLockedForEditing,
-  RESULT_DECISION_METHODS,
+  toIsoDateTime,
   type ExamStatus,
-  type ResultDecisionMethod,
 } from '@/features/examCore/types'
 import {
   getCentralizedScheduleReadiness,
@@ -184,12 +186,13 @@ export function SchoolAdminExamsPage() {
 }
 
 type ExamCreateDraft = {
+  closeAt: string
   code: string
   description: string
   languageId: string
   maxAttempt: string
   name: string
-  resultDecisionMethod: ResultDecisionMethod
+  openAt: string
 }
 
 type SelectedRubricVersion = { code: string; id: string; name: string; version: number }
@@ -217,9 +220,8 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   const [description, setDescription] = useState(locationState?.draft?.description ?? '')
   const [languageId, setLanguageId] = useState(locationState?.draft?.languageId ?? '')
   const [maxAttempt] = useState(locationState?.draft?.maxAttempt ?? '1')
-  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
-    locationState?.draft?.resultDecisionMethod ?? 'HIGHEST',
-  )
+  const [openAt, setOpenAt] = useState(locationState?.draft?.openAt ?? '')
+  const [closeAt, setCloseAt] = useState(locationState?.draft?.closeAt ?? '')
   const [selectedRubricVersion, setSelectedRubricVersion] = useState<SelectedRubricVersion | null>(
     locationState?.selectedRubricVersion ?? null,
   )
@@ -245,7 +247,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   function goToSelectRubricVersion() {
     navigate('/school-admin/rubric-versions/select', {
       state: {
-        draft: { code, description, languageId, maxAttempt, name, resultDecisionMethod },
+        draft: { closeAt, code, description, languageId, maxAttempt, name, openAt },
         languageId,
         returnTo: '/school-admin/exams/create',
       },
@@ -263,6 +265,20 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
       setErrorMessage('Vui lòng nhập tên, mã kỳ thi và ngôn ngữ.')
       return
     }
+    if (!openAt || !closeAt) {
+      setErrorMessage('Vui lòng nhập đầy đủ thời gian mở bài và đóng bài.')
+      return
+    }
+    const openAtIso = toIsoDateTime(openAt)
+    const closeAtIso = toIsoDateTime(closeAt)
+    if (!openAtIso || !closeAtIso) {
+      setErrorMessage('Thời gian mở bài hoặc đóng bài không hợp lệ.')
+      return
+    }
+    if (new Date(openAtIso).getTime() >= new Date(closeAtIso).getTime()) {
+      setErrorMessage('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
+      return
+    }
     if (!selectedRubricVersion) {
       setErrorMessage('Vui lòng chọn phiên bản thang đánh giá.')
       return
@@ -273,14 +289,18 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
     try {
       await createMutation.mutateAsync({
         assessmentPolicyId,
+        closeAt: closeAtIso,
         code: code.trim(),
         description: description || null,
         languageId,
         // CENTRALIZED luôn dùng OTP và mỗi thí sinh 1 lượt duy nhất - không cho nhập tay (mục H.8).
         maxAttempt: 1,
         name,
+        openAt: openAtIso,
         requiresOtp: true,
-        resultDecisionMethod,
+        // Chỉ 1 lượt thi nên mọi cách chốt điểm đều cho ra cùng kết quả — cố định HIGHEST thay vì
+        // bắt người dùng chọn giữa 5 phương án tương đương.
+        resultDecisionMethod: 'HIGHEST',
         // Qua bảng map, không gán tay hai trường: server chỉ nhận đúng 5 tổ hợp và mọi tổ hợp khác
         // trả về 400.
         ...EXAM_STREAM_SETUP_PAYLOAD[streamSetup],
@@ -341,20 +361,30 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             ))}
           </select>
         </label>
-        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-          Cách chốt điểm
-          <select
-            className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-            onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
-            value={resultDecisionMethod}
-          >
-            {RESULT_DECISION_METHODS.map((method) => (
-              <option key={method} value={method}>
-                {getResultDecisionMethodDisplay(method)}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Bắt buộc: khung mở/đóng của kỳ thi là ràng buộc ngoài cho mọi ca thi (CreateScheduleModal
+            lấy min/max từ đây). Bỏ trống thì phải mở modal sửa mới đặt lịch được. */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Mở lúc
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setOpenAt(event.target.value)}
+              required
+              type="datetime-local"
+              value={openAt}
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Đóng lúc
+            <input
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              onChange={(event) => setCloseAt(event.target.value)}
+              required
+              type="datetime-local"
+              value={closeAt}
+            />
+          </label>
+        </div>
 
         <ExamStreamSetupField
           description="Quyết định học viên phải chia sẻ những gì trong lúc thi."
@@ -751,11 +781,12 @@ function ExamDetailPage({
 
       <div className="mt-5.5">
         <TabPillGroup
+          // Cùng bộ icon với thanh quy trình thi (examWorkflow.tsx) để hai chỗ đọc ra một bước.
           items={[
-            { label: 'Phân công', value: 'people' },
-            { label: 'Chốt phiên bản', value: 'blueprint' },
-            { label: 'Đề bài', value: 'papers' },
-            { label: 'Xếp học sinh', value: 'students' },
+            { icon: <Users aria-hidden="true" className="size-4" />, label: 'Phân công giáo viên', value: 'people' },
+            { icon: <LayoutList aria-hidden="true" className="size-4" />, label: 'Chốt khung đề', value: 'blueprint' },
+            { icon: <FilePenLine aria-hidden="true" className="size-4" />, label: 'Tạo mã đề', value: 'papers' },
+            { icon: <UserPlus aria-hidden="true" className="size-4" />, label: 'Thêm thí sinh', value: 'students' },
             { icon: <Calendar aria-hidden="true" className="size-4" />, label: 'Xếp lịch', value: 'schedule' },
           ]}
           onChange={selectTab}

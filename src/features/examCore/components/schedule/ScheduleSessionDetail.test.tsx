@@ -37,6 +37,7 @@ function renderDetail(canEdit: boolean, paperDraftCount = 0) {
       onChangePaper={jest.fn()}
       onPageChange={jest.fn()}
       onRemoveCandidate={jest.fn()}
+      onRemoveCandidates={jest.fn()}
       onSearchChange={jest.fn()}
       page={1}
       paperDraftCount={paperDraftCount}

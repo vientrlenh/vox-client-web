@@ -22,7 +22,8 @@ type ExamWorkflowResult = {
 }
 
 /**
- * Năm bước khớp đúng thứ tự 5 tab bên dưới: phân công → chốt phiên bản → đề bài → xếp học sinh → xếp lịch.
+ * Năm bước khớp đúng thứ tự 5 tab bên dưới: phân công giáo viên → chốt khung đề → tạo mã đề →
+ * thêm thí sinh → xếp lịch.
  *
  * <p>`schedules`/`candidates` là optional vì trang danh sách kỳ thi chỉ có `exam` + `papers` và không
  * nên bắn thêm request cho từng dòng. Thiếu thì suy ra từ status: backend chỉ cho action SCHEDULE khi
@@ -68,18 +69,18 @@ export function getExamWorkflowSteps(
 
   const definitions: Array<Omit<ExamWorkflowStep, 'icon' | 'state'> & { pendingIcon: ReactNode }> = [
     {
-      cta: 'Phân công',
+      cta: 'Phân công giáo viên',
       done: peopleDone,
-      label: 'Phân công',
+      label: 'Phân công giáo viên',
       pendingIcon: <Users size={24} />,
       sublabel: peopleDone ? 'Đã phân công' : !hasChair ? 'Chưa có chủ tịch hội đồng' : 'Chưa có người ra đề',
       tab: 'people',
       todo: 'Kỳ thi cần cả chủ tịch hội đồng và người ra đề trước khi soạn đề.',
     },
     {
-      cta: 'Chốt phiên bản',
+      cta: 'Chốt khung đề',
       done: blueprintDone,
-      label: 'Chốt phiên bản',
+      label: 'Chốt khung đề',
       pendingIcon: <LayoutList size={24} />,
       sublabel: blueprintDone ? 'Đã chốt' : exam.blueprintId ? 'Chờ chủ tịch hội đồng chốt phiên bản' : 'Chưa gắn blueprint',
       tab: 'blueprint',
@@ -88,9 +89,9 @@ export function getExamWorkflowSteps(
         : 'Gắn blueprint rồi chốt phiên bản dùng cho kỳ thi.',
     },
     {
-      cta: 'Mở đề thi',
+      cta: 'Tạo mã đề',
       done: papersDone,
-      label: 'Đề bài',
+      label: 'Tạo mã đề',
       pendingIcon: <FilePenLine size={24} />,
       sublabel: totalPapers ? `${lockedPapers} / ${totalPapers} mã đề đã khóa` : 'Chưa có mã đề nào',
       tab: 'papers',
@@ -99,7 +100,7 @@ export function getExamWorkflowSteps(
     {
       cta: 'Thêm thí sinh',
       done: studentsDone,
-      label: 'Xếp học sinh',
+      label: 'Thêm thí sinh',
       pendingIcon: <UserPlus size={24} />,
       sublabel: candidates?.length ? `${candidates.length} thí sinh` : 'Chưa có thí sinh nào',
       tab: 'students',

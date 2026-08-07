@@ -100,7 +100,13 @@ describe('ProctorPickerModal', () => {
 
   it('gọi danh bạ giám thị theo examId, không dùng query quản trị của trường', async () => {
     renderWithProviders(
-      <ProctorPickerModal examId="exam-1" excludeUserIds={[]} onClose={jest.fn()} onSelect={jest.fn()} />,
+      <ProctorPickerModal
+        examId="exam-1"
+        excludeUserIds={[]}
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        scheduleId="schedule-1"
+      />,
       { queryClient: testQueryClient() },
     )
 
@@ -115,7 +121,13 @@ describe('ProctorPickerModal', () => {
     })
 
     renderWithProviders(
-      <ProctorPickerModal examId="exam-1" excludeUserIds={[]} onClose={jest.fn()} onSelect={jest.fn()} />,
+      <ProctorPickerModal
+        examId="exam-1"
+        excludeUserIds={[]}
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        scheduleId="schedule-1"
+      />,
       { queryClient: testQueryClient() },
     )
 

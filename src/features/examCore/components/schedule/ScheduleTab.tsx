@@ -12,6 +12,7 @@ import {
   useApplyPaperAssignmentsMutation,
   useAssignCandidateScheduleMutation,
   useAutoFillCandidatesMutation,
+  useBulkAssignCandidateScheduleMutation,
   useCreateScheduleMutation,
   useDeleteScheduleMutation,
   useRemoveProctorFromScheduleMutation,
@@ -88,6 +89,7 @@ export function ScheduleTab({
   const removeProctorMutation = useRemoveProctorFromScheduleMutation()
   const autoFillMutation = useAutoFillCandidatesMutation()
   const assignCandidateMutation = useAssignCandidateScheduleMutation()
+  const bulkAssignCandidateMutation = useBulkAssignCandidateScheduleMutation()
   const applyPaperAssignmentsMutation = useApplyPaperAssignmentsMutation()
 
   const schedules = schedulesQuery.data ?? []
@@ -248,13 +250,36 @@ export function ScheduleTab({
     }
   }
 
-  async function handleAssignCandidate(candidateId: string) {
-    if (!selectedSchedule) {
+  /** Rải đều học sinh chưa có ca ra TẤT CẢ ca (backend round-robin theo thứ tự giờ bắt đầu). */
+  async function handleAutoFillAllSchedules() {
+    const unassignedCount = candidates.filter((candidate) => !candidate.scheduleId).length
+    if (
+      !(await confirm({
+        message: `Chia đều ${unassignedCount} học sinh chưa xếp ca ra tất cả ca thi? Học sinh đã có ca giữ nguyên, không bị xáo trộn.`,
+        title: 'Tự động chia đều',
+      }))
+    ) {
       return
     }
     try {
-      await assignCandidateMutation.mutateAsync({ candidateId, examId, scheduleId: selectedSchedule.id })
+      // Không truyền scheduleIds = mọi ca DRAFT/PUBLISHED của kỳ thi.
+      await autoFillMutation.mutateAsync({ examId })
       await invalidate()
+      setMessage('Đã chia đều học sinh vào các ca thi.')
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleAssignCandidates(candidateIds: string[]) {
+    if (!selectedSchedule || candidateIds.length === 0) {
+      return
+    }
+    try {
+      await bulkAssignCandidateMutation.mutateAsync({ candidateIds, examId, scheduleId: selectedSchedule.id })
+      await invalidate()
+      setShowAddStudentModal(false)
+      setMessage(`Đã xếp ${candidateIds.length} học sinh vào ${getScheduleLabel(selectedSchedule)}.`)
     } catch (error) {
       handleError(error)
     }
@@ -264,6 +289,19 @@ export function ScheduleTab({
     try {
       await assignCandidateMutation.mutateAsync({ candidateId, examId, scheduleId: null })
       await invalidate()
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleRemoveManyFromSchedule(candidateIds: string[]) {
+    if (candidateIds.length === 0) {
+      return
+    }
+    try {
+      await bulkAssignCandidateMutation.mutateAsync({ candidateIds, examId, scheduleId: null })
+      await invalidate()
+      setMessage(`Đã gỡ ${candidateIds.length} học sinh khỏi ca thi.`)
     } catch (error) {
       handleError(error)
     }
@@ -487,6 +525,9 @@ export function ScheduleTab({
         canEdit={canEdit}
         getActions={getScheduleActions}
         onAutoAssignPapers={canEdit ? handleAssignPapersForAllSchedules : undefined}
+        onAutoFillAllSchedules={
+          canEdit && hasUnassignedCandidates ? () => void handleAutoFillAllSchedules() : undefined
+        }
         onCreate={() => setShowCreateModal(true)}
         onSearchChange={setScheduleSearch}
         onSelect={(scheduleId) => {
@@ -513,6 +554,7 @@ export function ScheduleTab({
           onChangePaper={(candidateId, paperId) => mergePaperDraft(new Map([[candidateId, paperId]]))}
           onPageChange={setStudentPage}
           onRemoveCandidate={(candidateId) => void handleRemoveFromSchedule(candidateId)}
+          onRemoveCandidates={(candidateIds) => void handleRemoveManyFromSchedule(candidateIds)}
           onSearchChange={(value) => {
             setStudentSearch(value)
             setStudentPage(1)
@@ -529,9 +571,11 @@ export function ScheduleTab({
       {showAddStudentModal && selectedSchedule ? (
         <AddStudentToRoomModal
           candidates={candidates}
-          onAssign={(candidateId) => void handleAssignCandidate(candidateId)}
+          onAssign={(candidateIds) => void handleAssignCandidates(candidateIds)}
           onClose={() => setShowAddStudentModal(false)}
           schedule={selectedSchedule}
+          schedules={schedules}
+          submitting={bulkAssignCandidateMutation.isPending}
         />
       ) : null}
 

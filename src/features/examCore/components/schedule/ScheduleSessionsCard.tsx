@@ -1,4 +1,4 @@
-import { Plus, Search, Sparkles } from 'lucide-react'
+import { Plus, Search, Sparkles, Wand2 } from 'lucide-react'
 import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { formatDateTime, getScheduleLabel, getScheduleStatusDisplay, type ExamScheduleDto } from '../../types'
@@ -9,6 +9,8 @@ type ScheduleSessionsCardProps = {
   canEdit: boolean
   getActions: (schedule: ExamScheduleDto) => ActionMenuItem[]
   onAutoAssignPapers?: () => void
+  /** Chỉ truyền khi còn học sinh chưa xếp ca — không có việc để làm thì không hiện nút. */
+  onAutoFillAllSchedules?: () => void
   onCreate: () => void
   onSearchChange: (value: string) => void
   onSelect: (scheduleId: string) => void
@@ -24,6 +26,7 @@ export function ScheduleSessionsCard({
   canEdit,
   getActions,
   onAutoAssignPapers,
+  onAutoFillAllSchedules,
   onCreate,
   onSearchChange,
   onSelect,
@@ -39,6 +42,16 @@ export function ScheduleSessionsCard({
         <h3 className="text-[15px] font-extrabold text-slate-900">Danh sách ca thi</h3>
         {canEdit ? (
           <div className="flex flex-wrap gap-2">
+            {onAutoFillAllSchedules ? (
+              <button
+                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50"
+                onClick={onAutoFillAllSchedules}
+                type="button"
+              >
+                <Wand2 aria-hidden="true" className="size-4" />
+                Chia đều vào tất cả ca
+              </button>
+            ) : null}
             {onAutoAssignPapers ? (
               <button
                 className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"

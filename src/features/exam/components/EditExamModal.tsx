@@ -5,14 +5,11 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
 import { RubricPolicyPicker, type RubricPolicySelection } from '@/features/examCore/components/RubricPolicyPicker'
 import {
-  getResultDecisionMethodDisplay,
-  RESULT_DECISION_METHODS,
   toDateTimeLocalValue,
   toExamStreamSetup,
   toIsoDateTime,
   toUpdateStreamPayload,
   type ExamDto,
-  type ResultDecisionMethod,
 } from '@/features/examCore/types'
 import { useUpdateExamMutation } from '../api/useExamMutations'
 import type { ExamStreamSetup } from '../types'
@@ -29,9 +26,6 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
   const [description, setDescription] = useState(exam.description ?? '')
   const [openAt, setOpenAt] = useState(toDateTimeLocalValue(exam.openAt))
   const [closeAt, setCloseAt] = useState(toDateTimeLocalValue(exam.closeAt))
-  const [resultDecisionMethod, setResultDecisionMethod] = useState<ResultDecisionMethod>(
-    exam.resultDecisionMethod ?? 'HIGHEST',
-  )
   const [streamSetup, setStreamSetup] = useState<ExamStreamSetup>(
     toExamStreamSetup(exam.requiredStreamType, exam.streamTypePermission),
   )
@@ -66,7 +60,9 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
           name: name.trim(),
           openAt: openIso,
           requiresOtp: true,
-          resultDecisionMethod,
+          // Chỉ 1 lượt thi nên mọi cách chốt điểm đều cho ra cùng kết quả — cố định HIGHEST thay vì
+          // bắt người dùng chọn giữa 5 phương án tương đương.
+          resultDecisionMethod: 'HIGHEST',
           ...toUpdateStreamPayload(streamSetup),
         },
       })
@@ -128,21 +124,6 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
               />
             </label>
           </div>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Cách chốt điểm
-            <select
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
-              onChange={(event) => setResultDecisionMethod(event.target.value as ResultDecisionMethod)}
-              value={resultDecisionMethod}
-            >
-              {RESULT_DECISION_METHODS.map((method) => (
-                <option key={method} value={method}>
-                  {getResultDecisionMethodDisplay(method)}
-                </option>
-              ))}
-            </select>
-          </label>
-
           <ExamStreamSetupField
             description="Quyết định học viên phải chia sẻ những gì trong lúc thi."
             name="editStreamSetup"

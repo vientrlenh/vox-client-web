@@ -1,4 +1,5 @@
-import { Check, Search, Sparkles, UserPlus, Wand2, X } from 'lucide-react'
+import { useState } from 'react'
+import { Check, Search, Sparkles, UserMinus, UserPlus, Wand2, X } from 'lucide-react'
 import { Pagination } from '@/shared/components/Pagination'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import {
@@ -13,7 +14,7 @@ import {
 import { PAPER_COLORS } from './paperAssignment'
 
 const PAGE_SIZE = 10
-const GRID = 'grid-cols-[1fr_1fr_150px_56px]'
+const GRID = 'grid-cols-[28px_1fr_1fr_150px_56px]'
 
 type ScheduleSessionDetailProps = {
   candidates: ExamCandidateDto[]
@@ -28,6 +29,8 @@ type ScheduleSessionDetailProps = {
   onChangePaper: (candidateId: string, paperId: string) => void
   onPageChange: (page: number) => void
   onRemoveCandidate: (candidateId: string) => void
+  /** Gỡ nhiều học sinh khỏi ca trong một request. */
+  onRemoveCandidates: (candidateIds: string[]) => void
   onSearchChange: (value: string) => void
   page: number
   paperDraftCount: number
@@ -50,6 +53,7 @@ export function ScheduleSessionDetail({
   onChangePaper,
   onPageChange,
   onRemoveCandidate,
+  onRemoveCandidates,
   onSearchChange,
   page,
   paperDraftCount,
@@ -69,6 +73,43 @@ export function ScheduleSessionDetail({
   const currentPage = Math.min(page, totalPages)
   const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   const statusDisplay = getScheduleStatusDisplay(schedule.status)
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // Học sinh vừa bị gỡ/chuyển đi thì id cũ phải rời khỏi tập đang chọn, nếu không thanh hành động
+  // vẫn đếm những người không còn trong ca.
+  const selectedInSchedule = candidates.filter((candidate) => selectedIds.has(candidate.id))
+  const visibleIds = visible.map((candidate) => candidate.id)
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+
+  function toggle(candidateId: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(candidateId)) {
+        next.delete(candidateId)
+      } else {
+        next.add(candidateId)
+      }
+      return next
+    })
+  }
+
+  /** Chỉ đụng tới trang đang hiện — đổi trang không được âm thầm bỏ chọn người ở trang trước. */
+  function toggleAllVisible() {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => next.delete(id))
+      } else {
+        visibleIds.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
+
+  function removeSelected() {
+    onRemoveCandidates(selectedInSchedule.map((candidate) => candidate.id))
+    setSelectedIds(new Set())
+  }
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
@@ -133,6 +174,22 @@ export function ScheduleSessionDetail({
         </div>
       ) : null}
 
+      {canEdit && selectedInSchedule.length > 0 ? (
+        <div className="mt-3.5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5">
+          <span className="text-xs font-semibold text-indigo-800">
+            Đã chọn {selectedInSchedule.length} học sinh trong ca này.
+          </span>
+          <button
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-red-200 bg-white px-4 text-xs font-bold text-red-600 transition hover:bg-red-50"
+            onClick={removeSelected}
+            type="button"
+          >
+            <UserMinus aria-hidden="true" className="size-3.5" />
+            Gỡ khỏi ca
+          </button>
+        </div>
+      ) : null}
+
       <div className="mt-3.5 flex flex-wrap gap-2.5">
         <div className="relative min-w-50 flex-1">
           <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -152,6 +209,17 @@ export function ScheduleSessionDetail({
             GRID,
           ].join(' ')}
         >
+          <span className="flex items-center">
+            {canEdit && visible.length > 0 ? (
+              <input
+                aria-label="Chọn tất cả học sinh trên trang này"
+                checked={allVisibleSelected}
+                className="size-3.5 accent-indigo-600"
+                onChange={toggleAllVisible}
+                type="checkbox"
+              />
+            ) : null}
+          </span>
           <span>Họ tên</span>
           <span>Email</span>
           <span>Mã đề</span>
@@ -168,6 +236,17 @@ export function ScheduleSessionDetail({
             const color = paperIndex >= 0 ? PAPER_COLORS[paperIndex % PAPER_COLORS.length] : undefined
             return (
               <div className={['grid items-center gap-2.5 border-t border-slate-100 px-4 py-2.5', GRID].join(' ')} key={candidate.id}>
+                <span className="flex items-center">
+                  {canEdit ? (
+                    <input
+                      aria-label={`Chọn ${getCandidateName(candidate)}`}
+                      checked={selectedIds.has(candidate.id)}
+                      className="size-3.5 accent-indigo-600"
+                      onChange={() => toggle(candidate.id)}
+                      type="checkbox"
+                    />
+                  ) : null}
+                </span>
                 <span className="text-[13px] text-slate-900">{getCandidateName(candidate)}</span>
                 <span className="truncate text-[13px] text-slate-500">{candidate.student?.email ?? '-'}</span>
                 <div className="flex items-center gap-2">
