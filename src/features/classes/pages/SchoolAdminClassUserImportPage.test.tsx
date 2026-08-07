@@ -162,7 +162,7 @@ describe('SchoolAdminClassUserImportPage', () => {
     renderPage()
 
     expect(
-      screen.getByRole('heading', { name: /import học viên vào lớp/i }),
+      screen.getByRole('heading', { name: /import người dùng vào lớp/i }),
     ).toBeInTheDocument()
     expect(screen.getAllByText(/csv hoặc excel/i).length).toBeGreaterThan(0)
     expect(

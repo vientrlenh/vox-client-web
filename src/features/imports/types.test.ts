@@ -9,7 +9,9 @@ import {
 describe('imports type helpers', () => {
   it('maps known import types to Vietnamese labels', () => {
     expect(getImportTypeDisplay('SCHOOL_CLASS')).toBe('Lớp học')
-    expect(getImportTypeDisplay('SCHOOL_CLASS_USER')).toBe('Học viên trong lớp')
+    expect(getImportTypeDisplay('SCHOOL_CLASS_USER')).toBe(
+      'Người dùng trong lớp',
+    )
     expect(getImportTypeDisplay('USER')).toBe('Người dùng')
     expect(getImportTypeDisplay('user')).toBe('Người dùng')
   })

@@ -1,6 +1,10 @@
-import { ArrowLeft, HelpCircle } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
+import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
+import { questionQueryKeys } from '@/features/question/api/useQuestionsQuery'
+import { TopicQuestionsPanel } from '@/features/question/components/TopicQuestionsPanel'
 import { useAppSelector } from '@/app/store/hooks'
 import { useQuestionTopicQuery } from '../api/useQuestionTopicQuery'
 import { useReviewQuestionTopicMutation } from '../api/useQuestionTopicMutations'
@@ -13,6 +17,7 @@ import { formatNullableText, getQuestionTopicStatusDisplay } from '../types'
 
 type QuestionTopicDetailPageProps = {
   basePath: string
+  scope: QuestionModuleScope
 }
 
 function getErrorMessage(error: unknown) {
@@ -25,11 +30,15 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Khong the tai chi tiet question topic.'
+  return 'Không thể tải chi tiết chủ đề câu hỏi.'
 }
 
-function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
+function QuestionTopicDetailPage({
+  basePath,
+  scope,
+}: QuestionTopicDetailPageProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const user = useAppSelector((state) => state.auth.user)
   const { topicId } = useParams()
   const [searchParams] = useSearchParams()
@@ -41,11 +50,19 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
   const topic = topicQuery.data
   const actorRole = getQuestionTopicActorRole(user?.roles)
   const canManage = canManageQuestionTopic(actorRole)
+  const banksPath = `${basePath}/question-banks`
+
+  // Backend có thể cascade trạng thái chủ đề xuống câu hỏi, nên bảng nhúng
+  // bên dưới phải được làm mới cùng lúc với chủ đề.
+  async function refreshAfterReview() {
+    await topicQuery.refetch()
+    await queryClient.invalidateQueries({ queryKey: questionQueryKeys.all })
+  }
 
   if (topicQuery.isLoading) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">
-        Dang tai chi tiet question topic...
+        Đang tải chi tiết chủ đề câu hỏi...
       </section>
     )
   }
@@ -56,10 +73,12 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
         <span>{getErrorMessage(topicQuery.error)}</span>
         <button
           className="inline-flex h-10 w-fit items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-bold text-white"
-          onClick={() => navigate(-1)}
+          onClick={() =>
+            navigate(bankId ? `${banksPath}/${bankId}?tab=topics` : banksPath)
+          }
           type="button"
         >
-          Quay lại
+          Quay lại ngân hàng
         </button>
       </section>
     )
@@ -68,41 +87,38 @@ function QuestionTopicDetailPage({ basePath }: QuestionTopicDetailPageProps) {
   const status = getQuestionTopicStatusDisplay(topic.status)
 
   return (
-    <section className="grid gap-6">
+    <section
+      aria-labelledby="question-topic-detail-title"
+      className="grid gap-6"
+    >
       {pageMessage ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
           {pageMessage}
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <button
-            className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600 transition hover:text-indigo-800"
-            onClick={() => navigate(-1)}
-            type="button"
-          >
-            <ArrowLeft aria-hidden="true" className="size-4" />
-            Quay lại
-          </button>
-          <h1 className="text-3xl font-black text-blue-950">Chi tiết question topic</h1>
-          <p className="mt-2 text-sm font-medium text-slate-600">
-Xem thông tin và cập nhật workflow theo quyền hiện tại.
-          </p>
-        </div>
-
+      <div>
         <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
+          className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600 transition hover:text-indigo-800"
           onClick={() =>
             navigate(
-              `${basePath}/questions/all?bankId=${bankId || topic.questionBankId}&topicId=${topic.id}&topicName=${encodeURIComponent(topic.name)}`,
+              `${banksPath}/${bankId || topic.questionBankId}?tab=topics`,
             )
           }
           type="button"
         >
-          <HelpCircle aria-hidden="true" className="size-4" />
-          Xem câu hỏi
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Quay lại ngân hàng
         </button>
+        <h1
+          className="text-3xl font-black text-blue-950"
+          id="question-topic-detail-title"
+        >
+          Chi tiết chủ đề câu hỏi
+        </h1>
+        <p className="mt-2 text-sm font-medium text-slate-600">
+          Xem thông tin và cập nhật quy trình duyệt theo quyền hiện tại.
+        </p>
       </div>
 
       <div className="grid gap-6 rounded-lg border border-slate-200 bg-white p-6">
@@ -116,13 +132,19 @@ Xem thông tin và cập nhật workflow theo quyền hiện tại.
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <DetailItem label="Tên topic" value={formatNullableText(topic.name)} />
           <DetailItem
-            label="Question bank"
+            label="Tên chủ đề"
+            value={formatNullableText(topic.name)}
+          />
+          <DetailItem
+            label="Ngân hàng câu hỏi"
             value={formatNullableText(bankName || topic.bank?.name || topic.questionBankId)}
           />
-          <DetailItem label="Topic ID" value={topic.id} />
-          <DetailItem label="Bank ID" value={topic.questionBankId} />
+          <DetailItem label="Mã định danh chủ đề" value={topic.id} />
+          <DetailItem
+            label="Mã định danh ngân hàng"
+            value={topic.questionBankId}
+          />
         </div>
 
         <div>
@@ -136,9 +158,11 @@ Xem thông tin và cập nhật workflow theo quyền hiện tại.
       {canManage ? (
         <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Workflow</h2>
+            <h2 className="text-lg font-black text-slate-950">
+              Quy trình duyệt
+            </h2>
             <p className="mt-1 text-sm font-medium text-slate-600">
-              Các thao tác status hợp lệ cho topic hiện tại.
+              Các thao tác hợp lệ với trạng thái hiện tại của chủ đề.
             </p>
           </div>
 
@@ -151,12 +175,12 @@ Xem thông tin và cập nhật workflow theo quyền hiện tại.
                       id: topic.id,
                       payload: { action: 'ARCHIVE' },
                     })
-                    await topicQuery.refetch()
+                    await refreshAfterReview()
                     setPageMessage(message)
                   } catch (error) {
                     setPageMessage(
                       getErrorMessage(error) ??
-                        'không thể cập nhật trạng thái question topic.',
+                        'Không thể cập nhật trạng thái chủ đề câu hỏi.',
                     )
                   }
                 })()
@@ -168,12 +192,12 @@ Xem thông tin và cập nhật workflow theo quyền hiện tại.
                       id: topic.id,
                       payload: { action: 'PUBLISH' },
                     })
-                    await topicQuery.refetch()
+                    await refreshAfterReview()
                     setPageMessage(message)
                   } catch (error) {
                     setPageMessage(
                       getErrorMessage(error) ??
-                        'không thể cập nhật trạng thái question topic.',
+                        'Không thể cập nhật trạng thái chủ đề câu hỏi.',
                     )
                   }
                 })()
@@ -197,6 +221,14 @@ Xem thông tin và cập nhật workflow theo quyền hiện tại.
           </div>
         </div>
       ) : null}
+
+      <TopicQuestionsPanel
+        basePath={basePath}
+        questionBankId={bankId || topic.questionBankId}
+        questionTopicId={topic.id}
+        scope={scope}
+        topicName={topic.name}
+      />
     </section>
   )
 }
@@ -207,19 +239,19 @@ function DetailItem({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 break-words text-sm font-bold text-slate-950">{value}</p>
+      <p className="mt-2 wrap-break-word text-sm font-bold text-slate-950">{value}</p>
     </div>
   )
 }
 
 export function TeacherQuestionTopicDetailPage() {
-  return <QuestionTopicDetailPage basePath="/teacher" />
+  return <QuestionTopicDetailPage basePath="/teacher" scope="teacher" />
 }
 
 export function SchoolAdminQuestionTopicDetailPage() {
-  return <QuestionTopicDetailPage basePath="/school-admin" />
+  return <QuestionTopicDetailPage basePath="/school-admin" scope="school" />
 }
 
 export function SystemAdminQuestionTopicDetailPage() {
-  return <QuestionTopicDetailPage basePath="/system-admin" />
+  return <QuestionTopicDetailPage basePath="/system-admin" scope="admin" />
 }

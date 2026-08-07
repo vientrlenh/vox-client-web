@@ -413,7 +413,7 @@ describe('AppRoutes', () => {
     })
 
     expect(
-      await screen.findByRole('heading', { name: /import học viên vào lớp/i }),
+      await screen.findByRole('heading', { name: /import người dùng vào lớp/i }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('navigation', { name: /school admin/i }),

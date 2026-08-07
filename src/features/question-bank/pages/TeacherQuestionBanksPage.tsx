@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import {
   useCreateQuestionBankMutation,
@@ -22,6 +23,7 @@ import { QuestionBankPageHeader } from '../components/QuestionBankPageHeader'
 import { QuestionBankPagination } from '../components/QuestionBankPagination'
 import { QuestionBankTable } from '../components/QuestionBankTable'
 import {
+  canDeleteQuestionBank,
   canEditQuestionBank,
   canManageQuestionBank,
   getQuestionBankActorRole,
@@ -139,13 +141,13 @@ function QuestionBanksPage({
       setPageMessage(message)
     } catch (error) {
       setDialogError(
-        getErrorMessage(error) ?? 'không thể cập nhật question bank.',
+        getErrorMessage(error) ?? 'Không thể cập nhật ngân hàng câu hỏi.',
       )
     }
   }
 
   async function handleDeleteBank(bank: QuestionBankDto) {
-    if (!window.confirm(`Xóa question bank "${bank.name}"?`)) {
+    if (!window.confirm(`Xóa ngân hàng câu hỏi "${bank.name}"?`)) {
       return
     }
 
@@ -158,7 +160,9 @@ function QuestionBanksPage({
           : result.message,
       )
     } catch (error) {
-      setPageMessage(getErrorMessage(error) ?? 'không thể xóa question bank.')
+      setPageMessage(
+        getErrorMessage(error) ?? 'Không thể xóa ngân hàng câu hỏi.',
+      )
     }
   }
 
@@ -181,6 +185,7 @@ function QuestionBanksPage({
       ) : null}
 
       <QuestionBankTable
+        canEdit={(bank) => canEditQuestionBank(bank, actorRole)}
         errorMessage={getErrorMessage(questionBanksQuery.error)}
         footer={
           <QuestionBankPagination
@@ -204,6 +209,7 @@ function QuestionBanksPage({
           canManage
             ? (bank) => [
                 ...getQuestionBankStatusActions(bank, actorRole).map((action) => ({
+                  icon: action.icon,
                   id: `${action.id}-${bank.id}`,
                   label: action.label,
                   onSelect: () => {
@@ -218,7 +224,7 @@ function QuestionBanksPage({
                       } catch (error) {
                         setPageMessage(
                           getErrorMessage(error) ??
-                            'không thể cập nhật trạng thái question bank.',
+                            'Không thể cập nhật trạng thái ngân hàng câu hỏi.',
                         )
                       }
                     })()
@@ -226,6 +232,9 @@ function QuestionBanksPage({
                   tone: action.action === 'PUBLISH' ? ('success' as const) : ('default' as const),
                 })),
                 {
+                  disabled: !canDeleteQuestionBank(bank, actorRole),
+                  disabledReason: 'Chỉ xóa được khi ở trạng thái Bản nháp',
+                  icon: Trash2,
                   id: `delete-${bank.id}`,
                   label: 'Xóa',
                   onSelect: () => {
@@ -258,9 +267,7 @@ function QuestionBanksPage({
           navigate(`${basePath}/question-banks/${id}`)
         }}
         onViewTopics={(bank) =>
-          navigate(
-            `${basePath}/question-topics?bankId=${bank.id}&bankName=${encodeURIComponent(bank.name)}`,
-          )
+          navigate(`${basePath}/question-banks/${bank.id}?tab=topics`)
         }
         questionBanks={questionBanks}
         selectedId={effectiveSelectedId}

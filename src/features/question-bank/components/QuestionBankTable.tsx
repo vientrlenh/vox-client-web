@@ -12,6 +12,7 @@ import {
 } from '../types'
 
 type QuestionBankTableProps = {
+  canEdit?: (bank: QuestionBankDto) => boolean
   errorMessage?: string
   footer?: ReactNode
   getAdditionalActions?: (bank: QuestionBankDto) => ActionMenuItem[]
@@ -41,6 +42,7 @@ function StatusBadge({ status }: { status: QuestionBankDto['status'] }) {
 }
 
 export function QuestionBankTable({
+  canEdit,
   errorMessage,
   footer,
   getAdditionalActions,
@@ -70,21 +72,21 @@ export function QuestionBankTable({
       {isError ? (
         <div className="flex min-h-80 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
           <p className="text-sm font-bold text-red-600">
-            {errorMessage ?? 'Khong the tai danh sach ngan hang cau hoi.'}
+            {errorMessage ?? 'Không thể tải danh sách ngân hàng câu hỏi.'}
           </p>
           <button
             className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
             onClick={onRetry}
             type="button"
           >
-            Thu lai
+            Thử lại
           </button>
         </div>
       ) : null}
 
       {!isLoading && !isError && questionBanks.length === 0 ? (
         <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
-          Chua co ngan hang cau hoi
+          Chưa có ngân hàng câu hỏi
         </div>
       ) : null}
 
@@ -150,6 +152,9 @@ export function QuestionBankTable({
                             ...(onEdit
                               ? [
                                   {
+                                    disabled: !(canEdit?.(bank) ?? true),
+                                    disabledReason:
+                                      'Chỉ chỉnh sửa được khi ở trạng thái Bản nháp',
                                     icon: Pencil,
                                     id: 'edit',
                                     label: 'Chỉnh sửa',

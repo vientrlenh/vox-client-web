@@ -32,7 +32,9 @@ jest.mock('@/features/subscription_school/api/useMySubscriptionQuery', () => ({
 }))
 
 function renderComposer() {
-  renderWithProviders(<ClassTestPaperComposer examId="exam-1" onClose={jest.fn()} onCreated={jest.fn()} />)
+  renderWithProviders(
+    <ClassTestPaperComposer examId="exam-1" onClose={jest.fn()} onCreated={jest.fn()} questionDetailBasePath="/teacher" />,
+  )
 }
 
 function sectionWeightInputs() {

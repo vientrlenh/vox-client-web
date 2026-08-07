@@ -1,5 +1,5 @@
 import { CalendarClock, CheckSquare, ArrowRight } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useMyProctorSchedulesQuery } from '@/features/examCore/api/queries'
 import { ScheduleCalendar } from '@/shared/ui/ScheduleCalendar'
@@ -11,10 +11,11 @@ export function ProctorScheduleListPage() {
   const navigate = useNavigate()
   const schedulesQuery = useMyProctorSchedulesQuery()
   const schedules = useMemo(() => schedulesQuery.data ?? [], [schedulesQuery.data])
+  const [now] = useState(() => Date.now())
   const basePath = location.pathname.startsWith('/school-admin')
     ? '/school-admin/proctor-attendance'
     : '/teacher/proctor-attendance'
-  const upcomingCount = schedules.filter((schedule) => schedule.startDate && new Date(schedule.startDate).getTime() > Date.now()).length
+  const upcomingCount = schedules.filter((schedule) => schedule.startDate && new Date(schedule.startDate).getTime() > now).length
   const events = schedules.map((schedule) => ({
     id: schedule.scheduleId,
     title: schedule.examName ?? schedule.examId,
