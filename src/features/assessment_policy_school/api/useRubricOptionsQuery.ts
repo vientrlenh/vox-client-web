@@ -43,6 +43,8 @@ const GET_SCHOOL_RUBRIC_VERSIONS_FOR_POLICY = `
         name
         version
         status
+        scoringScaleMin
+        scoringScaleMax
       }
     }
   }

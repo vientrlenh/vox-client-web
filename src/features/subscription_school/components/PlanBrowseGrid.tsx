@@ -1,4 +1,4 @@
-import { ClipboardList, FileCheck2, Headphones, Star } from 'lucide-react'
+import { CheckCircle2, ClipboardList, FileCheck2, Headphones, Star } from 'lucide-react'
 import {
   formatMinutes,
   formatQuotaMinutes,
@@ -54,12 +54,21 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
         return (
           <div
             className={[
-              'relative rounded-2xl border bg-white p-6',
-              plan.popular ? 'border-indigo-300 shadow-lg shadow-indigo-100' : 'border-slate-200',
+              'relative rounded-2xl border p-6',
+              isCurrent
+                ? 'border-emerald-300 bg-emerald-50/60 shadow-lg shadow-emerald-100'
+                : plan.popular
+                  ? 'border-indigo-300 bg-white shadow-lg shadow-indigo-100'
+                  : 'border-slate-200 bg-white',
             ].join(' ')}
             key={plan.id}
           >
-            {plan.popular ? (
+            {isCurrent ? (
+              <span className="absolute -top-3 left-6 inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-extrabold text-white">
+                <CheckCircle2 aria-hidden="true" className="size-3.5" />
+                Đang sử dụng
+              </span>
+            ) : plan.popular ? (
               <span className="absolute -top-3 left-6 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1 text-xs font-extrabold text-white">
                 <Star aria-hidden="true" className="size-3.5" />
                 Phổ biến nhất
@@ -100,11 +109,13 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
             <button
               className={[
                 'mt-4.5 w-full h-11 rounded-lg text-sm font-black transition',
-                disabled
-                  ? 'cursor-not-allowed border border-dashed border-slate-300 bg-slate-50 text-slate-400'
-                  : plan.popular
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                    : 'border-1.5 border-indigo-600 bg-white text-indigo-700 hover:bg-indigo-50',
+                isCurrent
+                  ? 'cursor-not-allowed border border-emerald-300 bg-emerald-100 text-emerald-700'
+                  : disabled
+                    ? 'cursor-not-allowed border border-dashed border-slate-300 bg-slate-50 text-slate-400'
+                    : plan.popular
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'border-1.5 border-indigo-600 bg-white text-indigo-700 hover:bg-indigo-50',
               ].join(' ')}
               disabled={disabled}
               onClick={() => onSelect(plan, requestType)}

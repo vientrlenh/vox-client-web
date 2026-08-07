@@ -60,6 +60,8 @@ const GET_SCHOOL_ASSESSMENT_POLICIES = `
           status
           effectiveFrom
           effectiveTo
+          scoringScaleMin
+          scoringScaleMax
         }
         targetFrameworkBand {
           code

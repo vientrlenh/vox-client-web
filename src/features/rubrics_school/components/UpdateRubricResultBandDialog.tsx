@@ -11,9 +11,10 @@ type Props = {
   onSubmit: (data: UpdateRubricResultBandPayload) => Promise<void>;
   isPending: boolean;
   initialData: RubricResultBand;
+  existingOrders?: number[];
 };
 
-export function UpdateRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending, initialData }: Props) {
+export function UpdateRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending, initialData, existingOrders = [] }: Props) {
   const [formData, setFormData] = useState(() => ({
     name: initialData.name,
     description: initialData.description ?? '',
@@ -31,6 +32,11 @@ export function UpdateRubricResultBandDialog({ isOpen, onClose, onSubmit, isPend
     const max = Number(formData.scoreMax);
     if (min >= max) {
       alert('Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!');
+      return;
+    }
+
+    if (existingOrders.includes(Number(formData.order))) {
+      alert(`Lỗi: Thứ tự (Order) ${formData.order} đã được sử dụng bởi một thang điểm khác trong phiên bản này. Vui lòng chọn thứ tự khác.`);
       return;
     }
 

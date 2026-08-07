@@ -146,31 +146,10 @@ export function SystemAdminAssessmentPolicyDetailPage() {
 
   const hasScope = Boolean(policy.school || policy.schoolGradeLevel || policy.schoolGrade || policy.schoolClass);
 
-  const tabs: { id: TabId; icon: LucideIcon; title: string; summary: string }[] = [
-    {
-      id: 'framework',
-      icon: BookMarked,
-      title: 'Framework Version',
-      summary: policy.frameworkVersion
-        ? `${policy.frameworkVersion.code} · v${policy.frameworkVersion.version} · ${policy.frameworkVersion.status}`
-        : 'Chưa có dữ liệu',
-    },
-    {
-      id: 'target',
-      icon: Target,
-      title: 'Target Band',
-      summary: policy.targetFrameworkBand
-        ? `${policy.targetFrameworkBand.code} - ${policy.targetFrameworkBand.label}`
-        : 'Chưa có dữ liệu',
-    },
-    {
-      id: 'rubric',
-      icon: ClipboardList,
-      title: 'Rubric Version',
-      summary: policy.rubricVersion
-        ? `${policy.rubricVersion.code} · v${policy.rubricVersion.version} · ${policy.rubricVersion.status}`
-        : 'Chưa có dữ liệu',
-    },
+  const tabs: { id: TabId; icon: LucideIcon; title: string }[] = [
+    { id: 'framework', icon: BookMarked, title: 'Framework Version' },
+    { id: 'target', icon: Target, title: 'Target Band' },
+    { id: 'rubric', icon: ClipboardList, title: 'Rubric Version' },
   ];
 
   return (
@@ -281,8 +260,8 @@ export function SystemAdminAssessmentPolicyDetailPage() {
       </div>
 
       {/* CÁC THÀNH PHẦN ĐƯỢC ASSESSMENT POLICY ÁP DỤNG */}
-      <div className="grid gap-4">
-        <div className="flex flex-wrap gap-3">
+      <div className="grid gap-0">
+        <div role="tablist" aria-label="Thành phần áp dụng" className="flex flex-wrap gap-1 border-b border-slate-200">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -290,24 +269,23 @@ export function SystemAdminAssessmentPolicyDetailPage() {
               <button
                 key={tab.id}
                 type="button"
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex min-w-[220px] flex-1 items-center gap-3 rounded-[14px] border px-4 py-4 text-left transition ${
+                className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition ${
                   isActive
-                    ? 'border-indigo-600 bg-indigo-50'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Icon className={`size-[18px] shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-900">{tab.title}</p>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">{tab.summary}</p>
-                </div>
+                <Icon className="size-4 shrink-0" />
+                {tab.title}
               </button>
             );
           })}
         </div>
 
-        <div className="rounded-[14px] border border-slate-200 bg-white p-6">
+        <div className="rounded-b-[14px] border border-t-0 border-slate-200 bg-white p-6">
           {activeTab === 'framework' && (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <InfoField label="Mã">{policy.frameworkVersion?.code || '—'}</InfoField>

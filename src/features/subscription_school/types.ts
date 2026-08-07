@@ -86,7 +86,9 @@ export type SubscriptionQuota = {
 export type Invoice = {
   id: string
   invoiceNumber: string
-  subscriptionId: string
+  // Chỉ có giá trị sau khi thanh toán thành công — null với hóa đơn còn PENDING hoặc đã
+  // CANCELLED/FAILED mà chưa từng chốt.
+  subscriptionId: string | null
   sourceType: 'SUBSCRIPTION' | 'SUBSCRIPTION_REQUEST' | 'TOKEN_PURCHASE'
   sourceId: string
   issueDate: string | null

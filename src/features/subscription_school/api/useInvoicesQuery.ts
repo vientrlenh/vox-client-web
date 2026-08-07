@@ -46,10 +46,19 @@ async function fetchInvoices(page: number, size: number): Promise<InvoicePage> {
   }
 }
 
-export function useInvoicesQuery(page: number, size: number) {
+type UseInvoicesQueryOptions = {
+  enabled?: boolean
+  // Dùng khi cần tự bám theo trạng thái mới nhất từ BE (vd trang kết quả thanh toán chờ webhook/job
+  // đối soát chốt hóa đơn) thay vì chỉ tải một lần. false/undefined nghĩa là không poll.
+  refetchInterval?: number | false
+}
+
+export function useInvoicesQuery(page: number, size: number, options?: UseInvoicesQueryOptions) {
   return useQuery({
+    enabled: options?.enabled ?? true,
     placeholderData: (previousData) => previousData,
     queryFn: () => fetchInvoices(page, size),
     queryKey: invoiceQueryKeys.list(page, size),
+    refetchInterval: options?.refetchInterval ?? false,
   })
 }

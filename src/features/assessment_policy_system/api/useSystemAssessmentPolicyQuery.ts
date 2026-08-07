@@ -47,6 +47,8 @@ const GET_SYSTEM_ASSESSMENT_POLICY_DETAIL = `
         status
         effectiveFrom
         effectiveTo
+        scoringScaleMin
+        scoringScaleMax
       }
       targetFrameworkBand {
         id
