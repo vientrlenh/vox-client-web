@@ -135,25 +135,72 @@ function ExamListPage({ allowCreate, basePath, title }: ExamListPageProps) {
       />
 
       <div className="mt-5 grid gap-3.5">
-        {examsQuery.data?.content.length === 0 ? (
+        {/*
+          Trước đây query lỗi và query đang tải đều rơi vào cùng một nhánh `data?.` -> trang trắng
+          trơn, không phân biệt được "không có kỳ thi nào" với "gọi API hỏng".
+        */}
+        {examsQuery.isError ? (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-10 text-center">
+            <p className="text-sm font-semibold text-red-700">
+              Không tải được danh sách kỳ thi: {toApiError(examsQuery.error).message}
+            </p>
+            <button
+              className="text-sm font-bold text-indigo-600 underline"
+              onClick={() => void examsQuery.refetch()}
+              type="button"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : examsQuery.isLoading ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-400">
+            Đang tải…
+          </div>
+        ) : examsQuery.data?.content.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-400">
             Không có kỳ thi phù hợp.
           </div>
         ) : (
           examsQuery.data?.content.map((exam) => {
             const statusDisplay = getExamStatusDisplay(exam.status)
-            const { steps } = getExamWorkflowSteps(exam, exam.papers)
+            // Không truyền schedules/candidates: query danh sách đã chọn sẵn `candidateCount` và
+            // `schedules { status }`, nên thanh tiến độ ở đây khớp đúng với trang chi tiết.
+            const { completedCount, currentStep, steps, summary, totalCount } = getExamWorkflowSteps(exam, exam.papers)
             const metaItems = [
               { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
               exam.blueprintId
                 ? { icon: <LayoutList aria-hidden="true" className="size-3.5" />, label: formatNullableText(exam.description) }
                 : { icon: <Clock4 aria-hidden="true" className="size-3.5" />, label: 'Chưa gắn blueprint', tone: 'warning' as const },
+              // Ba con số dưới đây là phần "kỳ thi đã tới đâu": mã đề, thí sinh, ca thi. Để tone mặc
+              // định — bước đang kẹt đã được thanh tiến độ và dòng "Tiếp theo" chỉ ra rồi.
+              {
+                icon: <FilePenLine aria-hidden="true" className="size-3.5" />,
+                label: summary.paperCount
+                  ? `${summary.lockedPaperCount}/${summary.paperCount} mã đề đã khóa`
+                  : 'Chưa có mã đề',
+              },
+              {
+                icon: <UserPlus aria-hidden="true" className="size-3.5" />,
+                label: summary.candidateCount ? `${summary.candidateCount} thí sinh` : 'Chưa có thí sinh',
+              },
+              {
+                icon: <Calendar aria-hidden="true" className="size-3.5" />,
+                label: summary.scheduleCount
+                  ? `${summary.publishedScheduleCount}/${summary.scheduleCount} ca thi đã công bố`
+                  : 'Chưa có ca thi',
+              },
             ]
             return (
               <ExamListRow
                 key={exam.id}
                 metaItems={metaItems}
                 onClick={() => navigate(`${basePath}/${exam.id}`)}
+                progress={{
+                  completedCount,
+                  currentLabel: currentStep?.label ?? null,
+                  currentSublabel: currentStep?.sublabel,
+                  totalCount,
+                }}
                 statusLabel={statusDisplay.label}
                 statusTone={statusDisplay.tone}
                 steps={steps}
@@ -777,7 +824,12 @@ function ExamDetailPage({
         </div>
       ) : null}
 
-      <WorkflowTrackerCard completedCount={completedCount} nextAction={nextAction} steps={steps} totalCount={5} />
+      <WorkflowTrackerCard
+        completedCount={completedCount}
+        nextAction={nextAction}
+        steps={steps}
+        totalCount={workflow.totalCount}
+      />
 
       <div className="mt-5.5">
         <TabPillGroup

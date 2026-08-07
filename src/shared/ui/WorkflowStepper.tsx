@@ -33,7 +33,12 @@ export function WorkflowStepper({ steps, variant = 'full' }: WorkflowStepperProp
         {steps.map((step, index) => (
           <div className="flex items-center gap-1.5" key={index}>
             <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${circleClassByState[step.state]}`}
+              // `[&_svg]:size-3.5` ép icon về cỡ vòng tròn: chỗ gọi khai báo icon theo bản đầy đủ
+              // (size 24–26) nên nhét nguyên vào vòng 24px là tràn ra ngoài, làm hàng bước bị lệch.
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold [&_svg]:size-3.5 ${circleClassByState[step.state]}`}
+              // Bản rút gọn chỉ còn con số nên không đọc ra bước nào; tooltip trả lại đúng phần chữ
+              // mà bản đầy đủ ở trang chi tiết hiện sẵn.
+              title={step.sublabel ? `${step.label} — ${step.sublabel}` : step.label}
             >
               {step.state === 'done' ? step.icon : index + 1}
             </span>

@@ -1,7 +1,9 @@
 import type { ExamCandidateDto, ExamDto, ExamPaperDto, ExamScheduleDto } from '@/features/examCore/types'
 import { getCentralizedScheduleReadiness, getExamWorkflowSteps } from './examWorkflow'
 
-type ExamOverrides = Partial<Pick<ExamDto, 'blueprintId' | 'blueprintVersionId' | 'members' | 'status'>>
+type ExamOverrides = Partial<
+  Pick<ExamDto, 'blueprintId' | 'blueprintVersionId' | 'candidateCount' | 'members' | 'schedules' | 'status'>
+>
 
 function exam(overrides: ExamOverrides = {}): ExamDto {
   return {
@@ -99,14 +101,73 @@ describe('getExamWorkflowSteps — 5 bước theo đúng thứ tự tab', () => 
     expect(result.steps).toHaveLength(5)
   })
 
-  /** Trang danh sách không có ca thi/thí sinh nên phải suy ra từ status thay vì báo "chưa làm". */
-  it('thiếu dữ liệu ca thi/thí sinh thì suy ra từ trạng thái kỳ thi', () => {
+  /** Chỉ khi không có CẢ candidateCount lẫn schedules mới được suy ra từ status. */
+  it('thiếu hẳn dữ liệu ca thi/thí sinh thì suy ra từ trạng thái kỳ thi', () => {
     const scheduled = getExamWorkflowSteps(exam({ status: 'SCHEDULED' }), [lockedPaper])
     const draft = getExamWorkflowSteps(exam(), [lockedPaper])
 
     expect(scheduled.completedCount).toBe(5)
     expect(draft.done.schedule).toBe(false)
     expect(draft.done.students).toBe(false)
+  })
+
+  /**
+   * Đây là chỗ trang danh sách từng lệch với trang chi tiết: nó suy bước thí sinh/xếp lịch từ status
+   * nên kỳ thi DRAFT dù đã đủ thí sinh và công bố hết ca vẫn hiện "chưa làm".
+   */
+  it('trang danh sách đọc candidateCount + schedules trên exam thay vì suy từ status', () => {
+    const fromList = getExamWorkflowSteps(
+      exam({ candidateCount: 12, schedules: [{ id: 's1', status: 'PUBLISHED' }] }),
+      [lockedPaper],
+    )
+
+    expect(fromList.done.students).toBe(true)
+    expect(fromList.done.schedule).toBe(true)
+    expect(fromList.completedCount).toBe(5)
+  })
+
+  it('cho ra cùng kết quả với trang chi tiết trên cùng một kỳ thi', () => {
+    const listExam = exam({ candidateCount: 1, schedules: [{ id: 's1', status: 'PUBLISHED' }, { id: 's2', status: 'DRAFT' }] })
+    const fromList = getExamWorkflowSteps(listExam, [lockedPaper])
+    const fromDetail = getExamWorkflowSteps(
+      listExam,
+      [lockedPaper],
+      [schedule('s1', 'PUBLISHED'), schedule('s2', 'DRAFT')],
+      candidates,
+    )
+
+    expect(fromList.done).toEqual(fromDetail.done)
+    expect(fromList.steps.map((step) => step.sublabel)).toEqual(fromDetail.steps.map((step) => step.sublabel))
+  })
+
+  it('kỳ thi đã lên lịch nhưng chưa có thí sinh thì vẫn báo thiếu thí sinh', () => {
+    // Ngược lại của case trên: candidateCount = 0 phải thắng suy luận "SCHEDULED nên chắc có rồi".
+    const result = getExamWorkflowSteps(exam({ candidateCount: 0, status: 'SCHEDULED' }), [lockedPaper])
+
+    expect(result.done.students).toBe(false)
+    expect(result.steps[3].sublabel).toBe('Chưa có thí sinh nào')
+  })
+
+  it('tham số truyền vào được ưu tiên hơn dữ liệu gắn sẵn trên exam', () => {
+    // Trang chi tiết vừa thêm thí sinh xong: danh sách mới về sớm hơn candidateCount trong bundle.
+    const result = getExamWorkflowSteps(exam({ candidateCount: 0 }), [lockedPaper], [schedule('s1', 'PUBLISHED')], candidates)
+
+    expect(result.done.students).toBe(true)
+  })
+
+  it('trả về số liệu tóm tắt để trang danh sách hiện kỳ thi đang tới đâu', () => {
+    const result = getExamWorkflowSteps(
+      exam({ candidateCount: 30, schedules: [{ id: 's1', status: 'PUBLISHED' }, { id: 's2', status: 'DRAFT' }] }),
+      [lockedPaper, { id: 'paper-2', status: 'IN_REVIEW' } as ExamPaperDto],
+    )
+
+    expect(result.summary).toEqual({
+      candidateCount: 30,
+      lockedPaperCount: 1,
+      paperCount: 2,
+      publishedScheduleCount: 1,
+      scheduleCount: 2,
+    })
   })
 })
 

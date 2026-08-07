@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react'
 import { Check, FilePenLine, LayoutList, Rocket, UserPlus, Users } from 'lucide-react'
 import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
-import type { ExamCandidateDto, ExamDto, ExamPaperDto, ExamScheduleDto } from '@/features/examCore/types'
+import type {
+  ExamCandidateDto,
+  ExamDto,
+  ExamPaperDto,
+  ExamScheduleDto,
+  ExamScheduleStatusDto,
+} from '@/features/examCore/types'
 
 export type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
 
@@ -13,27 +19,43 @@ type ExamWorkflowStep = WorkflowStep & {
   todo: string
 }
 
+/** Số liệu thô đằng sau từng bước, để chỗ gọi hiện "kỳ thi đang tới đâu" mà không tính lại. */
+type ExamWorkflowSummary = {
+  /** null khi query không trả về số thí sinh lẫn danh sách thí sinh. */
+  candidateCount: number | null
+  lockedPaperCount: number
+  paperCount: number
+  publishedScheduleCount: number
+  /** Đã trừ ca đã hủy. null khi không có dữ liệu ca thi. */
+  scheduleCount: number | null
+}
+
 type ExamWorkflowResult = {
   completedCount: number
   /** Bước chưa xong đầu tiên; null khi đã đủ cả 5 bước. */
   currentStep: ExamWorkflowStep | null
   done: { blueprint: boolean; papers: boolean; people: boolean; schedule: boolean; students: boolean }
   steps: ExamWorkflowStep[]
+  summary: ExamWorkflowSummary
+  totalCount: number
 }
 
 /**
  * Năm bước khớp đúng thứ tự 5 tab bên dưới: phân công giáo viên → chốt khung đề → tạo mã đề →
  * thêm thí sinh → xếp lịch.
  *
- * <p>`schedules`/`candidates` là optional vì trang danh sách kỳ thi chỉ có `exam` + `papers` và không
- * nên bắn thêm request cho từng dòng. Thiếu thì suy ra từ status: backend chỉ cho action SCHEDULE khi
- * đã có thí sinh và mọi ca thi đã công bố (UpdateExamStatusUseCase.requireCentralizedScheduleReadiness),
- * nên kỳ thi rời khỏi DRAFT tức là đã qua cả hai bước đó.
+ * <p>`schedules`/`candidates` là optional: trang chi tiết truyền vào (dữ liệu tươi nhất, ngay sau khi
+ * thêm/xóa), còn trang danh sách để trống và hàm tự đọc `exam.candidateCount` + `exam.schedules` mà
+ * query danh sách đã chọn sẵn — nhờ đó hai trang cho ra CÙNG một thanh tiến độ.
+ *
+ * <p>Chỉ khi thiếu cả hai nguồn mới suy ra từ status: backend chỉ cho action SCHEDULE khi đã có thí
+ * sinh và mọi ca thi đã công bố (UpdateExamStatusUseCase.requireCentralizedScheduleReadiness), nên kỳ
+ * thi rời khỏi DRAFT tức là đã qua cả hai bước đó.
  */
 export function getExamWorkflowSteps(
   exam: ExamDto,
   papers: ExamPaperDto[],
-  schedules?: ExamScheduleDto[],
+  schedules?: Array<ExamScheduleDto | ExamScheduleStatusDto>,
   candidates?: ExamCandidateDto[],
 ): ExamWorkflowResult {
   const isScheduled = exam.status !== 'DRAFT' && exam.status !== 'CANCELLED'
@@ -50,11 +72,15 @@ export function getExamWorkflowSteps(
   const lockedPapers = papers.filter((paper) => paper.status === 'LOCKED').length
   const papersDone = totalPapers > 0 && lockedPapers === totalPapers
 
-  const studentsDone = candidates ? candidates.length > 0 : isScheduled
+  // Danh sách truyền vào thắng số đếm gắn sẵn trên exam: trang chi tiết vừa thêm/xóa thí sinh thì
+  // `candidates` đã tươi trong khi `candidateCount` trong bundle còn là số cũ.
+  const candidateCount = candidates?.length ?? exam.candidateCount ?? null
+  const studentsDone = candidateCount === null ? isScheduled : candidateCount > 0
 
   // Ca đã hủy không tính vào "còn ca chưa công bố" — chúng không cản việc lên lịch ở backend.
-  const activeSchedules = schedules?.filter((schedule) => schedule.status !== 'CANCELLED')
+  const activeSchedules = (schedules ?? exam.schedules)?.filter((schedule) => schedule.status !== 'CANCELLED')
   const draftSchedules = activeSchedules?.filter((schedule) => schedule.status === 'DRAFT').length ?? 0
+  const publishedSchedules = activeSchedules?.filter((schedule) => schedule.status === 'PUBLISHED').length ?? 0
   const scheduleDone = activeSchedules
     ? activeSchedules.length > 0 && activeSchedules.every((schedule) => schedule.status === 'PUBLISHED')
     : isScheduled
@@ -102,7 +128,9 @@ export function getExamWorkflowSteps(
       done: studentsDone,
       label: 'Thêm thí sinh',
       pendingIcon: <UserPlus size={24} />,
-      sublabel: candidates?.length ? `${candidates.length} thí sinh` : 'Chưa có thí sinh nào',
+      sublabel: candidateCount === null
+        ? studentsDone ? 'Đã có thí sinh' : 'Chưa có thí sinh nào'
+        : candidateCount > 0 ? `${candidateCount} thí sinh` : 'Chưa có thí sinh nào',
       tab: 'students',
       todo: 'Thêm hoặc nhập thí sinh theo lớp/khối vào danh sách dự thi.',
     },
@@ -111,11 +139,13 @@ export function getExamWorkflowSteps(
       done: scheduleDone,
       label: 'Xếp lịch',
       pendingIcon: <Rocket size={24} />,
-      sublabel: scheduleDone
-        ? `${activeSchedules?.length ?? 0} ca thi đã công bố`
-        : draftSchedules > 0
-          ? `Còn ${draftSchedules} ca thi chưa công bố`
-          : 'Chưa có ca thi nào',
+      sublabel: !activeSchedules
+        ? scheduleDone ? 'Đã công bố ca thi' : 'Chưa có ca thi nào'
+        : scheduleDone
+          ? `${activeSchedules.length} ca thi đã công bố`
+          : draftSchedules > 0
+            ? `Còn ${draftSchedules} ca thi chưa công bố`
+            : 'Chưa có ca thi nào',
       tab: 'schedule',
       todo: 'Tạo ca thi, gán phòng và giám thị, rồi công bố tất cả ca thi.',
     },
@@ -134,6 +164,14 @@ export function getExamWorkflowSteps(
     currentStep: firstNotDoneIndex === -1 ? null : steps[firstNotDoneIndex],
     done,
     steps,
+    summary: {
+      candidateCount,
+      lockedPaperCount: lockedPapers,
+      paperCount: totalPapers,
+      publishedScheduleCount: publishedSchedules,
+      scheduleCount: activeSchedules?.length ?? null,
+    },
+    totalCount: steps.length,
   }
 }
 
