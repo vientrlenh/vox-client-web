@@ -170,7 +170,7 @@ describe('StudentClassTestResultPage', () => {
     )
   })
 
-  it('hiện phân tích của AI khi giáo viên đã chấm lại', async () => {
+  it('chỉ hiện nhận xét có hiệu lực, không hiện tín hiệu vận hành của AI', async () => {
     routeGraphql({
       examItemResponseEvaluation: {
         ai: {
@@ -232,9 +232,13 @@ describe('StudentClassTestResultPage', () => {
     // Nội dung câu hỏi phải sống sót qua lần chấm lại — chính là lỗi đang sửa.
     // Hiện ở cả tiêu đề thẻ lẫn khối lượt nói, nên khớp nhiều phần tử là đúng.
     expect(await screen.findAllByText('Describe a place you like')).not.toHaveLength(0)
-    expect(screen.getByText('Giáo viên chấm lại')).toBeInTheDocument()
-    expect(screen.getByText('Nhận xét của AI (tham khảo)')).toBeInTheDocument()
-    expect(screen.getByText('AI: còn ngập ngừng ở đoạn giữa')).toBeInTheDocument()
+    // Học sinh đọc nhận xét có hiệu lực; khối metadata chấm điểm không dành cho họ.
+    expect(screen.getByText('GV: đạt yêu cầu')).toBeInTheDocument()
+    expect(screen.queryByText('Giáo viên chấm lại')).not.toBeInTheDocument()
+    expect(screen.queryByText('Nhận xét của AI (tham khảo)')).not.toBeInTheDocument()
+    expect(screen.queryByText('AI: còn ngập ngừng ở đoạn giữa')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Overall confidence/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Audio quality/i)).not.toBeInTheDocument()
     // Điểm tiêu chí vẫn là của giáo viên.
     expect(screen.getByText('GV: trôi chảy')).toBeInTheDocument()
   })

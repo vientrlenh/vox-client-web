@@ -373,7 +373,6 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         // token và startedAt đọc qua ref có chủ ý, và `stream` được thu về `streamId`: xem lý do đầy
         // đủ ở đầu effect. Tóm tắt - deps ở đây đổi là player bị dựng lại và người xem đứng hình,
         // nên chỉ những thứ thực sự bắt buộc phải dựng lại mới được đứng đây.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scheduleId, streamId, dateToMedia, mediaToDate, readDvrWindow, requestFreshToken])
 
     const onScrubStart = useCallback(() => {

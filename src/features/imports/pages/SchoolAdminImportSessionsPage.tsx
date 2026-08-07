@@ -258,7 +258,7 @@ const IMPORT_TYPE_OPTION_GROUPS: ImportTypeOptionGroup[] = [
     label: 'Trường học',
     options: [
       { label: 'Lớp học', to: '/school-admin/classes/import' },
-      { label: 'Học viên trong lớp', to: '/school-admin/classes/users/import' },
+      { label: 'Người dùng trong lớp', to: '/school-admin/classes/users/import' },
       { label: 'Người dùng', to: '/school-admin/students/import' },
       { label: 'Khối', to: '/school-admin/grades/import' },
       { label: 'Năm học (chọn khối)', to: '/school-admin/grades' },

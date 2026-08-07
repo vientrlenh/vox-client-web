@@ -24,13 +24,19 @@ export async function reviewQuestion(
   return response.data.message
 }
 
-export async function bulkReviewQuestions(payload: BulkUpdateQuestionStatusRequest) {
+export async function bulkReviewQuestions(
+  payload: BulkUpdateQuestionStatusRequest,
+): Promise<BulkUpdateQuestionStatusResponse> {
   const response = await apiClient.patch<ApiResponse<BulkUpdateQuestionStatusResponse>>(
     '/v1/questions/status/bulk',
     payload,
   )
 
-  return response.data.data
+  // BE trả 200 kèm cả hai danh sách kể cả khi mọi câu đều bị từ chối. Vẫn phòng thân
+  // để envelope thiếu `data` không biến thành TypeError khi caller đọc `.failed`.
+  const data = response.data.data
+
+  return { failed: data?.failed ?? [], updated: data?.updated ?? [] }
 }
 
 export function useReviewQuestionMutation() {

@@ -507,6 +507,7 @@ export function QuestionEvaluationCard({
   onToggle,
   questionCode,
   questionText,
+  variant = 'full',
 }: {
   evaluation: ExamItemEvaluationDto | null | undefined
   itemResult: ExamCandidateResultDto['items'][number] | undefined
@@ -514,11 +515,28 @@ export function QuestionEvaluationCard({
   open: boolean
   questionCode?: string | null
   questionText?: string | null
+  /**
+   * `student` giấu các tín hiệu vận hành (uncertainty, confidence profile, trạng thái
+   * bằng chứng, ruleId/severity/action) — học sinh không hành động được gì với chúng và
+   * chúng chỉ làm loãng phần thật sự cần đọc. `full` giữ nguyên cho giáo viên/nhà trường.
+   */
+  variant?: 'full' | 'student'
 }) {
   // Sau khi giáo viên chấm lại, bằng chứng AI nằm ở khối `ai` chứ không còn ở bản hiệu
   // lực. Đi qua một chỗ gộp duy nhất để màn học sinh và màn giáo viên không lệch nhau.
   const display = evaluation ? resolveEvaluationDisplay(evaluation) : null
   const validityRules = display ? buildValidityRulesForDisplay(display) : []
+  const isStudentView = variant === 'student'
+  // Học sinh chỉ đọc được thông điệp đã dịch; rule không có message thì không còn gì để hiện.
+  const visibleValidityRules = isStudentView ? validityRules.filter((rule) => rule.message) : validityRules
+  // Khi AI chấm và không ai chấm lại, hai trường này là cùng một câu — in hai lần chỉ
+  // làm người đọc tưởng có hai nhận xét khác nhau.
+  const aiFeedbackDiffers =
+    Boolean(display?.aiFeedbackSummary?.trim())
+    && display?.aiFeedbackSummary?.trim() !== (evaluation?.feedbackSummary?.trim() ?? '')
+  // Màn học sinh không phân biệt nguồn nhận xét: bản có hiệu lực là bản đáng đọc, và
+  // khi giáo viên chưa chấm lại thì bản đó vốn đã là của AI.
+  const studentFeedback = evaluation?.feedbackSummary?.trim() || display?.aiFeedbackSummary?.trim() || null
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white">
@@ -551,6 +569,13 @@ export function QuestionEvaluationCard({
             <p className="text-sm text-slate-400">Chưa có evaluation cho câu trả lời này.</p>
           ) : (
             <div className="grid gap-5">
+              {isStudentView ? (
+                studentFeedback ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm leading-6 text-slate-700">{studentFeedback}</p>
+                  </div>
+                ) : null
+              ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge label={getExamResultStatusDisplay(evaluation.status).label} tone={getExamResultStatusDisplay(evaluation.status).tone} />
@@ -627,14 +652,16 @@ export function QuestionEvaluationCard({
                   <p className="mt-3 text-sm leading-6 text-slate-700">{evaluation.feedbackSummary}</p>
                 ) : null}
                 {/* Nhận xét của AI để riêng, không trộn vào nhận xét của giáo viên: đây là
-                    hai người khác nhau nói về cùng một bài. */}
-                {display.aiFeedbackSummary ? (
+                    hai người khác nhau nói về cùng một bài — nhưng chỉ khi họ thật sự nói
+                    khác nhau. */}
+                {aiFeedbackDiffers ? (
                   <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                     <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Nhận xét của AI (tham khảo)</p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">{display.aiFeedbackSummary}</p>
                   </div>
                 ) : null}
               </div>
+              )}
 
               <div className="grid gap-4">
                 {evaluation.turns.map((turn) => (
@@ -693,33 +720,35 @@ export function QuestionEvaluationCard({
                 ))}
               </div>
 
-              {validityRules && validityRules.length > 0 ? (
+              {visibleValidityRules.length > 0 ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <div className="flex items-center gap-2">
                     <AlertTriangle aria-hidden="true" className="size-4 text-amber-600" />
                     <p className="text-sm font-extrabold text-amber-800">Vi phạm quy tắc</p>
                   </div>
                   <div className="mt-3 grid gap-2">
-                    {validityRules.map((rule) => (
+                    {visibleValidityRules.map((rule) => (
                       <div className="rounded-lg border border-amber-200 bg-white px-3 py-2" key={rule.ruleId ?? rule.message ?? 'rule'}>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-bold text-slate-900">{rule.ruleId ?? 'Rule'}</p>
+                          {isStudentView ? null : <p className="text-sm font-bold text-slate-900">{rule.ruleId ?? 'Rule'}</p>}
                           {rule.occurrenceCount > 1 ? (
                             <StatusBadge label={`${rule.occurrenceCount} lượt`} tone="warning" />
                           ) : null}
                         </div>
-                        {rule?.message ? <p className="mt-1 text-sm leading-6 text-slate-600">{rule.message}</p> : null}
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                          {rule?.severity ? <span>Mức độ: {rule.severity}</span> : null}
-                          {rule?.action ? (
-                            <span>
-                              Hành động:{' '}
-                              {display.validity?.validForScoring !== false && rule.action === 'reject_or_zero'
-                                ? 'chỉ áp dụng ở lượt bị gắn cờ; toàn bài vẫn được chấm'
-                                : rule.action}
-                            </span>
-                          ) : null}
-                        </div>
+                        {rule?.message ? <p className={`text-sm leading-6 text-slate-600 ${isStudentView && rule.occurrenceCount <= 1 ? '' : 'mt-1'}`}>{rule.message}</p> : null}
+                        {isStudentView ? null : (
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                            {rule?.severity ? <span>Mức độ: {rule.severity}</span> : null}
+                            {rule?.action ? (
+                              <span>
+                                Hành động:{' '}
+                                {display.validity?.validForScoring !== false && rule.action === 'reject_or_zero'
+                                  ? 'chỉ áp dụng ở lượt bị gắn cờ; toàn bài vẫn được chấm'
+                                  : rule.action}
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

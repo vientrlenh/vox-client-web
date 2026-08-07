@@ -692,6 +692,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
           onClose={() => setPickerForSlotKey(null)}
           onSelect={(question) => handleSelectFixedQuestion(activeSlot.section.key, activeSlot.slot.key, question)}
           publishedOnly
+          questionDetailBasePath={basePath.replace(/\/blueprints$/, '')}
           scope="teacher"
           selectedQuestionIds={activeSlot.slot.fixedQuestionId ? [activeSlot.slot.fixedQuestionId] : []}
         />

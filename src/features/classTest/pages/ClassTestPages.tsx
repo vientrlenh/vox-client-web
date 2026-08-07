@@ -2201,6 +2201,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
             await invalidate()
             setMessage('Đã tạo mã đề mới.')
           }}
+          questionDetailBasePath={roleBasePath}
         />
       ) : null}
 
@@ -2214,6 +2215,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           }
           onClose={() => setPickerMode(null)}
           onSelect={(question) => void handlePickQuestion(question)}
+          questionDetailBasePath={roleBasePath}
           scope="teacher"
           selectedQuestionIds={
             pickerMode.kind === 'existing'

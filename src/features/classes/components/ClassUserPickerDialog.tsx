@@ -165,7 +165,7 @@ export function ClassUserPickerDialog({
               className="text-lg font-black text-slate-900"
               id="class-user-picker-title"
             >
-              Thêm học viên vào lớp
+              Thêm người dùng vào lớp
             </h2>
             <p className="mt-0.5 text-[12.5px] font-medium text-slate-500">
               Chỉ hiển thị người dùng đang hoạt động và chưa ở trong lớp này.
