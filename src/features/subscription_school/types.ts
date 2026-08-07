@@ -7,7 +7,7 @@ export const QUOTA_TYPES: QuotaType[] = ['GRADING', 'CLASS_TEST', 'PRACTICE']
 
 export const QUOTA_LABELS: Record<QuotaType, string> = {
   CLASS_TEST: 'Bài kiểm tra trên lớp',
-  GRADING: 'Bài thi cần chấm',
+  GRADING: 'Bài Kiểm Tra Tập Trung',
   PRACTICE: 'Lượt ôn luyện cá nhân',
 }
 

@@ -81,7 +81,7 @@ export function QuotaAllocationPanel({
   }
 
   function handleReset() {
-    setEdits(originalEdits)
+    setEdits(Object.fromEntries(allocations.map((allocation) => [allocation.userId, 0])))
   }
 
   async function handleAutoSplit() {
