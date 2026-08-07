@@ -356,17 +356,23 @@ export function ProctorAttendanceDetailPage() {
                   ? `${formatDateTime(selectedSchedule.startDate)} - ${formatDateTime(selectedSchedule.endDate)}`
                   : 'Chọn một ca thi để xem danh sách thí sinh.'}
               </p>
-              {selectedSchedule?.schoolRoomId ? (
+              {/* Đi thẳng sang màn giám sát của ĐÚNG ca thi này.
+                  Trước đây trỏ `/monitoring/exams/:examId/rooms/:schoolRoomId` -- KHÔNG có
+                  route nào như vậy (AppRoutes chỉ khai `.../exams/:examId` và
+                  `.../exams/:examId/schedules/:scheduleId`), nên bấm vào là rơi vào màn trắng.
+                  Điều kiện hiện nút cũng đổi theo: gác bằng `scheduleId` -- thứ đường dẫn thật
+                  sự cần -- thay vì `schoolRoomId` vốn không còn nằm trong URL nữa. */}
+              {selectedSchedule ? (
                 <Link
                   className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700 transition hover:border-cyan-300 hover:text-cyan-700"
                   to={
                     isSchoolAdminView
-                      ? `/school-admin/monitoring/exams/${selectedSchedule.examId}/rooms/${selectedSchedule.schoolRoomId}`
-                      : `/teacher/monitoring/exams/${selectedSchedule.examId}/rooms/${selectedSchedule.schoolRoomId}`
+                      ? `/school-admin/monitoring/exams/${selectedSchedule.examId}/schedules/${selectedSchedule.scheduleId}`
+                      : `/teacher/monitoring/exams/${selectedSchedule.examId}/schedules/${selectedSchedule.scheduleId}`
                   }
                 >
                   <Video aria-hidden="true" className="size-4" />
-                  Xem chi tiết
+                  Xem giám sát ca thi
                 </Link>
               ) : null}
               <div className="mt-4 flex flex-wrap items-center gap-3">

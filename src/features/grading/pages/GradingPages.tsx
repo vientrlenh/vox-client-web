@@ -68,6 +68,7 @@ import {
   useGradingTaskDetailQuery,
   useMyGradingTasksQuery,
 } from '../api/useGradingQueries'
+import { ExamRecordingPlayer } from '@/features/exam-recordings'
 import { AiEvaluationSummary } from '../components/AiEvaluationSummary'
 import { AiQualityPanel } from '../components/AiQualityPanel'
 import { AssignTeacherDialog } from '../components/AssignTeacherDialog'
@@ -1790,6 +1791,11 @@ export function GradingTaskDetailView({
           </div>
         ) : null}
       </div>
+
+      {/* Đặt TRƯỚC danh sách câu, sau khối cảnh báo: bài bị đánh dấu nghi vấn thì video là thứ
+          người chấm cần xem đầu tiên để quyết định, chứ không phải cuộn xuống cuối mới thấy.
+          Component tự ẩn khi ca thi không có bản ghi hoặc người gọi không có quyền. */}
+      <ExamRecordingPlayer sessionId={detail.sessionId ?? null} />
 
       <div className="grid gap-4">
         {detail.items.length > 1 ? (

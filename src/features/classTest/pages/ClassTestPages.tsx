@@ -1210,6 +1210,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [pickerMode, setPickerMode] = useState<{ kind: 'existing'; sectionIndex: number } | { kind: 'new'; title: string } | null>(null)
+  /** Giỏ chọn tạm của picker — chỉ ghi xuống server khi bấm "Thêm N câu". */
+  const [pendingQuestions, setPendingQuestions] = useState<QuestionDto[]>([])
   const [showEditInfo, setShowEditInfo] = useState(false)
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
@@ -1266,7 +1268,21 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   // trống hết), giữ nguyên weight của câu đã có nếu chỉ thêm/bớt 1 câu.
   function toApiSections(sections: Array<ReturnType<typeof currentSectionsPayload>[number]>) {
     return sections.map(({ instruction, questionIds, questionWeights, title, weight }) => {
-      const resolved = autoDistributeWeights(questionIds.map((id) => questionWeights[id] ?? null))
+      let resolved = autoDistributeWeights(questionIds.map((id) => questionWeights[id] ?? null))
+      // Chuẩn hoá lại nếu tổng lệch khỏi 1.00.
+      //
+      // `autoDistributeWeights` chỉ lấp chỗ TRỐNG: mọi ô đều có số thì nó trả nguyên trạng, kể
+      // cả khi tổng đã sai. Thêm/bớt câu trên mã đề đã lưu rơi đúng vào đó -- bỏ 1 câu khỏi
+      // nhóm 3 câu (0.33 mỗi câu) còn lại tổng 0.66, hoặc mã đề cũ lưu toàn 0 thì tổng ra 0.
+      // Backend từ chối thẳng ("Tổng trọng số câu hỏi trong phần phải bằng 1.00"), nên người
+      // dùng bấm "Bỏ" xong chỉ thấy lỗi đỏ mà không hiểu vì sao và cũng không sửa được ở đâu.
+      //
+      // Dung sai 0.01 khớp WEIGHT_TOLERANCE bên ClassTestSectionWeightPolicy -- rộng hơn thì
+      // client gửi đi những bộ số mà backend vẫn chặn.
+      const sum = resolved.reduce((total, value) => total + value, 0)
+      if (resolved.length > 0 && Math.abs(sum - 1) > 0.01) {
+        resolved = autoDistributeWeights(questionIds.map(() => null))
+      }
       return {
         instruction,
         questions: questionIds.map((id, index) => ({ questionId: id, weight: resolved[index] })),
@@ -1378,23 +1394,51 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     setPickerMode({ kind: 'new', title: `Part ${paperSections.length + 1}` })
   }
 
-  async function handlePickQuestion(question: QuestionDto) {
-    if (!exam || !pickerMode) {
+  /**
+   * Bấm một câu = cho vào/bỏ khỏi GIỎ, chưa gọi mạng.
+   *
+   * Bản cũ lưu ngay từng câu rồi `setPickerMode(null)` — picker đóng sau mỗi lần bấm, nên thêm
+   * 5 câu là mở lại picker 5 lần, gõ lại từ khoá 5 lần, và 5 lượt gọi mạng. Giờ gom lại, bấm
+   * "Thêm N câu" mới gửi một lượt.
+   */
+  function togglePendingQuestion(question: QuestionDto) {
+    setPendingQuestions((current) =>
+      current.some((item) => item.id === question.id)
+        ? current.filter((item) => item.id !== question.id)
+        : [...current, question],
+    )
+  }
+
+  async function handleConfirmPickedQuestions() {
+    if (!exam || !pickerMode || pendingQuestions.length === 0) {
       return
     }
-    const candidateDurationSeconds = (selectedPaper?.timeDurationSeconds ?? 0) + getQuestionAttemptSeconds(question)
-    const quotaWarning = buildTimeQuotaWarning('Mã đề trên lớp', candidateDurationSeconds, maxTimePerAttemptMin)
+    // Trần thời lượng xét trên TỔNG cả giỏ, không phải từng câu: cộng dồn mới là con số thật
+    // mà học sinh phải làm, và kiểm từng câu sẽ cho lọt một giỏ vượt trần.
+    const addedSeconds = pendingQuestions.reduce((total, item) => total + getQuestionAttemptSeconds(item), 0)
+    const quotaWarning = buildTimeQuotaWarning(
+      'Mã đề trên lớp',
+      (selectedPaper?.timeDurationSeconds ?? 0) + addedSeconds,
+      maxTimePerAttemptMin,
+    )
     if (quotaWarning) {
-      setErrorMessage(`${quotaWarning} Không thể gán thêm câu hỏi này.`)
+      setErrorMessage(`${quotaWarning} Không thể gán thêm ${pendingQuestions.length} câu hỏi này.`)
       return
     }
+    const pendingIds = pendingQuestions.map((item) => item.id)
     const current = currentSectionsPayload()
     const next =
       pickerMode.kind === 'new'
-        ? [...current, { instruction: null, questionIds: [question.id], questionWeights: {}, title: pickerMode.title, weight: null }]
+        ? [...current, { instruction: null, questionIds: pendingIds, questionWeights: {}, title: pickerMode.title, weight: null }]
         : current.map((section, index) =>
-            index === pickerMode.sectionIndex && !section.questionIds.includes(question.id)
-              ? { ...section, questionIds: [...section.questionIds, question.id] }
+            index === pickerMode.sectionIndex
+              ? {
+                  ...section,
+                  questionIds: [
+                    ...section.questionIds,
+                    ...pendingIds.filter((id) => !section.questionIds.includes(id)),
+                  ],
+                }
               : section,
           )
     try {
@@ -1404,7 +1448,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
       })
       await invalidate()
       setPickerMode(null)
-      setMessage('Đã cập nhật câu hỏi.')
+      setPendingQuestions([])
+      setMessage(`Đã thêm ${pendingIds.length} câu hỏi.`)
     } catch (error) {
       setErrorMessage(toApiError(error).message)
     }
@@ -2249,8 +2294,16 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               .flatMap((section) => section.items.map((item) => item.questionId))
               .filter(Boolean) as string[]
           }
-          onClose={() => setPickerMode(null)}
-          onSelect={(question) => void handlePickQuestion(question)}
+          confirmLabel={`Thêm ${pendingQuestions.length} câu`}
+          confirmPending={updateQuestionsMutation.isPending}
+          multiSelect
+          onClose={() => {
+            setPickerMode(null)
+            setPendingQuestions([])
+          }}
+          onConfirm={() => void handleConfirmPickedQuestions()}
+          onSelect={togglePendingQuestion}
+          pendingQuestionIds={pendingQuestions.map((item) => item.id)}
           questionDetailBasePath={roleBasePath}
           scope="teacher"
           selectedQuestionIds={

@@ -68,8 +68,41 @@ export function ClassTestPaperComposer({ examId, onClose, onCreated, questionDet
     setSections((current) => current.map((section) => (section.key === sectionKey ? { ...section, ...patch } : section)))
   }
 
-  function addQuestionToSection(sectionKey: string, question: QuestionDto) {
+  /**
+   * Bấm câu chưa chọn thì thêm, bấm lại câu đã chọn thì gỡ.
+   *
+   * Picker ở đây KHÔNG đóng sau mỗi lần chọn (luồng chèn nhiều câu một lượt), nên chọn nhầm
+   * giữa chừng mà không gỡ được ngay tại chỗ thì phải đóng picker, gỡ ở danh sách phần, rồi mở
+   * lại từ đầu -- mất luôn từ khoá tìm kiếm và trang đang xem.
+   *
+   * Câu đang nằm ở phần KHÁC vẫn là no-op, không phải bỏ sót: picker đã vô hiệu hoá chúng qua
+   * `excludeQuestionIds` kèm nhãn "Đã dùng ở phần khác". Gỡ một câu khỏi phần mà người dùng
+   * không nhìn thấy trên màn hình là loại bất ngờ tệ hơn hẳn việc không làm gì.
+   */
+  function toggleQuestionInSection(sectionKey: string, question: QuestionDto) {
     setSections((current) => {
+      const inThisSection = current.some(
+        (section) =>
+          section.key === sectionKey &&
+          section.questions.some((existing) => existing.id === question.id),
+      )
+      if (inThisSection) {
+        return current.map((section) => {
+          if (section.key !== sectionKey) {
+            return section
+          }
+          // Xoá luôn trọng số đã nhập cho câu đó -- giữ lại là để rác trong payload tạo mã đề,
+          // và nếu người dùng chọn lại thì trọng số cũ lặng lẽ sống dậy.
+          const restWeights = Object.fromEntries(
+            Object.entries(section.questionWeights).filter(([id]) => id !== question.id),
+          )
+          return {
+            ...section,
+            questions: section.questions.filter((existing) => existing.id !== question.id),
+            questionWeights: restWeights,
+          }
+        })
+      }
       if (current.some((section) => section.questions.some((existing) => existing.id === question.id))) {
         return current
       }
@@ -428,11 +461,12 @@ export function ClassTestPaperComposer({ examId, onClose, onCreated, questionDet
 
       {pickerSection ? (
         <QuestionPicker
+          multiSelect
           excludeQuestionIds={sections
             .filter((section) => section.key !== pickerSection.key)
             .flatMap((section) => section.questions.map((question) => question.id))}
           onClose={() => setPickerForSectionKey(null)}
-          onSelect={(question) => addQuestionToSection(pickerSection.key, question)}
+          onSelect={(question) => toggleQuestionInSection(pickerSection.key, question)}
           questionDetailBasePath={questionDetailBasePath}
           scope="teacher"
           selectedQuestionIds={pickerSection.questions.map((question) => question.id)}
