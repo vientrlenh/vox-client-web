@@ -719,6 +719,18 @@ const SchoolAdminSubscriptionPaymentResultPage = lazy(() =>
   })),
 );
 
+const TeacherQuotaUsagePage = lazy(() =>
+  import("@/features/subscription_school").then((module) => ({
+    default: module.TeacherQuotaUsagePage,
+  })),
+);
+
+const StudentQuotaUsagePage = lazy(() =>
+  import("@/features/subscription_school").then((module) => ({
+    default: module.StudentQuotaUsagePage,
+  })),
+);
+
 // Dùng cho ba route /payment/* mà SePay redirect người dùng về — không truyền backTo nên trang tự
 // suy đường quay lại từ role hiện tại.
 const PaymentResultPage = lazy(() =>
@@ -1072,6 +1084,10 @@ export function AppRoutes() {
               element={<TeacherDashboardPage/>}
             />
             <Route
+              path="teacher/quota-usage"
+              element={<TeacherQuotaUsagePage />}
+            />
+            <Route
               path="teacher/monitoring"
               element={<TeacherMonitoringRoomsPage />}
             />
@@ -1134,6 +1150,7 @@ export function AppRoutes() {
         </Route>
         <Route element={<RequireRole role="STUDENT" />}>
           <Route element={<StudentLayout />}>
+            <Route path="student/quota-usage" element={<StudentQuotaUsagePage />} />
             <Route path="student/exams" element={<StudentExamsPage />} />
             <Route path="student/exams/:sessionId/result" element={<StudentExamResultPage />} />
             <Route path="student/class-tests" element={<StudentClassTestsPage />} />

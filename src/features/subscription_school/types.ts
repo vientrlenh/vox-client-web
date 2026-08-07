@@ -1,3 +1,5 @@
+import { ClipboardList, FileCheck2, Headphones, type LucideIcon } from 'lucide-react'
+
 export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
 export type RequestType = 'REGISTRATION' | 'UPGRADE'
@@ -9,6 +11,12 @@ export const QUOTA_LABELS: Record<QuotaType, string> = {
   CLASS_TEST: 'Bài kiểm tra trên lớp',
   GRADING: 'Bài thi cần chấm',
   PRACTICE: 'Lượt ôn luyện cá nhân',
+}
+
+export const QUOTA_ICONS: Record<QuotaType, LucideIcon> = {
+  CLASS_TEST: ClipboardList,
+  GRADING: FileCheck2,
+  PRACTICE: Headphones,
 }
 
 // includedQuantity / totalAllocated / usedQuantity đều tính bằng GIÂY audio xử lý —
