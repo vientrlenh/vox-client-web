@@ -17,6 +17,8 @@ import {
   UserRound,
 } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { useAppSelector } from '@/app/store/hooks'
+import { ExamRecordingPlayer } from '@/features/exam-recordings'
 import { useForceEndExamSessionMutation } from '@/features/examCore/api/mutations'
 import { examQueryKeys, useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
 import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
@@ -24,14 +26,7 @@ import { Pagination } from '@/shared/components/Pagination'
 import {
   buildValidityRulesForDisplay,
   criterionScorePercentage,
-  formatConfidencePercent,
-  getAudioGateLabel,
-  getAudioGateTone,
-  getAudioReasonLabel,
-  getConfidenceModeLabel,
-  getEvidenceReasonLabel,
   getResultScoreTone,
-  getReviewReasonLabel,
 } from '@/shared/lib/aiEvaluation'
 import { formatPublishedResult } from '@/shared/lib/resultScore'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
@@ -582,15 +577,10 @@ export function QuestionEvaluationCard({
                   {display.humanGraded ? <StatusBadge label="Giáo viên chấm lại" tone="violet" /> : null}
                   {display.requiresRetake ? <StatusBadge label="Cần thi lại" tone="danger" /> : null}
                   {display.requiresHumanReview ? <StatusBadge label="Cần giáo viên duyệt lại" tone="warning" /> : null}
-                  {display.signals?.uncertaintyType === 'SYSTEM_UNCERTAINTY' || display.signals?.uncertaintyType === 'MIXED' ? (
-                    <StatusBadge label="System uncertainty" tone="warning" />
-                  ) : null}
-                  {display.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
-                    <StatusBadge label="Chưa đủ bằng chứng chấm điểm" tone="info" />
-                  ) : null}
-                  {getConfidenceModeLabel(display.signals?.confidenceMode) ? (
-                    <StatusBadge label={getConfidenceModeLabel(display.signals?.confidenceMode) as string} tone="neutral" />
-                  ) : null}
+                  {/* GỠ: "System uncertainty", "Chưa đủ bằng chứng chấm điểm", nhãn chế độ tin
+                      cậy (Profile: High-stakes). Ba nhãn nội bộ của bộ chấm, đứng cạnh nhau
+                      thành một hàng chữ mà người chấm không hành động được gì -- và nhãn nào
+                      thật sự cần hành động thì đã có "Cần giáo viên duyệt lại" nói rồi. */}
                   {display.markedInvalid ? <StatusBadge label="Đánh dấu không hợp lệ" tone="danger" /> : null}
                   <span className="text-xs text-slate-500">Chấm lúc {formatDateTime(evaluation.evaluatedAt)}</span>
                   {/* Hai mốc thời gian khác nhau: phán quyết của giáo viên và lần AI phân
@@ -599,55 +589,14 @@ export function QuestionEvaluationCard({
                     <span className="text-xs text-slate-500">· phân tích AI {formatDateTime(display.aiEvaluatedAt)}</span>
                   ) : null}
                 </div>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-slate-500">
-                      <Gauge aria-hidden="true" className="size-4" />
-                      <span className="text-xs font-bold uppercase tracking-wide">Overall confidence</span>
-                    </div>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{formatConfidencePercent(display.overallConfidence)}</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-slate-500">
-                      <Mic2 aria-hidden="true" className="size-4" />
-                      <span className="text-xs font-bold uppercase tracking-wide">Audio quality</span>
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-bold text-slate-900">{formatConfidencePercent(display.signals?.audioQuality)}</p>
-                      <StatusBadge
-                        label={getAudioGateLabel(display.signals?.audioGateStatus)}
-                        tone={getAudioGateTone(display.signals?.audioGateStatus)}
-                      />
-                    </div>
-                    {display.signals?.audioGateReasonCodes?.length ? (
-                      <p className="mt-1 text-xs text-slate-500">
-                        {display.signals.audioGateReasonCodes.map(getAudioReasonLabel).join(' · ')}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                {display.signals?.evidenceStatus === 'INSUFFICIENT_EVIDENCE' ? (
-                  <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-900">
-                    <div className="flex items-start gap-2">
-                      <FileText aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                      <div>
-                        <p className="font-bold">Điểm thấp có thể hợp lệ vì chưa đủ bằng chứng.</p>
-                        <p className="mt-1 text-sky-800">
-                          {(display.signals.evidenceReasonCodes ?? []).map(getEvidenceReasonLabel).join(' · ')}
-                        </p>
-                        <p className="mt-1 text-xs text-sky-700">Cờ này không tự động được xem là lỗi hệ thống và không tự bật human review.</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-                {display.requiresHumanReview || display.reviewReasonCode ? (
-                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                      <p>{getReviewReasonLabel(display.reviewReasonCode) ?? 'Bài làm cần được giáo viên xem lại trước khi tin cậy hoàn toàn.'}</p>
-                    </div>
-                  </div>
-                ) : null}
+                {/* GỠ: ô "Overall confidence", ô "Audio quality", dải "Chưa đủ bằng chứng" và
+                    dải cảnh báo alignment.
+                    Chúng là số đo NỘI BỘ của bộ chấm, không phải thứ người chấm quyết định
+                    được: thấy "0% confidence" hay "độ phủ alignment thấp" thì việc phải làm vẫn
+                    y hệt -- nghe lại rồi tự cho điểm. Nhồi bốn khối đó lên đầu mỗi câu chỉ đẩy
+                    NHẬN XÉT và điểm từng tiêu chí -- thứ thật sự dùng để chấm -- xuống dưới.
+                    Dữ liệu vẫn còn nguyên trong `display.signals`, cần thì dựng lại một trang
+                    chẩn đoán riêng cho người vận hành, đừng trộn vào màn chấm. */}
                 {evaluation.feedbackSummary ? (
                   <p className="mt-3 text-sm leading-6 text-slate-700">{evaluation.feedbackSummary}</p>
                 ) : null}
@@ -772,6 +721,11 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   const { confirm, confirmWithReason, dialog } = useConfirmationDialog()
   const sessionQuery = useExamSessionStatusQuery(sessionId ?? null)
   const resultQuery = useExamSessionResultQuery(sessionId ?? null)
+  // Trang này dùng chung cho school admin và giáo viên, nhưng route học sinh cũng chạm tới
+  // được. Xét "KHÔNG phải học sinh" thay vì liệt kê vai được xem: thêm vai mới sau này thì
+  // mặc định là xem được, đúng như luật ở backend (chỉ chặn đúng vai STUDENT).
+  const currentRoles = useAppSelector((state) => state.auth.user?.roles)
+  const canViewRecordings = !currentRoles?.includes('STUDENT')
   const decideOutcomeMutation = useDecideExamCandidateResultOutcomeMutation()
   const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const retryGradingMutation = useRetryGradingExamSessionMutation()
@@ -1073,8 +1027,15 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
           </div>
 
           {activeTab === 'overview' ? (
-            <div className="mt-4">
+            <div className="mt-4 grid gap-4">
               <SectionOverview result={result} />
+
+              {/* Bản ghi ca thi -- KHÔNG cho học sinh xem.
+                  Backend cũng chặn (query `examRecordingPlayback` chỉ nhận SCHOOL_ADMIN/
+                  TEACHER), nhưng chặn thêm ở đây để học sinh không phải thấy một khối tải rồi
+                  biến mất. Hai lớp phục vụ hai việc khác nhau: lớp backend là bảo mật, lớp này
+                  là giao diện. */}
+              {canViewRecordings ? <ExamRecordingPlayer sessionId={sessionId ?? null} /> : null}
             </div>
           ) : null}
 

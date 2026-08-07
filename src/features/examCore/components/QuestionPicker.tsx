@@ -22,6 +22,17 @@ type QuestionPickerProps = {
   initialType?: QuestionType | null
   onClose: () => void
   onSelect: (question: QuestionDto) => void
+  /**
+   * Chế độ GIỎ: bấm câu là cho vào/bỏ khỏi giỏ, picker ở lại, bấm nút xác nhận mới ghi thật.
+   *
+   * Blueprint và mã đề kỳ thi tập trung chọn đúng một câu rồi đóng nên để mặc định tắt.
+   */
+  multiSelect?: boolean
+  /** Id đang nằm trong giỏ (chưa ghi). Chỉ dùng khi `multiSelect`. */
+  pendingQuestionIds?: string[]
+  onConfirm?: () => void
+  confirmLabel?: string
+  confirmPending?: boolean
   publishedOnly?: boolean
   scope: QuestionModuleScope
   selectedQuestionIds: string[]
@@ -36,6 +47,11 @@ export function QuestionPicker({
   initialType = null,
   onClose,
   onSelect,
+  multiSelect = false,
+  pendingQuestionIds = [],
+  onConfirm,
+  confirmLabel = 'Thêm',
+  confirmPending = false,
   publishedOnly = false,
   scope,
   selectedQuestionIds,
@@ -126,18 +142,33 @@ export function QuestionPicker({
                 const isSelected = selectedQuestionIds.includes(question.id)
                 const isUsedElsewhere = !isSelected && excludeQuestionIds.includes(question.id)
                 const cannotUseInExam = question.usableInExam === false
-                const isDisabled = isUsedElsewhere || cannotUseInExam
+                // Chọn nhiều: câu đã thêm khoá luôn. Bấm nó vốn đã là no-op ở nơi gọi, khoá lại
+                // chỉ là cho con trỏ và độ mờ nói đúng sự thật đó.
+                // Câu ĐÃ nằm trong đề rồi thì khoá -- gỡ là việc làm ở danh sách phần bên
+                // ngoài, nơi nhìn thấy hậu quả ngay; picker đang che mất danh sách đó.
+                const alreadyInPaper = multiSelect && isSelected
+                // Câu đang trong GIỎ thì bấm lại để bỏ ra, nên KHÔNG khoá.
+                const isPending = multiSelect && pendingQuestionIds.includes(question.id)
+                const isDisabled = isUsedElsewhere || cannotUseInExam || alreadyInPaper
                 const statusDisplay = getQuestionStatusDisplay(question.status)
 
                 return (
                   <div
                     className={[
                       'flex items-stretch gap-2 rounded-xl border p-3.5 transition',
-                      isDisabled
-                        ? 'border-slate-200 bg-slate-100'
-                        : isSelected
-                          ? 'border-indigo-500 bg-indigo-50'
-                          : 'border-slate-200',
+                      // isSelected xét TRƯỚC isDisabled: câu đã thêm cũng nằm trong isDisabled,
+                      // để nhánh xám đứng trước thì nó trông y hệt câu bị cấm dùng -- mất luôn
+                      // dấu hiệu "đã chọn" mà cả khối này dựng ra để thể hiện.
+                      // Trong giỏ = viền xanh nổi bật; đã nằm trong đề = xám như các câu khoá
+                      // khác. Hai trạng thái trông khác nhau vì chúng KHÁC nhau: một cái bấm
+                      // lại bỏ được, một cái không.
+                      isPending
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : isDisabled
+                          ? 'border-slate-200 bg-slate-100'
+                          : isSelected
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-slate-200',
                     ].join(' ')}
                     key={question.id}
                   >
@@ -167,7 +198,19 @@ export function QuestionPicker({
                               tone={statusDisplay.className.includes('emerald') ? 'success' : 'neutral'}
                             />
                           )}
-                          {isSelected ? <Check aria-hidden="true" className="size-4 text-indigo-600" /> : null}
+                          {alreadyInPaper ? (
+                            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                              Đã có trong đề
+                            </span>
+                          ) : null}
+                          {isPending ? (
+                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
+                              Đang chọn · bấm để bỏ
+                            </span>
+                          ) : null}
+                          {isSelected || isPending ? (
+                            <Check aria-hidden="true" className="size-4 text-indigo-600" />
+                          ) : null}
                         </div>
                       </div>
                       <p className="text-xs text-slate-500">{formatNullableText(question.questionText)}</p>
@@ -227,6 +270,26 @@ export function QuestionPicker({
             </button>
           </div>
         </div>
+
+        {/* Thanh xác nhận của chế độ giỏ. Để RIÊNG dưới thanh phân trang: giỏ sống xuyên trang,
+            nên gộp vào đó sẽ khiến nó trông như chỉ áp cho trang đang xem. */}
+        {multiSelect && onConfirm ? (
+          <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-6 py-3.5">
+            <span className="text-xs font-semibold text-slate-500">
+              {pendingQuestionIds.length > 0
+                ? `Đang chọn ${pendingQuestionIds.length} câu`
+                : 'Bấm vào câu hỏi để chọn — chọn xong bấm nút bên phải.'}
+            </span>
+            <button
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={pendingQuestionIds.length === 0 || confirmPending}
+              onClick={onConfirm}
+              type="button"
+            >
+              {confirmPending ? 'Đang thêm…' : confirmLabel}
+            </button>
+          </div>
+        ) : null}
       </section>
     </div>
   )
