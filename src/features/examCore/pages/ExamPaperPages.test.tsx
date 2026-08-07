@@ -33,7 +33,16 @@ function item(id: string, overrides: ItemOverrides = {}) {
   }
 }
 
-function mockGraphQL(items: ReturnType<typeof item>[]) {
+type ExamOverrides = {
+  kind?: string
+  myRole?: string | null
+  paperStatus?: string
+}
+
+function mockGraphQL(items: ReturnType<typeof item>[], overrides: ExamOverrides = {}) {
+  const kind = overrides.kind ?? 'CENTRALIZED'
+  const myRole = overrides.myRole === undefined ? 'AUTHOR' : overrides.myRole
+  const paperStatus = overrides.paperStatus ?? 'DRAFT'
   mockedPost.mockImplementation((_url: string, body?: unknown) => {
     const { query } = body as GraphQLBody
 
@@ -59,7 +68,7 @@ function mockGraphQL(items: ReturnType<typeof item>[]) {
                   weight: 1,
                 },
               ],
-              status: 'DRAFT',
+              status: paperStatus,
               timeDurationSeconds: 90,
               updatedAt: null,
               variant: 1,
@@ -70,14 +79,14 @@ function mockGraphQL(items: ReturnType<typeof item>[]) {
     }
 
     if (query.includes('query ExamMyRole')) {
-      return Promise.resolve({ data: { data: { examMyRole: 'AUTHOR' } } })
+      return Promise.resolve({ data: { data: { examMyRole: myRole } } })
     }
 
     if (query.includes('query Exam(')) {
       return Promise.resolve({
         data: {
           data: {
-            exam: { code: 'KT-01', id: EXAM_ID, kind: 'CENTRALIZED', name: 'Kỳ thi', status: 'DRAFT' },
+            exam: { code: 'KT-01', id: EXAM_ID, kind, name: 'Kỳ thi', status: 'DRAFT' },
           },
         },
       })
@@ -164,5 +173,51 @@ describe('TeacherExamPaperEditPage', () => {
 
     expect(await screen.findByText('Tiêu chí:')).toBeInTheDocument()
     expect(screen.getByText('Mức độ: EASY')).toBeInTheDocument()
+  })
+})
+
+/** Chủ tịch hội đồng chỉ duyệt đề của người ra đề, không sửa nội dung và không xóa mã đề. */
+describe('TeacherExamPaperEditPage — quyền của CHAIR trên mã đề', () => {
+  beforeEach(() => {
+    mockedPost.mockReset()
+  })
+
+  it('CHAIR chỉ còn duyệt và yêu cầu sửa lại trên mã đề đang chờ duyệt', async () => {
+    mockGraphQL([item('item-1', { questionId: 'question-1', slotType: 'SELECTION' })], {
+      myRole: 'CHAIR',
+      paperStatus: 'IN_REVIEW',
+    })
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Duyệt mã đề' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Yêu cầu sửa lại' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sửa phần Phần 1' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Đổi câu hỏi' })).not.toBeInTheDocument()
+  })
+
+  it('CHAIR không xóa được mã đề kể cả khi mã đề còn ở bản nháp', async () => {
+    mockGraphQL([item('item-1', { slotType: 'SELECTION' })], { myRole: 'CHAIR', paperStatus: 'DRAFT' })
+    renderPage()
+
+    expect(await screen.findByText('Phần 1')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Xóa mã đề/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Gán câu hỏi' })).not.toBeInTheDocument()
+  })
+
+  it('AUTHOR vẫn sửa và xóa được mã đề bản nháp', async () => {
+    mockGraphQL([item('item-1', { slotType: 'SELECTION' })], { myRole: 'AUTHOR', paperStatus: 'DRAFT' })
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Sửa phần Phần 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Gán câu hỏi' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Xóa mã đề/ })).toBeInTheDocument()
+  })
+
+  it('bài kiểm tra trên lớp không có hội đồng nên vẫn sửa được', async () => {
+    mockGraphQL([item('item-1', { slotType: 'SELECTION' })], { kind: 'CLASS_TEST', myRole: null, paperStatus: 'LOCKED' })
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Sửa phần Phần 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Gán câu hỏi' })).toBeInTheDocument()
   })
 })

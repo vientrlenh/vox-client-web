@@ -153,9 +153,15 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
   const paperQuotaWarning = buildTimeQuotaWarning(`Mã đề ${paper.code}`, paper.timeDurationSeconds, maxTimePerAttemptMin)
   const allowedActionsForRole = myRole ? ROLE_ACTIONS[myRole] ?? [] : []
   const nextActions = canManage ? (NEXT_ACTIONS[paper.status] ?? []).filter((action) => allowedActionsForRole.includes(action)) : []
-  // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED (không dùng luồng duyệt) nên LOCKED không chặn sửa ở đây.
+  // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED (không dùng luồng duyệt) nên LOCKED không chặn sửa ở đây,
+  // và cũng không có hội đồng ra đề (myRole thường null) nên không role-gate ở nhánh đó.
+  // Kỳ thi tập trung: chủ tịch hội đồng chỉ duyệt/khóa/mở lại, không sửa nội dung đề của người ra đề.
+  // Chờ myRoleQuery xong mới mở nút: `myRole` còn undefined lúc đầu, không chốt ở đây thì chủ tịch
+  // hội đồng vẫn thấy nút Sửa/Xóa nhấp nháy một nhịp và bấm kịp.
   const canEditPaperContent =
-    canManage && exam?.status !== 'IN_PROGRESS' && (exam?.kind === 'CLASS_TEST' || paper.status !== 'LOCKED')
+    canManage &&
+    exam?.status !== 'IN_PROGRESS' &&
+    (exam?.kind === 'CLASS_TEST' || (paper.status !== 'LOCKED' && myRoleQuery.isSuccess && myRole !== 'CHAIR'))
   const pickerCurrentItem = pickerItemId
     ? paper.sections.flatMap((section) => section.items).find((item) => item.id === pickerItemId)
     : null
@@ -439,7 +445,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
         </div>
       ) : null}
 
-      {canManage && paper.status === 'DRAFT' ? (
+      {canEditPaperContent && paper.status === 'DRAFT' ? (
         <div className="mt-3">
           <button
             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-red-200 px-4 text-xs font-bold text-red-600 hover:bg-red-50"

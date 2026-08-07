@@ -106,6 +106,11 @@ export const EXAM_LIST_FIELDS = `
       }
     }
   }
+  # Chỉ role, đủ cho bước "Phân công" của stepper ở trang danh sách. Field này chạy qua DataLoader
+  # examMembersByExamId nên cả trang chỉ tốn thêm một truy vấn gộp, không phải N+1.
+  members {
+    role
+  }
 `
 
 const EXAM_SUMMARY_FIELDS = `

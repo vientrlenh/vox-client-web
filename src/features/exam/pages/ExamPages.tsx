@@ -1,12 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   Calendar,
-  Check,
   CircleCheck,
   ClipboardList,
   Clock4,
-  FilePenLine,
   Hash,
   Languages,
   LayoutList,
@@ -14,7 +12,6 @@ import {
   Megaphone,
   PlayCircle,
   Plus,
-  Rocket,
   Timer,
   Trash2,
   X,
@@ -27,7 +24,6 @@ import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { TabPillGroup } from '@/shared/ui/TabPill'
-import type { WorkflowStep } from '@/shared/ui/WorkflowStepper'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
@@ -36,14 +32,18 @@ import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamS
 import { PaperCard } from '@/features/examCore/components/PaperCard'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
 import { WorkflowTrackerCard } from '@/features/examCore/components/WorkflowTrackerCard'
-import { examQueryKeys, useExamDetailBundleQuery } from '@/features/examCore/api/queries'
+import {
+  examQueryKeys,
+  useExamCandidatesQuery,
+  useExamDetailBundleQuery,
+  useExamSchedulesQuery,
+} from '@/features/examCore/api/queries'
 import { useMatchingSchoolAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
 import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import {
   useCreateExamPaperMutation,
   useReleaseSecurePoolMutation,
-  useSetExamDeliveryModeMutation,
   useUpdateExamPaperStatusMutation,
 } from '@/features/examCore/api/mutations'
 import {
@@ -56,12 +56,14 @@ import {
   getResultDecisionMethodDisplay,
   isExamLockedForEditing,
   RESULT_DECISION_METHODS,
-  type ExamDeliveryMode,
-  type ExamDto,
-  type ExamPaperDto,
   type ExamStatus,
   type ResultDecisionMethod,
 } from '@/features/examCore/types'
+import {
+  getCentralizedScheduleReadiness,
+  getExamWorkflowSteps,
+  type ExamDetailTab,
+} from '../utils/examWorkflow'
 import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
 import { EditExamModal } from '../components/EditExamModal'
 import { MembersTab } from '../components/MembersTab'
@@ -79,43 +81,6 @@ const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
   { label: 'Đã công bố kết quả', value: 'RESULTS_PUBLISHED' },
 ]
 
-function getExamWorkflowSteps(exam: ExamDto, papers: ExamPaperDto[]): { completedCount: number; steps: WorkflowStep[] } {
-  const step1Done = Boolean(exam.blueprintId)
-  const step2Done = Boolean(exam.blueprintVersionId)
-  const totalPapers = papers.length
-  const lockedPapers = papers.filter((paper) => paper.status === 'LOCKED').length
-  const step3Done = step2Done && totalPapers > 0 && lockedPapers === totalPapers
-  const step4Done = exam.status === 'RESULTS_PUBLISHED' || exam.status === 'CLOSED'
-
-  const steps: WorkflowStep[] = [
-    {
-      icon: step1Done ? <Check size={26} /> : <LayoutList size={24} />,
-      label: 'Khung đề',
-      state: step1Done ? 'done' : 'current',
-      sublabel: step1Done ? 'Hoàn tất' : 'Chưa gắn blueprint',
-    },
-    {
-      icon: step2Done ? <Check size={26} /> : <LayoutList size={24} />,
-      label: 'Chốt phiên bản',
-      state: !step1Done ? 'upcoming' : step2Done ? 'done' : 'current',
-      sublabel: step2Done ? 'Đã chốt' : 'Chờ chủ tịch hội đồng chốt phiên bản',
-    },
-    {
-      icon: step3Done ? <Check size={26} /> : <FilePenLine size={24} />,
-      label: 'Đề bài',
-      state: !step2Done ? 'upcoming' : step3Done ? 'done' : 'current',
-      sublabel: totalPapers ? `${lockedPapers} / ${totalPapers} mã đề đã khóa` : undefined,
-    },
-    {
-      icon: step4Done ? <Check size={26} /> : <Rocket size={24} />,
-      label: 'Xếp lịch',
-      state: !step3Done ? 'upcoming' : step4Done ? 'done' : 'current',
-      sublabel: step4Done ? 'Đã công bố kết quả' : 'Lên lịch → công bố',
-    },
-  ]
-
-  return { completedCount: [step1Done, step2Done, step3Done, step4Done].filter(Boolean).length, steps }
-}
 
 type ExamListPageProps = {
   allowCreate: boolean
@@ -509,8 +474,6 @@ type ExamDetailPageProps = {
   canReleaseSecurePool: boolean
 }
 
-type ExamDetailTab = 'blueprint' | 'papers' | 'people' | 'schedule' | 'students'
-
 function ExamDetailPage({
   basePath,
   canManageInfo,
@@ -528,13 +491,17 @@ function ExamDetailPage({
   const attachedBlueprint = exam?.blueprint ?? null
   const subscriptionQuery = useMySubscriptionQuery()
   const myRole = bundleQuery.data?.myRole
+  // Cùng query key với ScheduleTab/CandidatesTab nên TanStack dùng chung cache — tab mở ra không refetch.
+  // Cần ở đây để tính bước "Xếp học sinh"/"Xếp lịch" và lý do chặn nút lên lịch.
+  const schedulesQuery = useExamSchedulesQuery(examId ?? null)
+  const candidatesQuery = useExamCandidatesQuery(examId ?? null)
   const createPaperMutation = useCreateExamPaperMutation()
   const updatePaperStatusMutation = useUpdateExamPaperStatusMutation()
   const updateStatusMutation = useUpdateExamStatusMutation()
   const deleteMutation = useDeleteExamMutation()
   const releaseSecurePoolMutation = useReleaseSecurePoolMutation()
-  const setDeliveryModeMutation = useSetExamDeliveryModeMutation()
-  const [tab, setTab] = useState<ExamDetailTab>('papers')
+  const [tab, setTab] = useState<ExamDetailTab | null>(null)
+  const autoTabAppliedRef = useRef(false)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -594,15 +561,6 @@ function ExamDetailPage({
     }
   }
 
-  async function handleSetDeliveryMode(forExamId: string, mode: ExamDeliveryMode) {
-    try {
-      await setDeliveryModeMutation.mutateAsync({ deliveryMode: mode, examId: forExamId })
-      await invalidate()
-    } catch (error) {
-      setErrorMessage(toApiError(error).message)
-    }
-  }
-
   /**
    * Chuyển trạng thái kỳ thi có thể hỏng vì nhiều lý do người dùng sửa được: `SCHEDULE`
    * chạy qua kiểm tra hạn mức gói (chưa có gói / quá số học sinh / hết token) và trả 422,
@@ -634,18 +592,39 @@ function ExamDetailPage({
     }
   }
 
+  // Truyền thẳng `.data` (undefined khi đang tải) chứ không phải `?? []` — mảng rỗng sẽ khiến tracker
+  // nháy "chưa có thí sinh" trước khi dữ liệu về, còn undefined thì nó rơi về suy luận theo status.
+  const workflow = exam ? getExamWorkflowSteps(exam, papers, schedulesQuery.data, candidatesQuery.data) : null
+  const dataReady = Boolean(exam && schedulesQuery.data && candidatesQuery.data)
+  const suggestedTab: ExamDetailTab = workflow?.currentStep?.tab ?? 'schedule'
+
+  // Mở trang là nhảy thẳng vào tab của bước đang dở, nhưng chỉ đúng một lần: người dùng bấm tab khác
+  // trong lúc ca thi/thí sinh còn đang tải thì không bị hất ngược lại.
+  useEffect(() => {
+    if (autoTabAppliedRef.current || !dataReady) {
+      return
+    }
+    autoTabAppliedRef.current = true
+    setTab(suggestedTab)
+  }, [dataReady, suggestedTab])
+
+  function selectTab(next: ExamDetailTab) {
+    autoTabAppliedRef.current = true
+    setTab(next)
+  }
+
   if (bundleQuery.isLoading) {
     return <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Đang tải…</section>
   }
 
-  if (!exam) {
+  if (!exam || !workflow) {
     return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy kỳ thi.</section>
   }
 
+  const activeTab: ExamDetailTab = tab ?? 'papers'
   const statusDisplay = getExamStatusDisplay(exam.status)
-  const { completedCount, steps } = getExamWorkflowSteps(exam, papers)
-  const totalPapers = papers.length
-  const lockedPapers = papers.filter((paper) => paper.status === 'LOCKED').length
+  const { completedCount, steps } = workflow
+  const scheduleReadiness = getCentralizedScheduleReadiness(papers, schedulesQuery.data, candidatesQuery.data)
   // Backend authorizes schedule/candidate management for SCHOOL_ADMIN (same school) or the exam's CHAIR.
   const canManageSchedule = canManageStatus || myRole === 'CHAIR'
   // Từ IN_PROGRESS trở đi backend khóa sửa thông tin kỳ thi và mọi thao tác xếp lịch.
@@ -660,32 +639,40 @@ function ExamDetailPage({
   const selectedCopyPaper = copyFromPaperId ? papers.find((paper) => paper.id === copyFromPaperId) : null
   const copyQuotaWarning = buildTimeQuotaWarning('Mã đề sao chép', selectedCopyPaper?.timeDurationSeconds, maxTimePerAttemptMin)
 
+  // Nút SCHEDULE giờ luôn hiện khi kỳ thi còn DRAFT (trước đây nó lặng lẽ biến mất) — thà disable kèm
+  // lý do còn hơn để người dùng không biết mình đang thiếu gì.
   const primaryStatusAction =
-    exam.status === 'DRAFT' && completedCount >= 3
-      ? { action: 'SCHEDULE' as const, icon: <Calendar aria-hidden="true" className="size-4.5" />, label: 'Lên lịch kỳ thi' }
+    exam.status === 'DRAFT'
+      ? {
+          action: 'SCHEDULE' as const,
+          disabledReason: scheduleReadiness.blockingReason,
+          icon: <Calendar aria-hidden="true" className="size-4.5" />,
+          label: 'Lên lịch kỳ thi',
+        }
       : exam.status === 'SCHEDULED'
-        ? { action: 'START' as const, icon: <PlayCircle aria-hidden="true" className="size-4.5" />, label: 'Bắt đầu thi' }
+        ? { action: 'START' as const, disabledReason: null, icon: <PlayCircle aria-hidden="true" className="size-4.5" />, label: 'Bắt đầu thi' }
         : exam.status === 'IN_PROGRESS'
-          ? { action: 'CLOSE' as const, icon: <Lock aria-hidden="true" className="size-4.5" />, label: 'Đóng kỳ thi' }
+          ? { action: 'CLOSE' as const, disabledReason: null, icon: <Lock aria-hidden="true" className="size-4.5" />, label: 'Đóng kỳ thi' }
           : exam.status === 'CLOSED'
-            ? { action: 'PUBLISH_RESULTS' as const, icon: <Megaphone aria-hidden="true" className="size-4.5" />, label: 'Công bố kết quả' }
+            ? { action: 'PUBLISH_RESULTS' as const, disabledReason: null, icon: <Megaphone aria-hidden="true" className="size-4.5" />, label: 'Công bố kết quả' }
             : null
 
-  const nextAction =
-    completedCount === 0
-      ? { ctaLabel: 'Gắn blueprint', description: 'Chọn blueprint ở tab Blueprint để bắt đầu.', onClick: () => setTab('blueprint'), title: 'Chưa gắn blueprint' }
-      : completedCount === 1
-        ? { ctaLabel: 'Chốt phiên bản', description: 'Chọn phiên bản đã xuất bản để chủ tịch hội đồng chốt dùng cho kỳ thi.', onClick: () => setTab('blueprint'), title: 'Chờ chủ tịch hội đồng chốt phiên bản' }
-        : completedCount === 2
-          ? {
-              ctaLabel: 'Mở đề thi',
-              description: totalPapers ? `${lockedPapers}/${totalPapers} mã đề đã khóa. Duyệt và khóa các mã đề còn lại.` : 'Tạo mã đề để bắt đầu soạn.',
-              onClick: () => setTab('papers'),
-              title: 'Duyệt và khóa các mã đề còn lại',
-            }
-          : completedCount === 3
-            ? { ctaLabel: 'Mở phân lịch', description: 'Xếp ca thi, phòng thi và giám thị để vận hành kỳ thi.', onClick: () => setTab('schedule'), title: 'Chuyển sang vận hành thi' }
-            : null
+  const currentStep = workflow.currentStep
+  const nextAction = currentStep
+    ? {
+        ctaLabel: currentStep.cta,
+        description: currentStep.todo,
+        onClick: () => selectTab(currentStep.tab),
+        title: currentStep.label,
+      }
+    : exam.status === 'DRAFT' && scheduleReadiness.ready
+      ? {
+          ctaLabel: 'Lên lịch',
+          description: 'Ca thi, thí sinh và mã đề đã đủ — bấm lên lịch để chốt kỳ thi.',
+          onClick: () => void handleStatusAction(exam.id, 'SCHEDULE'),
+          title: 'Sẵn sàng lên lịch',
+        }
+      : null
 
   return (
     <section className="mx-auto max-w-260">
@@ -724,8 +711,10 @@ function ExamDetailPage({
                 </button>
                 {primaryStatusAction ? (
                   <button
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={Boolean(primaryStatusAction.disabledReason)}
                     onClick={() => void handleStatusAction(exam.id, primaryStatusAction.action)}
+                    title={primaryStatusAction.disabledReason ?? undefined}
                     type="button"
                   >
                     {primaryStatusAction.icon}
@@ -752,23 +741,29 @@ function ExamDetailPage({
         title={exam.name}
       />
 
-      <WorkflowTrackerCard completedCount={completedCount} nextAction={nextAction} steps={steps} totalCount={4} />
+      {canManageStatus && exam.status === 'DRAFT' && scheduleReadiness.blockingReason ? (
+        <div className="mt-3.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-700">
+          Chưa lên lịch được kỳ thi: {scheduleReadiness.blockingReason}
+        </div>
+      ) : null}
+
+      <WorkflowTrackerCard completedCount={completedCount} nextAction={nextAction} steps={steps} totalCount={5} />
 
       <div className="mt-5.5">
         <TabPillGroup
           items={[
             { label: 'Phân công', value: 'people' },
-            { label: 'Blueprint', value: 'blueprint' },
+            { label: 'Chốt phiên bản', value: 'blueprint' },
             { label: 'Đề bài', value: 'papers' },
-            { label: 'Học sinh', value: 'students' },
+            { label: 'Xếp học sinh', value: 'students' },
             { icon: <Calendar aria-hidden="true" className="size-4" />, label: 'Xếp lịch', value: 'schedule' },
           ]}
-          onChange={setTab}
-          value={tab}
+          onChange={selectTab}
+          value={activeTab}
         />
       </div>
 
-      {tab === 'papers' ? (
+      {activeTab === 'papers' ? (
         <div className="mt-4 grid gap-3.5">
           {canReleaseSecurePool && exam.securePool?.status === 'SEALED' ? (
             <div className="flex justify-end">
@@ -931,9 +926,9 @@ function ExamDetailPage({
         </div>
       ) : null}
 
-      {tab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
+      {activeTab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
 
-      {tab === 'students' ? (
+      {activeTab === 'students' ? (
         // `locked` chỉ khóa nhóm sửa danh sách; thao tác giám thị phải sống trong lúc thi nên
         // không được gộp `examLocked` vào `canManage`.
         <CandidatesTab
@@ -945,7 +940,7 @@ function ExamDetailPage({
         />
       ) : null}
 
-      {tab === 'blueprint' ? (
+      {activeTab === 'blueprint' ? (
         <BlueprintAttachPanel
           blueprintId={exam.blueprintId}
           blueprintVersionId={exam.blueprintVersionId}
@@ -962,20 +957,18 @@ function ExamDetailPage({
         />
       ) : null}
 
-      {tab === 'schedule' ? (
+      {activeTab === 'schedule' ? (
         <ScheduleTab
           canManage={canManageSchedule}
-          deliveryMode={exam.deliveryMode}
           examCloseAt={exam.closeAt}
           examId={exam.id}
           examOpenAt={exam.openAt}
           examTimeDurationSecond={exam.examTimeDurationSecond}
           isClassTest={false}
           locked={examLocked}
-          onGoToPapers={() => setTab('papers')}
-          onSetDeliveryMode={canManageSchedule ? (mode) => void handleSetDeliveryMode(exam.id, mode) : undefined}
+          onGoToPapers={() => selectTab('papers')}
           papers={papers}
-          unlocked={completedCount >= 3}
+          unlocked={workflow.done.papers}
         />
       ) : null}
 
