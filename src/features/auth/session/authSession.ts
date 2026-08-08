@@ -135,7 +135,6 @@ export function getStoredAuthUser() {
   const user = decodeAccessToken(tokens.accessToken)
 
   if (!user || isAccessTokenExpired(user)) {
-    clearAuthTokens()
     return null
   }
 
@@ -166,4 +165,9 @@ export function readStoredAuthState(): StoredAuthState {
   }
 
   return { status: 'authenticated', user }
+}
+
+export function getStoredAuthClaims() {
+  const tokens = getAuthTokens()
+  return tokens ? decodeAccessToken(tokens.accessToken) : null
 }
