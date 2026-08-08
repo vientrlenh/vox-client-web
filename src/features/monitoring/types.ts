@@ -56,7 +56,7 @@ export type AlertEvent = {
   capturedAt: string
   confidence: number
   participantId: string
-  scheduleId: string
+  sessionId: string
   streamId: string
 }
 

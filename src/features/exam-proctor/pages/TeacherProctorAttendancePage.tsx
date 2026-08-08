@@ -24,7 +24,6 @@ import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 
 const FLAG_REASON = 'Giám thị đánh dấu bài thi là nghi vấn để chờ xem xét.'
-const FORCE_END_REASON = 'Giám thị yêu cầu tạm dừng bài thi để xem xét.'
 const UNBLOCK_REASON = 'Giám thị dỡ cấm để học sinh tiếp tục bài thi đang dở.'
 
 function areIdSetsEqual(a: Set<string>, b: Set<string>) {
@@ -296,7 +295,8 @@ export function ProctorAttendanceDetailPage() {
             const result = await confirmWithReason({
               message: `Tạm dừng bài thi của ${candidateName} để xem xét? Học sinh sẽ bị ngắt kết nối ngay và không vào lại được cho tới khi được dỡ cấm.`,
               reasonLabel: 'Lý do buộc kết thúc',
-              reasonPlaceholder: 'Nhập lý do nếu cần...',
+              reasonPlaceholder: 'Nhập lý do buộc kết thúc bài thi...',
+              requireReason: true,
               title: 'Xác nhận buộc kết thúc',
             })
             if (!result.confirmed) {
@@ -305,7 +305,7 @@ export function ProctorAttendanceDetailPage() {
 
             try {
               await forceEndExamSessionMutation.mutateAsync({
-                reason: result.reason || FORCE_END_REASON,
+                reason: result.reason,
                 sessionId: candidate.sessionId ?? '',
               })
               await invalidateAttendance()

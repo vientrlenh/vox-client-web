@@ -37,7 +37,6 @@ import { StudentPickerModal } from './StudentPickerModal'
 
 const PAGE_SIZE = 10
 const FLAG_REASON = 'Giám thị đánh dấu bài thi là nghi vấn để chờ xem xét.'
-const FORCE_END_REASON = 'Giám thị yêu cầu tạm dừng bài thi để xem xét.'
 const UNBLOCK_REASON = 'Giám thị dỡ cấm để học sinh tiếp tục bài thi đang dở.'
 
 type CandidatesTabProps = {
@@ -340,7 +339,8 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
             const result = await confirmWithReason({
               message: `Tạm dừng bài thi của ${candidateName} để xem xét? Học sinh sẽ bị ngắt kết nối ngay và không vào lại được cho tới khi được dỡ cấm.`,
               reasonLabel: 'Lý do buộc kết thúc',
-              reasonPlaceholder: 'Nhập lý do nếu cần...',
+              reasonPlaceholder: 'Nhập lý do buộc kết thúc bài thi...',
+              requireReason: true,
               title: 'Xác nhận buộc kết thúc',
             })
             if (!result.confirmed) {
@@ -349,7 +349,7 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
 
             try {
               await forceEndExamSessionMutation.mutateAsync({
-                reason: result.reason || FORCE_END_REASON,
+                reason: result.reason,
                 sessionId: forceEndSession.sessionId,
               })
               await invalidateAll()

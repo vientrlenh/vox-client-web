@@ -32,9 +32,13 @@ export type ParticipantBoardEntry = {
     candidateStatus?: null | string
     /** Mọi stream của học viên, không lọc - dùng để đếm và để biết họ có những loại nào. */
     allStreams: StreamView[]
+    /** Đã bị giám thị cấm (do buộc kết thúc) hay chưa - quyết định có cho hủy bài thi lần nữa không. */
+    blockedAt?: null | string
     latestAlert?: AlertView
     sessionFlagged: boolean
     sessionId?: null | string
+    /** Trạng thái phiên thi (IN_PROGRESS/INTERRUPTED/...) - chỉ phiên đang sống mới buộc kết thúc được. */
+    sessionStatus?: null | string
     status: ParticipantStatus
     /** Stream sau khi áp bộ lọc mật độ; có thể rỗng nếu học viên không có loại đang chọn. */
     streams: StreamView[]
@@ -111,12 +115,14 @@ export function useMonitoringBoard({ alerts, candidates, filter, now, streams }:
             const latestAlert = alertByCandidate.get(candidateId)
             entries.push({
                 allStreams: candidateStreams,
+                blockedAt: candidate?.blockedAt,
                 candidateId,
                 candidateStatus: candidate?.status,
                 latestAlert,
                 sessionFlagged: candidate?.sessionFlagged ?? false,
                 // Ưu tiên sessionId từ luồng: roster có thể chưa kịp thấy phiên thi vừa mở.
                 sessionId: candidateStreams.find((stream) => stream.sessionId)?.sessionId ?? candidate?.sessionId,
+                sessionStatus: candidate?.sessionStatus,
                 status: resolveStatus(candidateStreams, latestAlert, now),
                 streams:
                     filter === 'all'

@@ -11,6 +11,8 @@ type ConfirmOptions = {
 type ConfirmWithReasonOptions = ConfirmOptions & {
   reasonLabel?: string
   reasonPlaceholder?: string
+  /** Chặn nút "Xác nhận" tới khi lý do có nội dung thật (không chỉ khoảng trắng). */
+  requireReason?: boolean
 }
 
 type SelectOption = {
@@ -34,6 +36,7 @@ type ConfirmState = ConfirmOptions & {
   reason: string
   reasonLabel?: string
   reasonPlaceholder?: string
+  requireReason: boolean
   selection: string
   selectLabel?: string
   selectOptions: SelectOption[]
@@ -50,6 +53,7 @@ const DEFAULT_STATE: ConfirmState = {
   reason: '',
   reasonLabel: 'Lý do',
   reasonPlaceholder: 'Nhập lý do nếu cần...',
+  requireReason: false,
   selection: '',
   selectLabel: '',
   selectOptions: [],
@@ -89,6 +93,11 @@ export function useConfirmationDialog() {
   }
 
   function closeWithReason(confirmed: boolean) {
+    // Chặn xác nhận với lý do rỗng/toàn khoảng trắng khi dialog yêu cầu bắt buộc - nút "Xác
+    // nhận" đã bị disable cho trường hợp này, đây là lớp phòng vệ thứ hai (vd: Enter trong form).
+    if (confirmed && state.requireReason && !state.reason.trim()) {
+      return
+    }
     if (resolverRef.current?.kind === 'reason') {
       resolverRef.current.resolve({
         confirmed,
@@ -134,6 +143,7 @@ export function useConfirmationDialog() {
       message: options.message,
       reasonLabel: options.reasonLabel ?? 'Lý do',
       reasonPlaceholder: options.reasonPlaceholder ?? 'Nhập lý do nếu cần...',
+      requireReason: options.requireReason ?? false,
       showReasonField: true,
       title: options.title ?? 'Xác nhận thao tác',
     })
@@ -193,6 +203,7 @@ export function useConfirmationDialog() {
     dialog: (
       <ConfirmationDialog
         cancelLabel={state.cancelLabel}
+        confirmDisabled={state.requireReason && !state.reason.trim()}
         confirmLabel={state.confirmLabel}
         isOpen={state.isOpen}
         message={state.message}
