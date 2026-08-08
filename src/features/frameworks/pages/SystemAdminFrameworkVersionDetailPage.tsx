@@ -85,7 +85,8 @@ function FrameworkVersionDetailPage({ basePath }: { basePath: string }) {
   const location = useLocation()
   const user = useAppSelector((state) => state.auth.user)
   const canManageRole = canManageFramework(getFrameworkActorRole(user?.roles))
-  const versionQuery = useFrameworkVersionQuery(versionId ?? null)
+  const isSchoolAdmin = basePath === '/school-admin'
+  const versionQuery = useFrameworkVersionQuery(versionId ?? null, isSchoolAdmin)
   const version = versionQuery.data ?? null
   const canManage = canManageRole && version?.status === 'DRAFT'
 
