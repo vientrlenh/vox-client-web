@@ -42,7 +42,11 @@ export async function fetchExamRecordingPlayback(examSessionId: string) {
  * 30 phút thì kể cả tab mở suốt buổi cũng không chạm tới hạn.
  *
  * `retry: false` vì hai lỗi hay gặp nhất -- không có quyền (403) và phiên thi không tồn tại
- * (404) -- đều không tự khỏi khi thử lại.
+ * (404) -- đều không tự khỏi khi thử lại. Lỗi mạng thì có, nên nơi gọi phải dựng nút thử lại
+ * bằng tay thay vì trông vào retry tự động.
+ *
+ * Trả nguyên `error` ra ngoài: người gọi cần phân biệt "không có quyền" với "tải hỏng", hai thứ
+ * này nói với người dùng hai câu khác nhau.
  */
 export function useExamRecordingPlaybackQuery(examSessionId: string | null) {
   return useQuery({

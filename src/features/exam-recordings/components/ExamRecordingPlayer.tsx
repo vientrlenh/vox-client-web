@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Monitor, Video, VideoOff } from 'lucide-react'
+import { isForbiddenApiError } from '@/shared/api'
 import { useExamRecordingPlaybackQuery } from '../api/useExamRecordingPlaybackQuery'
 import type { ExamRecordingPlaybackDto, ExamRecordingStreamType } from '../types'
 
@@ -115,25 +116,91 @@ function StreamPanel({
   )
 }
 
+function RecordingSection({ children }: { children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 className="mb-3 text-sm font-bold text-slate-800">Bản ghi ca thi</h3>
+      {children}
+    </section>
+  )
+}
+
+function Notice({ children, onRetry }: { children: ReactNode; onRetry?: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
+      <VideoOff className="text-slate-400" size={22} />
+      <span className="text-xs text-slate-500">{children}</span>
+      {onRetry ? (
+        <button
+          className="mt-1 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-200"
+          onClick={onRetry}
+          type="button"
+        >
+          Thử lại
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 /**
  * Hai video của một ca thi: camera thí sinh và màn hình.
  *
  * Dùng chung cho trang chấm bài (kỳ thi tập trung + bài kiểm tra lớp) và trang kết quả phía
  * giáo viên. KHÔNG dành cho học sinh: query `examRecordingPlayback` chặn vai STUDENT ở backend,
  * nên nơi gọi phải tự giấu component này đi với học sinh thay vì để nó hiện ra rồi báo lỗi.
+ *
+ * Bốn trạng thái được nói ra RIÊNG chứ không gộp. Bản trước gộp hết vào một dòng
+ * `if (isError || !data || data.length === 0) return null` -- lý do là "khối phụ trợ, đừng làm
+ * người chấm phân tâm", nhưng cái giá là một sự cố phân quyền thật (người được giao chấm không
+ * phải giám thị thì backend trả 403) trông y hệt "ca thi không có bản ghi", nên nó sống suốt mà
+ * không ai báo. Im lặng chỉ đúng khi thật sự không có gì để nói.
  */
 export function ExamRecordingPlayer({ sessionId }: { sessionId: string | null }) {
-  const { data, isError, isLoading } = useExamRecordingPlaybackQuery(sessionId)
+  const { data, error, isError, isLoading, refetch } = useExamRecordingPlaybackQuery(sessionId)
 
-  if (!sessionId || isLoading) return null
+  // Không có ca thi thì không có gì để nói -- đây là ca duy nhất còn im lặng.
+  if (!sessionId) return null
 
-  // Không có quyền hoặc phiên thi không tồn tại: im lặng. Đây là khối phụ trợ trong trang chấm,
-  // dựng một hộp lỗi đỏ ở đây chỉ làm người chấm phân tâm khỏi việc chính.
-  if (isError || !data || data.length === 0) return null
+  if (isLoading) {
+    return (
+      <RecordingSection>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {STREAMS.map(({ type }) => (
+            <div className="aspect-video w-full animate-pulse rounded-lg bg-slate-100" key={type} />
+          ))}
+        </div>
+      </RecordingSection>
+    )
+  }
+
+  if (isError) {
+    return (
+      <RecordingSection>
+        {isForbiddenApiError(error) ? (
+          <Notice>
+            Bạn không có quyền xem bản ghi của ca thi này. Liên hệ nhà trường nếu bạn cần bản ghi
+            để chấm bài.
+          </Notice>
+        ) : (
+          // retry: false ở query nên lỗi mạng phải có nút bấm tay, nếu không thì người chấm chỉ
+          // còn cách tải lại cả trang.
+          <Notice onRetry={() => void refetch()}>Không tải được bản ghi ca thi.</Notice>
+        )}
+      </RecordingSection>
+    )
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <RecordingSection>
+        <Notice>Ca thi này chưa có bản ghi nào.</Notice>
+      </RecordingSection>
+    )
+  }
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
-      <h3 className="mb-3 text-sm font-bold text-slate-800">Bản ghi ca thi</h3>
+    <RecordingSection>
       <div className="grid gap-4 lg:grid-cols-2">
         {STREAMS.map(({ icon, label, type }) => {
           const forStream = data.filter((item) => item.streamType === type)
@@ -141,6 +208,6 @@ export function ExamRecordingPlayer({ sessionId }: { sessionId: string | null })
           return <StreamPanel icon={icon} key={type} label={label} recordings={forStream} />
         })}
       </div>
-    </section>
+    </RecordingSection>
   )
 }

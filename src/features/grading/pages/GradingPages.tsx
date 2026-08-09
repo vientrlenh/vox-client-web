@@ -1794,7 +1794,8 @@ export function GradingTaskDetailView({
 
       {/* Đặt TRƯỚC danh sách câu, sau khối cảnh báo: bài bị đánh dấu nghi vấn thì video là thứ
           người chấm cần xem đầu tiên để quyết định, chứ không phải cuộn xuống cuối mới thấy.
-          Component tự ẩn khi ca thi không có bản ghi hoặc người gọi không có quyền. */}
+          Component tự nói ra lý do khi chưa có bản ghi / không đủ quyền, chỉ ẩn hẳn khi bài
+          không gắn với ca thi nào. */}
       <ExamRecordingPlayer sessionId={detail.sessionId ?? null} />
 
       <div className="grid gap-4">
