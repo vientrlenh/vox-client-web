@@ -7,6 +7,13 @@ import type {
   ExamScheduleDto,
   ExamScheduleStatusDto,
 } from '@/features/examCore/types'
+import type { ScheduleProgress } from '@/features/examCore/utils/scheduleProgress'
+import {
+  formatScheduleProgressLabel,
+  isScheduleCounted,
+  isScheduleStepDone,
+  summarizeSchedules,
+} from '@/features/examCore/utils/scheduleProgress'
 
 export type ClassTestDetailTab = 'blueprint' | 'papers' | 'schedule' | 'students'
 
@@ -23,9 +30,8 @@ type ClassTestWorkflowSummary = {
   /** null khi không có cả danh sách học sinh lẫn `exam.candidateCount`. */
   candidateCount: number | null
   paperCount: number
-  publishedScheduleCount: number
-  /** Đã trừ ca đã hủy. null khi không có dữ liệu ca thi. */
-  scheduleCount: number | null
+  /** Đã trừ ca đã hủy/dời. null khi không có dữ liệu ca thi. */
+  scheduleProgress: ScheduleProgress | null
   unlockedPaperCount: number
 }
 
@@ -62,8 +68,8 @@ export function getClassTestScheduleReadiness(
   if (!schedules || !candidates) {
     return { blockingReason: 'Đang tải dữ liệu ca thi và học sinh…', ready: false }
   }
-  // Ca đã hủy không cản việc lên lịch ở backend nên cũng không được cản ở đây.
-  const active = schedules.filter((schedule) => schedule.status !== 'CANCELLED')
+  // Ca đã hủy/dời không cản việc lên lịch ở backend nên cũng không được cản ở đây.
+  const active = schedules.filter((schedule) => isScheduleCounted(schedule.status))
   const unassignedCandidates = candidates.filter((candidate) => !candidate.scheduleId).length
   const withoutPaper = candidates.filter((candidate) => !candidate.assignedPaperId).length
   const draftCount = active.filter((schedule) => schedule.status === 'DRAFT').length
@@ -118,15 +124,14 @@ export function getClassTestWorkflowSteps(
   const candidateCount = candidates?.length ?? exam.candidateCount ?? null
   const studentsDone = candidateCount === null ? isScheduled : candidateCount > 0
 
-  const activeSchedules = (schedules ?? exam.schedules)?.filter((schedule) => schedule.status !== 'CANCELLED')
-  const draftScheduleCount = activeSchedules?.filter((schedule) => schedule.status === 'DRAFT').length ?? 0
-  const publishedScheduleCount = activeSchedules?.filter((schedule) => schedule.status === 'PUBLISHED').length ?? 0
+  const activeSchedules = (schedules ?? exam.schedules)?.filter((schedule) => isScheduleCounted(schedule.status))
+  const scheduleProgress = summarizeSchedules(activeSchedules ?? [])
   const readiness =
     isDetailedSchedules(schedules) && candidates ? getClassTestScheduleReadiness(schedules, candidates) : null
   const scheduleDone = readiness
     ? readiness.ready
     : activeSchedules
-      ? activeSchedules.length > 0 && activeSchedules.every((schedule) => schedule.status === 'PUBLISHED')
+      ? isScheduleStepDone(scheduleProgress)
       : isScheduled
 
   const done = { papers: papersDone, schedule: scheduleDone, students: studentsDone }
@@ -173,9 +178,8 @@ export function getClassTestWorkflowSteps(
           ? 'Đã công bố ca thi'
           : 'Chưa có ca thi nào'
         : scheduleDone
-          ? `${publishedScheduleCount} ca thi đã công bố`
-          : (readiness?.blockingReason ??
-            (draftScheduleCount > 0 ? `Còn ${draftScheduleCount} ca thi chưa công bố` : 'Chưa có ca thi nào')),
+          ? formatScheduleProgressLabel(scheduleProgress)
+          : (readiness?.blockingReason ?? formatScheduleProgressLabel(scheduleProgress)),
       tab: 'schedule',
       todo: 'Chọn phòng, phân giám khảo, xếp học sinh vào ca rồi công bố tất cả ca thi.',
     },
@@ -197,8 +201,7 @@ export function getClassTestWorkflowSteps(
     summary: {
       candidateCount,
       paperCount,
-      publishedScheduleCount,
-      scheduleCount: activeSchedules?.length ?? null,
+      scheduleProgress: activeSchedules ? scheduleProgress : null,
       unlockedPaperCount,
     },
     totalCount: steps.length,

@@ -86,7 +86,7 @@ describe('getClassTestWorkflowSteps — 3 bước khớp đúng tab', () => {
     )
 
     expect(result.done.schedule).toBe(true)
-    expect(result.summary.scheduleCount).toBe(1)
+    expect(result.summary.scheduleProgress?.totalCount).toBe(1)
   })
 
   it('trang danh sách (không có ca thi/học sinh chi tiết) đọc exam.schedules để dựng bước Xếp lịch', () => {
@@ -95,7 +95,7 @@ describe('getClassTestWorkflowSteps — 3 bước khớp đúng tab', () => {
 
     expect(published.done.schedule).toBe(true)
     expect(draft.done.schedule).toBe(false)
-    expect(draft.summary.publishedScheduleCount).toBe(0)
+    expect(draft.summary.scheduleProgress?.publishedCount).toBe(0)
   })
 
   it('thiếu cả hai nguồn dữ liệu ca thi thì suy từ trạng thái bài', () => {
@@ -111,6 +111,42 @@ describe('getClassTestWorkflowSteps — 3 bước khớp đúng tab', () => {
 
     expect(result.summary.candidateCount).toBe(1)
     expect(result.done.students).toBe(true)
+  })
+})
+
+/**
+ * `ExamStatusAutoTransitionJob` đóng bài trên lớp rồi cascade ca đã chạy sang `COMPLETED`, nên bước
+ * Xếp lịch phải nhận trạng thái đó thay vì đòi đúng `PUBLISHED`.
+ */
+describe('getClassTestWorkflowSteps — ca thi đã hoàn thành vẫn là đã xếp lịch', () => {
+  it('trang chi tiết: ca đã hoàn thành thì bước Xếp lịch xong và đếm đúng', () => {
+    const result = getClassTestWorkflowSteps(exam(), [schedule('s1', 'COMPLETED')], candidates)
+
+    expect(result.done.schedule).toBe(true)
+    expect(result.steps[2].sublabel).toBe('1 ca thi đã hoàn thành')
+  })
+
+  it('trang danh sách: ca đã hoàn thành không còn ra "Chưa có ca thi nào"', () => {
+    const result = getClassTestWorkflowSteps(exam({ schedules: [{ id: 's1', status: 'COMPLETED' }] }))
+
+    expect(result.done.schedule).toBe(true)
+    expect(result.steps[2].sublabel).toBe('1 ca thi đã hoàn thành')
+  })
+
+  it('trang danh sách: ca đã hoàn thành không che được ca còn bản nháp', () => {
+    const result = getClassTestWorkflowSteps(
+      exam({ schedules: [{ id: 's1', status: 'COMPLETED' }, { id: 's2', status: 'DRAFT' }] }),
+    )
+
+    expect(result.done.schedule).toBe(false)
+    expect(result.steps[2].sublabel).toBe('Còn 1 ca thi chưa công bố')
+  })
+
+  it('ca đã dời bị bỏ như ca đã hủy', () => {
+    const result = getClassTestWorkflowSteps(exam({ schedules: [{ id: 's1', status: 'MOVED' }] }))
+
+    expect(result.done.schedule).toBe(false)
+    expect(result.summary.scheduleProgress?.totalCount).toBe(0)
   })
 })
 

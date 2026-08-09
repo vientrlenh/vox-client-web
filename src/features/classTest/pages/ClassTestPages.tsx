@@ -62,6 +62,7 @@ import {
   useUpdateExamPaperStatusMutation,
 } from '@/features/examCore/api/mutations'
 import { useMatchingTeacherAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
+import { formatScheduleProgressLabel } from '@/features/examCore/utils/scheduleProgress'
 import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '@/features/examCore/utils/timeQuota'
 import { buildClassTestQuotaWarning } from '@/features/classTest/utils/classTestTokenQuota'
 import {
@@ -201,16 +202,15 @@ function ClassTestListPage({ allowCreate, basePath, title }: ClassTestListPagePr
                 ? { icon: <LayoutList aria-hidden="true" className="size-3.5" />, label: formatNullableText(exam.description) }
                 : { icon: <Clock aria-hidden="true" className="size-3.5" />, label: 'Chưa soạn đề bài', tone: 'warning' as const },
               { icon: <Users aria-hidden="true" className="size-3.5" />, label: `${summary.candidateCount ?? 0} học sinh` },
-              ...(summary.scheduleCount === null
+              ...(summary.scheduleProgress === null
                 ? []
                 : [
                     {
                       icon: <Calendar aria-hidden="true" className="size-3.5" />,
-                      label: `${summary.publishedScheduleCount}/${summary.scheduleCount} ca thi đã công bố`,
+                      label: formatScheduleProgressLabel(summary.scheduleProgress),
+                      // Chỉ ca còn bản nháp mới là việc chưa làm xong — ca đã hoàn thành thì không.
                       tone:
-                        summary.publishedScheduleCount < summary.scheduleCount
-                          ? ('warning' as const)
-                          : ('default' as const),
+                        summary.scheduleProgress.draftCount > 0 ? ('warning' as const) : ('default' as const),
                     },
                   ]),
             ]

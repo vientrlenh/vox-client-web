@@ -165,9 +165,70 @@ describe('getExamWorkflowSteps — 5 bước theo đúng thứ tự tab', () => 
       candidateCount: 30,
       lockedPaperCount: 1,
       paperCount: 2,
-      publishedScheduleCount: 1,
-      scheduleCount: 2,
+      scheduleProgress: { completedCount: 0, draftCount: 1, publishedCount: 1, readyCount: 1, totalCount: 2 },
     })
+  })
+})
+
+/**
+ * `ExamScheduleAutoCompleteJob` lật `PUBLISHED → COMPLETED` sau khi ca hết giờ, nên nếu bước Xếp lịch
+ * chỉ chấp nhận đúng `PUBLISHED` thì kỳ thi đã thi xong lại tụt về "Chưa có ca thi nào".
+ */
+describe('getExamWorkflowSteps — ca thi đã hoàn thành vẫn là đã xếp lịch', () => {
+  it('ca đã hoàn thành thì bước Xếp lịch vẫn xong', () => {
+    const result = getExamWorkflowSteps(exam(), [lockedPaper], [schedule('s1', 'COMPLETED')], candidates)
+
+    expect(result.done.schedule).toBe(true)
+    expect(result.completedCount).toBe(5)
+    expect(result.steps[4].sublabel).toBe('1 ca thi đã hoàn thành')
+  })
+
+  it('trộn ca đã công bố và ca đã hoàn thành thì nêu rõ bao nhiêu ca đã xong', () => {
+    const result = getExamWorkflowSteps(
+      exam(),
+      [lockedPaper],
+      [schedule('s1', 'PUBLISHED'), schedule('s2', 'COMPLETED')],
+      candidates,
+    )
+
+    expect(result.done.schedule).toBe(true)
+    expect(result.steps[4].sublabel).toBe('2 ca thi (1 đã hoàn thành)')
+  })
+
+  it('ca đã hoàn thành không che được ca còn bản nháp', () => {
+    const result = getExamWorkflowSteps(
+      exam(),
+      [lockedPaper],
+      [schedule('s1', 'COMPLETED'), schedule('s2', 'DRAFT')],
+      candidates,
+    )
+
+    expect(result.done.schedule).toBe(false)
+    expect(result.steps[4].sublabel).toBe('Còn 1 ca thi chưa công bố')
+  })
+
+  it('ca đã dời bị bỏ như ca đã hủy', () => {
+    const onlyMoved = getExamWorkflowSteps(exam(), [lockedPaper], [schedule('s1', 'MOVED')], candidates)
+    const movedPlusCompleted = getExamWorkflowSteps(
+      exam(),
+      [lockedPaper],
+      [schedule('s1', 'MOVED'), schedule('s2', 'COMPLETED')],
+      candidates,
+    )
+
+    expect(onlyMoved.done.schedule).toBe(false)
+    expect(onlyMoved.steps[4].sublabel).toBe('Chưa có ca thi nào')
+    expect(movedPlusCompleted.done.schedule).toBe(true)
+    expect(movedPlusCompleted.summary.scheduleProgress?.totalCount).toBe(1)
+  })
+
+  it('trang danh sách với ca đã hoàn thành cho ra cùng kết quả trang chi tiết', () => {
+    const listExam = exam({ candidateCount: 1, schedules: [{ id: 's1', status: 'COMPLETED' }] })
+    const fromList = getExamWorkflowSteps(listExam, [lockedPaper])
+    const fromDetail = getExamWorkflowSteps(listExam, [lockedPaper], [schedule('s1', 'COMPLETED')], candidates)
+
+    expect(fromList.done).toEqual(fromDetail.done)
+    expect(fromList.steps.map((step) => step.sublabel)).toEqual(fromDetail.steps.map((step) => step.sublabel))
   })
 })
 

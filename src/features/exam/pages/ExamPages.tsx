@@ -42,6 +42,7 @@ import {
   useExamSchedulesQuery,
 } from '@/features/examCore/api/queries'
 import { useMatchingSchoolAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
+import { formatScheduleProgressLabel } from '@/features/examCore/utils/scheduleProgress'
 import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import {
@@ -185,8 +186,8 @@ function ExamListPage({ allowCreate, basePath, title }: ExamListPageProps) {
               },
               {
                 icon: <Calendar aria-hidden="true" className="size-3.5" />,
-                label: summary.scheduleCount
-                  ? `${summary.publishedScheduleCount}/${summary.scheduleCount} ca thi đã công bố`
+                label: summary.scheduleProgress
+                  ? formatScheduleProgressLabel(summary.scheduleProgress)
                   : 'Chưa có ca thi',
               },
             ]
