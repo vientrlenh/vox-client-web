@@ -75,6 +75,7 @@ import { AssignTeacherDialog } from '../components/AssignTeacherDialog'
 import { AutoAssignDialog } from '../components/AutoAssignDialog'
 import { CriterionScoreCard } from '../components/CriterionScoreCard'
 import { FinalizeExamDialog } from '../components/FinalizeExamDialog'
+import { GradedCriteriaSummary } from '../components/GradedCriteriaSummary'
 import { GradingDecisionDialog, type DecisionOutcome } from '../components/GradingDecisionDialog'
 import { GradingTurnList } from '../components/GradingTurnList'
 import { ReclaimOverdueDialog } from '../components/ReclaimOverdueDialog'
@@ -1902,7 +1903,17 @@ export function GradingTaskDetailView({
                   />
                 ))}
               </div>
-            ) : null}
+            ) : (
+              /* Không chấm lại được thì cột nhập điểm biến mất — trước đây kéo theo cả điểm
+                 tiêu chí, nhận xét từng tiêu chí và nhận xét của người chấm. Dựng bản chỉ đọc
+                 vào đúng chỗ đó. Bám `canRegrade` chứ không phải `readOnly`: vòng xét vô hiệu
+                 vẫn mở nhưng cũng không có ô nhập nào. */
+              <GradedCriteriaSummary
+                criteria={detail.criteria}
+                item={item}
+                label={itemLabel(item, detail.items)}
+              />
+            )}
           </div>
         ))}
       </div>
