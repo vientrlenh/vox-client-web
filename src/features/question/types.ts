@@ -124,6 +124,11 @@ export type QuestionDto = {
   createdAt: string | null
   updatedAt: string | null
   createdBy: string | null
+  createdByUser?: {
+    email?: string | null
+    fullName?: string | null
+    id: string
+  } | null
   updatedBy: string | null
   usableInExam?: boolean
   topic?: QuestionTopicRefDto | null
@@ -309,6 +314,17 @@ export function formatQuestionDate(value?: string | null) {
 
 export function formatNullableText(value?: string | null) {
   return value?.trim() ? value : '-'
+}
+
+export function formatQuestionCreator(user?: QuestionDto['createdByUser']) {
+  const fullName = user?.fullName?.trim()
+  const email = user?.email?.trim()
+
+  if (!fullName) {
+    return null
+  }
+
+  return email ? `${fullName} (${email})` : fullName
 }
 
 export function formatDuration(seconds?: number | null) {

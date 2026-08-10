@@ -28,6 +28,11 @@ const QUESTION_DETAIL_QUERY = `
       updatedAt
       createdBy
       updatedBy
+      createdByUser {
+        id
+        fullName
+        email
+      }
       topic {
         id
         questionBankId
