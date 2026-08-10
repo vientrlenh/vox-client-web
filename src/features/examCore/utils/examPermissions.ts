@@ -1,3 +1,4 @@
+import { isExamLockedForEditing } from '../types'
 import type { ExamMemberRole, ExamPaperStatus, UpdateExamPaperStatusRequest } from '../types'
 
 export type ExamPaperAction = UpdateExamPaperStatusRequest['action']
@@ -125,8 +126,12 @@ export function resolvePaperActions(input: {
 }
 
 /**
- * Nội dung mã đề còn sửa được không. Trạng thái kỳ thi và trạng thái mã đề đã chặn ở
- * `UpdateExamPaperItemUseCase`; ở đây chỉ nhân bản để nút không hiện ra rồi ăn lỗi.
+ * Nội dung mã đề còn sửa được không.
+ *
+ * <p>Cố ý chặn rộng hơn backend: `UpdateExamPaperItemUseCase` mới chỉ từ chối `IN_PROGRESS`, nên một
+ * kỳ thi `CLOSED`/`RESULTS_PUBLISHED` vẫn sửa được đề nếu vào thẳng URL trang soạn đề — sửa đề của kỳ
+ * thi đã chấm xong là làm sai lệch dữ liệu kết quả. Dùng chung `isExamLockedForEditing` với tab Thí
+ * sinh / Xếp lịch để cả trang chi tiết khóa cùng một lúc, đừng thu hẹp lại cho "khớp BE".
  */
 export function canEditPaperContent(input: {
   authority: ExamAuthority
@@ -135,7 +140,7 @@ export function canEditPaperContent(input: {
   paperStatus: ExamPaperStatus
 }): boolean {
   const { authority, examKind, examStatus, paperStatus } = input
-  if (examStatus === 'IN_PROGRESS') {
+  if (isExamLockedForEditing(examStatus)) {
     return false
   }
   // Bài trên lớp không có hội đồng đề — chỉ giáo viên chủ bài vào được trang này và họ soạn mọi mã đề

@@ -39,6 +39,7 @@ function item(id: string, overrides: ItemOverrides = {}) {
 
 type ExamOverrides = {
   createdBy?: string
+  examStatus?: string
   kind?: string
   myRole?: string | null
   paperStatus?: string
@@ -48,6 +49,7 @@ function mockGraphQL(items: ReturnType<typeof item>[], overrides: ExamOverrides 
   const kind = overrides.kind ?? 'CENTRALIZED'
   const myRole = overrides.myRole === undefined ? 'AUTHOR' : overrides.myRole
   const paperStatus = overrides.paperStatus ?? 'DRAFT'
+  const examStatus = overrides.examStatus ?? 'DRAFT'
   const createdBy = overrides.createdBy ?? ME
   mockedPost.mockImplementation((_url: string, body?: unknown) => {
     const { query } = body as GraphQLBody
@@ -93,7 +95,7 @@ function mockGraphQL(items: ReturnType<typeof item>[], overrides: ExamOverrides 
       return Promise.resolve({
         data: {
           data: {
-            exam: { code: 'KT-01', id: EXAM_ID, kind, name: 'Kỳ thi', status: 'DRAFT' },
+            exam: { code: 'KT-01', id: EXAM_ID, kind, name: 'Kỳ thi', status: examStatus },
           },
         },
       })
@@ -269,5 +271,43 @@ describe('TeacherExamPaperEditPage — quyền của CHAIR trên mã đề', () 
 
     expect(await screen.findByRole('button', { name: 'Sửa phần Phần 1' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Gán câu hỏi' })).toBeInTheDocument()
+  })
+})
+
+/**
+ * Trang này vào thẳng bằng URL được, nên nó phải tự gác trạng thái kỳ thi — ẩn nút "Soạn đề" ở trang
+ * chi tiết không đủ.
+ */
+describe('TeacherExamPaperEditPage — kỳ thi đã khóa', () => {
+  beforeEach(() => {
+    mockedPost.mockReset()
+  })
+
+  it.each(['IN_PROGRESS', 'CLOSED', 'RESULTS_PUBLISHED', 'CANCELLED'])(
+    'chuyển sang chỉ xem khi kỳ thi ở trạng thái %s',
+    async (examStatus) => {
+      mockGraphQL([item('item-1', { questionId: 'question-1', slotType: 'SELECTION' })], {
+        createdBy: ME,
+        examStatus,
+        myRole: 'CHAIR',
+        paperStatus: 'DRAFT',
+      })
+      renderPage()
+
+      expect(await screen.findByText(/Kỳ thi đã bắt đầu/)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Gán câu hỏi' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Đổi câu hỏi' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Sửa phần Phần 1' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Xóa mã đề/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Khóa mã đề' })).not.toBeInTheDocument()
+    },
+  )
+
+  it('vẫn cho soạn khi kỳ thi mới chỉ lên lịch', async () => {
+    mockGraphQL([item('item-1', { slotType: 'SELECTION' })], { examStatus: 'SCHEDULED', myRole: 'CHAIR' })
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Gán câu hỏi' })).toBeInTheDocument()
+    expect(screen.queryByText(/Kỳ thi đã bắt đầu/)).not.toBeInTheDocument()
   })
 })

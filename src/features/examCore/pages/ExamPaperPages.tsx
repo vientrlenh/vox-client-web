@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CircleCheck, Eye, FilePenLine, Pencil, Trash2 } from 'lucide-react'
+import { CircleCheck, Eye, FilePenLine, Lock, Pencil, Trash2 } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { toApiError } from '@/shared/api'
@@ -27,6 +27,7 @@ import {
   formatDurationSeconds,
   formatNullableText,
   getExamPaperStatusDisplay,
+  isExamLockedForEditing,
   type ExamMemberRole,
   type UpdateExamPaperStatusRequest,
 } from '../types'
@@ -147,14 +148,18 @@ function ExamPaperPage({ rolePath }: ExamPaperPageProps) {
   // Chờ myRoleQuery xong mới mở nút: `myRole` còn undefined lúc đầu, không chốt ở đây thì người xem
   // vẫn thấy nút Sửa/Xóa nhấp nháy một nhịp và bấm kịp trước khi quyền thật về.
   const roleResolved = myRoleQuery.isSuccess
-  const nextActions = roleResolved
-    ? resolvePaperActions({
-        authority,
-        isOwnPaper: Boolean(currentUser?.userId && paper.createdBy === currentUser.userId),
-        myRole,
-        paperStatus: paper.status,
-      })
-    : []
+  // Trang này vào được bằng URL trực tiếp, nên phải tự gác trạng thái kỳ thi chứ không dựa vào việc
+  // trang chi tiết đã ẩn nút "Soạn đề".
+  const examLocked = isExamLockedForEditing(exam?.status)
+  const nextActions =
+    roleResolved && !examLocked
+      ? resolvePaperActions({
+          authority,
+          isOwnPaper: Boolean(currentUser?.userId && paper.createdBy === currentUser.userId),
+          myRole,
+          paperStatus: paper.status,
+        })
+      : []
   const canEditPaperContent =
     roleResolved &&
     resolveCanEditPaperContent({
@@ -200,6 +205,13 @@ function ExamPaperPage({ rolePath }: ExamPaperPageProps) {
       </button>
       {dialog}
       <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+
+      {examLocked ? (
+        <div className="mb-3.5 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-semibold text-amber-800">
+          <Lock aria-hidden="true" className="size-4 shrink-0" />
+          Kỳ thi đã bắt đầu — mã đề chuyển sang chỉ xem, không sửa nội dung hay đổi trạng thái được nữa.
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center gap-3">

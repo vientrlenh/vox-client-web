@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Check, UserPlus } from 'lucide-react'
+import { Check, Lock, UserPlus } from 'lucide-react'
 import { examQueryKeys } from '@/features/examCore/api/queries'
 import type { ExamMemberDto } from '@/features/examCore/types'
 import { useCreateExamMemberMutation, useDeleteExamMemberMutation, useUpdateExamMemberMutation } from '../api/useExamMutations'
@@ -38,10 +38,15 @@ type MembersTabProps = {
    */
   canManageChair: boolean
   examId: string
+  /**
+   * Kỳ thi đã bắt đầu trở đi (`isExamLockedForEditing`) thì hội đồng đề coi như chốt: đổi người ra đề
+   * lúc thí sinh đang làm bài chỉ tạo ra tranh chấp trách nhiệm chứ không sửa được gì nữa.
+   */
+  locked?: boolean
   members: ExamMemberDto[]
 }
 
-export function MembersTab({ canManage, canManageChair, examId, members }: MembersTabProps) {
+export function MembersTab({ canManage, canManageChair, examId, locked = false, members }: MembersTabProps) {
   const queryClient = useQueryClient()
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
   const [showTeacherPicker, setShowTeacherPicker] = useState(false)
@@ -73,8 +78,17 @@ export function MembersTab({ canManage, canManageChair, examId, members }: Membe
     setBusyMemberId(null)
   }
 
+  const canEditMembers = canManage && !locked
+
   return (
     <div className="mt-4">
+      {canManage && locked ? (
+        <div className="mb-3.5 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-semibold text-amber-800">
+          <Lock aria-hidden="true" className="size-4 shrink-0" />
+          Kỳ thi đã bắt đầu — hội đồng đề đã chốt, không thể thêm, đổi vai trò hay gỡ thành viên nữa.
+        </div>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-3">
         {ROLE_ORDER.map((role) => {
           const count = members.filter((member) => member.role === role).length
@@ -120,7 +134,7 @@ export function MembersTab({ canManage, canManageChair, examId, members }: Membe
       <div className="mt-3.5 rounded-2xl border border-slate-200 bg-white p-5.5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-[15px] font-extrabold text-slate-900">Hội đồng đề ({members.length})</h3>
-          {canManage ? (
+          {canEditMembers ? (
             <button
               className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-4 text-[13px] font-semibold text-white transition hover:bg-indigo-700"
               onClick={() => setShowTeacherPicker(true)}
@@ -140,7 +154,7 @@ export function MembersTab({ canManage, canManageChair, examId, members }: Membe
           <div className="grid gap-2.5">
             {members.map((member) => {
               const isBusy = busyMemberId === member.id
-              const canTouch = canManage && (canManageChair || member.role !== 'CHAIR')
+              const canTouch = canEditMembers && (canManageChair || member.role !== 'CHAIR')
               return (
                 <div className="flex items-center gap-3.5 rounded-xl border border-slate-200 px-3.5 py-3" key={member.id}>
                   <span
@@ -172,9 +186,11 @@ export function MembersTab({ canManage, canManageChair, examId, members }: Membe
                     <span
                       className="rounded-full bg-indigo-50 px-3.5 py-1 text-xs font-bold text-indigo-700"
                       title={
-                        canManage && member.role === 'CHAIR'
-                          ? 'Chỉ quản trị trường thay đổi được chủ tịch hội đồng'
-                          : undefined
+                        canManage && locked
+                          ? 'Kỳ thi đã bắt đầu — không đổi được thành viên hội đồng'
+                          : canManage && member.role === 'CHAIR'
+                            ? 'Chỉ quản trị trường thay đổi được chủ tịch hội đồng'
+                            : undefined
                       }
                     >
                       {getMemberRoleDisplay(member.role)}

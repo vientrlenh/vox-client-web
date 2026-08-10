@@ -719,6 +719,9 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const paperBasePath = `${basePath.replace(/\/exams$/, '')}/exam-papers`
   // Từ IN_PROGRESS trở đi backend khóa sửa thông tin kỳ thi và mọi thao tác xếp lịch.
   const examLocked = isExamLockedForEditing(exam.status)
+  // Quyền soạn mã đề = quyền vai trò AND kỳ thi chưa khóa. Kỳ thi đã bắt đầu thì mã đề là bằng chứng
+  // của bài làm, sửa vào là làm lệch dữ liệu đã chấm.
+  const canComposePaper = authority.canManagePapers && !examLocked
   const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
   const currentBlueprintVersion = attachedBlueprint?.versions.find((version) => version.id === exam.blueprintVersionId)
   const createFromBlueprintQuotaWarning = buildTimeQuotaWarning(
@@ -789,7 +792,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
               <ClipboardList aria-hidden="true" className="size-4" />
               Xem kết quả
             </button>
-            {authority.canDeleteExam ? (
+            {authority.canDeleteExam && !examLocked ? (
               <button
                 className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
                 onClick={() => void handleDeleteExam(exam.id)}
@@ -863,6 +866,14 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
 
       {activeTab === 'papers' ? (
         <div className="mt-4 grid gap-3.5">
+          {authority.canManagePapers && examLocked ? (
+            <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-semibold text-amber-800">
+              <Lock aria-hidden="true" className="size-4 shrink-0" />
+              Kỳ thi đã bắt đầu — không thể tạo, sao chép, soạn lại hay đổi trạng thái mã đề nữa. Chỉ còn
+              xem lại nội dung đề.
+            </div>
+          ) : null}
+          {/* Mở khóa ngân hàng câu hỏi là việc hậu kỳ thi — cố tình không gác theo `examLocked`. */}
           {authority.canReleaseSecurePool && exam.securePool?.status === 'SEALED' ? (
             <div className="flex justify-end">
               <button
@@ -874,7 +885,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
               </button>
             </div>
           ) : null}
-          {authority.canManagePapers ? (
+          {canComposePaper ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {showCopyPicker ? (
                 <>
@@ -970,12 +981,16 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
               const isOwnPaper = Boolean(currentUser?.userId && paper.createdBy === currentUser.userId)
               // Chỉ hiện nút mà backend thật sự cho bấm. Nhánh LOCK từ DRAFT là đường tắt dành cho
               // người quyết định tự soạn đề — không có bước duyệt nào ở giữa để chờ.
-              const actions = resolvePaperActions({
-                authority,
-                isOwnPaper,
-                myRole,
-                paperStatus: paper.status,
-              })
+              const actions = (
+                examLocked
+                  ? []
+                  : resolvePaperActions({
+                      authority,
+                      isOwnPaper,
+                      myRole,
+                      paperStatus: paper.status,
+                    })
+              )
                 // REQUEST_REVISION bắt buộc kèm góp ý, mà ô nhập góp ý chỉ có ở trang soạn đề — hiện
                 // nút ở đây là bấm vào ăn 400. Người duyệt mở mã đề ra để viết góp ý.
                 .filter((action) => action !== 'REQUEST_REVISION')
@@ -1000,13 +1015,11 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
                   key={paper.id}
                   onOpen={() =>
                     navigate(
-                      authority.canManagePapers
-                        ? `${paperBasePath}/${paper.id}/edit`
-                        : `${paperBasePath}/${paper.id}`,
+                      canComposePaper ? `${paperBasePath}/${paper.id}/edit` : `${paperBasePath}/${paper.id}`,
                       { state: { examId: exam.id, paperId: paper.id } },
                     )
                   }
-                  openLabel={authority.canManagePapers ? 'Soạn đề' : 'Xem đề'}
+                  openLabel={canComposePaper ? 'Soạn đề' : 'Xem đề'}
                   paper={paper}
                   subtitle={paperStatusDisplay.label}
                 />
@@ -1021,6 +1034,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
           canManage={authority.canManageMembers}
           canManageChair={authority.canManageChairMembers}
           examId={exam.id}
+          locked={examLocked}
           members={exam.members}
         />
       ) : null}
@@ -1044,6 +1058,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
           blueprintVersionId={exam.blueprintVersionId}
           examId={exam.id}
           hasPapers={papers.length > 0}
+          locked={examLocked}
           onCreateVersion={(blueprintId) =>
             navigate(`${basePath.replace(/\/exams$/, '')}/blueprints/${blueprintId}/versions/new`)
           }

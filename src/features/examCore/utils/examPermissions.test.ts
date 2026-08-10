@@ -125,4 +125,21 @@ describe('canEditPaperContent', () => {
       canEditPaperContent({ authority: chair, examKind: 'CENTRALIZED', examStatus: 'IN_PROGRESS', paperStatus: 'DRAFT' }),
     ).toBe(false)
   })
+
+  it('keeps papers frozen after the exam ends, for both exam kinds', () => {
+    for (const examStatus of ['IN_PROGRESS', 'CLOSED', 'RESULTS_PUBLISHED', 'CANCELLED']) {
+      expect(
+        canEditPaperContent({ authority: chair, examKind: 'CENTRALIZED', examStatus, paperStatus: 'DRAFT' }),
+      ).toBe(false)
+      expect(
+        canEditPaperContent({ authority: chair, examKind: 'CLASS_TEST', examStatus, paperStatus: 'DRAFT' }),
+      ).toBe(false)
+    }
+  })
+
+  it('still allows editing while the exam is only scheduled', () => {
+    expect(
+      canEditPaperContent({ authority: chair, examKind: 'CENTRALIZED', examStatus: 'SCHEDULED', paperStatus: 'DRAFT' }),
+    ).toBe(true)
+  })
 })
