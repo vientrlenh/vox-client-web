@@ -8,7 +8,11 @@ export function isScheduleRemoved(status: ExamScheduleStatus): boolean {
   return status === 'MOVED'
 }
 
-/** Ca còn tính vào "kỳ thi đã xếp lịch tới đâu" — bỏ ca đã hủy và ca đã dời. */
+/**
+ * Ca còn tính vào "kỳ thi đã xếp lịch tới đâu" — bỏ ca đã hủy và ca đã dời. Cùng tập hợp với
+ * `ExamScheduleStatus.isInEffect()` ở backend, thứ quyết định ca nào bị soi phòng/giám thị khi lên
+ * lịch; hai bên lệch nhau là nút "Lên lịch" sáng rồi ăn lỗi 400.
+ */
 export function isScheduleCounted(status: ExamScheduleStatus): boolean {
   return !isScheduleRemoved(status) && status !== 'CANCELLED'
 }
