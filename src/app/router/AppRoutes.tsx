@@ -511,6 +511,9 @@ const TeacherExamPaperEditPage = lazy(() =>
 const SchoolAdminExamPaperViewPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.SchoolAdminExamPaperViewPage })),
 );
+const SchoolAdminExamPaperEditPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminExamPaperEditPage })),
+);
 const TeacherBlueprintsPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.TeacherBlueprintsPage })),
 );
@@ -983,6 +986,7 @@ export function AppRoutes() {
             <Route path="school-admin/class-tests/:examId/papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/class-tests/:examId/grading" element={<ClassTestGradingBoardPage />} />
             <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
+            <Route path="school-admin/exam-papers/:paperId/edit" element={<SchoolAdminExamPaperEditPage />} />
             <Route path="school-admin/exam-papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
             <Route path="school-admin/rubric-versions/select" element={<SchoolAdminSelectRubricVersionPage />} />
@@ -1004,9 +1008,6 @@ export function AppRoutes() {
             />
             <Route path="school-admin/blueprints/:blueprintId" element={<SchoolAdminBlueprintDetailPage />} />
             <Route path="school-admin/blueprints" element={<SchoolAdminBlueprintsPage />} />
-            <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
-            <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
-            <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
             <Route path="school-admin/class-tests/:examId" element={<SchoolAdminClassTestDetailPage />} />
             <Route
               path="school-admin/rubrics"

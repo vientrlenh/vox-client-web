@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { CircleCheck, Eye, FilePenLine, Pencil, Trash2 } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router'
+import { useAppSelector } from '@/app/store/hooks'
 import { toApiError } from '@/shared/api'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
@@ -9,6 +10,11 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { QuestionPicker } from '../components/QuestionPicker'
 import { examQueryKeys, useExamMyRoleQuery, useExamPaperQuery, useExamQuery } from '../api/queries'
 import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '../utils/timeQuota'
+import {
+  canEditPaperContent as resolveCanEditPaperContent,
+  resolveExamAuthority,
+  resolvePaperActions,
+} from '../utils/examPermissions'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { getQuestionTypeDisplay, type QuestionType } from '@/features/question/types'
 import {
@@ -33,30 +39,20 @@ const STATUS_ACTION_LABEL: Record<UpdateExamPaperStatusRequest['action'], string
   SUBMIT: 'Nộp duyệt',
 }
 
-const NEXT_ACTIONS: Partial<Record<string, UpdateExamPaperStatusRequest['action'][]>> = {
-  APPROVED: ['LOCK'],
-  DRAFT: ['SUBMIT'],
-  IN_REVIEW: ['APPROVE', 'REQUEST_REVISION'],
-  LOCKED: ['REOPEN'],
-}
-
-// CHAIR có toàn quyền của REVIEWER (approve/request-revision) ngoài quyền lock/reopen riêng — khớp rule backend.
-const ROLE_ACTIONS: Partial<Record<ExamMemberRole, UpdateExamPaperStatusRequest['action'][]>> = {
-  AUTHOR: ['SUBMIT'],
-  CHAIR: ['APPROVE', 'REQUEST_REVISION', 'LOCK', 'REOPEN'],
-  REVIEWER: ['APPROVE', 'REQUEST_REVISION'],
-}
-
 type ExamPaperPageLocationState = {
   examId?: string
   paperId?: string
 }
 
 type ExamPaperPageProps = {
-  canManage: boolean
+  /**
+   * Tiền tố route của người đang xem. Trước đây suy từ `canManage`, nên khi mở trình soạn đề cho
+   * quản trị trường thì mọi liên kết trỏ nhầm sang /teacher và `RequireRole` xoá token, đá về /login.
+   */
+  rolePath: '/school-admin' | '/teacher'
 }
 
-function ExamPaperPage({ canManage }: ExamPaperPageProps) {
+function ExamPaperPage({ rolePath }: ExamPaperPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { paperId } = useParams()
@@ -72,6 +68,11 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
   const examQuery = useExamQuery(examId)
   const myRoleQuery = useExamMyRoleQuery(examId)
   const myRole = myRoleQuery.data as ExamMemberRole | null | undefined
+  const currentUser = useAppSelector((state) => state.auth.user)
+  const authority = resolveExamAuthority({
+    isSchoolAdmin: currentUser?.roles.includes('SCHOOL_ADMIN') ?? false,
+    myRole,
+  })
   const updateItemMutation = useUpdateExamPaperItemMutation()
   const updateSectionMutation = useUpdateExamPaperSectionMutation()
   const updateStatusMutation = useUpdateExamPaperStatusMutation()
@@ -134,15 +135,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
     return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy mã đề.</section>
   }
 
-  const backPath = exam
-    ? exam.kind === 'CLASS_TEST'
-      ? canManage
-        ? `/teacher/class-tests/${exam.id}`
-        : `/school-admin/class-tests/${exam.id}`
-      : canManage
-        ? `/teacher/exams/${exam.id}`
-        : `/school-admin/exams/${exam.id}`
-    : null
+  const backPath = exam ? `${rolePath}/${exam.kind === 'CLASS_TEST' ? 'class-tests' : 'exams'}/${exam.id}` : null
 
   const statusDisplay = getExamPaperStatusDisplay(paper.status)
   const totalItems = paper.sections.reduce((sum, section) => sum + section.items.length, 0)
@@ -151,17 +144,25 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
     0,
   )
   const paperQuotaWarning = buildTimeQuotaWarning(`Mã đề ${paper.code}`, paper.timeDurationSeconds, maxTimePerAttemptMin)
-  const allowedActionsForRole = myRole ? ROLE_ACTIONS[myRole] ?? [] : []
-  const nextActions = canManage ? (NEXT_ACTIONS[paper.status] ?? []).filter((action) => allowedActionsForRole.includes(action)) : []
-  // Bài trên lớp luôn tạo mã đề ở trạng thái LOCKED (không dùng luồng duyệt) nên LOCKED không chặn sửa ở đây,
-  // và cũng không có hội đồng ra đề (myRole thường null) nên không role-gate ở nhánh đó.
-  // Kỳ thi tập trung: chủ tịch hội đồng chỉ duyệt/khóa/mở lại, không sửa nội dung đề của người ra đề.
-  // Chờ myRoleQuery xong mới mở nút: `myRole` còn undefined lúc đầu, không chốt ở đây thì chủ tịch
-  // hội đồng vẫn thấy nút Sửa/Xóa nhấp nháy một nhịp và bấm kịp.
+  // Chờ myRoleQuery xong mới mở nút: `myRole` còn undefined lúc đầu, không chốt ở đây thì người xem
+  // vẫn thấy nút Sửa/Xóa nhấp nháy một nhịp và bấm kịp trước khi quyền thật về.
+  const roleResolved = myRoleQuery.isSuccess
+  const nextActions = roleResolved
+    ? resolvePaperActions({
+        authority,
+        isOwnPaper: Boolean(currentUser?.userId && paper.createdBy === currentUser.userId),
+        myRole,
+        paperStatus: paper.status,
+      })
+    : []
   const canEditPaperContent =
-    canManage &&
-    exam?.status !== 'IN_PROGRESS' &&
-    (exam?.kind === 'CLASS_TEST' || (paper.status !== 'LOCKED' && myRoleQuery.isSuccess && myRole !== 'CHAIR'))
+    roleResolved &&
+    resolveCanEditPaperContent({
+      authority,
+      examKind: exam?.kind,
+      examStatus: exam?.status,
+      paperStatus: paper.status,
+    })
   const pickerCurrentItem = pickerItemId
     ? paper.sections.flatMap((section) => section.items).find((item) => item.id === pickerItemId)
     : null
@@ -350,7 +351,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
                       <a
                         aria-label={`Xem chi tiết ${item.question.code}`}
                         className="inline-flex size-8.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                        href={`${canManage ? '/teacher' : '/school-admin'}/questions/${item.question.id}`}
+                        href={`${rolePath}/questions/${item.question.id}`}
                         rel="noopener noreferrer"
                         target="_blank"
                         title="Xem chi tiết câu hỏi"
@@ -494,7 +495,7 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
               .catch((error) => setErrorMessage(toApiError(error).message))
           }}
           publishedOnly={exam?.kind === 'CENTRALIZED' || Boolean(pickerCurrentItem?.slotType)}
-          questionDetailBasePath={canManage ? '/teacher' : '/school-admin'}
+          questionDetailBasePath={rolePath}
           scope="teacher"
           selectedQuestionIds={pickerCurrentItem?.questionId ? [pickerCurrentItem.questionId] : []}
         />
@@ -503,10 +504,16 @@ function ExamPaperPage({ canManage }: ExamPaperPageProps) {
   )
 }
 
+// Cả hai vai đều có thể chỉ được xem (ví dụ REVIEWER, hoặc mã đề đã khoá) — quyền do
+// resolveExamAuthority quyết định, trang chỉ cần biết mình đang nằm dưới tiền tố route nào.
 export function TeacherExamPaperEditPage() {
-  return <ExamPaperPage canManage />
+  return <ExamPaperPage rolePath="/teacher" />
+}
+
+export function SchoolAdminExamPaperEditPage() {
+  return <ExamPaperPage rolePath="/school-admin" />
 }
 
 export function SchoolAdminExamPaperViewPage() {
-  return <ExamPaperPage canManage={false} />
+  return <ExamPaperPage rolePath="/school-admin" />
 }

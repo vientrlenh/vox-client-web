@@ -31,11 +31,17 @@ function getInitials(name?: string | null) {
 
 type MembersTabProps = {
   canManage: boolean
+  /**
+   * Chủ tịch hội đồng lập được hội đồng ra đề nhưng không đụng vào hàng CHAIR — kể cả của chính mình.
+   * Tự thu hồi vai trò là kỳ thi mất người quyết định mà luồng giáo viên không dựng lại được, nên
+   * bổ nhiệm/thu hồi chủ tịch vẫn là việc của quản trị trường (khớp ExamMemberManageAccessService).
+   */
+  canManageChair: boolean
   examId: string
   members: ExamMemberDto[]
 }
 
-export function MembersTab({ canManage, examId, members }: MembersTabProps) {
+export function MembersTab({ canManage, canManageChair, examId, members }: MembersTabProps) {
   const queryClient = useQueryClient()
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
   const [showTeacherPicker, setShowTeacherPicker] = useState(false)
@@ -134,6 +140,7 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
           <div className="grid gap-2.5">
             {members.map((member) => {
               const isBusy = busyMemberId === member.id
+              const canTouch = canManage && (canManageChair || member.role !== 'CHAIR')
               return (
                 <div className="flex items-center gap-3.5 rounded-xl border border-slate-200 px-3.5 py-3" key={member.id}>
                   <span
@@ -148,25 +155,32 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
                     <div className="text-sm font-bold text-slate-900">{member.user?.fullName ?? member.userId}</div>
                     <div className="text-xs text-slate-500">{member.user?.email ?? '-'}</div>
                   </div>
-                  {canManage ? (
+                  {canTouch ? (
                     <select
                       className="h-8.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={isBusy}
                       onChange={(event) => void handleChangeRole(member.id, event.target.value as ExamMemberRole)}
                       value={member.role}
                     >
-                      {ROLE_ORDER.map((role) => (
+                      {ROLE_ORDER.filter((role) => canManageChair || role !== 'CHAIR').map((role) => (
                         <option key={role} value={role}>
                           {getMemberRoleDisplay(role)}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    <span className="rounded-full bg-indigo-50 px-3.5 py-1 text-xs font-bold text-indigo-700">
+                    <span
+                      className="rounded-full bg-indigo-50 px-3.5 py-1 text-xs font-bold text-indigo-700"
+                      title={
+                        canManage && member.role === 'CHAIR'
+                          ? 'Chỉ quản trị trường thay đổi được chủ tịch hội đồng'
+                          : undefined
+                      }
+                    >
                       {getMemberRoleDisplay(member.role)}
                     </span>
                   )}
-                  {canManage ? (
+                  {canTouch ? (
                     <button
                       aria-label={`Xóa ${member.user?.fullName ?? member.userId} khỏi hội đồng`}
                       className="inline-flex h-8.5 items-center justify-center rounded-full border border-red-200 px-3 text-xs font-bold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -186,14 +200,11 @@ export function MembersTab({ canManage, examId, members }: MembersTabProps) {
 
       {showTeacherPicker ? (
         <TeacherPickerModal
+          canManageChair={canManageChair}
+          examId={examId}
           excludeUserIds={members.map((member) => member.userId)}
           onClose={() => setShowTeacherPicker(false)}
-          onSelect={(teacher, role) => {
-            if (!teacher.userId) {
-              return
-            }
-            void handleAddMember(teacher.userId, role)
-          }}
+          onSelect={(teacher, role) => void handleAddMember(teacher.userId, role)}
         />
       ) : null}
     </div>

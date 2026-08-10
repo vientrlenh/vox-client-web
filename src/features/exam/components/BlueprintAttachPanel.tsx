@@ -1,25 +1,26 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye } from 'lucide-react'
-import { useAppSelector } from '@/app/store/hooks'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { toApiError } from '@/shared/api'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { examQueryKeys, useExamBlueprintSummaryQuery, useExamBlueprintsQuery } from '@/features/examCore/api/queries'
-import { formatDurationSeconds, getBlueprintVersionStatusDisplay, type ExamMemberDto } from '@/features/examCore/types'
+import { formatDurationSeconds, getBlueprintVersionStatusDisplay } from '@/features/examCore/types'
 import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useAttachExamBlueprintMutation } from '../api/useExamMutations'
+import type { ExamAuthority } from '@/features/examCore/utils/examPermissions'
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
 type BlueprintAttachPanelProps = {
+  /** Quyền đã giải sẵn ở trang chi tiết — panel không tự suy lại để hai chỗ không lệch nhau. */
+  authority: ExamAuthority
   blueprintId?: string | null
   blueprintVersionId?: string | null
   examId: string
   hasPapers: boolean
-  members: ExamMemberDto[]
   onCreateVersion: (blueprintId: string) => void
   onOpenBlueprint: (blueprintId: string, versionId?: string) => void
   optional?: boolean
@@ -30,34 +31,38 @@ const PAPERS_EXIST_MESSAGE =
 
 /**
  * Nút "Đổi blueprint khác" bị `disabled` trông gần như nút thường, nên lý do phải hiện thành chữ chứ
- * không nấp trong tooltip. Quản trị trường lại không quản lý mã đề (`canManagePapers={false}` ở
- * `SchoolAdminExamDetailPage`) nên phải nói rõ ai xóa được, tránh bế tắc không lối thoát.
+ * không nấp trong tooltip — kèm luôn lối thoát, vì người đọc dòng này đang bị chặn.
  */
-function BlueprintLockedByPapersHint() {
+function BlueprintLockedByPapersHint({ canManagePapers }: { canManagePapers: boolean }) {
   return (
     <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-600">
-      {PAPERS_EXIST_MESSAGE} Quản trị trường không quản lý mã đề — nhờ giáo viên soạn đề hoặc chủ tịch
-      hội đồng xóa giúp ở tab <b className="text-slate-900">Mã đề</b>.
+      {PAPERS_EXIST_MESSAGE}{' '}
+      {canManagePapers ? (
+        <>
+          Sang tab <b className="text-slate-900">Tạo mã đề</b> để xóa.
+        </>
+      ) : (
+        <>
+          Nhờ chủ tịch hội đồng hoặc quản trị trường xóa giúp ở tab <b className="text-slate-900">Tạo mã đề</b>.
+        </>
+      )}
     </p>
   )
 }
 
 export function BlueprintAttachPanel({
+  authority,
   blueprintId,
   blueprintVersionId,
   examId,
   hasPapers,
-  members,
   onCreateVersion,
   onOpenBlueprint,
   optional = false,
 }: BlueprintAttachPanelProps) {
   const queryClient = useQueryClient()
-  const user = useAppSelector((state) => state.auth.user)
-  const isSchoolAdmin = user?.roles.includes('SCHOOL_ADMIN') ?? false
-  const myRole = members.find((member) => member.userId === user?.userId)?.role
-  const canAttach = isSchoolAdmin || myRole === 'AUTHOR'
-  const canApproveVersion = isSchoolAdmin || myRole === 'CHAIR'
+  const canAttach = authority.canAttachBlueprint
+  const canApproveVersion = authority.canFinalizeBlueprintVersion
   const canChangeBlueprint = canAttach && !hasPapers
   const canChangeVersion = canApproveVersion && !hasPapers
   const [keyword, setKeyword] = useState('')
@@ -597,7 +602,7 @@ export function BlueprintAttachPanel({
           ) : null}
         </div>
       </div>
-      {canAttach && hasPapers ? <BlueprintLockedByPapersHint /> : null}
+      {canAttach && hasPapers ? <BlueprintLockedByPapersHint canManagePapers={authority.canManagePapers} /> : null}
       {showNewerVersionHint ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5">
           <p className="text-[13px] text-amber-800">

@@ -223,6 +223,7 @@ export type ExamPaperDto = {
   blueprintVersionId?: string | null
   code: string
   createdAt?: string | null
+  createdBy?: string | null
   examId: string
   id: string
   sections: ExamPaperSectionDto[]

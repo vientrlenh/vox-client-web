@@ -1,6 +1,8 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
+import { setAuthenticatedUser } from '@/app/store/authSlice'
+import { configureAppStore } from '@/app/store/store'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { TeacherExamPaperEditPage } from './ExamPaperPages'
@@ -12,6 +14,8 @@ type GraphQLBody = { query: string; variables: Record<string, unknown> }
 const PAPER_ID = 'paper-1'
 const EXAM_ID = 'exam-1'
 const TOPIC_ID = 'topic-1'
+const ME = 'user-me'
+const SOMEONE_ELSE = 'user-other'
 
 type ItemOverrides = {
   questionId?: string | null
@@ -34,6 +38,7 @@ function item(id: string, overrides: ItemOverrides = {}) {
 }
 
 type ExamOverrides = {
+  createdBy?: string
   kind?: string
   myRole?: string | null
   paperStatus?: string
@@ -43,6 +48,7 @@ function mockGraphQL(items: ReturnType<typeof item>[], overrides: ExamOverrides 
   const kind = overrides.kind ?? 'CENTRALIZED'
   const myRole = overrides.myRole === undefined ? 'AUTHOR' : overrides.myRole
   const paperStatus = overrides.paperStatus ?? 'DRAFT'
+  const createdBy = overrides.createdBy ?? ME
   mockedPost.mockImplementation((_url: string, body?: unknown) => {
     const { query } = body as GraphQLBody
 
@@ -54,6 +60,7 @@ function mockGraphQL(items: ReturnType<typeof item>[], overrides: ExamOverrides 
               blueprintVersionId: 'version-1',
               code: 'KT-01-P1',
               createdAt: null,
+              createdBy,
               examId: EXAM_ID,
               id: PAPER_ID,
               sections: [
@@ -103,11 +110,22 @@ function mockGraphQL(items: ReturnType<typeof item>[], overrides: ExamOverrides 
 }
 
 function renderPage() {
+  // Luật quyền đọc `paper.createdBy` so với người đang đăng nhập, nên store phải có user thật —
+  // để trống thì mọi mã đề đều là "của người khác" và test đo nhầm nhánh.
+  const store = configureAppStore()
+  store.dispatch(
+    setAuthenticatedUser({
+      email: 'me@example.com',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      roles: ['TEACHER'],
+      userId: ME,
+    }),
+  )
   return renderWithProviders(
     <Routes>
       <Route element={<TeacherExamPaperEditPage />} path="/teacher/exam-papers/:paperId/edit" />
     </Routes>,
-    { route: `/teacher/exam-papers/${PAPER_ID}/edit` },
+    { route: `/teacher/exam-papers/${PAPER_ID}/edit`, store },
   )
 }
 
@@ -176,14 +194,52 @@ describe('TeacherExamPaperEditPage', () => {
   })
 })
 
-/** Chủ tịch hội đồng chỉ duyệt đề của người ra đề, không sửa nội dung và không xóa mã đề. */
+/**
+ * Chủ tịch hội đồng giờ chạy trọn quy trình ra đề: tự soạn, và khoá một bước mã đề của chính mình.
+ * Ranh giới duy nhất còn lại là maker-checker — không ai tự duyệt đề mình soạn.
+ */
 describe('TeacherExamPaperEditPage — quyền của CHAIR trên mã đề', () => {
   beforeEach(() => {
     mockedPost.mockReset()
   })
 
-  it('CHAIR chỉ còn duyệt và yêu cầu sửa lại trên mã đề đang chờ duyệt', async () => {
+  it('CHAIR soạn được nội dung mã đề', async () => {
+    mockGraphQL([item('item-1', { slotType: 'SELECTION' })], { myRole: 'CHAIR', paperStatus: 'DRAFT' })
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Sửa phần Phần 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Gán câu hỏi' })).toBeInTheDocument()
+  })
+
+  it('CHAIR khoá một bước mã đề của chính mình, không phải đi qua nộp duyệt', async () => {
     mockGraphQL([item('item-1', { questionId: 'question-1', slotType: 'SELECTION' })], {
+      createdBy: ME,
+      myRole: 'CHAIR',
+      paperStatus: 'DRAFT',
+    })
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Khóa mã đề' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Nộp duyệt' })).not.toBeInTheDocument()
+  })
+
+  /** Chốt hồi quy cho maker-checker: đường tắt chỉ nới nhánh khoá, không nới nhánh duyệt. */
+  it('CHAIR không tự duyệt được mã đề do chính mình soạn', async () => {
+    mockGraphQL([item('item-1', { questionId: 'question-1', slotType: 'SELECTION' })], {
+      createdBy: ME,
+      myRole: 'CHAIR',
+      paperStatus: 'IN_REVIEW',
+    })
+    renderPage()
+
+    expect(await screen.findByText('Phần 1')).toBeInTheDocument()
+    await waitFor(() => expect(mockedPost.mock.calls.some((call) => (call[1] as GraphQLBody).query.includes('query ExamMyRole'))).toBe(true))
+    expect(screen.queryByRole('button', { name: 'Duyệt mã đề' })).not.toBeInTheDocument()
+  })
+
+  it('CHAIR duyệt được mã đề do người khác soạn', async () => {
+    mockGraphQL([item('item-1', { questionId: 'question-1', slotType: 'SELECTION' })], {
+      createdBy: SOMEONE_ELSE,
       myRole: 'CHAIR',
       paperStatus: 'IN_REVIEW',
     })
@@ -191,28 +247,22 @@ describe('TeacherExamPaperEditPage — quyền của CHAIR trên mã đề', () 
 
     expect(await screen.findByRole('button', { name: 'Duyệt mã đề' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Yêu cầu sửa lại' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Sửa phần Phần 1' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Đổi câu hỏi' })).not.toBeInTheDocument()
   })
 
-  it('CHAIR không xóa được mã đề kể cả khi mã đề còn ở bản nháp', async () => {
-    mockGraphQL([item('item-1', { slotType: 'SELECTION' })], { myRole: 'CHAIR', paperStatus: 'DRAFT' })
+  it('AUTHOR nộp duyệt chứ không khoá, và vẫn xóa được mã đề bản nháp', async () => {
+    mockGraphQL([item('item-1', { questionId: 'question-1', slotType: 'SELECTION' })], {
+      myRole: 'AUTHOR',
+      paperStatus: 'DRAFT',
+    })
     renderPage()
 
-    expect(await screen.findByText('Phần 1')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Xóa mã đề/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Gán câu hỏi' })).not.toBeInTheDocument()
-  })
-
-  it('AUTHOR vẫn sửa và xóa được mã đề bản nháp', async () => {
-    mockGraphQL([item('item-1', { slotType: 'SELECTION' })], { myRole: 'AUTHOR', paperStatus: 'DRAFT' })
-    renderPage()
-
-    expect(await screen.findByRole('button', { name: 'Sửa phần Phần 1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Gán câu hỏi' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Nộp duyệt' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Khóa mã đề' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sửa phần Phần 1' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Xóa mã đề/ })).toBeInTheDocument()
   })
 
+  /** Bài trên lớp không có hội đồng nên `examMyRole` ở đó không phải tín hiệu để gác. */
   it('bài kiểm tra trên lớp không có hội đồng nên vẫn sửa được', async () => {
     mockGraphQL([item('item-1', { slotType: 'SELECTION' })], { kind: 'CLASS_TEST', myRole: null, paperStatus: 'LOCKED' })
     renderPage()

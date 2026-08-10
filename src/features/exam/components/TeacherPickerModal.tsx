@@ -1,27 +1,36 @@
 import { useState } from 'react'
 import { Search, X } from 'lucide-react'
-import { useSchoolTeachersQuery } from '@/features/school-users/api/useSchoolTeachersQuery'
-import type { SchoolUser } from '@/features/school-users/types'
+import { useExamDirectoryProctorsQuery, type ExamDirectoryUser } from '@/features/examCore/api/examDirectoryQueries'
 import { getMemberRoleDisplay, type ExamMemberRole } from '../types'
 
 type TeacherPickerModalProps = {
+  canManageChair: boolean
+  examId: string
   excludeUserIds: string[]
   onClose: () => void
-  onSelect: (teacher: SchoolUser, role: ExamMemberRole) => void
+  onSelect: (teacher: ExamDirectoryUser, role: ExamMemberRole) => void
 }
 
 const PAGE_SIZE = 8
 const ROLE_OPTIONS: ExamMemberRole[] = ['AUTHOR', 'CHAIR', 'REVIEWER']
 
-export function TeacherPickerModal({ excludeUserIds, onClose, onSelect }: TeacherPickerModalProps) {
+export function TeacherPickerModal({
+  canManageChair,
+  examId,
+  excludeUserIds,
+  onClose,
+  onSelect,
+}: TeacherPickerModalProps) {
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [role, setRole] = useState<ExamMemberRole>('AUTHOR')
-  const teachersQuery = useSchoolTeachersQuery(page, PAGE_SIZE, { search: keyword, status: 'ACTIVE' })
+  // Nguồn giáo viên phải là danh bạ của chính kỳ thi: `schoolTeachersBySchool` gated SCHOOL_ADMIN nên
+  // chủ tịch hội đồng mở modal này ra chỉ thấy danh sách rỗng. `examDirectoryProctors` cùng phạm vi
+  // (giáo viên của trường kỳ thi) nhưng phân quyền qua ExamDirectoryAccessService — nhận cả chủ tịch.
+  const teachersQuery = useExamDirectoryProctorsQuery(examId, page, PAGE_SIZE, keyword)
 
-  const teachers = (teachersQuery.data?.content ?? []).filter(
-    (teacher) => teacher.userId && !excludeUserIds.includes(teacher.userId),
-  )
+  const roleOptions = canManageChair ? ROLE_OPTIONS : ROLE_OPTIONS.filter((option) => option !== 'CHAIR')
+  const teachers = (teachersQuery.data?.content ?? []).filter((teacher) => !excludeUserIds.includes(teacher.userId))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
@@ -48,6 +57,7 @@ export function TeacherPickerModal({ excludeUserIds, onClose, onSelect }: Teache
         <p className="border-b border-slate-200 bg-amber-50 px-6 py-2.5 text-xs font-semibold text-amber-700">
           Chỉ hiện giáo viên đã kích hoạt tài khoản (đã đặt mật khẩu). Giáo viên vừa tạo cần đặt mật khẩu qua email trước khi
           xuất hiện ở đây.
+          {canManageChair ? null : ' Chỉ quản trị trường mới bổ nhiệm được chủ tịch hội đồng.'}
         </p>
 
         <div className="grid gap-3 border-b border-slate-200 px-6 py-3.5 sm:grid-cols-[1fr_auto]">
@@ -68,7 +78,7 @@ export function TeacherPickerModal({ excludeUserIds, onClose, onSelect }: Teache
             onChange={(event) => setRole(event.target.value as ExamMemberRole)}
             value={role}
           >
-            {ROLE_OPTIONS.map((option) => (
+            {roleOptions.map((option) => (
               <option key={option} value={option}>
                 {getMemberRoleDisplay(option)}
               </option>
@@ -84,12 +94,12 @@ export function TeacherPickerModal({ excludeUserIds, onClose, onSelect }: Teache
               {teachers.map((teacher) => (
                 <button
                   className="grid gap-0.5 rounded-xl border border-slate-200 p-3.5 text-left transition hover:border-indigo-300 hover:bg-indigo-50"
-                  key={teacher.id}
+                  key={teacher.userId}
                   onClick={() => onSelect(teacher, role)}
                   type="button"
                 >
-                  <span className="text-sm font-bold text-slate-900">{teacher.user?.fullName ?? '-'}</span>
-                  <span className="text-xs text-slate-500">{teacher.user?.email ?? '-'}</span>
+                  <span className="text-sm font-bold text-slate-900">{teacher.fullName ?? '-'}</span>
+                  <span className="text-xs text-slate-500">{teacher.email ?? '-'}</span>
                 </button>
               ))}
             </div>

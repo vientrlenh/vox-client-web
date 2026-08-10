@@ -40,6 +40,9 @@ const EXAM_PAPER_FIELDS = `
   timeDurationSeconds
   createdAt
   updatedAt
+  # Ai soạn mã đề quyết định nút hiện ra: người quyết định tự soạn thì khoá một bước, còn lại đi
+  # đủ luồng duyệt. Xem resolvePaperActions trong features/exam/utils/examPermissions.ts.
+  createdBy
   sections {
     id
     paperId
@@ -159,6 +162,7 @@ const EXAM_PAPERS_SUMMARY_FIELDS = `
   variant
   status
   timeDurationSeconds
+  createdBy
   sections {
     id
     items {

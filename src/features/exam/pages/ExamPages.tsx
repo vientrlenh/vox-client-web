@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router'
+import { useAppSelector } from '@/app/store/hooks'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { Pagination } from '@/shared/components/Pagination'
 import { toApiError } from '@/shared/api'
@@ -67,12 +68,25 @@ import {
   getExamWorkflowSteps,
   type ExamDetailTab,
 } from '../utils/examWorkflow'
+import {
+  resolveExamAuthority,
+  resolvePaperActions,
+  type ExamPaperAction,
+} from '@/features/examCore/utils/examPermissions'
 import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
 import { EditExamModal } from '../components/EditExamModal'
 import { MembersTab } from '../components/MembersTab'
 import { useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
 import { useCreateExamMutation, useDeleteExamMutation, useUpdateExamStatusMutation } from '../api/useExamMutations'
-import { EXAM_STREAM_SETUP_PAYLOAD, getExamStatusDisplay, type ExamStreamSetup } from '../types'
+import { EXAM_STREAM_SETUP_PAYLOAD, getExamStatusDisplay, type ExamMemberRole, type ExamStreamSetup } from '../types'
+
+const PAPER_ACTION_LABEL: Record<ExamPaperAction, string> = {
+  APPROVE: 'Duyệt',
+  LOCK: 'Khóa mã đề',
+  REOPEN: 'Mở lại để sửa',
+  REQUEST_REVISION: 'Yêu cầu sửa lại',
+  SUBMIT: 'Nộp duyệt',
+}
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
@@ -545,21 +559,9 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
 
 type ExamDetailPageProps = {
   basePath: string
-  canManageInfo: boolean
-  canManageMembers: boolean
-  canManagePapers: boolean
-  canManageStatus: boolean
-  canReleaseSecurePool: boolean
 }
 
-function ExamDetailPage({
-  basePath,
-  canManageInfo,
-  canManageMembers,
-  canManagePapers,
-  canManageStatus,
-  canReleaseSecurePool,
-}: ExamDetailPageProps) {
+function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { examId } = useParams()
@@ -568,7 +570,15 @@ function ExamDetailPage({
   const papers = exam?.papers ?? []
   const attachedBlueprint = exam?.blueprint ?? null
   const subscriptionQuery = useMySubscriptionQuery()
-  const myRole = bundleQuery.data?.myRole
+  const currentUser = useAppSelector((state) => state.auth.user)
+  // `examMyRole` là String ở GraphQL; giá trị hợp lệ đúng bằng ExamMemberRole (null nếu không phải thành viên).
+  const myRole = bundleQuery.data?.myRole as ExamMemberRole | null | undefined
+  // Quyền không còn suy từ đường dẫn trang mà từ (vai trò toàn cục + vai trò trong chính kỳ thi này):
+  // quản trị trường và chủ tịch hội đồng đều chạy trọn quy trình, chỉ khác vài ranh giới nhỏ.
+  const authority = resolveExamAuthority({
+    isSchoolAdmin: currentUser?.roles.includes('SCHOOL_ADMIN') ?? false,
+    myRole,
+  })
   // Cùng query key với ScheduleTab/CandidatesTab nên TanStack dùng chung cache — tab mở ra không refetch.
   // Cần ở đây để tính bước "Xếp học sinh"/"Xếp lịch" và lý do chặn nút lên lịch.
   const schedulesQuery = useExamSchedulesQuery(examId ?? null)
@@ -618,7 +628,7 @@ function ExamDetailPage({
     }
   }
 
-  async function handleUpdatePaperStatus(paperId: string, action: 'APPROVE' | 'LOCK' | 'SUBMIT') {
+  async function handleUpdatePaperStatus(paperId: string, action: ExamPaperAction) {
     try {
       await updatePaperStatusMutation.mutateAsync({ paperId, payload: { action } })
       await invalidate()
@@ -703,8 +713,10 @@ function ExamDetailPage({
   const statusDisplay = getExamStatusDisplay(exam.status)
   const { completedCount, steps } = workflow
   const scheduleReadiness = getCentralizedScheduleReadiness(papers, schedulesQuery.data, candidatesQuery.data)
-  // Backend authorizes schedule/candidate management for SCHOOL_ADMIN (same school) or the exam's CHAIR.
-  const canManageSchedule = canManageStatus || myRole === 'CHAIR'
+  const canManageSchedule = authority.canManageSchedule
+  // Trang soạn/xem mã đề nằm dưới cùng tiền tố vai trò với trang này. Trỏ cứng sang /teacher như
+  // trước là quản trị trường bị RequireRole xoá token và đá về /login.
+  const paperBasePath = `${basePath.replace(/\/exams$/, '')}/exam-papers`
   // Từ IN_PROGRESS trở đi backend khóa sửa thông tin kỳ thi và mọi thao tác xếp lịch.
   const examLocked = isExamLockedForEditing(exam.status)
   const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
@@ -777,16 +789,18 @@ function ExamDetailPage({
               <ClipboardList aria-hidden="true" className="size-4" />
               Xem kết quả
             </button>
-            {canManageStatus ? (
+            {authority.canDeleteExam ? (
+              <button
+                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                onClick={() => void handleDeleteExam(exam.id)}
+                type="button"
+              >
+                <Trash2 aria-hidden="true" className="size-4" />
+                Xóa
+              </button>
+            ) : null}
+            {authority.canManageStatus ? (
               <>
-                <button
-                  className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
-                  onClick={() => void handleDeleteExam(exam.id)}
-                  type="button"
-                >
-                  <Trash2 aria-hidden="true" className="size-4" />
-                  Xóa
-                </button>
                 {primaryStatusAction ? (
                   <button
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -813,13 +827,13 @@ function ExamDetailPage({
           { icon: <Timer aria-hidden="true" className="size-3.5" />, label: `Thời gian làm bài: ${formatDurationSeconds(exam.examTimeDurationSecond)}` },
           { icon: <CircleCheck aria-hidden="true" className="size-3.5" />, label: `Cách chốt điểm: ${getResultDecisionMethodDisplay(exam.resultDecisionMethod)}` },
         ]}
-        onEdit={canManageInfo && !examLocked ? () => setShowEditModal(true) : undefined}
+        onEdit={authority.canManageInfo && !examLocked ? () => setShowEditModal(true) : undefined}
         statusLabel={statusDisplay.label}
         statusTone={statusDisplay.tone}
         title={exam.name}
       />
 
-      {canManageStatus && exam.status === 'DRAFT' && scheduleReadiness.blockingReason ? (
+      {authority.canManageStatus && exam.status === 'DRAFT' && scheduleReadiness.blockingReason ? (
         <div className="mt-3.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-700">
           Chưa lên lịch được kỳ thi: {scheduleReadiness.blockingReason}
         </div>
@@ -849,7 +863,7 @@ function ExamDetailPage({
 
       {activeTab === 'papers' ? (
         <div className="mt-4 grid gap-3.5">
-          {canReleaseSecurePool && exam.securePool?.status === 'SEALED' ? (
+          {authority.canReleaseSecurePool && exam.securePool?.status === 'SEALED' ? (
             <div className="flex justify-end">
               <button
                 className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-4 text-[13px] font-semibold text-amber-700 hover:bg-amber-100"
@@ -860,7 +874,7 @@ function ExamDetailPage({
               </button>
             </div>
           ) : null}
-          {canManagePapers && myRole === 'AUTHOR' ? (
+          {authority.canManagePapers ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {showCopyPicker ? (
                 <>
@@ -953,42 +967,32 @@ function ExamDetailPage({
               )
               const isIncomplete = filledItems < totalItems
               const paperQuotaWarning = buildTimeQuotaWarning(`Mã đề ${paper.code}`, paper.timeDurationSeconds, maxTimePerAttemptMin)
-              // CHAIR có toàn quyền của REVIEWER (approve) ngoài quyền lock riêng — khớp rule backend.
-              const canSubmit = canManagePapers && myRole === 'AUTHOR'
-              const canApprove = canManagePapers && (myRole === 'CHAIR' || myRole === 'REVIEWER')
-              const canLock = canManagePapers && myRole === 'CHAIR'
-              const actions =
-                paper.status === 'DRAFT' && canSubmit
-                  ? [
-                      {
-                        disabled: isIncomplete || Boolean(paperQuotaWarning),
-                        label: 'Nộp duyệt',
-                        onClick: () => void handleUpdatePaperStatus(paper.id, 'SUBMIT'),
-                        title: paperQuotaWarning ?? (isIncomplete ? 'Còn ô câu hỏi chưa được gán — gán đủ trước khi nộp duyệt' : undefined),
-                        tone: 'primary' as const,
-                      },
-                    ]
-                  : paper.status === 'IN_REVIEW' && canApprove
-                    ? [
-                        {
-                          disabled: Boolean(paperQuotaWarning),
-                          label: 'Duyệt',
-                          onClick: () => void handleUpdatePaperStatus(paper.id, 'APPROVE'),
-                          title: paperQuotaWarning ?? undefined,
-                          tone: 'primary' as const,
-                        },
-                      ]
-                    : paper.status === 'APPROVED' && canLock
-                      ? [
-                          {
-                            disabled: Boolean(paperQuotaWarning),
-                            label: 'Khóa mã đề',
-                            onClick: () => void handleUpdatePaperStatus(paper.id, 'LOCK'),
-                            title: paperQuotaWarning ?? undefined,
-                            tone: 'primary' as const,
-                          },
-                        ]
-                      : []
+              const isOwnPaper = Boolean(currentUser?.userId && paper.createdBy === currentUser.userId)
+              // Chỉ hiện nút mà backend thật sự cho bấm. Nhánh LOCK từ DRAFT là đường tắt dành cho
+              // người quyết định tự soạn đề — không có bước duyệt nào ở giữa để chờ.
+              const actions = resolvePaperActions({
+                authority,
+                isOwnPaper,
+                myRole,
+                paperStatus: paper.status,
+              })
+                // REQUEST_REVISION bắt buộc kèm góp ý, mà ô nhập góp ý chỉ có ở trang soạn đề — hiện
+                // nút ở đây là bấm vào ăn 400. Người duyệt mở mã đề ra để viết góp ý.
+                .filter((action) => action !== 'REQUEST_REVISION')
+                .map((action) => {
+                const blocksOnEmptySlots = action === 'SUBMIT' || (action === 'LOCK' && paper.status === 'DRAFT')
+                return {
+                  disabled: (blocksOnEmptySlots && isIncomplete) || Boolean(paperQuotaWarning),
+                  label: PAPER_ACTION_LABEL[action],
+                  onClick: () => void handleUpdatePaperStatus(paper.id, action),
+                  title:
+                    paperQuotaWarning ??
+                    (blocksOnEmptySlots && isIncomplete
+                      ? 'Còn ô câu hỏi chưa được gán — gán đủ trước khi chốt mã đề'
+                      : undefined),
+                  tone: (action === 'REOPEN' ? 'default' : 'primary') as 'default' | 'primary',
+                }
+              })
               return (
                 <PaperCard
                   actions={actions}
@@ -996,11 +1000,13 @@ function ExamDetailPage({
                   key={paper.id}
                   onOpen={() =>
                     navigate(
-                      canManagePapers ? `/teacher/exam-papers/${paper.id}/edit` : `${basePath.replace(/\/exams$/, '')}/exam-papers/${paper.id}`,
+                      authority.canManagePapers
+                        ? `${paperBasePath}/${paper.id}/edit`
+                        : `${paperBasePath}/${paper.id}`,
                       { state: { examId: exam.id, paperId: paper.id } },
                     )
                   }
-                  openLabel={canManagePapers ? 'Soạn đề' : 'Xem đề'}
+                  openLabel={authority.canManagePapers ? 'Soạn đề' : 'Xem đề'}
                   paper={paper}
                   subtitle={paperStatusDisplay.label}
                 />
@@ -1010,7 +1016,14 @@ function ExamDetailPage({
         </div>
       ) : null}
 
-      {activeTab === 'people' ? <MembersTab canManage={canManageMembers} examId={exam.id} members={exam.members} /> : null}
+      {activeTab === 'people' ? (
+        <MembersTab
+          canManage={authority.canManageMembers}
+          canManageChair={authority.canManageChairMembers}
+          examId={exam.id}
+          members={exam.members}
+        />
+      ) : null}
 
       {activeTab === 'students' ? (
         // `locked` chỉ khóa nhóm sửa danh sách; thao tác giám thị phải sống trong lúc thi nên
@@ -1026,11 +1039,11 @@ function ExamDetailPage({
 
       {activeTab === 'blueprint' ? (
         <BlueprintAttachPanel
+          authority={authority}
           blueprintId={exam.blueprintId}
           blueprintVersionId={exam.blueprintVersionId}
           examId={exam.id}
           hasPapers={papers.length > 0}
-          members={exam.members}
           onCreateVersion={(blueprintId) =>
             navigate(`${basePath.replace(/\/exams$/, '')}/blueprints/${blueprintId}/versions/new`)
           }
@@ -1070,28 +1083,12 @@ function ExamDetailPage({
   )
 }
 
+// Hai trang giờ chỉ khác nhau ở tiền tố đường dẫn; quyền do resolveExamAuthority quyết định theo
+// vai trò thật của người đăng nhập trong chính kỳ thi đó.
 export function TeacherExamDetailPage() {
-  return (
-    <ExamDetailPage
-      basePath="/teacher/exams"
-      canManageInfo={false}
-      canManageMembers={false}
-      canManagePapers
-      canManageStatus={false}
-      canReleaseSecurePool
-    />
-  )
+  return <ExamDetailPage basePath="/teacher/exams" />
 }
 
 export function SchoolAdminExamDetailPage() {
-  return (
-    <ExamDetailPage
-      basePath="/school-admin/exams"
-      canManageInfo
-      canManageMembers
-      canManagePapers={false}
-      canManageStatus
-      canReleaseSecurePool={false}
-    />
-  )
+  return <ExamDetailPage basePath="/school-admin/exams" />
 }
