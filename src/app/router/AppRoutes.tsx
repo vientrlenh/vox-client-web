@@ -270,12 +270,6 @@ const SystemAdminSchoolsPage = lazy(() =>
   })),
 );
 
-const SystemAdminUsersPage = lazy(() =>
-  import("@/features/system-users").then((module) => ({
-    default: module.SystemAdminUsersPage,
-  })),
-);
-
 const TeacherMonitoringRoomsPage = lazy(() =>
   import("@/features/monitoring").then((module) => ({
     default: module.TeacherMonitoringRoomsPage,
@@ -825,10 +819,6 @@ export function AppRoutes() {
             <Route
               path="system-admin/schools"
               element={<SystemAdminSchoolsPage />}
-            />
-            <Route
-              path="system-admin/users"
-              element={<SystemAdminUsersPage />}
             />
             <Route path="system-admin/question-banks" element={<SystemAdminQuestionBanksPage />} />
             <Route path="system-admin/question-banks/:bankId" element={<SystemAdminQuestionBankDetailPage />} />

@@ -52,13 +52,7 @@ function getErrorMessage(error: unknown) {
   return undefined
 }
 
-function FrameworkDetailPage({
-  basePath,
-  restrictToActive,
-}: {
-  basePath: string
-  restrictToActive?: boolean
-}) {
+function FrameworkDetailPage({ basePath }: { basePath: string }) {
   const { frameworkId } = useParams<{ frameworkId: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -90,9 +84,6 @@ function FrameworkDetailPage({
   const versionStatusMutation = useUpdateFrameworkVersionStatusMutation()
 
   const framework = frameworkQuery.data ?? null
-  const isHiddenFromViewer = Boolean(
-    restrictToActive && framework && !framework.isActive,
-  )
 
   async function handleUpdateFramework(
     id: string,
@@ -270,15 +261,7 @@ function FrameworkDetailPage({
         </div>
       ) : null}
 
-      {!frameworkQuery.isLoading && isHiddenFromViewer ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-white px-6 py-12 text-center">
-          <p className="text-sm font-bold text-slate-600">
-            Không tìm thấy khung đánh giá năng lực này.
-          </p>
-        </div>
-      ) : null}
-
-      {!frameworkQuery.isLoading && framework && !isHiddenFromViewer ? (
+      {!frameworkQuery.isLoading && framework ? (
         <div className="rounded-lg border border-slate-200 bg-white px-6 py-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
@@ -324,7 +307,6 @@ function FrameworkDetailPage({
         </div>
       ) : null}
 
-      {!isHiddenFromViewer ? (
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <h2 className="text-lg font-black text-blue-950">Phiên bản</h2>
@@ -407,7 +389,6 @@ function FrameworkDetailPage({
           versions={versionsQuery.data?.content ?? []}
         />
       </div>
-      ) : null}
 
       <FrameworkFormDialog
         errorMessage={editError ?? undefined}
@@ -471,5 +452,5 @@ export function SystemAdminFrameworkDetailPage() {
 }
 
 export function SchoolAdminFrameworkDetailPage() {
-  return <FrameworkDetailPage basePath="/school-admin" restrictToActive />
+  return <FrameworkDetailPage basePath="/school-admin" />
 }

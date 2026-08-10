@@ -1,14 +1,19 @@
 import { useState } from 'react'
 import {
-  Bell,
+  BookOpen,
   Building2,
   ChevronDown,
   ClipboardCheck,
+  ClipboardList,
+  CreditCard,
   FileQuestion,
+  Gavel,
   Home,
+  Languages,
+  Library,
   LogOut,
   Menu,
-  Settings,
+  Search,
   ShieldCheck,
   UserRound,
   X,
@@ -43,50 +48,55 @@ const navigationItems: NavigationItem[] = [
     icon: Home,
     label: 'Tổng quan',
     to: '/system-admin/dashboard',
-  }
-]
-
-const navigationGroups: NavigationGroup[] = [
+  },
+  {
+    icon: ClipboardList,
+    label: 'Quản lý đơn đăng ký',
+    to: '/system-admin/registrations',
+  },
+  {
+    icon: Languages,
+    label: 'Quản lý ngôn ngữ',
+    to: '/system-admin/languages',
+  },
+  {
+    icon: Library,
+    label: 'Danh mục trường',
+    to: '/system-admin/school-directory',
+  },
+  {
+    icon: BookOpen,
+    label: 'Quản lý khung đánh giá năng lực',
+    to: '/system-admin/frameworks',
+  },
   {
     icon: Building2,
-    label: 'Trường học',
-    items: [
-      {
-        label: 'Quản lý đơn đăng ký',
-        to: '/system-admin/registrations',
-      },
-      {
-        label: 'Danh mục trường',
-        to: '/system-admin/school-directory',
-      },
-      {
-        label: 'Quản lý trường học',
-        to: '/system-admin/schools',
-      },
-    ],
+    label: 'Quản lý trường học',
+    to: '/system-admin/schools',
+  },
+  {
+    icon: ClipboardList,
+    label: 'Quản lý tiêu chí đánh giá',
+    to: '/system-admin/rubrics',
   },
   {
     icon: ClipboardCheck,
-    label: 'Đánh giá',
-    items: [
-      {
-        label: 'Quản lý khung đánh giá năng lực',
-        to: '/system-admin/frameworks',
-      },
-      {
-        label: 'Quản lý tiêu chí đánh giá',
-        to: '/system-admin/rubrics',
-      },
-      {
-        label: 'Quản lý chính sách đánh giá',
-        to: '/system-admin/assessment-policies',
-      },
-      {
-        label: 'Quản lý quy tắc tính điểm',
-        to: '/system-admin/scoring-rules',
-      },
-    ],
+    label: 'Quản lý chính sách đánh giá',
+    to: '/system-admin/assessment-policies',
   },
+  {
+    icon: Gavel,
+    label: 'Quản lý quy tắc tính điểm',
+    to: '/system-admin/scoring-rules',
+  },
+  {
+    icon: CreditCard,
+    label: 'Gói dịch vụ',
+    to: '/system-admin/subscription',
+  },
+]
+
+const navigationGroups: NavigationGroup[] = [
   {
     icon: FileQuestion,
     label: 'Câu hỏi',
@@ -102,24 +112,6 @@ const navigationGroups: NavigationGroup[] = [
       {
         label: 'Duyệt câu hỏi',
         to: '/system-admin/questions/review',
-      },
-    ],
-  },
-  {
-    icon: Settings,
-    label: 'Hệ thống',
-    items: [
-      {
-        label: 'Quản lý ngôn ngữ',
-        to: '/system-admin/languages',
-      },
-      {
-        label: 'Gói dịch vụ',
-        to: '/system-admin/subscription',
-      },
-      {
-        label: 'Cài đặt hệ thống',
-        to: '/system-admin/settings',
       },
     ],
   },
@@ -388,6 +380,23 @@ export function SystemAdminLayout() {
           >
             <Menu aria-hidden="true" className="size-5" />
           </button>
+
+          <div className="relative hidden max-w-2xl flex-1 md:block">
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-blue-900/70"
+            />
+            <input
+              aria-label="Tìm kiếm hệ thống"
+              className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-20 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+              placeholder="Tìm kiếm theo tên trường, email, số điện thoại, mã đơn..."
+              readOnly
+              type="search"
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-blue-900/70">
+              Ctrl K
+            </span>
+          </div>
 
           <div className="ml-auto flex items-center gap-3">
             <NotificationBell className="text-blue-950" />

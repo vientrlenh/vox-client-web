@@ -3,97 +3,76 @@ import { graphQLRequest } from '@/shared/api'
 import type { FrameworkVersionDetail } from '../types'
 import { frameworkQueryKeys } from './useFrameworksQuery'
 
-const FRAMEWORK_VERSION_FIELDS = `
-  id
-  frameworkId
-  code
-  name
-  description
-  version
-  effectiveFrom
-  effectiveTo
-  status
-  createdAt
-  updatedAt
-  criteria {
-    id
-    code
-    name
-    description
-    order
-    frameworkVersionId
-    bands {
-      id
-      descriptor
-      frameworkCriterionId
-      frameworkResultBandId
-      positiveSignals {
-        values {
-          description
-          code
-          evidenceHint
-          importance
-        }
-      }
-      negativeSignals {
-        values {
-          code
-          description
-          evidenceHint
-          importance
-        }
-      }
-    }
-  }
-  resultBands {
-    id
-    code
-    label
-    description
-    order
-    frameworkVersionId
-  }
-`
-
 const FRAMEWORK_VERSION_QUERY = `
   query FrameworkVersion($id: ID!) {
     frameworkVersion(id: $id) {
-      ${FRAMEWORK_VERSION_FIELDS}
+      id
+      frameworkId
+      code
+      name
+      description
+      version
+      effectiveFrom
+      effectiveTo
+      status
+      createdAt
+      updatedAt
+      criteria {
+        id
+        code
+        name
+        description
+        order
+        frameworkVersionId
+        bands {
+          id
+          descriptor
+          frameworkCriterionId
+          frameworkResultBandId
+          positiveSignals {
+            values {
+              description
+              code
+              evidenceHint
+              importance
+            }
+          }
+          negativeSignals {
+            values {
+              code
+              description
+              evidenceHint
+              importance
+            }
+          }
+        }
+      }
+      resultBands {
+        id
+        code
+        label
+        description
+        order
+        frameworkVersionId
+      }
     }
   }
 `
-
-const SCHOOL_FRAMEWORK_VERSION_QUERY = `
-  query SchoolFrameworkVersion($id: ID!) {
-    schoolFrameworkVersion(id: $id) {
-      ${FRAMEWORK_VERSION_FIELDS}
-    }
-  }
-`
-
-export type FrameworkVersionQueryScope = 'system' | 'school'
 
 type FrameworkVersionQueryData = {
-  frameworkVersion?: FrameworkVersionDetail | null
-  schoolFrameworkVersion?: FrameworkVersionDetail | null
+  frameworkVersion: FrameworkVersionDetail | null
 }
 
-export async function fetchFrameworkVersion(
-  id: string,
-  scope: FrameworkVersionQueryScope = 'system',
-) {
+export async function fetchFrameworkVersion(id: string) {
   const data = await graphQLRequest<FrameworkVersionQueryData>(
-    scope === 'school' ? SCHOOL_FRAMEWORK_VERSION_QUERY : FRAMEWORK_VERSION_QUERY,
+    FRAMEWORK_VERSION_QUERY,
     { id },
   )
 
-  return (scope === 'school' ? data.schoolFrameworkVersion : data.frameworkVersion) ?? null
+  return data.frameworkVersion
 }
 
-export function useFrameworkVersionQuery(
-  id: string | null,
-  scope: FrameworkVersionQueryScope = 'system',
-) {
+export function useFrameworkVersionQuery(id: string | null) {
   return useQuery({
     enabled: Boolean(id),
     queryFn: () => {
@@ -101,7 +80,7 @@ export function useFrameworkVersionQuery(
         throw new Error('Framework version id is required')
       }
 
-      return fetchFrameworkVersion(id, scope)
+      return fetchFrameworkVersion(id)
     },
     queryKey: frameworkQueryKeys.version(id),
   })
