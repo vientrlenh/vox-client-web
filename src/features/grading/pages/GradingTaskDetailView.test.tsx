@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { GradingOutcome, GradingTaskDetail } from '../types'
 import { GradingTaskDetailView } from './GradingPages'
@@ -87,5 +88,17 @@ describe('GradingTaskDetailView', () => {
 
     expect(screen.getByLabelText('Điểm tiêu chí Phát âm')).toBeInTheDocument()
     expect(screen.queryByText('Điểm từng tiêu chí · Phần 1')).not.toBeInTheDocument()
+  })
+
+  it('opens the score timeline, including once the assignment is closed', async () => {
+    // "Điểm này đã đi qua những tay nào" là câu hỏi của vòng phúc khảo, mà lúc đó phân
+    // công vòng trước đã đóng — nút phải còn ở cả hai trạng thái.
+    renderView(detail([], false))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lịch sử điểm' }))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Lịch sử điểm' })).toBeInTheDocument()
+    expect(screen.getByText('#R-001')).toBeInTheDocument()
   })
 })

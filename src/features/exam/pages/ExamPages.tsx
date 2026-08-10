@@ -61,6 +61,7 @@ import {
   getResultDecisionMethodDisplay,
   isExamLockedForEditing,
   toIsoDateTime,
+  type BlueprintNavState,
   type ExamStatus,
 } from '@/features/examCore/types'
 import {
@@ -561,10 +562,17 @@ type ExamDetailPageProps = {
   basePath: string
 }
 
+// Trang blueprint quay lại đây kèm state này để mở lại đúng tab người dùng đang đứng.
+type ExamDetailNavState = {
+  tab?: ExamDetailTab
+} | null
+
 function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const { examId } = useParams()
+  const requestedTab = (location.state as ExamDetailNavState)?.tab ?? null
   const bundleQuery = useExamDetailBundleQuery(examId ?? null)
   const exam = bundleQuery.data?.exam
   const papers = exam?.papers ?? []
@@ -588,8 +596,10 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const updateStatusMutation = useUpdateExamStatusMutation()
   const deleteMutation = useDeleteExamMutation()
   const releaseSecurePoolMutation = useReleaseSecurePoolMutation()
-  const [tab, setTab] = useState<ExamDetailTab | null>(null)
-  const autoTabAppliedRef = useRef(false)
+  // Quay lại từ trang blueprint thì tab đã được chỉ định — coi như người dùng đã tự chọn tab để
+  // hiệu ứng nhảy-về-bước-đang-dở bên dưới không hất họ sang tab khác.
+  const [tab, setTab] = useState<ExamDetailTab | null>(requestedTab)
+  const autoTabAppliedRef = useRef(requestedTab !== null)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -771,7 +781,9 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
     <section className="mx-auto max-w-260">
       <button
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600"
-        onClick={() => navigate(-1)}
+        // Đi thẳng về danh sách đúng như nhãn nút, không lùi lịch sử: vào lại trang này từ trang
+        // blueprint (hoặc từ form tạo kỳ thi) thì navigate(-1) sẽ quay ngược vào chính trang vừa rời.
+        onClick={() => navigate(basePath)}
         type="button"
       >
         ← Kiểm tra tập trung
@@ -1064,7 +1076,18 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
           }
           onOpenBlueprint={(blueprintId, versionId) => {
             const blueprintsBasePath = basePath.replace(/\/exams$/, '') + '/blueprints'
-            navigate(versionId ? `${blueprintsBasePath}/${blueprintId}/versions/${versionId}` : `${blueprintsBasePath}/${blueprintId}`)
+            // Trang blueprint dùng chung cho nhiều lối vào nên phải nói cho nó biết "quay lại" là về đâu:
+            // vào từ kỳ thi thì "←" phải trả về đúng kỳ thi này (tab Chốt khung đề), không phải trang blueprint.
+            navigate(
+              versionId ? `${blueprintsBasePath}/${blueprintId}/versions/${versionId}` : `${blueprintsBasePath}/${blueprintId}`,
+              {
+                state: {
+                  returnLabel: exam.name,
+                  returnState: { tab: 'blueprint' } satisfies ExamDetailNavState,
+                  returnTo: `${basePath}/${exam.id}`,
+                } satisfies BlueprintNavState,
+              },
+            )
           }}
         />
       ) : null}

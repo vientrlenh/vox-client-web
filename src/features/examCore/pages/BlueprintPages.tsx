@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, LayoutList, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { toApiError } from '@/shared/api'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { Pagination } from '@/shared/components/Pagination'
@@ -13,6 +13,7 @@ import { useCreateBlueprintMutation, useDeleteBlueprintVersionMutation, useUpdat
 import {
   formatNullableText,
   getBlueprintVersionStatusDisplay,
+  type BlueprintNavState,
   type ExamBlueprintDto,
   type ExamBlueprintVersionDto,
   type ExamBlueprintVersionStatus,
@@ -306,8 +307,10 @@ type BlueprintDetailPageProps = {
 
 function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const { blueprintId } = useParams()
+  const navState = location.state as BlueprintNavState
   const blueprintQuery = useExamBlueprintSummaryQuery(blueprintId ?? null)
   const blueprint = blueprintQuery.data
   const updateVersionStatusMutation = useUpdateBlueprintVersionStatusMutation()
@@ -382,10 +385,10 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
     <section className="mx-auto max-w-290">
       <button
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600"
-        onClick={() => navigate(-1)}
+        onClick={() => (navState?.returnTo ? navigate(navState.returnTo, { state: navState.returnState }) : navigate(-1))}
         type="button"
       >
-        ← Blueprint đề thi
+        ← {navState?.returnLabel ?? 'Blueprint đề thi'}
       </button>
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
@@ -457,7 +460,17 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
                         <button
                           aria-label={`Chi tiết phiên bản ${version.code}`}
                           className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                          onClick={() => navigate(`${basePath}/${blueprint.id}/versions/${version.id}`)}
+                          onClick={() =>
+                            // Trang phiên bản quay lại đúng trang này, và mang theo cả đích quay lại của
+                            // trang này (vd: kỳ thi đã mở blueprint) để chuỗi "←" không bị đứt.
+                            navigate(`${basePath}/${blueprint.id}/versions/${version.id}`, {
+                              state: {
+                                returnLabel: blueprint.name,
+                                returnState: navState,
+                                returnTo: `${basePath}/${blueprint.id}`,
+                              } satisfies BlueprintNavState,
+                            })
+                          }
                           title="Chi tiết"
                           type="button"
                         >

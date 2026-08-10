@@ -256,6 +256,12 @@ export type BulkUpdateQuestionStatusRequest = {
 
 export type BulkUpdateQuestionStatusFailure = {
   questionId: string
+  /** null khi backend không tìm thấy câu hỏi. */
+  questionCode: string | null
+  /** Trạng thái tại thời điểm bị từ chối; null khi không tìm thấy câu hỏi. */
+  currentStatus: QuestionStatus | null
+  /** Mã lý do ổn định (RejectionCode phía backend) — dùng để gom nhóm thay vì so khớp chuỗi. */
+  reasonCode: string
   reason: string
 }
 

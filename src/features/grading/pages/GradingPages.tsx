@@ -66,6 +66,7 @@ import {
   useGradingAssignmentsQuery,
   useGradingStatsQuery,
   useGradingTaskDetailQuery,
+  useMyGradingExamsQuery,
   useMyGradingTasksQuery,
 } from '../api/useGradingQueries'
 import { ExamRecordingPlayer } from '@/features/exam-recordings'
@@ -103,6 +104,7 @@ import {
   type GradingAssignmentRow,
   type GradingAssignmentStatus,
   type GradingRoundType,
+  type GradingTask,
   type GradingTaskDetail,
   type GradingTaskItem,
 } from '../types'
@@ -1237,7 +1239,13 @@ export function TeacherGradingPage({ title = 'Bài cần chấm' }: { title?: st
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<'' | GradingAssignmentStatus>('')
   const [roundType, setRoundType] = useState<'' | GradingRoundType>('')
-  const tasksQuery = useMyGradingTasksQuery(page, PAGE_SIZE, { roundType, status })
+  const [examId, setExamId] = useState('')
+  const [historyTarget, setHistoryTarget] = useState<GradingTask | null>(null)
+  const tasksQuery = useMyGradingTasksQuery(page, PAGE_SIZE, { examId, roundType, status })
+  // Chỉ kỳ thi giáo viên thật sự có bài — không dùng ExamPickerModal như bên nhà trường
+  // vì query kỳ thi ở đó không cho giáo viên chấm nhìn thấy kỳ thi tập trung.
+  const examsQuery = useMyGradingExamsQuery()
+  const exams = examsQuery.data ?? []
 
   // Số cho thẻ thống kê là TỔNG toàn bộ (độc lập filter). Hai query size=1 chỉ để lấy
   // totalElements; enum chỉ có ASSIGNED/COMPLETED nên tổng được giao = pending + done.
@@ -1285,7 +1293,7 @@ export function TeacherGradingPage({ title = 'Bài cần chấm' }: { title?: st
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        {/* Hai bộ lọc gộp vào đầu bảng thay vì hai hàng rời phía trên. */}
+        {/* Ba bộ lọc gộp vào đầu bảng thay vì mấy hàng rời phía trên. */}
         <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-3.5 py-2.5">
           <SegmentedControl
             ariaLabel="Trạng thái phân công"
@@ -1296,6 +1304,25 @@ export function TeacherGradingPage({ title = 'Bài cần chấm' }: { title?: st
             }}
             value={status}
           />
+          {/* Chỉ có một kỳ thi thì bộ lọc không lọc được gì — ẩn đi cho đỡ rối. */}
+          {exams.length > 1 ? (
+            <select
+              aria-label="Lọc theo kỳ thi"
+              className={`${FIELD_CLASS} max-w-64 min-w-44`}
+              onChange={(event) => {
+                setExamId(event.target.value)
+                setPage(1)
+              }}
+              value={examId}
+            >
+              <option value="">Tất cả kỳ thi</option>
+              {exams.map((exam) => (
+                <option key={exam.id} value={exam.id}>
+                  {exam.name ?? exam.code ?? 'Kỳ thi'} ({exam.taskCount})
+                </option>
+              ))}
+            </select>
+          ) : null}
           <select
             aria-label="Lọc theo vòng chấm"
             className={`${FIELD_CLASS} min-w-40`}
@@ -1412,20 +1439,35 @@ export function TeacherGradingPage({ title = 'Bài cần chấm' }: { title?: st
                           <StatusBadge label={display.label} tone={display.tone} />
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          className={[
-                            'inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold transition',
-                            completed
-                              ? 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                              : 'bg-cyan-600 text-white hover:bg-cyan-700',
-                          ].join(' ')}
-                          onClick={() => navigate(`/teacher/grading/${task.assignmentId}`)}
-                          type="button"
-                        >
-                          <Mic className="size-4" />
-                          {completed ? 'Xem lại' : 'Mở bài'}
-                        </button>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            className={[
+                              'inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold transition',
+                              completed
+                                ? 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                : 'bg-cyan-600 text-white hover:bg-cyan-700',
+                            ].join(' ')}
+                            onClick={() => navigate(`/teacher/grading/${task.assignmentId}`)}
+                            type="button"
+                          >
+                            <Mic className="size-4" />
+                            {completed ? 'Xem lại' : 'Mở bài'}
+                          </button>
+                          {/* Bấm được cả ở dòng ĐÃ CHẤM XONG: BE cho giáo viên đọc lịch
+                              sử của mọi bài mình TỪNG được giao, không chỉ bài đang cầm. */}
+                          <ActionMenuButton
+                            ariaLabel={`Thao tác khác cho bài ${task.resultCode}`}
+                            items={[
+                              {
+                                icon: History,
+                                id: 'history',
+                                label: 'Lịch sử điểm',
+                                onSelect: () => setHistoryTarget(task),
+                              },
+                            ]}
+                          />
+                        </div>
                       </td>
                     </tr>
                   )
@@ -1460,6 +1502,16 @@ export function TeacherGradingPage({ title = 'Bài cần chấm' }: { title?: st
           </div>
         </div>
       </div>
+
+      {/* Không truyền studentName: hàng đợi kỳ thi tập trung chấm ẩn danh, và BE cũng
+          không trả tên học sinh ở đây. */}
+      {historyTarget ? (
+        <ResultHistoryDialog
+          candidateResultId={historyTarget.candidateResultId}
+          onClose={() => setHistoryTarget(null)}
+          resultCode={historyTarget.resultCode}
+        />
+      ) : null}
     </section>
   )
 }
@@ -1560,6 +1612,7 @@ export function GradingTaskDetailView({
   const [initializedFor, setInitializedFor] = useState<string | null>(null)
   const [decision, setDecision] = useState<DecisionOutcome | null>(null)
   const [submitOpen, setSubmitOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   // Đồng bộ state khi mở một bài khác (điều hướng trực tiếp giữa các bài). Khoá theo
@@ -1723,6 +1776,16 @@ export function GradingTaskDetailView({
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5">
+          {/* "Điểm này đã đi qua những tay nào" — câu hỏi đúng của vòng phúc khảo, nên
+              để ngay trên header thay vì bắt quay về hàng đợi mới tra được. */}
+          <button
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+            onClick={() => setHistoryOpen(true)}
+            type="button"
+          >
+            <History className="size-4" />
+            Lịch sử điểm
+          </button>
           {readOnly ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">
               <CircleCheck className="size-3.5" />
@@ -2043,6 +2106,17 @@ export function GradingTaskDetailView({
           roundType={detail.roundType}
           scoreBefore={detail.scoreBefore ?? detail.currentTotalScore}
           totalScore={preview?.totalScore}
+        />
+      ) : null}
+
+      {/* studentName do BE quyết: chỉ bài kiểm tra trên lớp mới có, kỳ thi tập trung
+          luôn null nên tính ẩn danh giữ nguyên mà không cần điều kiện riêng ở đây. */}
+      {historyOpen ? (
+        <ResultHistoryDialog
+          candidateResultId={detail.candidateResultId}
+          onClose={() => setHistoryOpen(false)}
+          resultCode={detail.resultCode}
+          studentName={detail.studentName}
         />
       ) : null}
 

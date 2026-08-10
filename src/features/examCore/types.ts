@@ -297,6 +297,15 @@ export type ExamBlueprintDto = {
   versions: ExamBlueprintVersionDto[]
 }
 
+// State kèm theo khi một trang khác mở trang blueprint / phiên bản blueprint (vd: tab "Chốt khung đề"
+// của kỳ thi). Trang blueprint không biết ai gọi nó nên nơi gọi tự khai báo đích "quay lại" của mình;
+// `returnState` được truyền nguyên vẹn lại cho trang đích (kỳ thi dùng để mở lại đúng tab).
+export type BlueprintNavState = {
+  returnLabel?: string
+  returnState?: unknown
+  returnTo?: string
+} | null
+
 export type RubricVersionDto = {
   code: string
   id: string
