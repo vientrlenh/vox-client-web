@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CalendarClock, FileText, Scale } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarClock, CircleX, FileText, Scale } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { formatScore } from '@/features/exam-results/types'
 import { APPEAL_SCOPE_TEXT } from '@/features/reevaluation'
@@ -66,6 +66,16 @@ export function StudentAppealDetailPage() {
           <div className="border-y border-emerald-200 bg-emerald-50 px-5 py-5">
             <div className="flex flex-wrap items-center gap-4"><div><p className="text-xs font-bold uppercase text-slate-500">Điểm ban đầu</p><p className="mt-1 text-2xl font-extrabold text-slate-700">{formatScore(appeal.originalScore)}</p></div><ArrowRight className="size-5 text-emerald-600" /><div><p className="text-xs font-bold uppercase text-emerald-700">Điểm sau phúc khảo</p><p className="mt-1 text-2xl font-extrabold text-emerald-700">{formatScore(appeal.finalScore)}</p></div></div>
             <div className="mt-4 border-t border-emerald-200 pt-4"><p className="flex items-center gap-2 text-sm font-bold text-emerald-900"><FileText className="size-4" />Ghi chú công bố</p><p className="mt-2 text-sm leading-6 text-emerald-900">{appeal.decisionNote || 'Không có ghi chú bổ sung.'}</p></div>
+          </div>
+        ) : null}
+        {/* Đơn bị từ chối cũng phải nói vì sao: BE bắt buộc người duyệt nhập lý do và trả về
+            qua `decisionNote`, trước đây FE chỉ vẽ field này trong nhánh PUBLISHED nên học
+            sinh chỉ thấy mỗi badge "Bị từ chối". */}
+        {appeal.status === 'REJECTED' ? (
+          <div className="border-y border-red-200 bg-red-50 px-5 py-5">
+            <p className="flex items-center gap-2 text-sm font-bold text-red-900"><CircleX className="size-4" />Lý do từ chối</p>
+            <p className="mt-2 text-sm leading-6 text-red-900">{appeal.decisionNote || 'Không có lý do được ghi nhận.'}</p>
+            <p className="mt-4 border-t border-red-200 pt-4 text-xs text-red-700">Từ chối lúc {formatDate(appeal.resolvedAt)} · Điểm giữ nguyên {formatScore(appeal.originalScore)}</p>
           </div>
         ) : null}
       </div>
