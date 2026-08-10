@@ -9,6 +9,9 @@ export const appConfig = {
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? '',
     storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? '',
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? '',
+    // Web Push certificate (Firebase Console > Cloud Messaging). Thiếu khoá này thì
+    // `getToken` không tạo được push subscription, và toàn bộ nhánh push tự tắt.
+    vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '',
   },
   graphqlEndpoint: import.meta.env.VITE_GRAPHQL_ENDPOINT ?? '/graphql',
   streamApiUrl: import.meta.env.VITE_STREAM_API_URL ?? '',

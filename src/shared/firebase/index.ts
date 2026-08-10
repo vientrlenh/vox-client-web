@@ -5,4 +5,6 @@ import { appConfig } from '@/shared/config/env'
 const app =
   getApps().length === 0 ? initializeApp(appConfig.firebase) : getApps()[0]
 
+export const firebaseApp = app
+
 export const storage = getStorage(app)

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "serve": "node --env-file-if-exists=.env scripts/serve.mjs",
+    "start": "pnpm build && pnpm serve",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "jest --runInBand",
