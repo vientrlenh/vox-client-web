@@ -108,6 +108,30 @@ const SchoolAdminFrameworksPage = lazy(() =>
   })),
 )
 
+const SystemAdminFrameworkVersionImportPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.FrameworkVersionImportPage,
+  })),
+)
+
+const SystemAdminFrameworkCriterionImportPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.FrameworkCriterionImportPage,
+  })),
+)
+
+const SystemAdminFrameworkResultBandImportPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.FrameworkResultBandImportPage,
+  })),
+)
+
+const SystemAdminFrameworkCriterionBandImportPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.FrameworkCriterionBandImportPage,
+  })),
+)
+
 const SchoolAdminFrameworkDetailPage = lazy(() =>
   import('@/features/frameworks').then((module) => ({
     default: module.SchoolAdminFrameworkDetailPage,
@@ -817,8 +841,24 @@ export function AppRoutes() {
               element={<SystemAdminFrameworkDetailPage />}
             />
             <Route
+              path="system-admin/frameworks/:frameworkId/versions/import"
+              element={<SystemAdminFrameworkVersionImportPage />}
+            />
+            <Route
               path="system-admin/frameworks/:frameworkId/versions/:versionId"
               element={<SystemAdminFrameworkVersionDetailPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId/versions/:versionId/criteria/import"
+              element={<SystemAdminFrameworkCriterionImportPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId/versions/:versionId/result-bands/import"
+              element={<SystemAdminFrameworkResultBandImportPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId/versions/:versionId/criterion-bands/import"
+              element={<SystemAdminFrameworkCriterionBandImportPage />}
             />
             <Route
               path="system-admin/rubrics"

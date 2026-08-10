@@ -1,4 +1,4 @@
-import { getStoredAuthUser } from '@/features/auth/session/authSession'
+import { getStoredAuthClaims } from '@/features/auth/session/authSession'
 
 export type ApiResponse<T> = {
   data: T
@@ -11,7 +11,7 @@ export type MutationResult<TData> = {
 }
 
 export function requireSchoolId() {
-  const schoolId = getStoredAuthUser()?.schoolId?.trim()
+  const schoolId = getStoredAuthClaims()?.schoolId?.trim()
 
   if (!schoolId) {
     throw {

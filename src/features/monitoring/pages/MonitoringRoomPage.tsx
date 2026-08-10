@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 
+import { toApiError } from '@/shared/api'
+import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
+import { useForceEndExamSessionMutation } from '@/features/examCore/api/mutations'
 import { useMyProctorScheduleCandidatesQuery } from '@/features/examCore/api/queries'
 import type { ProctorCandidateSummaryDto } from '@/features/examCore/types'
 
@@ -10,7 +14,7 @@ import { LiveRewindPanel } from '../components/LiveRewindPanel'
 import { ParticipantCard } from '../components/ParticipantCard'
 import { RoomAlertFeed } from '../components/RoomAlertFeed'
 import { RoomRosterPanel } from '../components/RoomRosterPanel'
-import { useMonitoringBoard, type StreamFilter } from '../hooks/useMonitoringBoard'
+import { useMonitoringBoard, type ParticipantBoardEntry, type StreamFilter } from '../hooks/useMonitoringBoard'
 import { type MonitorConnectionState, type StreamType } from '../types'
 
 const EMPTY_CANDIDATES: ProctorCandidateSummaryDto[] = []
@@ -38,6 +42,11 @@ export function MonitoringRoomPage() {
     })
     const candidatesQuery = useMyProctorScheduleCandidatesQuery(scheduleId ?? null)
     const candidates = candidatesQuery.data ?? EMPTY_CANDIDATES
+
+    const forceEndExamSessionMutation = useForceEndExamSessionMutation()
+    const { confirmWithReason, dialog } = useConfirmationDialog()
+    const [message, setMessage] = useState<string | null>(null)
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
     // Bộ lọc mật độ, KHÔNG phải tab điều hướng: mọi lựa chọn đều đang nhìn cùng một tập học viên,
     // chỉ khác số luồng hiện trên mỗi ô. Tách camera và màn hình thành hai tab sẽ chia đôi đúng thứ
@@ -87,6 +96,32 @@ export function MonitoringRoomPage() {
         }
         return map
     }, [candidates])
+
+    async function handleForceEnd(entry: ParticipantBoardEntry) {
+        if (!entry.sessionId) {
+            return
+        }
+        const candidateName = nameByCandidateId.get(entry.candidateId) ?? entry.studentName
+
+        const result = await confirmWithReason({
+            message: `Tạm dừng bài thi của ${candidateName} để xem xét? Học sinh sẽ bị ngắt kết nối ngay và không vào lại được cho tới khi được dỡ cấm.`,
+            reasonLabel: 'Lý do buộc kết thúc',
+            reasonPlaceholder: 'Nhập lý do buộc kết thúc bài thi...',
+            requireReason: true,
+            title: 'Xác nhận buộc kết thúc',
+        })
+        if (!result.confirmed) {
+            return
+        }
+
+        try {
+            await forceEndExamSessionMutation.mutateAsync({ reason: result.reason, sessionId: entry.sessionId })
+            await candidatesQuery.refetch()
+            setMessage(`Đã buộc kết thúc bài thi của ${candidateName}.`)
+        } catch (error) {
+            setErrorMessage(toApiError(error).message)
+        }
+    }
 
     return (
         <section aria-labelledby="monitoring-room-title" className="grid gap-6">
@@ -145,6 +180,7 @@ export function MonitoringRoomPage() {
                                     entry={entry}
                                     key={entry.candidateId}
                                     now={now}
+                                    onForceEnd={handleForceEnd}
                                     onWatch={(streamId) => {
                                         const picked = entry.allStreams.find((item) => item.streamId === streamId)
                                         if (picked) {
@@ -185,6 +221,10 @@ export function MonitoringRoomPage() {
                     />
                 </div>
             </div>
+
+            {dialog}
+            <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
+            <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
         </section>
     )
 }

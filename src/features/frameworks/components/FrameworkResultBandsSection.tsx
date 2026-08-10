@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Pencil, Plus, X } from 'lucide-react'
 import type { FrameworkResultBand } from '../types'
 import { formatNullableText } from '../types'
@@ -5,6 +6,8 @@ import { formatNullableText } from '../types'
 type FrameworkResultBandsSectionProps = {
   canManage?: boolean
   errorMessage?: string
+  // Nút phụ (VD: link "Import hàng loạt") hiển thị cạnh nút thêm thủ công.
+  headerExtra?: ReactNode
   isError: boolean
   isLoading: boolean
   onAddResultBand?: () => void
@@ -17,6 +20,7 @@ type FrameworkResultBandsSectionProps = {
 export function FrameworkResultBandsSection({
   canManage = false,
   errorMessage,
+  headerExtra,
   isError,
   isLoading,
   onAddResultBand,
@@ -32,14 +36,17 @@ export function FrameworkResultBandsSection({
       <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
         <h2 className="text-lg font-black text-blue-950">Thang kết quả</h2>
         {canManage ? (
-          <button
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
-            onClick={onAddResultBand}
-            type="button"
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Thêm thang kết quả
-          </button>
+          <div className="flex items-center gap-2">
+            {headerExtra}
+            <button
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+              onClick={onAddResultBand}
+              type="button"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              Thêm thang kết quả
+            </button>
+          </div>
         ) : null}
       </div>
 

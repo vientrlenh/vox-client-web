@@ -1,8 +1,15 @@
 export type ImportField = {
+  // Ghi chú thêm hiển thị dưới dạng tooltip cạnh lựa chọn cột — dùng cho các
+  // trường có cú pháp riêng (VD: positiveSignals/negativeSignals) mà tên
+  // trường không tự giải thích được.
+  hint?: string
   isRequired: boolean
   label: string
   value: string
 }
+
+const FRAMEWORK_SIGNAL_HINT =
+  'Cú pháp mỗi tín hiệu: code|description|importance|evidenceHint. Nhiều tín hiệu cách nhau bằng dấu ";". importance thuộc {HIGH, MEDIUM, LOW}. VD: CLR1|Phát âm rõ ràng|HIGH|Nghe được toàn bộ câu;CLR2|Ngập ngừng nhẹ|LOW|'
 
 export const IMPORT_FIELDS_BY_TYPE: Record<string, ImportField[]> = {
   ASSESSMENT_POLICY: [
@@ -19,6 +26,47 @@ export const IMPORT_FIELDS_BY_TYPE: Record<string, ImportField[]> = {
     { isRequired: false, label: 'Khối', value: 'schoolGradeLevel' },
     { isRequired: false, label: 'Khối năm học', value: 'schoolGrade' },
     { isRequired: false, label: 'Lớp', value: 'schoolClass' },
+  ],
+  FRAMEWORK_CRITERION: [
+    {
+      hint: 'Phải khớp một FrameworkCriterionCode được backend cho phép; dòng có mã không hợp lệ sẽ bị đánh dấu lỗi.',
+      isRequired: true,
+      label: 'Mã tiêu chí (code)',
+      value: 'code',
+    },
+    { isRequired: true, label: 'Tên tiêu chí', value: 'name' },
+    { isRequired: false, label: 'Mô tả', value: 'description' },
+    { isRequired: true, label: 'Thứ tự (order)', value: 'order' },
+  ],
+  FRAMEWORK_CRITERION_BAND: [
+    { isRequired: true, label: 'Mã tiêu chí (criterionCode)', value: 'criterionCode' },
+    { isRequired: true, label: 'Mã thang kết quả (resultBandCode)', value: 'resultBandCode' },
+    { isRequired: false, label: 'Mô tả mức đánh giá (descriptor)', value: 'descriptor' },
+    {
+      hint: FRAMEWORK_SIGNAL_HINT,
+      isRequired: false,
+      label: 'Tín hiệu tích cực (positiveSignals)',
+      value: 'positiveSignals',
+    },
+    {
+      hint: FRAMEWORK_SIGNAL_HINT,
+      isRequired: false,
+      label: 'Tín hiệu tiêu cực (negativeSignals)',
+      value: 'negativeSignals',
+    },
+  ],
+  FRAMEWORK_RESULT_BAND: [
+    { isRequired: true, label: 'Mã thang kết quả (code)', value: 'code' },
+    { isRequired: true, label: 'Nhãn (label)', value: 'label' },
+    { isRequired: false, label: 'Mô tả', value: 'description' },
+    { isRequired: true, label: 'Thứ tự (order)', value: 'order' },
+  ],
+  FRAMEWORK_VERSION: [
+    { isRequired: true, label: 'Số phiên bản (version)', value: 'version' },
+    { isRequired: true, label: 'Tên phiên bản', value: 'name' },
+    { isRequired: false, label: 'Mô tả', value: 'description' },
+    { isRequired: true, label: 'Hiệu lực từ ngày', value: 'effectiveFrom' },
+    { isRequired: false, label: 'Hiệu lực đến ngày', value: 'effectiveTo' },
   ],
   QUESTION: [
     { isRequired: false, label: 'Mã câu hỏi', value: 'code' },

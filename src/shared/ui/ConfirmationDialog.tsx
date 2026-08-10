@@ -7,6 +7,7 @@ type SelectOption = {
 
 type ConfirmationDialogProps = {
   cancelLabel?: string
+  confirmDisabled?: boolean
   confirmLabel?: string
   isOpen: boolean
   message: string
@@ -28,6 +29,7 @@ type ConfirmationDialogProps = {
 
 export function ConfirmationDialog({
   cancelLabel = 'Không',
+  confirmDisabled = false,
   confirmLabel = 'Xác nhận',
   isOpen,
   message,
@@ -123,7 +125,8 @@ export function ConfirmationDialog({
             {cancelLabel}
           </button>
           <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300"
+            disabled={confirmDisabled}
             onClick={onConfirm}
             type="button"
           >

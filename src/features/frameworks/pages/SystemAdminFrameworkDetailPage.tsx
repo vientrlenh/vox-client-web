@@ -311,17 +311,27 @@ function FrameworkDetailPage({ basePath }: { basePath: string }) {
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <h2 className="text-lg font-black text-blue-950">Phiên bản</h2>
           {canManage ? (
-            <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700"
-              onClick={() => {
-                setCreateVersionError(null)
-                setCreateVersionOpen(true)
-              }}
-              type="button"
-            >
-              <Plus aria-hidden="true" className="size-4" />
-              Tạo phiên bản
-            </button>
+            <div className="flex items-center gap-2">
+              {basePath === '/system-admin' ? (
+                <Link
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+                  to={`${basePath}/frameworks/${frameworkId ?? ''}/versions/import`}
+                >
+                  Import hàng loạt
+                </Link>
+              ) : null}
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700"
+                onClick={() => {
+                  setCreateVersionError(null)
+                  setCreateVersionOpen(true)
+                }}
+                type="button"
+              >
+                <Plus aria-hidden="true" className="size-4" />
+                Tạo phiên bản
+              </button>
+            </div>
           ) : null}
         </div>
 

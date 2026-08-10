@@ -1,10 +1,12 @@
-import { Flag } from 'lucide-react'
+import { Ban, Flag } from 'lucide-react'
 
 import { StatusBadge, type StatusTone } from '@/shared/ui/StatusBadge'
 
 import type { ParticipantBoardEntry, ParticipantStatus } from '../hooks/useMonitoringBoard'
 import { getAlertTypeDisplay, getStreamTypeLabel } from '../types'
 import { StreamThumbnail } from './StreamThumbnail'
+
+const LIVE_SESSION_STATUSES = new Set(['IN_PROGRESS', 'INTERRUPTED'])
 
 const STATUS_DISPLAY: Record<ParticipantStatus, { label: string; tone: StatusTone }> = {
     alerted: { label: 'Có cảnh báo', tone: 'danger' },
@@ -27,17 +29,24 @@ const STATUS_RING: Record<ParticipantStatus, string> = {
 type ParticipantCardProps = {
     entry: ParticipantBoardEntry
     now: number
+    onForceEnd: (entry: ParticipantBoardEntry) => void
     onWatch: (streamId: string) => void
     watchingStreamId?: string
 }
 
-export function ParticipantCard({ entry, now, onWatch, watchingStreamId }: ParticipantCardProps) {
+export function ParticipantCard({ entry, now, onForceEnd, onWatch, watchingStreamId }: ParticipantCardProps) {
     const status = STATUS_DISPLAY[entry.status]
     const alertDisplay = entry.latestAlert ? getAlertTypeDisplay(entry.latestAlert.alertType) : null
 
     // Học viên không có loại luồng đang lọc: vẫn giữ ô lại thay vì ẩn đi, vì "không có màn hình"
     // chính là thông tin mà bộ lọc màn hình cần cho thấy.
     const missingForFilter = entry.streams.length === 0
+
+    // Khớp điều kiện "Buộc kết thúc" của CandidatesTab: chỉ phiên đang sống, chưa bị cấm mới hủy
+    // được - quyền thật sự vẫn do backend (@PreAuthorize + ExamSessionModerationAccessService)
+    // quyết định, đây chỉ là gợi ý hiển thị để không mời bấm vào một hành động chắc chắn sẽ lỗi.
+    const canForceEnd =
+        Boolean(entry.sessionId) && !entry.blockedAt && LIVE_SESSION_STATUSES.has(entry.sessionStatus ?? '')
 
     return (
         <div className={`rounded-xl border bg-white p-4 ${STATUS_RING[entry.status]}`}>
@@ -59,6 +68,17 @@ export function ParticipantCard({ entry, now, onWatch, watchingStreamId }: Parti
                         </span>
                     ) : null}
                     <StatusBadge label={status.label} tone={status.tone} />
+                    {canForceEnd ? (
+                        <button
+                            className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                            onClick={() => onForceEnd(entry)}
+                            title="Buộc kết thúc bài thi của học viên này"
+                            type="button"
+                        >
+                            <Ban aria-hidden="true" className="size-3" />
+                            Hủy bài thi
+                        </button>
+                    ) : null}
                 </div>
             </div>
 

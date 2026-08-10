@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  Bell,
   BookOpen,
   ChevronDown,
   ClipboardCheck,
@@ -29,6 +28,7 @@ import logoImage from '@/assets/images/logo.png'
 import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
+import { NotificationBell, unregisterPushDevice } from '@/features/notifications'
 import { useProfileQuery } from '@/features/profile'
 import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
 
@@ -371,9 +371,12 @@ export function SchoolAdminLayout() {
       : group,
   )
 
-  function handleLogout() {
+  async function handleLogout() {
     setIsMobileMenuOpen(false)
     setIsUserMenuOpen(false)
+    // Gỡ thiết bị nhận thông báo TRƯỚC khi xoá token: request cần header
+    // Authorization, và backend không có endpoint đăng xuất nào dọn giúp việc này.
+    await unregisterPushDevice()
     clearAuthTokens()
     dispatch(clearAuthState())
     navigate('/login', { replace: true })
@@ -435,14 +438,7 @@ export function SchoolAdminLayout() {
           </div>
 
           <div className="ml-auto flex items-center gap-3">
-            <button
-              aria-label="Thông báo"
-              className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-slate-950 transition hover:border-slate-200 hover:bg-slate-50"
-              type="button"
-            >
-              <Bell aria-hidden="true" className="size-5" />
-              <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500 ring-2 ring-white" />
-            </button>
+            <NotificationBell />
 
             <div className="relative">
               <button
