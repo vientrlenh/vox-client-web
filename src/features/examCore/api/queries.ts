@@ -242,6 +242,8 @@ const EXAM_CANDIDATE_FIELDS = `
     flagged
     flagReason
     totalScore
+    scoringScaleMin
+    scoringScaleMax
     rubricResultBandCode
     rubricResultBandName
     resultStatus
@@ -254,6 +256,8 @@ const EXAM_CANDIDATE_FIELDS = `
     flagged
     flagReason
     totalScore
+    scoringScaleMin
+    scoringScaleMax
     rubricResultBandCode
     rubricResultBandName
     resultStatus

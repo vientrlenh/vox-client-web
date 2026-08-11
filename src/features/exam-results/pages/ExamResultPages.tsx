@@ -26,6 +26,7 @@ import { Pagination } from '@/shared/components/Pagination'
 import {
   buildValidityRulesForDisplay,
   criterionScorePercentage,
+  formatScaleMax,
   getResultScoreTone,
 } from '@/shared/lib/aiEvaluation'
 import { formatPublishedResult } from '@/shared/lib/resultScore'
@@ -88,8 +89,37 @@ function getPendingRowStatus(candidateStatus?: string | null) {
   }
 }
 
-function getResultScoreTextClass(value?: number | null) {
-  const tone = getResultScoreTone(value)
+/**
+ * Hậu tố " / 100" cho một con số điểm. Không biết thang thì KHÔNG hiện gì -- một con số trần vẫn
+ * đúng, còn đoán bừa mẫu số thì sai. Trước 2026-08-11 tổng điểm hiện trần không mẫu số, người xem
+ * phải tự đoán thang.
+ */
+function scaleSuffixOf(scaleMax?: number | null) {
+  const formatted = formatScaleMax(scaleMax)
+  return formatted === null ? '' : ` / ${formatted}`
+}
+
+function scaleSuffix(result: Pick<ExamCandidateResultDto, 'scoringScaleMax'>) {
+  const formatted = formatScaleMax(result.scoringScaleMax)
+  return formatted === null ? null : <span className="text-slate-400"> / {formatted}</span>
+}
+
+/**
+ * Màu chữ cho một điểm số, quy đổi về phần trăm theo THANG THẬT trước khi so ngưỡng 80/45.
+ *
+ * Ngưỡng đó chỉ đúng trên thang phần trăm; truyền điểm thô vào là sai với mọi rubric không phải
+ * 0-100 (thang 0-10 thì mọi điểm đều < 45, bài 10/10 cũng đỏ). Đó chính là lỗi có sẵn ở đây trước
+ * 2026-08-11 -- thang 0-100 làm điểm trùng phần trăm nên không ai thấy.
+ *
+ * `criterionScorePercentage` trả nguyên giá trị khi thiếu thang, nên chỗ nào chưa truyền thang
+ * vẫn chạy y như cũ thay vì đổi màu bất ngờ.
+ */
+function getResultScoreTextClass(
+  value?: number | null,
+  scaleMin?: number | null,
+  scaleMax?: number | null,
+) {
+  const tone = getResultScoreTone(criterionScorePercentage(value, scaleMin, scaleMax))
   if (tone === 'success') {
     return 'text-emerald-600'
   }
@@ -141,7 +171,10 @@ function ResultBand({
 
   return (
     <div>
-      <p className={`text-[13px] font-bold ${getResultScoreTextClass(officialScore)}`}>{formatScore(officialScore)}</p>
+      <p className={`text-[13px] font-bold ${getResultScoreTextClass(officialScore, attempt?.scoringScaleMin, attempt?.scoringScaleMax)}`}>
+        {formatScore(officialScore)}
+        {scaleSuffixOf(attempt?.scoringScaleMax)}
+      </p>
       <p className="text-xs text-slate-500">{formatPublishedResult(attempt)}</p>
     </div>
   )
@@ -203,7 +236,10 @@ function AttemptRows({
               <StatusBadge label={attemptStatus.label} tone={attemptStatus.tone} />
             </span>
             <div>
-              <p className={`text-sm font-bold ${getResultScoreTextClass(attempt.totalScore)}`}>{formatScore(attempt.totalScore)}</p>
+              <p className={`text-sm font-bold ${getResultScoreTextClass(attempt.totalScore, attempt.scoringScaleMin, attempt.scoringScaleMax)}`}>
+                {formatScore(attempt.totalScore)}
+                {scaleSuffixOf(attempt.scoringScaleMax)}
+              </p>
               <p className="text-xs text-slate-500">
                 {formatPublishedResult(attempt)}
               </p>
@@ -211,8 +247,9 @@ function AttemptRows({
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <StatusBadge label="Chính thức" tone="violet" />
                   {officialScore != null && officialScore !== attempt.totalScore ? (
-                    <span className={`text-xs ${getResultScoreTextClass(officialScore)}`}>
+                    <span className={`text-xs ${getResultScoreTextClass(officialScore, attempt.scoringScaleMin, attempt.scoringScaleMax)}`}>
                       Điểm chính thức: {formatScore(officialScore)}
+                      {scaleSuffixOf(attempt.scoringScaleMax)}
                     </span>
                   ) : null}
                 </div>
@@ -317,6 +354,12 @@ function ExamResultsListPage({
     gradedRows.length === 0
       ? null
       : gradedRows.reduce((sum, row) => sum + (row.candidate.officialScore ?? 0), 0) / gradedRows.length
+  // Trang này là kết quả của MỘT kỳ thi, mà một kỳ gắn đúng một assessment policy nên đúng một
+  // rubric version -- mọi thí sinh ở đây cùng thang. Lấy thang của lượt đầu tiên tra được là đủ,
+  // không cần (và không nên) trung bình các thang khác nhau.
+  const examScale = gradedRows
+    .flatMap((row) => row.candidate.attempts ?? [])
+    .find((attempt) => typeof attempt.scoringScaleMax === 'number')
 
   if (!examId) {
     return (
@@ -361,7 +404,12 @@ function ExamResultsListPage({
           icon={<Gauge size={19} />}
           iconTone="violet"
           label="Điểm trung bình"
-          value={<span className={getResultScoreTextClass(averageScoreValue)}>{formatScore(averageScoreValue)}</span>}
+          value={(
+            <span className={getResultScoreTextClass(averageScoreValue, examScale?.scoringScaleMin, examScale?.scoringScaleMax)}>
+              {formatScore(averageScoreValue)}
+              {scaleSuffixOf(examScale?.scoringScaleMax)}
+            </span>
+          )}
         />
       </div>
 
@@ -487,7 +535,10 @@ function SectionOverview({ result }: { result: ExamCandidateResultDto }) {
       {result.sections.map((section) => (
         <div className="rounded-2xl border border-slate-200 bg-white p-4" key={section.sectionId}>
           <p className="text-sm font-bold text-slate-900">{section.title ?? 'Section'}</p>
-          <p className={`mt-2 text-2xl font-extrabold ${getResultScoreTextClass(section.score)}`}>{formatScore(section.score)}</p>
+          <p className={`mt-2 text-2xl font-extrabold ${getResultScoreTextClass(section.score, result.scoringScaleMin, result.scoringScaleMax)}`}>
+            {formatScore(section.score)}
+            {scaleSuffix(result)}
+          </p>
           <p className="mt-1 text-xs text-slate-500">Điểm quy đổi của phần này</p>
         </div>
       ))}
@@ -502,11 +553,16 @@ export function QuestionEvaluationCard({
   onToggle,
   questionCode,
   questionText,
+  scoringScaleMax,
+  scoringScaleMin,
   variant = 'full',
 }: {
   evaluation: ExamItemEvaluationDto | null | undefined
   itemResult: ExamCandidateResultDto['items'][number] | undefined
   onToggle: () => void
+  /** Thang điểm của rubric, để tô màu theo mức đạt thật. Không truyền thì giữ hành vi cũ. */
+  scoringScaleMax?: number | null
+  scoringScaleMin?: number | null
   open: boolean
   questionCode?: string | null
   questionText?: string | null
@@ -546,7 +602,12 @@ export function QuestionEvaluationCard({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {itemResult ? (
-            <StatusBadge label={`Điểm câu ${formatScore(itemResult.itemScore)}`} tone={getResultScoreTone(itemResult.itemScore)} />
+            <StatusBadge
+              label={`Điểm câu ${formatScore(itemResult.itemScore)}${scaleSuffixOf(scoringScaleMax)}`}
+              tone={getResultScoreTone(
+                criterionScorePercentage(itemResult.itemScore, scoringScaleMin, scoringScaleMax),
+              )}
+            />
           ) : null}
           {itemResult ? (
             <StatusBadge label={`Quy đổi ${formatScore(itemResult.weightedScore)}`} tone="violet" />
@@ -1015,7 +1076,12 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
               icon={<Gauge size={19} />}
               iconTone="indigo"
               label="Tổng điểm"
-              value={<span className={getResultScoreTextClass(result.totalScore)}>{formatScore(result.totalScore)}</span>}
+              value={(
+                <span className={getResultScoreTextClass(result.totalScore, result.scoringScaleMin, result.scoringScaleMax)}>
+                  {formatScore(result.totalScore)}
+                  {scaleSuffix(result)}
+                </span>
+              )}
             />
             <StatCard icon={<Target size={19} />} iconTone="violet" label="Xếp loại" value={formatPublishedResult(result)} />
             <StatCard icon={<ClipboardList size={19} />} iconTone="amber" label="Band mục tiêu" value={result.targetFrameworkBandLabel ?? result.targetFrameworkBandCode ?? '-'} />
@@ -1047,6 +1113,8 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
                 const open = expandedItems[item.id] ?? true
                 return (
                   <QuestionEvaluationCard
+                    scoringScaleMax={result.scoringScaleMax}
+                    scoringScaleMin={result.scoringScaleMin}
                     evaluation={evaluation}
                     itemResult={itemResult}
                     key={item.id}

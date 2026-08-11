@@ -416,6 +416,12 @@ export type ExamAttemptSummaryDto = {
   resultStatus?: string | null
   rubricResultBandCode?: string | null
   rubricResultBandName?: string | null
+  /**
+   * Thang điểm của rubric đã chấm ĐÚNG lượt này. Danh sách lượt thi trộn nhiều kỳ, mỗi kỳ có thể
+   * dùng rubric khác thang, nên không suy chung được -- phải đọc theo từng dòng.
+   */
+  scoringScaleMax?: number | null
+  scoringScaleMin?: number | null
   sessionId: string
   startedAt?: string | null
   status: string

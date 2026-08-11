@@ -66,6 +66,8 @@ export type ExamCandidateResultDto = {
   rubricResultBandName?: string | null
   sections: ExamResultSectionDto[]
   sessionId: string
+  scoringScaleMax?: number | null
+  scoringScaleMin?: number | null
   status: string
   targetFrameworkBandCode?: string | null
   targetFrameworkBandId?: string | null
