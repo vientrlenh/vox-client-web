@@ -45,7 +45,7 @@ const navigationItems = [
 const navigationGroups: NavigationGroup[] = [
   {
     icon: BookOpen,
-    label: 'Lớp học',
+    label: 'Trường học',
     items: [
       {
         label: 'Quản lý lớp học',
