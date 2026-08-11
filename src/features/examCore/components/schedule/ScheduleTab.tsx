@@ -25,6 +25,7 @@ import { AddStudentToRoomModal } from './AddStudentToRoomModal'
 import { CreateScheduleModal } from './CreateScheduleModal'
 import { ManageProctorsModal } from './ManageProctorsModal'
 import { MoveScheduleModal } from './MoveScheduleModal'
+import { getSchedulePublishBlockingReason } from '../../utils/schedulePublish'
 import { computeAssignments } from './paperAssignment'
 import { ScheduleSessionDetail } from './ScheduleSessionDetail'
 import { ScheduleSessionsCard } from './ScheduleSessionsCard'
@@ -181,16 +182,38 @@ export function ScheduleTab({
   /**
    * Công bố hàng loạt các ca còn Bản nháp. Cả hai loại bài đều đòi mọi ca đã công bố mới lên lịch
    * được (UpdateExamStatusUseCase), nên mở từng menu để bấm "Công bố" là việc lặp không cần thiết.
-   * Chạy tuần tự để lỗi của ca nào hiện đúng message của ca đó — ca thiếu giám thị sẽ bị BE từ chối.
+   *
+   * <p>Bỏ qua sẵn những ca backend chắc chắn từ chối (thiếu giám thị, chưa có thí sinh, còn thí sinh
+   * chưa có đề) thay vì để lượt chạy đứt giữa chừng ở ca đầu tiên hỏng: một ca thiếu điều kiện không
+   * phải lý do để các ca còn lại không được công bố. Vẫn chạy tuần tự để lỗi ngoài dự đoán của ca nào
+   * hiện đúng message của ca đó.
    */
   async function handlePublishAllSchedules() {
     const draftSchedules = schedules.filter((schedule) => schedule.status === 'DRAFT')
     if (draftSchedules.length === 0) {
       return
     }
+    const evaluated = draftSchedules.map((schedule) => ({
+      reason: getSchedulePublishBlockingReason(schedule, candidates),
+      schedule,
+    }))
+    const readySchedules = evaluated.filter((entry) => entry.reason === null).map((entry) => entry.schedule)
+    const skippedCount = draftSchedules.length - readySchedules.length
+    if (readySchedules.length === 0) {
+      // Mỗi ca có thể vướng một lý do khác nhau; chỉ nêu đích danh khi cả loạt cùng một lý do, còn lại
+      // trỏ người dùng về menu từng ca thay vì nói như thể chỉ có một nguyên nhân.
+      const reasons = new Set(evaluated.map((entry) => entry.reason))
+      setErrorMessage(
+        reasons.size === 1
+          ? `Chưa ca thi nào công bố được: ${[...reasons][0]}`
+          : 'Chưa ca thi nào công bố được — mở menu từng ca để xem lý do.',
+      )
+      return
+    }
+    const skippedNote = skippedCount > 0 ? ` ${skippedCount} ca chưa đủ điều kiện sẽ được bỏ qua.` : ''
     if (
       !(await confirm({
-        message: `Công bố ${draftSchedules.length} ca thi? Học sinh và giám thị sẽ thấy các ca này, và không sửa được phòng/khung giờ nữa.`,
+        message: `Công bố ${readySchedules.length} ca thi? Học sinh và giám thị sẽ thấy các ca này, và không sửa được phòng/khung giờ nữa.${skippedNote}`,
         title: 'Công bố tất cả ca thi',
       }))
     ) {
@@ -198,11 +221,15 @@ export function ScheduleTab({
     }
     let publishedCount = 0
     try {
-      for (const schedule of draftSchedules) {
+      for (const schedule of readySchedules) {
         await updateStatusMutation.mutateAsync({ examId, payload: { action: 'PUBLISH' }, scheduleId: schedule.id })
         publishedCount += 1
       }
-      setMessage(`Đã công bố ${publishedCount} ca thi.`)
+      setMessage(
+        skippedCount > 0
+          ? `Đã công bố ${publishedCount} ca thi, bỏ qua ${skippedCount} ca chưa đủ điều kiện.`
+          : `Đã công bố ${publishedCount} ca thi.`,
+      )
     } catch (error) {
       handleError(error)
     } finally {
@@ -379,7 +406,10 @@ export function ScheduleTab({
     }
     // Công bố / hoàn thành / hủy ca là thao tác vận hành nên vẫn dùng được khi kỳ thi đang diễn ra.
     if (schedule.status === 'DRAFT') {
+      const publishBlockingReason = getSchedulePublishBlockingReason(schedule, candidates)
       items.push({
+        disabled: Boolean(publishBlockingReason),
+        disabledReason: publishBlockingReason ?? undefined,
         id: 'publish',
         label: 'Công bố',
         onSelect: () => void handleStatusAction(schedule, 'PUBLISH'),

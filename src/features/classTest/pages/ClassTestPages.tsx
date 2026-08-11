@@ -1443,12 +1443,15 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
   /**
    * Phân đề yêu cầu mọi mã đề đã khoá. Bài trên lớp không có luồng duyệt nên khoá là một bước.
+   *
+   * <p>Khoá mã đề cuối cùng là lúc backend tự phân đề cho học sinh chưa có đề
+   * (`ExamPaperAutoAssigner.backfillExam`), còn mở lại thì gỡ đề của học sinh đang dùng mã đề đó.
    */
   async function handleUpdatePaperStatus(paperId: string, action: 'LOCK' | 'REOPEN') {
     const confirmMessage =
       action === 'LOCK'
-        ? 'Khoá mã đề này? Sau khi khoá bạn mới phân đề được cho học sinh. Vẫn có thể mở lại để sửa.'
-        : 'Mở lại mã đề này để sửa? Bạn sẽ phải khoá lại trước khi phân đề.'
+        ? 'Khoá mã đề này? Khoá xong hệ thống sẽ tự phân đề cho học sinh chưa có đề. Vẫn có thể mở lại để sửa.'
+        : 'Mở lại mã đề này để sửa? Học sinh đang được gán mã đề này sẽ trở về "chưa phân đề". Khoá lại thì hệ thống tự phân đề cho họ.'
     if (!(await confirm({ message: confirmMessage }))) {
       return
     }

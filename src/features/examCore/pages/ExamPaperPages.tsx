@@ -119,6 +119,18 @@ function ExamPaperPage({ rolePath }: ExamPaperPageProps) {
       setErrorMessage(`${quotaWarning} Không thể ${STATUS_ACTION_LABEL[action].toLowerCase()} cho tới khi giảm thời lượng.`)
       return
     }
+    // Mở lại mã đề gỡ luôn đề của mọi thí sinh đang dùng nó (UpdateExamPaperStatusUseCase.REOPEN) —
+    // mã đề sắp bị sửa dưới chân họ. Phải nói trước, vì nhìn nút thì không đoán ra được.
+    if (
+      action === 'REOPEN' &&
+      !(await confirm({
+        message:
+          'Mở lại mã đề này để sửa? Học sinh đang được gán mã đề này sẽ trở về "chưa phân đề". Khóa lại thì hệ thống tự phân đề cho họ.',
+        title: 'Xác nhận mở lại mã đề',
+      }))
+    ) {
+      return
+    }
     try {
       await updateStatusMutation.mutateAsync({ paperId, payload: { action, note } })
       await invalidate()
