@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import type { CreateRubricPayload } from '../api/useCreateSystemRubricMutation';
 
 type CreateRubricDialogProps = {
@@ -22,6 +23,7 @@ export function CreateRubricDialog({ isOpen, onClose, onSubmit, isPending, frame
 
   // Reset Form khi mở lại
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const { showError, feedbackToast } = useFeedbackToast();
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen);
     if (isOpen) {
@@ -38,7 +40,7 @@ export function CreateRubricDialog({ isOpen, onClose, onSubmit, isPending, frame
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim() || !name.trim() || !frameworkId || !languageId) {
-      alert('Vui lòng nhập đầy đủ các trường bắt buộc!');
+      showError('Vui lòng nhập đầy đủ các trường bắt buộc!');
       return;
     }
     await onSubmit({ code, name, description, frameworkId, languageId });
@@ -47,7 +49,8 @@ export function CreateRubricDialog({ isOpen, onClose, onSubmit, isPending, frame
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition-opacity" onClick={!isPending ? onClose : undefined} />
-      
+      {feedbackToast}
+
       <div className="relative w-full max-w-lg rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h2 className="text-lg font-bold text-slate-900">Thêm mới Rubric</h2>

@@ -14,6 +14,7 @@ import {
   Filter,
   Upload,
 } from "lucide-react";
+import { useFeedbackToast } from "@/shared/ui/useFeedbackToast";
 
 // API Queries & Mutations
 import { useSystemRubricQuery } from "../api/useSystemRubricQuery";
@@ -93,15 +94,16 @@ export function SystemAdminRubricDetailPage() {
   const { mutateAsync: updateRubric, isPending: isUpdating } = useUpdateSystemRubricMutation(rubricId);
   const { mutateAsync: deleteRubric, isPending: isDeleting } = useDeleteSystemRubricMutation();
   const { mutateAsync: addVersions, isPending: isAdding } = useAddSystemRubricVersionsMutation(rubricId); // HOOK MỚI
+  const { showError, feedbackToast } = useFeedbackToast();
 
   // 4. Hàm xử lý submit Form Cập nhật Rubric
-  const handleUpdateRubric = async (formData: { name: string; description: string; }) => {
+  const handleUpdateRubric = async (formData: { name: string; description?: string; }) => {
     try {
       await updateRubric(formData);
       setIsEditModalOpen(false);
     } catch (error: unknown) {
       console.error("Chi tiết lỗi từ BE:", error);
-      alert((error as { message?: string }).message || "Có lỗi xảy ra khi lưu thay đổi. Vui lòng thử lại.");
+      showError((error as { message?: string }).message || "Có lỗi xảy ra khi lưu thay đổi. Vui lòng thử lại.");
     }
   };
 
@@ -117,7 +119,7 @@ export function SystemAdminRubricDetailPage() {
       navigate("/system-admin/rubrics");
     } catch (error: unknown) {
       console.error("Lỗi xóa Rubric:", error);
-      alert((error as { message?: string }).message || "Có lỗi xảy ra khi xóa Rubric.");
+      showError((error as { message?: string }).message || "Có lỗi xảy ra khi xóa Rubric.");
     }
   };
 
@@ -128,7 +130,7 @@ export function SystemAdminRubricDetailPage() {
       setIsAddModalOpen(false); // Thành công thì đóng popup
     } catch (error: unknown) {
       console.error("Lỗi thêm Version:", error);
-      alert((error as { message?: string }).message || "Có lỗi xảy ra khi thêm phiên bản mới.");
+      showError((error as { message?: string }).message || "Có lỗi xảy ra khi thêm phiên bản mới.");
     }
   };
 
@@ -160,6 +162,7 @@ export function SystemAdminRubricDetailPage() {
 
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}

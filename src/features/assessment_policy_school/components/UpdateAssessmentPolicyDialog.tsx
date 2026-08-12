@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import type { AssessmentPolicy, AssessmentPolicyStrictness, UpdateAssessmentPolicyPayload } from '../types';
 
 // Chỉ cần các field sẽ sửa được, để dialog dùng chung được cho cả AssessmentPolicy (list)
@@ -45,6 +46,7 @@ function toBackendDate(value: string, endOfDay = false) {
 
 export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPending }: UpdateAssessmentPolicyDialogProps) {
   const resultBands = policy?.frameworkVersion?.resultBands ?? [];
+  const { showError, feedbackToast } = useFeedbackToast();
 
   const [form, setForm] = useState(() => ({
     targetFrameworkBandId: policy?.targetFrameworkBandId ?? '',
@@ -83,17 +85,17 @@ export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPend
     e.preventDefault();
 
     if (isMissingRequired) {
-      alert('Vui lòng nhập đầy đủ các trường bắt buộc!');
+      showError('Vui lòng nhập đầy đủ các trường bắt buộc!');
       return;
     }
 
     if (form.effectiveTo && new Date(form.effectiveFrom) > new Date(form.effectiveTo)) {
-      alert('Ngày kết thúc không được nhỏ hơn Ngày áp dụng!');
+      showError('Ngày kết thúc không được nhỏ hơn Ngày áp dụng!');
       return;
     }
 
     if (passingScoreError) {
-      alert(`${passingScoreError}!`);
+      showError(`${passingScoreError}!`);
       return;
     }
 
@@ -111,6 +113,7 @@ export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPend
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition-opacity" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative w-full max-w-lg rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">

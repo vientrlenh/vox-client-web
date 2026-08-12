@@ -7,7 +7,13 @@ import { Pagination } from '@/shared/components/Pagination'
 import { goToCheckout } from '@/shared/payment/checkout'
 import { isPaymentMethod, PAYMENT_METHOD_OPTIONS } from '@/shared/payment/types'
 import { useSubscriptionPlansQuery } from '../api/useSubscriptionPlansQuery'
-import { useCreatePlanMutation, useUpdatePlanMutation, useArchivePlanMutation } from '../api/usePlanMutations'
+import {
+  useArchivePlanMutation,
+  useCreatePlanMutation,
+  useDeleteDraftPlanMutation,
+  usePublishPlanMutation,
+  useUpdatePlanMutation,
+} from '../api/usePlanMutations'
 import { useSchoolSubscriptionsQuery } from '../api/useSchoolSubscriptionsQuery'
 import { useCancelSubscriptionMutation, useRenewSubscriptionMutation } from '../api/useSchoolSubscriptionMutations'
 import { useSubscriptionRequestsQuery } from '../api/useSubscriptionRequestsQuery'
@@ -80,6 +86,8 @@ export function SystemAdminSubscriptionPage() {
   const createPlanMutation = useCreatePlanMutation()
   const updatePlanMutation = useUpdatePlanMutation()
   const archivePlanMutation = useArchivePlanMutation()
+  const publishPlanMutation = usePublishPlanMutation()
+  const deleteDraftPlanMutation = useDeleteDraftPlanMutation()
   const renewMutation = useRenewSubscriptionMutation()
   const cancelMutation = useCancelSubscriptionMutation()
   const paymentLinkMutation = useCreatePaymentLinkForRequestMutation()
@@ -179,6 +187,44 @@ export function SystemAdminSubscriptionPage() {
       setToast({ text: 'Đã lưu trữ gói', tone: 'success' })
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể lưu trữ gói.', tone: 'error' })
+    }
+  }
+
+  async function handlePublishPlan(plan: SubscriptionPlan) {
+    const confirmed = await confirm({
+      confirmLabel: 'Xuất bản',
+      message: `Xuất bản gói "${plan.name}"? Sau khi xuất bản, gói sẽ hiển thị để trường đăng ký và không thể chỉnh sửa được nữa — muốn đổi gì thì phải lưu trữ và tạo gói mới.`,
+      title: 'Xuất bản gói dịch vụ',
+    })
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await publishPlanMutation.mutateAsync(plan.id)
+      setToast({ text: 'Đã xuất bản gói', tone: 'success' })
+    } catch (error) {
+      setToast({ text: getErrorMessage(error) ?? 'Không thể xuất bản gói.', tone: 'error' })
+    }
+  }
+
+  async function handleDeleteDraftPlan(plan: SubscriptionPlan) {
+    const confirmed = await confirm({
+      confirmLabel: 'Xóa vĩnh viễn',
+      message: `Xóa vĩnh viễn gói nháp "${plan.name}"? Hành động này không thể hoàn tác.`,
+      title: 'Xóa gói nháp',
+    })
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await deleteDraftPlanMutation.mutateAsync(plan.id)
+      setToast({ text: 'Đã xóa gói nháp', tone: 'success' })
+    } catch (error) {
+      setToast({ text: getErrorMessage(error) ?? 'Không thể xóa gói nháp.', tone: 'error' })
     }
   }
 
@@ -328,7 +374,9 @@ export function SystemAdminSubscriptionPage() {
               getPlanName={getPlanName}
               key={plan.id}
               onArchive={handleArchivePlan}
+              onDeleteDraft={handleDeleteDraftPlan}
               onEdit={openEditPlan}
+              onPublish={handlePublishPlan}
               plan={plan}
             />
           ))}

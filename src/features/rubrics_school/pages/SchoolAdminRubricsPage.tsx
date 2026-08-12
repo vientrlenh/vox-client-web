@@ -7,12 +7,15 @@ import { ClipboardList, Plus, RefreshCw, Search, Filter } from "lucide-react";
 import { useSearchSchoolRubricsQuery, type SearchRubricFilter } from "../api/useSearchSchoolRubricsQuery";
 import { useFrameworkOptionsQuery, useLanguageOptionsQuery } from "../api/useFilterOptionsQuery";
 // IMPORT THÊM TYPE CreateRubricPayload TỪ FILE API
-import { useCreateSchoolRubricMutation, type CreateRubricPayload } from "../api/useCreateSchoolRubricMutation"; 
+import { useCreateSchoolRubricMutation, type CreateRubricPayload } from "../api/useCreateSchoolRubricMutation";
+import { useDeleteSchoolRubricMutation } from "../api/useDeleteSchoolRubricMutation";
 
 import { RubricTable } from "../components/RubricTable";
-import { CreateRubricDialog } from "../components/CreateRubricDialog"; 
+import { CreateRubricDialog } from "../components/CreateRubricDialog";
 import { Pagination } from "@/shared/components/Pagination";
+import { useFeedbackToast } from "@/shared/ui/useFeedbackToast";
 import { useAppSelector } from "@/app/store/hooks";
+import type { Rubric } from "../types";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 10;
@@ -56,15 +59,17 @@ export function SchoolAdminRubricsPage() {
   const totalPages = data?.totalPages ?? 0;
   const totalElements = data?.totalElements ?? 0;
 
-  // KHỞI TẠO MUTATION THÊM MỚI
+  // KHỞI TẠO MUTATION THÊM MỚI / XÓA
   const { mutateAsync: createRubric, isPending: isCreating } = useCreateSchoolRubricMutation(schoolId);
+  const { mutateAsync: deleteRubric } = useDeleteSchoolRubricMutation(schoolId);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   // HÀM XỬ LÝ SUBMIT VÀ BẮT LỖI TỪ BE (Đã thay 'any' bằng type cụ thể)
   const handleCreateRubric = async (formData: CreateRubricPayload) => {
     try {
       const newRubricId = await createRubric(formData);
       setIsCreateModalOpen(false);
-      
+
       // UX xịn: Tạo thành công đá thẳng sang trang chi tiết để User add Versions!
       navigate(`/school-admin/rubrics/${newRubricId}`);
     } catch (error) {
@@ -72,12 +77,27 @@ export function SchoolAdminRubricsPage() {
       const err = error as Error;
       console.error("Lỗi tạo Rubric:", err);
       // Nơi này sẽ hứng cái lỗi "Trường của bạn đã thiết lập một bộ Rubric cho ngôn ngữ này rồi."
-      alert(err.message || 'Có lỗi xảy ra khi tạo Rubric.');
+      showError(err.message || 'Có lỗi xảy ra khi tạo Rubric.');
+    }
+  };
+
+  const handleDeleteRubric = async (rubric: Rubric) => {
+    const isConfirm = window.confirm(
+      `Bạn có chắc chắn muốn xóa bộ Rubric "${rubric.name}"? Chỉ xóa được khi chưa có phiên bản (version) nào bên trong.`
+    );
+    if (!isConfirm) return;
+
+    try {
+      await deleteRubric(rubric.id);
+    } catch (error) {
+      const err = error as Error;
+      showError(err.message || 'Có lỗi xảy ra khi xóa Rubric.');
     }
   };
 
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       {/* vox background decoration — đồng bộ với gradient nút */}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
@@ -140,7 +160,14 @@ export function SchoolAdminRubricsPage() {
 
       {/* TABLE */}
       <div className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white">
-        <RubricTable rubrics={rubrics} isLoading={isLoading} isError={isError} onRetry={() => refetch()} onViewDetails={(rubric) => navigate(`/school-admin/rubrics/${rubric.id}`)} />
+        <RubricTable
+          rubrics={rubrics}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => refetch()}
+          onViewDetails={(rubric) => navigate(`/school-admin/rubrics/${rubric.id}`)}
+          onDelete={handleDeleteRubric}
+        />
         {!isLoading && !isError && rubrics.length > 0 && (
           <Pagination currentPage={page} totalPages={totalPages} totalElements={totalElements} itemName="rubric" onPageChange={setPage} />
         )}

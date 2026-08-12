@@ -1,11 +1,9 @@
 import { useMemo, useState } from 'react'
 import { RotateCcw, Scale, Search, Shuffle, Users } from 'lucide-react'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
+import { UsageProgressBar } from '@/shared/ui/UsageProgressBar'
 import {
-  formatQuotaMinutes,
-  getUsageBarColor,
-  minutesToSeconds,
-  secondsToMinutes,
+  formatUsd,
   type AllocateQuotaPayload,
   type QuotaUserAllocation,
   type QuotaUserAllocationSummary,
@@ -22,9 +20,7 @@ type QuotaAllocationPanelProps = {
 }
 
 function buildEditsFromAllocations(allocations: QuotaUserAllocation[]) {
-  return Object.fromEntries(
-    allocations.map((allocation) => [allocation.userId, secondsToMinutes(allocation.allocatedQuantity)]),
-  )
+  return Object.fromEntries(allocations.map((allocation) => [allocation.userId, allocation.allocatedQuantity]))
 }
 
 export function QuotaAllocationPanel({
@@ -58,25 +54,23 @@ export function QuotaAllocationPanel({
   }, [allocations, search])
 
   const pool = summary?.pool
-  const poolTotalMinutes = secondsToMinutes(pool?.totalAllocated)
-  const editedTotalMinutes = allocations.reduce((sum, allocation) => sum + (edits[allocation.userId] ?? 0), 0)
-  const remainingMinutes = Math.max(0, poolTotalMinutes - editedTotalMinutes)
-  const pct = poolTotalMinutes > 0 ? Math.min(100, Math.round((editedTotalMinutes / poolTotalMinutes) * 100)) : 0
-  const overAllocated = editedTotalMinutes > poolTotalMinutes
+  const poolTotalUsd = pool?.totalAllocated ?? 0
+  const editedTotalUsd = allocations.reduce((sum, allocation) => sum + (edits[allocation.userId] ?? 0), 0)
+  const overAllocated = editedTotalUsd > poolTotalUsd
 
   function maxAllowedFor(userId: string) {
-    const otherUsersTotal = editedTotalMinutes - (edits[userId] ?? 0)
-    return Math.max(0, poolTotalMinutes - otherUsersTotal)
+    const otherUsersTotal = editedTotalUsd - (edits[userId] ?? 0)
+    return Math.max(0, poolTotalUsd - otherUsersTotal)
   }
 
-  function updateAmount(userId: string, minutes: number) {
+  function updateAmount(userId: string, amount: number) {
     setEdits((current) => {
       const otherUsersTotal = allocations.reduce(
         (sum, allocation) => (allocation.userId === userId ? sum : sum + (current[allocation.userId] ?? 0)),
         0,
       )
-      const maxAllowed = Math.max(0, poolTotalMinutes - otherUsersTotal)
-      return { ...current, [userId]: Math.min(Math.max(0, minutes), maxAllowed) }
+      const maxAllowed = Math.max(0, poolTotalUsd - otherUsersTotal)
+      return { ...current, [userId]: Math.min(Math.max(0, amount), maxAllowed) }
     })
   }
 
@@ -111,7 +105,7 @@ export function QuotaAllocationPanel({
 
     onSubmit({
       allocations: allocations.map((allocation) => ({
-        amount: minutesToSeconds(edits[allocation.userId] ?? 0),
+        amount: edits[allocation.userId] ?? 0,
         userId: allocation.userId,
       })),
       mode: 'MANUAL',
@@ -135,21 +129,10 @@ export function QuotaAllocationPanel({
           </span>
           <span className="text-sm font-bold text-slate-900">Hạn mức của trường</span>
         </div>
-        <div className="mt-4 flex items-baseline gap-1.5">
-          <span className={`text-2xl font-extrabold ${overAllocated ? 'text-red-600' : 'text-slate-900'}`}>
-            {new Intl.NumberFormat('vi-VN').format(remainingMinutes)}
-          </span>
-          <span className="text-sm text-slate-400">/ {new Intl.NumberFormat('vi-VN').format(poolTotalMinutes)} phút còn lại</span>
-        </div>
-        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full"
-            style={{ backgroundColor: overAllocated ? '#ef4444' : getUsageBarColor(pct), width: `${pct}%` }}
-          />
-        </div>
+        <UsageProgressBar total={poolTotalUsd} used={editedTotalUsd} />
         {overAllocated ? (
           <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-700">
-            Tổng hạn mức phân bổ đang vượt quá hạn mức của trường ({formatQuotaMinutes(pool?.totalAllocated)}).
+            Tổng hạn mức phân bổ đang vượt quá hạn mức của trường ({formatUsd(pool?.totalAllocated)}).
           </p>
         ) : null}
       </div>
@@ -201,7 +184,7 @@ export function QuotaAllocationPanel({
                 <th className="px-6 py-3.5">Họ tên</th>
                 <th className="px-4 py-3.5">Đã sử dụng</th>
                 <th className="px-4 py-3.5">Hạn mức hiện tại</th>
-                <th className="px-4 py-3.5">Hạn mức mới (phút)</th>
+                <th className="px-4 py-3.5">Hạn mức mới (USD)</th>
               </tr>
             </thead>
             <tbody>
@@ -221,8 +204,8 @@ export function QuotaAllocationPanel({
                   return (
                     <tr className="border-b border-slate-100" key={allocation.userId}>
                       <td className="px-6 py-3.5 text-sm font-bold text-slate-900">{allocation.fullName ?? '-'}</td>
-                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatQuotaMinutes(allocation.usedQuantity)}</td>
-                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatQuotaMinutes(allocation.allocatedQuantity)}</td>
+                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatUsd(allocation.usedQuantity)}</td>
+                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatUsd(allocation.allocatedQuantity)}</td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           <input
@@ -230,10 +213,11 @@ export function QuotaAllocationPanel({
                             max={rowMax}
                             min={0}
                             onChange={(event) => updateAmount(allocation.userId, Number(event.target.value) || 0)}
+                            step="0.01"
                             type="number"
                             value={edits[allocation.userId] ?? 0}
                           />
-                          <span className="text-xs text-slate-400">/ {rowMax} phút</span>
+                          <span className="text-xs text-slate-400">/ {formatUsd(rowMax)}</span>
                         </div>
                       </td>
                     </tr>

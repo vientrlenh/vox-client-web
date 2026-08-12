@@ -12,6 +12,7 @@ import { useDeleteSystemRubricMutation } from "../api/useDeleteSystemRubricMutat
 import { RubricTable } from "../components/RubricTable";
 import { CreateRubricDialog } from "../components/CreateRubricDialog";
 import { Pagination } from "@/shared/components/Pagination";
+import { useFeedbackToast } from "@/shared/ui/useFeedbackToast";
 import type { Rubric } from "../types";
 
 const DEFAULT_PAGE = 1;
@@ -57,6 +58,7 @@ export function SystemAdminRubricsPage() {
   // KHỞI TẠO MUTATION THÊM MỚI / XÓA
   const { mutateAsync: createRubric, isPending: isCreating } = useCreateSystemRubricMutation();
   const { mutateAsync: deleteRubric } = useDeleteSystemRubricMutation();
+  const { showError, feedbackToast } = useFeedbackToast();
 
   const handleCreateRubric = async (formData: CreateRubricPayload) => {
     try {
@@ -68,7 +70,7 @@ export function SystemAdminRubricsPage() {
     } catch (error) {
       const err = error as Error;
       console.error("Lỗi tạo Rubric:", err);
-      alert(err.message || 'Có lỗi xảy ra khi tạo Rubric.');
+      showError(err.message || 'Có lỗi xảy ra khi tạo Rubric.');
     }
   };
 
@@ -82,12 +84,13 @@ export function SystemAdminRubricsPage() {
       await deleteRubric(rubric.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa Rubric.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa Rubric.');
     }
   };
 
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       {/* vox background decoration — đồng bộ với gradient nút */}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"

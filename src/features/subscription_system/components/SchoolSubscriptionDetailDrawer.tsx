@@ -1,20 +1,18 @@
 import { useState } from 'react'
 import { ClipboardList, ExternalLink, FileCheck2, Headphones, Inbox, X } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
+import { UsageProgressBar } from '@/shared/ui/UsageProgressBar'
 import { Pagination } from '@/shared/components/Pagination'
 import { useSchoolSubscriptionUsageQuery } from '../api/useSchoolSubscriptionUsageQuery'
 import { useSchoolInvoicesQuery } from '../api/useSchoolInvoicesQuery'
 import type { SchoolLookupEntry } from '../api/useSchoolLookup'
 import {
   formatDate,
-  formatQuotaMinutes,
   formatVnd,
   getInvoiceStatusDisplay,
   getSubscriptionStatusDisplay,
-  getUsageBarColor,
   QUOTA_LABELS,
   QUOTA_TYPES,
-  secondsToMinutes,
   type QuotaType,
   type SchoolSubscription,
 } from '../types'
@@ -134,8 +132,6 @@ export function SchoolSubscriptionDetailDrawer({
                   const planQuota = quotaByType.get(quotaType)
                   const total = usage?.totalAllocated ?? planQuota?.includedQuantity ?? 0
                   const used = usage?.usedQuantity ?? 0
-                  const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
-                  const color = getUsageBarColor(pct)
 
                   return (
                     <div className="rounded-lg border border-slate-200 p-4" key={quotaType}>
@@ -144,31 +140,7 @@ export function SchoolSubscriptionDetailDrawer({
                         <span className="text-sm font-bold text-blue-950">{QUOTA_LABELS[quotaType]}</span>
                       </div>
 
-                      {usageQuery.isLoading ? (
-                        <p className="mt-3 text-xs font-semibold text-slate-400">Đang tải...</p>
-                      ) : (
-                        <>
-                          <div className="mt-3 flex items-baseline gap-1.5">
-                            <span className="text-xl font-extrabold text-slate-900">
-                              {new Intl.NumberFormat('vi-VN').format(secondsToMinutes(used))}
-                            </span>
-                            <span className="text-xs text-slate-400">
-                              / {new Intl.NumberFormat('vi-VN').format(secondsToMinutes(total))} phút
-                            </span>
-                          </div>
-                          <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full" style={{ backgroundColor: color, width: `${pct}%` }} />
-                          </div>
-                          <div className="mt-1.5 flex items-center justify-between">
-                            <span className="text-xs text-slate-500">
-                              Còn lại {formatQuotaMinutes(Math.max(0, total - used))}
-                            </span>
-                            <span className="text-xs font-extrabold" style={{ color }}>
-                              {pct}%
-                            </span>
-                          </div>
-                        </>
-                      )}
+                      <UsageProgressBar isLoading={usageQuery.isLoading} total={total} used={used} />
                     </div>
                   )
                 })}

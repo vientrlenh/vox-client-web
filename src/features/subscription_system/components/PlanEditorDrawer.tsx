@@ -2,7 +2,7 @@ import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { Check, ClipboardList, FileCheck2, Headphones, X } from 'lucide-react'
 import type { CreatePlanPayload, QuotaType, SubscriptionPlan } from '../types'
-import { minutesToSeconds, QUOTA_LABELS, QUOTA_TYPES, secondsToMinutes } from '../types'
+import { QUOTA_LABELS, QUOTA_TYPES } from '../types'
 
 const QUOTA_ICONS: Record<QuotaType, typeof FileCheck2> = {
   CLASS_TEST: ClipboardList,
@@ -26,7 +26,6 @@ type FormState = {
   maxStudentCount: string
   maxTimePerAttemptMin: string
   name: string
-  popular: boolean
   pricePerYear: string
   quotas: QuotaFormState
   tagline: string
@@ -47,7 +46,6 @@ function createFormState(plan: SubscriptionPlan | null): FormState {
       maxStudentCount: '',
       maxTimePerAttemptMin: '',
       name: '',
-      popular: false,
       pricePerYear: '',
       quotas: emptyQuotas(),
       tagline: '',
@@ -58,8 +56,8 @@ function createFormState(plan: SubscriptionPlan | null): FormState {
   const quotas = emptyQuotas()
   for (const quota of plan.quotas) {
     quotas[quota.quotaType] = {
-      includedQuantity: String(secondsToMinutes(quota.includedQuantity)),
-      tokenUnitPrice: String(Math.round(quota.tokenUnitPrice * 60 * 100) / 100),
+      includedQuantity: String(quota.includedQuantity),
+      tokenUnitPrice: String(quota.tokenUnitPrice),
     }
   }
 
@@ -67,7 +65,6 @@ function createFormState(plan: SubscriptionPlan | null): FormState {
     maxStudentCount: plan.maxStudentCount != null ? String(plan.maxStudentCount) : '',
     maxTimePerAttemptMin: plan.maxTimePerAttemptMin != null ? String(plan.maxTimePerAttemptMin) : '',
     name: plan.name,
-    popular: plan.popular,
     pricePerYear: String(plan.pricePerYear),
     quotas,
     tagline: plan.tagline ?? '',
@@ -110,14 +107,13 @@ function toPayload(form: FormState): CreatePlanPayload {
     maxStudentCount: Number(form.maxStudentCount),
     maxTimePerAttemptMin: form.maxTimePerAttemptMin ? Number(form.maxTimePerAttemptMin) : null,
     name: form.name.trim(),
-    popular: form.popular,
     pricePerYear: Number(form.pricePerYear),
     quotas: QUOTA_TYPES.map((quotaType) => ({
-      includedQuantity: minutesToSeconds(Number(form.quotas[quotaType].includedQuantity)),
+      includedQuantity: Number(form.quotas[quotaType].includedQuantity),
       quotaType,
       // token_unit_price ở DB là NUMERIC(15,0) — không có phần thập phân — nên làm tròn
-      // về giá/giây nguyên ngay tại FE thay vì để DB tự làm tròn khi lưu.
-      tokenUnitPrice: Math.round(Number(form.quotas[quotaType].tokenUnitPrice) / 60),
+      // ngay tại FE thay vì để DB tự làm tròn khi lưu.
+      tokenUnitPrice: Math.round(Number(form.quotas[quotaType].tokenUnitPrice)),
     })),
     tagline: form.tagline.trim() || null,
     validityDays: Number(form.validityDays),
@@ -289,21 +285,10 @@ export function PlanEditorDrawer({
               </label>
             </div>
 
-            <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
-              <span className="text-sm font-black text-blue-950">Gói phổ biến nhất</span>
-              <input
-                checked={form.popular}
-                className="size-5 accent-indigo-600"
-                disabled={isSubmitting}
-                onChange={(event) => updateField('popular', event.target.checked)}
-                type="checkbox"
-              />
-            </label>
-
             <div className="border-t border-slate-200 pt-4">
               <p className="text-sm font-black text-blue-950">Hạn mức &amp; giá mua thêm</p>
               <p className="mt-1 text-xs text-slate-500">
-                Hạn mức tính theo phút xử lý audio được tặng miễn phí mỗi chu kỳ; giá áp dụng khi trường dùng vượt hạn mức.
+                Hạn mức tính theo USD chi phí AI ước tính được tặng miễn phí mỗi chu kỳ; giá áp dụng khi trường dùng vượt hạn mức.
               </p>
               <div className="mt-4 grid gap-4">
                 {QUOTA_TYPES.map((quotaType) => {
@@ -316,18 +301,19 @@ export function PlanEditorDrawer({
                       </p>
                       <div className="mt-3 grid grid-cols-2 gap-3">
                         <label className="grid gap-1.5 text-xs font-bold text-slate-600">
-                          Hạn mức bao gồm (phút)
+                          Hạn mức bao gồm (USD)
                           <input
                             className={inputClassName}
                             disabled={isSubmitting}
                             min={0}
                             onChange={(event) => updateQuota(quotaType, 'includedQuantity', event.target.value)}
+                            step="0.01"
                             type="number"
                             value={form.quotas[quotaType].includedQuantity}
                           />
                         </label>
                         <label className="grid gap-1.5 text-xs font-bold text-slate-600">
-                          Giá / phút (VNĐ)
+                          Giá / $1 (VNĐ)
                           <input
                             className={inputClassName}
                             disabled={isSubmitting}

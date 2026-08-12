@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import type { UpdateRubricCriterionPayload } from '../api/useUpdateSystemRubricCriterionMutation';
 import type { RubricCriterion } from '../types';
 
@@ -63,6 +64,7 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
     isRequired: initialData.isRequired,
   }));
   const [examples, setExamples] = useState<ExampleItem[]>(() => parseExamples(initialData.examplesJson));
+  const { showError, feedbackToast } = useFeedbackToast();
 
   if (!isOpen) return null;
 
@@ -78,7 +80,7 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
     e.preventDefault();
 
     if (existingOrders.includes(Number(formData.order))) {
-      alert(`Lỗi: Thứ tự (Order) ${formData.order} đã được sử dụng bởi một tiêu chí khác trong phiên bản này. Vui lòng chọn thứ tự khác.`);
+      showError(`Lỗi: Thứ tự (Order) ${formData.order} đã được sử dụng bởi một tiêu chí khác trong phiên bản này. Vui lòng chọn thứ tự khác.`);
       return;
     }
 
@@ -108,6 +110,7 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative w-full max-w-xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">

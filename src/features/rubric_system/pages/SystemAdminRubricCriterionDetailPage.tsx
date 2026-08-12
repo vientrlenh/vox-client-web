@@ -3,6 +3,7 @@
 import { useParams, useNavigate } from 'react-router';
 import { useState } from 'react';
 import { ChevronLeft, ListChecks, RefreshCw, AlertTriangle, Edit, Trash2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 
 import { useSystemRubricCriterionQuery } from '../api/useSystemRubricCriterionQuery';
 import { useSystemRubricVersionQuery } from '../api/useSystemRubricVersionQuery';
@@ -56,6 +57,7 @@ export function SystemAdminRubricCriterionDetailPage() {
 
   const { mutateAsync: updateCriterion, isPending: isUpdatingCriterion } = useUpdateSystemRubricCriterionMutation(criterionId);
   const { mutateAsync: deleteCriterion, isPending: isDeletingCriterion } = useDeleteSystemRubricCriterionMutation(versionId);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   const handleUpdateCriterion = async (payload: UpdateRubricCriterionPayload) => {
     try {
@@ -63,7 +65,7 @@ export function SystemAdminRubricCriterionDetailPage() {
       setIsEditModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
     }
   };
 
@@ -77,7 +79,7 @@ export function SystemAdminRubricCriterionDetailPage() {
       navigate(`/system-admin/rubrics/${rubricId}/versions/${versionId}`);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
     }
   };
 
@@ -106,6 +108,7 @@ export function SystemAdminRubricCriterionDetailPage() {
 
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}

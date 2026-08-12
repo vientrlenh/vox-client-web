@@ -43,7 +43,6 @@ import { InvoicesTable } from '../components/InvoicesTable'
 import { QuotaAllocationPanel } from '../components/QuotaAllocationPanel'
 import {
   formatVnd,
-  minutesToSeconds,
   QUOTA_TYPES,
   type RenewalPreview,
   type RequestType,
@@ -100,8 +99,8 @@ export function SchoolAdminSubscriptionPage() {
   const activePlans = (plansQuery.data?.content ?? []).filter((plan) => plan.status === 'ACTIVE')
   const isRegisteringOrPaying = submitRequestMutation.isPending || requestPaymentLinkMutation.isPending
 
-  function updateTokenQuantity(quotaType: (typeof QUOTA_TYPES)[number], minutes: number) {
-    setTokenState((current) => ({ ...current, [quotaType]: minutes }))
+  function updateTokenQuantity(quotaType: (typeof QUOTA_TYPES)[number], amountUsd: number) {
+    setTokenState((current) => ({ ...current, [quotaType]: amountUsd }))
   }
 
   async function handleRenew() {
@@ -220,12 +219,12 @@ export function SchoolAdminSubscriptionPage() {
     }
 
     const items = QUOTA_TYPES.filter((quotaType) => tokenState[quotaType] > 0).map((quotaType) => ({
-      quantity: minutesToSeconds(tokenState[quotaType]),
+      quantity: tokenState[quotaType],
       quotaType,
     }))
 
     if (items.length === 0) {
-      setToast({ text: 'Chọn số phút cần mua thêm', tone: 'error' })
+      setToast({ text: 'Chọn số tiền cần mua thêm', tone: 'error' })
       return
     }
 

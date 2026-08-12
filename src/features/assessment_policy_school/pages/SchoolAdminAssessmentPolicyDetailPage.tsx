@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { useSchoolAssessmentPolicyQuery } from '../api/useSchoolAssessmentPolicyQuery';
 import { useUpdateSchoolAssessmentPolicyMutation } from '../api/useUpdateSchoolAssessmentPolicyMutation';
 import { useDeleteSchoolAssessmentPolicyMutation } from '../api/useDeleteSchoolAssessmentPolicyMutation';
@@ -70,6 +71,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   const { mutateAsync: deletePolicy, isPending: isDeleting } = useDeleteSchoolAssessmentPolicyMutation(schoolId);
   const { mutateAsync: publishPolicy, isPending: isPublishing } = usePublishSchoolAssessmentPolicyMutation(schoolId);
   const { mutateAsync: archivePolicy, isPending: isArchiving } = useArchiveSchoolAssessmentPolicyMutation(schoolId);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   const handlePublishPolicy = async () => {
     if (!policyId) return;
@@ -81,7 +83,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
       await publishPolicy(policyId);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xuất bản Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi xuất bản Chính Sách Đánh Giá.');
     }
   };
 
@@ -95,7 +97,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
       await archivePolicy(policyId);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi lưu trữ Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi lưu trữ Chính Sách Đánh Giá.');
     }
   };
 
@@ -107,7 +109,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
       setIsEditModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
     }
   };
 
@@ -122,7 +124,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
       navigate('/school-admin/assessment-policies');
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
     }
   };
 
@@ -157,6 +159,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
 
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}

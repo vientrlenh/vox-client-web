@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router';
 import { useState } from 'react';
 import { ChevronLeft, ListChecks, RefreshCw, AlertTriangle, Edit, Trash2 } from 'lucide-react';
 import { useAppSelector } from '@/app/store/hooks';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 
 import { useSchoolRubricCriterionQuery } from '../api/useSchoolRubricCriterionQuery';
 import { useSchoolRubricVersionQuery } from '../api/useSchoolRubricVersionQuery';
@@ -60,6 +61,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
 
   const { mutateAsync: updateCriterion, isPending: isUpdatingCriterion } = useUpdateSchoolRubricCriterionMutation(schoolId, criterionId);
   const { mutateAsync: deleteCriterion, isPending: isDeletingCriterion } = useDeleteSchoolRubricCriterionMutation(schoolId, versionId);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   const handleUpdateCriterion = async (payload: UpdateRubricCriterionPayload) => {
     try {
@@ -67,7 +69,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
       setIsEditModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
     }
   };
 
@@ -81,7 +83,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
       navigate(`/school-admin/rubrics/${rubricId}/versions/${versionId}`);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
     }
   };
 
@@ -110,6 +112,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
 
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}

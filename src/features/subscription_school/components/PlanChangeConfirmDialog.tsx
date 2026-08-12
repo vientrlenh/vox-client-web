@@ -2,7 +2,7 @@ import { ArrowRight, Sparkles } from 'lucide-react'
 import { PaymentMethodField } from '@/shared/payment/PaymentMethodField'
 import {
   formatMinutes,
-  formatQuotaMinutes,
+  formatUsd,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -77,7 +77,7 @@ export function PlanChangeConfirmDialog({
                       improved ? 'text-emerald-600' : 'text-slate-900',
                     ].join(' ')}
                   >
-                    {formatQuotaMinutes(before)} → {formatQuotaMinutes(after)}
+                    {formatUsd(before)} → {formatUsd(after)}
                   </span>
                 </div>
               )

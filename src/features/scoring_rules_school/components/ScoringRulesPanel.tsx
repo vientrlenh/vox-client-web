@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Search, Filter, Plus } from 'lucide-react';
 import { Pagination } from '@/shared/components/Pagination';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 
 import { useSearchSchoolScoringRulesQuery, type SearchScoringRuleFilter } from '../api/useSearchSchoolScoringRulesQuery';
 import { useCreateSchoolScoringRuleMutation } from '../api/useCreateSchoolScoringRuleMutation';
@@ -47,6 +48,7 @@ export function ScoringRulesPanel({ schoolId, policyId }: Props) {
   const { mutateAsync: createRule, isPending: isCreating } = useCreateSchoolScoringRuleMutation(schoolId, policyId);
   const { mutateAsync: updateRule, isPending: isUpdating } = useUpdateSchoolScoringRuleMutation(schoolId, policyId, editingRule?.id);
   const { mutateAsync: deleteRule } = useDeleteSchoolScoringRuleMutation(schoolId, policyId);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   const handleCreate: React.ComponentProps<typeof CreateScoringRuleDialog>['onSubmit'] = async (payload) => {
     try {
@@ -54,7 +56,7 @@ export function ScoringRulesPanel({ schoolId, policyId }: Props) {
       setIsCreateModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi thêm Scoring Rule.');
+      showError(err.message || 'Có lỗi xảy ra khi thêm Scoring Rule.');
     }
   };
 
@@ -64,7 +66,7 @@ export function ScoringRulesPanel({ schoolId, policyId }: Props) {
       setEditingRule(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật Scoring Rule.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật Scoring Rule.');
     }
   };
 
@@ -76,12 +78,13 @@ export function ScoringRulesPanel({ schoolId, policyId }: Props) {
       await deleteRule(rule.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa Scoring Rule.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa Scoring Rule.');
     }
   };
 
   return (
     <div>
+      {feedbackToast}
       <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:px-6">
         <h2 className="text-lg font-medium text-slate-950">Scoring Rules</h2>
         <button

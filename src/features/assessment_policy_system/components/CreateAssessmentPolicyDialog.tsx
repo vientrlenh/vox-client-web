@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { useFrameworkOptionsQuery, useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useFrameworkVersionBandsQuery, useFrameworkVersionsQuery } from '../api/useFrameworkVersionOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
@@ -328,6 +329,7 @@ function PolicyFormFields({ index, form, onChange, onRemove, isPending }: Policy
 
 export function CreateAssessmentPolicyDialog({ isOpen, onClose, onSubmit, isPending }: CreateAssessmentPolicyDialogProps) {
   const [forms, setForms] = useState<PolicyFormState[]>([makeEmptyPolicyForm(0)]);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   // Reset form mỗi khi mở lại dialog
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -369,13 +371,13 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, onSubmit, isPend
     e.preventDefault();
 
     if (forms.some(validateForm)) {
-      alert('Vui lòng nhập đầy đủ các trường bắt buộc cho tất cả Chính Sách Đánh Giá!');
+      showError('Vui lòng nhập đầy đủ các trường bắt buộc cho tất cả Chính Sách Đánh Giá!');
       return;
     }
 
     for (const form of forms) {
       if (form.effectiveTo && new Date(form.effectiveFrom) > new Date(form.effectiveTo)) {
-        alert('Ngày kết thúc không được nhỏ hơn Ngày áp dụng!');
+        showError('Ngày kết thúc không được nhỏ hơn Ngày áp dụng!');
         return;
       }
 
@@ -383,7 +385,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, onSubmit, isPend
         const range = getEffectiveScoreRange(form.rubricVersionIds, form.rubricVersionScales);
         const score = Number(form.passingScore);
         if (range && (score < range.min || score > range.max)) {
-          alert(`Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${range.min} – ${range.max})!`);
+          showError(`Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${range.min} – ${range.max})!`);
           return;
         }
       }
@@ -407,6 +409,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, onSubmit, isPend
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition-opacity" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-2xl">
         <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">

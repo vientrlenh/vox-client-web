@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import type { AddRubricResultBandsPayload, RubricResultBandItemRequest } from '../api/useAddSystemRubricResultBandsMutation';
 
 type Props = {
@@ -24,6 +25,7 @@ function nextOrder(usedOrders: number[]): number {
 
 export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending, existingOrders = [] }: Props) {
   const [bands, setBands] = useState<BandFormItem[]>(() => [makeEmptyBand(nextOrder(existingOrders))]);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   if (!isOpen) return null;
 
@@ -47,13 +49,13 @@ export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending
       const min = Number(band.mappedScoreMin);
       const max = Number(band.mappedScoreMax);
       if (min >= max) {
-        alert(`Lỗi: Ở thang điểm "${band.code || band.name || '(chưa đặt tên)'}", Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!`);
+        showError(`Lỗi: Ở thang điểm "${band.code || band.name || '(chưa đặt tên)'}", Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!`);
         return;
       }
 
       const order = Number(band.order);
       if (seenOrders.has(order) || existingOrders.includes(order)) {
-        alert(`Lỗi: Thứ tự (Order) ${order} bị trùng lặp (ở thang điểm "${band.code || band.name || '(chưa đặt tên)'}"). Vui lòng chọn thứ tự khác.`);
+        showError(`Lỗi: Thứ tự (Order) ${order} bị trùng lặp (ở thang điểm "${band.code || band.name || '(chưa đặt tên)'}"). Vui lòng chọn thứ tự khác.`);
         return;
       }
       seenOrders.add(order);
@@ -76,6 +78,7 @@ export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative w-full max-w-2xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">

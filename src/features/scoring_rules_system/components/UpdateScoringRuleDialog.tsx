@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { CONDITION_TYPE_OPTIONS, ACTION_TYPE_OPTIONS, SEVERITY_OPTIONS, buildParamsValue, paramsToRawValues } from '../constants';
 import { ScoringRuleParamsFields } from './ScoringRuleParamsFields';
 import type { UpdateScoringRulePayload } from '../api/useUpdateSystemScoringRuleMutation';
@@ -34,6 +35,7 @@ export function UpdateScoringRuleDialog({ isOpen, onClose, onSubmit, isPending, 
     const option = ACTION_TYPE_OPTIONS.find((o) => o.value === initialData.actionType);
     return option ? paramsToRawValues(option.fields, parseParamsJson(initialData.actionParamsJson)) : {};
   });
+  const { showError, feedbackToast } = useFeedbackToast();
 
   if (!isOpen) return null;
 
@@ -43,7 +45,7 @@ export function UpdateScoringRuleDialog({ isOpen, onClose, onSubmit, isPending, 
     const conditionOption = CONDITION_TYPE_OPTIONS.find((o) => o.value === conditionType);
     const actionOption = ACTION_TYPE_OPTIONS.find((o) => o.value === actionType);
     if (!conditionOption || !actionOption) {
-      alert('Vui lòng chọn Loại điều kiện và Loại hành động!');
+      showError('Vui lòng chọn Loại điều kiện và Loại hành động!');
       return;
     }
 
@@ -66,6 +68,7 @@ export function UpdateScoringRuleDialog({ isOpen, onClose, onSubmit, isPending, 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative w-full max-w-xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import type { UpdateRubricResultBandPayload } from '../api/useUpdateSystemRubricResultBandMutation';
 import type { RubricResultBand } from '../types';
 
@@ -22,6 +23,7 @@ export function UpdateRubricResultBandDialog({ isOpen, onClose, onSubmit, isPend
     scoreMax: initialData.scoreMax,
     order: initialData.order,
   }));
+  const { showError, feedbackToast } = useFeedbackToast();
 
   if (!isOpen) return null;
 
@@ -31,12 +33,12 @@ export function UpdateRubricResultBandDialog({ isOpen, onClose, onSubmit, isPend
     const min = Number(formData.scoreMin);
     const max = Number(formData.scoreMax);
     if (min >= max) {
-      alert('Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!');
+      showError('Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!');
       return;
     }
 
     if (existingOrders.includes(Number(formData.order))) {
-      alert(`Lỗi: Thứ tự (Order) ${formData.order} đã được sử dụng bởi một thang điểm khác trong phiên bản này. Vui lòng chọn thứ tự khác.`);
+      showError(`Lỗi: Thứ tự (Order) ${formData.order} đã được sử dụng bởi một thang điểm khác trong phiên bản này. Vui lòng chọn thứ tự khác.`);
       return;
     }
 
@@ -54,6 +56,7 @@ export function UpdateRubricResultBandDialog({ isOpen, onClose, onSubmit, isPend
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative w-full max-w-xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">

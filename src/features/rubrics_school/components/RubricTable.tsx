@@ -1,6 +1,7 @@
 // src/features/rubrics/components/RubricTable.tsx
 
-import { RefreshCw, LayoutList, ChevronRight } from 'lucide-react';
+import { RefreshCw, LayoutList, Eye, Trash2 } from 'lucide-react';
+import { ActionMenuButton } from '@/shared/ui/ActionMenuButton';
 import type { Rubric } from '../types';
 
 type RubricTableProps = {
@@ -9,9 +10,10 @@ type RubricTableProps = {
   isError: boolean;
   onRetry: () => void;
   onViewDetails: (rubric: Rubric) => void;
+  onDelete: (rubric: Rubric) => void;
 };
 
-export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetails }: RubricTableProps) {
+export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetails, onDelete }: RubricTableProps) {
   if (isLoading) {
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3">
@@ -48,7 +50,7 @@ export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetail
             <th className="px-4 py-3">Tên Rubric</th>
             <th className="px-4 py-3">Khung năng lực</th>
             <th className="px-4 py-3">Ngôn ngữ</th>
-            <th className="px-4 py-3 text-right">Chi tiết</th>
+            <th className="px-4 py-3 text-right">Hành động</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200">
@@ -71,10 +73,15 @@ export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetail
                   {r.language?.name || '—'}
                 </span>
               </td>
-              <td className="px-4 py-3 text-right">
-                {/* Thay icon con mắt bằng icon Mũi tên trượt để chỉ hướng di chuyển */}
-                <div className="inline-flex size-8 items-center justify-center rounded-full text-slate-400 group-hover:bg-white group-hover:text-cyan-600 group-hover:shadow-sm transition">
-                  <ChevronRight className="size-5" />
+              <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-end">
+                  <ActionMenuButton
+                    ariaLabel={`Hành động cho rubric ${r.code}`}
+                    items={[
+                      { id: 'view', label: 'Xem chi tiết', icon: Eye, onSelect: () => onViewDetails(r) },
+                      { id: 'delete', label: 'Xóa', icon: Trash2, tone: 'danger', onSelect: () => onDelete(r) },
+                    ]}
+                  />
                 </div>
               </td>
             </tr>

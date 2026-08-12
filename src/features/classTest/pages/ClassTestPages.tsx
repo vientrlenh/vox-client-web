@@ -69,6 +69,7 @@ import { buildClassTestQuotaWarning } from '@/features/classTest/utils/classTest
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useMySubscriptionUsageQuery } from '@/features/subscription_school/api/useMySubscriptionUsageQuery'
 import { useMyClassTestQuotaAllocationQuery } from '@/features/subscription_school/api/useMyClassTestQuotaAllocationQuery'
+import { useQuotaPricingQuery } from '@/features/subscription_school/api/useQuotaPricingQuery'
 import {
   formatDate,
   formatDateTime,
@@ -1193,6 +1194,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const subscriptionQuery = useMySubscriptionQuery()
   const subscriptionUsageQuery = useMySubscriptionUsageQuery()
   const myClassTestQuotaAllocationQuery = useMyClassTestQuotaAllocationQuery()
+  const quotaPricingQuery = useQuotaPricingQuery()
   const updateQuestionsMutation = useUpdateClassTestQuestionsMutation()
   const updateExamMutation = useUpdateClassTestMutation()
   const updateStatusMutation = useUpdateClassTestStatusMutation()
@@ -1572,6 +1574,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     gradingQuota,
     maxAttempt: exam.maxAttempt,
     personalAllocation: myClassTestQuotaAllocationQuery.data,
+    pricePerSecondUsd: quotaPricingQuery.data?.estimatedCostPerExamSecondUsd,
   })
   // Ước lượng "nếu lưu với giá trị đang sửa" trong modal — dùng editMaxAttempt thay vì exam.maxAttempt
   // vì đây là số người dùng đang gõ, chưa lưu.
@@ -1583,6 +1586,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     gradingQuota,
     maxAttempt: Number(editMaxAttempt) || 1,
     personalAllocation: myClassTestQuotaAllocationQuery.data,
+    pricePerSecondUsd: quotaPricingQuery.data?.estimatedCostPerExamSecondUsd,
   })
   const { completedCount, steps } = getClassTestWorkflowSteps(exam, schedules, candidates)
   const scheduleReadiness = getClassTestScheduleReadiness(schedules, candidates)

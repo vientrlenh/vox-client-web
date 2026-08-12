@@ -19,22 +19,11 @@ export const QUOTA_ICONS: Record<QuotaType, LucideIcon> = {
   PRACTICE: Headphones,
 }
 
-// includedQuantity / totalAllocated / usedQuantity đều tính bằng GIÂY audio xử lý —
-// quy đổi sang phút khi hiển thị cho dễ hiểu, chỉ gửi lại giây khi gọi API.
-export function secondsToMinutes(seconds?: number | null) {
-  return Math.round((Number(seconds) || 0) / 60)
-}
-
-export function minutesToSeconds(minutes?: number | null) {
-  return Math.round((Number(minutes) || 0) * 60)
-}
-
-export function formatQuotaMinutes(seconds?: number | null) {
-  return `${new Intl.NumberFormat('vi-VN').format(secondsToMinutes(seconds))} phút`
-}
-
-export function formatPricePerMinute(pricePerSecond?: number | null) {
-  return `${formatVnd((Number(pricePerSecond) || 0) * 60)} / phút`
+// includedQuantity / totalAllocated / usedQuantity đều tính bằng USD chi phí AI ước
+// tính (xem AI_USAGE_QUOTA_USD_MIGRATION.md) — hiển thị thẳng, không quy đổi đơn vị.
+export function formatUsd(value?: number | null) {
+  const amount = Number(value) || 0
+  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(amount)}`
 }
 
 export type PlanQuota = {
@@ -270,14 +259,4 @@ export function getInvoiceStatusDisplay(status: InvoiceStatus) {
   }
 
   return { label: 'Thất bại', tone: 'danger' as const }
-}
-
-export function getUsageBarColor(pct: number) {
-  if (pct >= 90) {
-    return '#ef4444'
-  }
-  if (pct >= 75) {
-    return '#f59e0b'
-  }
-  return '#4f46e5'
 }

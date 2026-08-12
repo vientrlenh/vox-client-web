@@ -27,6 +27,7 @@ import { usePublishSystemRubricVersionMutation } from '../api/usePublishSystemRu
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
 
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { AssessmentPolicyTable } from '../components/AssessmentPolicyTable';
 import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPolicyDialog';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
@@ -130,15 +131,16 @@ export function SystemAdminAssessmentPoliciesPage() {
   const { mutateAsync: publishPoliciesByVersion, isPending: isPublishingPolicies } = usePublishSystemAssessmentPoliciesByRubricVersionMutation();
   const { mutateAsync: publishRubricVersion, isPending: isPublishingVersion } = usePublishSystemRubricVersionMutation();
   const isQuickPublishing = isPublishingPolicies || isPublishingVersion;
+  const { showError, showSuccess, feedbackToast } = useFeedbackToast();
 
   const handleCreatePolicy = async (formDataList: CreateAssessmentPolicyPayload[]) => {
     try {
       const createdPolicyIds = await createPolicy(formDataList);
       setIsCreateModalOpen(false);
-      alert(`Đã tạo thành công ${createdPolicyIds.length} Chính Sách Đánh Giá.`);
+      showSuccess(`Đã tạo thành công ${createdPolicyIds.length} Chính Sách Đánh Giá.`);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi tạo Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi tạo Chính Sách Đánh Giá.');
     }
   };
 
@@ -150,7 +152,7 @@ export function SystemAdminAssessmentPoliciesPage() {
       setEditingPolicy(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
     }
   };
 
@@ -179,10 +181,10 @@ export function SystemAdminAssessmentPoliciesPage() {
       if (willPublishVersion) {
         await publishRubricVersion(selectedRubricVersionId);
       }
-      alert('Đã xuất bản thành công.');
+      showSuccess('Đã xuất bản thành công.');
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xuất bản.');
+      showError(err.message || 'Có lỗi xảy ra khi xuất bản.');
     }
   };
 
@@ -196,12 +198,13 @@ export function SystemAdminAssessmentPoliciesPage() {
       await deletePolicy(policy.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
     }
   };
 
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       {/* vox background decoration — đồng bộ với gradient nút */}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"

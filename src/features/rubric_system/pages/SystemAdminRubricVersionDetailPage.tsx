@@ -3,6 +3,7 @@
 import { useParams, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
 import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, Edit, Plus, ListChecks, Layers, Calculator, Trash2, Archive, Search, Filter, FileSpreadsheet } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 
 import { useSystemRubricQuery } from '../api/useSystemRubricQuery';
 import { useSystemRubricVersionQuery } from '../api/useSystemRubricVersionQuery';
@@ -143,6 +144,7 @@ export function SystemAdminRubricVersionDetailPage() {
   const { mutateAsync: updateResultBand, isPending: isUpdatingResultBand } = useUpdateSystemRubricResultBandMutation(editingResultBand?.id);
   const { mutateAsync: deleteResultBand } = useDeleteSystemRubricResultBandMutation(versionId);
 
+  const { showError, feedbackToast } = useFeedbackToast();
 
   // --- 3. CÁC HÀM XỬ LÝ SỰ KIỆN ---
 
@@ -154,7 +156,7 @@ export function SystemAdminRubricVersionDetailPage() {
     } catch (error) {
       const err = error as Error;
       console.error("Lỗi cập nhật Version:", err);
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật.');
     }
   };
 
@@ -164,7 +166,7 @@ export function SystemAdminRubricVersionDetailPage() {
       await changeVersionStatus('PUBLISHED');
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi chuyển trạng thái phiên bản.');
+      showError(err.message || 'Có lỗi xảy ra khi chuyển trạng thái phiên bản.');
     }
   };
 
@@ -180,7 +182,7 @@ export function SystemAdminRubricVersionDetailPage() {
     } catch (error) {
       const err = error as Error;
       console.error("Lỗi xóa Version:", err);
-      alert(err.message || 'Có lỗi xảy ra khi xóa phiên bản.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa phiên bản.');
     }
   };
 
@@ -190,7 +192,7 @@ export function SystemAdminRubricVersionDetailPage() {
       await archiveVersion();
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi lưu trữ phiên bản.');
+      showError(err.message || 'Có lỗi xảy ra khi lưu trữ phiên bản.');
     }
   };
 
@@ -201,7 +203,7 @@ export function SystemAdminRubricVersionDetailPage() {
       setIsAddCriterionModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi thêm tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi thêm tiêu chí.');
     }
   };
 
@@ -212,7 +214,7 @@ export function SystemAdminRubricVersionDetailPage() {
       setEditingCriterion(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
     }
   };
 
@@ -225,7 +227,7 @@ export function SystemAdminRubricVersionDetailPage() {
       await deleteCriterion(criterion.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
     }
   };
 
@@ -236,7 +238,7 @@ export function SystemAdminRubricVersionDetailPage() {
       setIsAddResultBandModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi thêm thang điểm.');
+      showError(err.message || 'Có lỗi xảy ra khi thêm thang điểm.');
     }
   };
 
@@ -247,7 +249,7 @@ export function SystemAdminRubricVersionDetailPage() {
       setEditingResultBand(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật thang điểm.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật thang điểm.');
     }
   };
 
@@ -260,7 +262,7 @@ export function SystemAdminRubricVersionDetailPage() {
       await deleteResultBand(band.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa thang điểm.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa thang điểm.');
     }
   };
 
@@ -291,6 +293,7 @@ export function SystemAdminRubricVersionDetailPage() {
   // --- 5. RENDER UI CHÍNH ---
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}

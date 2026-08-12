@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import type { AddRubricCriteriaPayload } from '../api/useAddSystemRubricCriteriaMutation';
 import { useFrameworkVersionCriteriaQuery, useFrameworkVersionsQuery } from '../api/useFrameworkVersionOptionsQuery';
 
@@ -43,6 +44,7 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
   const frameworkCriteria = frameworkCriteriaAll?.filter((fc) => !usedFrameworkCriterionIds.includes(fc.id));
   // Mã Code luôn theo đúng Framework Criterion đã chọn — không cho gõ tay để tránh lệch dữ liệu.
   const selectedFrameworkCriterion = frameworkCriteria?.find((fc) => fc.id === formData.frameworkCriterionId);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   if (!isOpen) return null;
 
@@ -63,12 +65,12 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
     e.preventDefault();
 
     if (!formData.frameworkCriterionId.trim()) {
-      alert('Lỗi: Vui lòng chọn Framework Version và Framework Criterion!');
+      showError('Lỗi: Vui lòng chọn Framework Version và Framework Criterion!');
       return;
     }
 
     if (existingOrders.includes(Number(formData.order))) {
-      alert(`Lỗi: Thứ tự (Order) ${formData.order} đã được sử dụng bởi một tiêu chí khác trong phiên bản này. Vui lòng chọn thứ tự khác.`);
+      showError(`Lỗi: Thứ tự (Order) ${formData.order} đã được sử dụng bởi một tiêu chí khác trong phiên bản này. Vui lòng chọn thứ tự khác.`);
       return;
     }
 
@@ -102,6 +104,7 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative w-full max-w-xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">

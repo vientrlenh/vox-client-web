@@ -9,11 +9,13 @@ import {
   AlertTriangle,
   Plus,
   Edit,
+  Trash2,
   Search,
   Filter,
   Upload,
 } from "lucide-react";
 import { useAppSelector } from "@/app/store/hooks";
+import { useFeedbackToast } from "@/shared/ui/useFeedbackToast";
 
 // API Queries & Mutations
 import { useSchoolRubricQuery } from "../api/useSchoolRubricQuery";
@@ -22,6 +24,7 @@ import {
   type SearchRubricVersionFilter,
 } from "../api/useSearchSchoolRubricVersionsQuery";
 import { useUpdateSchoolRubricMutation } from "../api/useUpdateSchoolRubricMutation";
+import { useDeleteSchoolRubricMutation } from "../api/useDeleteSchoolRubricMutation";
 
 // IMPORT HOOK THÊM VERSION MỚI LÀM
 import { 
@@ -92,18 +95,36 @@ export function SchoolAdminRubricDetailPage() {
   const totalPages = versionsData?.totalPages ?? 0;
   const totalElements = versionsData?.totalElements ?? 0;
 
-  // 3. Mutations (Cập nhật Rubric & Thêm Version)
+  // 3. Mutations (Cập nhật/Xóa Rubric & Thêm Version)
   const { mutateAsync: updateRubric, isPending: isUpdating } = useUpdateSchoolRubricMutation(schoolId, rubricId);
+  const { mutateAsync: deleteRubric, isPending: isDeleting } = useDeleteSchoolRubricMutation(schoolId);
   const { mutateAsync: addVersions, isPending: isAdding } = useAddSchoolRubricVersionsMutation(schoolId, rubricId); // HOOK MỚI
+  const { showError, feedbackToast } = useFeedbackToast();
 
   // 4. Hàm xử lý submit Form Cập nhật Rubric
-  const handleUpdateRubric = async (formData: { name: string; description: string; }) => {
+  const handleUpdateRubric = async (formData: { name: string; description?: string; }) => {
     try {
       await updateRubric(formData);
       setIsEditModalOpen(false);
     } catch (error: unknown) {
       console.error("Chi tiết lỗi từ BE:", error);
-      alert((error as { message?: string }).message || "Có lỗi xảy ra khi lưu thay đổi. Vui lòng thử lại.");
+      showError((error as { message?: string }).message || "Có lỗi xảy ra khi lưu thay đổi. Vui lòng thử lại.");
+    }
+  };
+
+  // Hàm xử lý Xóa toàn bộ Rubric (chỉ School Admin của đúng trường mới có quyền này)
+  const handleDeleteRubric = async () => {
+    const isConfirm = window.confirm(
+      "Bạn có chắc chắn muốn xóa bộ Rubric này? Chỉ xóa được khi chưa có phiên bản (version) nào bên trong. Hành động này không thể hoàn tác!"
+    );
+    if (!isConfirm || !rubricId) return;
+
+    try {
+      await deleteRubric(rubricId);
+      navigate("/school-admin/rubrics");
+    } catch (error: unknown) {
+      console.error("Lỗi xóa Rubric:", error);
+      showError((error as { message?: string }).message || "Có lỗi xảy ra khi xóa Rubric.");
     }
   };
 
@@ -114,7 +135,7 @@ export function SchoolAdminRubricDetailPage() {
       setIsAddModalOpen(false); // Thành công thì đóng popup
     } catch (error: unknown) {
       console.error("Lỗi thêm Version:", error);
-      alert((error as { message?: string }).message || "Có lỗi xảy ra khi thêm phiên bản mới.");
+      showError((error as { message?: string }).message || "Có lỗi xảy ra khi thêm phiên bản mới.");
     }
   };
 
@@ -146,6 +167,7 @@ export function SchoolAdminRubricDetailPage() {
 
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}
@@ -208,8 +230,18 @@ export function SchoolAdminRubricDetailPage() {
           </div>
         </div>
 
-        {/* NÚT UPDATE */}
-        <div className="mt-6 flex justify-end border-t border-slate-100 pt-5">
+        {/* NÚT XÓA / UPDATE */}
+        <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
+          <button
+            type="button"
+            onClick={handleDeleteRubric}
+            disabled={isDeleting}
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-5 text-sm font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+          >
+            {isDeleting ? <RefreshCw className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+            Xóa Rubric
+          </button>
+
           <button
             type="button"
             onClick={() => setIsEditModalOpen(true)}

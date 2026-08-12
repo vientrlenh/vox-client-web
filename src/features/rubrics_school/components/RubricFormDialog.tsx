@@ -2,12 +2,13 @@
 
 import { useState } from 'react'; // Đã xóa import useEffect
 import { X, Loader2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 
 type RubricFormDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   initialData?: { name: string; description?: string | null };
-  onSubmit: (data: { name: string; description: string }) => Promise<void>;
+  onSubmit: (data: { name: string; description?: string }) => Promise<void>;
   isPending: boolean;
 };
 
@@ -17,6 +18,7 @@ export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPen
 
   // Kỹ thuật React 19: Lưu lại prop isOpen của lần render trước để so sánh
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   // Cập nhật state trực tiếp trong lúc render thay vì dùng useEffect
   // Giúp tránh render 2 lần (Cascading Renders) và fix triệt để lỗi ESLint
@@ -36,20 +38,23 @@ export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPen
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      alert('Vui lòng nhập tên Rubric!');
+      showError('Vui lòng nhập tên Rubric!');
       return;
     }
-    await onSubmit({ name, description });
+    // Để trống thì gửi undefined (không đổi), không gửi chuỗi rỗng -- BE COALESCE chỉ giữ nguyên
+    // giá trị cũ khi field là null/không có, chuỗi rỗng "" bị coi là giá trị thật.
+    await onSubmit({ name, description: description.trim() || undefined });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       {/* Lớp nền đen mờ (Click ra ngoài để đóng nếu không đang load) */}
-      <div 
-        className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition-opacity" 
+      <div
+        className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition-opacity"
         onClick={!isPending ? onClose : undefined}
       />
-      
+      {feedbackToast}
+
       {/* Box Dialog */}
       <div className="relative w-full max-w-lg rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">

@@ -6,7 +6,8 @@ import { useSchoolsQuery } from "../api/useSchoolsQuery";
 import { useUpdateSchoolStatusMutation } from "../api/useUpdateSchoolStatusMutation";
 import { SchoolTable } from "../components/SchoolTable";
 import { SchoolDetailDialog } from "../components/SchoolDetailDialog";
-import { Pagination } from "@/shared/components/Pagination"; 
+import { Pagination } from "@/shared/components/Pagination";
+import { useFeedbackToast } from "@/shared/ui/useFeedbackToast";
 import type { School } from "../types";
 
 const DEFAULT_PAGE = 1;
@@ -24,6 +25,7 @@ export function SystemAdminSchoolsPage() {
   );
   const { mutateAsync: updateStatus, isPending: isUpdatingStatus } =
     useUpdateSchoolStatusMutation();
+  const { showError, feedbackToast } = useFeedbackToast();
 
   const schools = data?.content ?? [];
   const totalPages = data?.totalPages ?? 0;
@@ -37,14 +39,14 @@ export function SystemAdminSchoolsPage() {
     if (!isConfirmed) return;
     try {
       await updateStatus({ id: school.id, isActive: !school.isActive });
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
-      alert("Có lỗi xảy ra khi cập nhật trạng thái.");
+    } catch {
+      showError("Có lỗi xảy ra khi cập nhật trạng thái.");
     }
   }
 
   return (
     <section className="grid gap-6 p-4 sm:p-6 rounded-2xl bg-linear-to-br from-blue-500 via-white to-blue-100/80 min-h-[calc(100vh-6rem)]">
+      {feedbackToast}
       {/* Bọc toàn trang bằng gradient Xanh biển - Trắng mềm mại */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-blue-950 flex items-center gap-2">

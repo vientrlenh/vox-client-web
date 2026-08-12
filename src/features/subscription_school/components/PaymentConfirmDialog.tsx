@@ -2,7 +2,7 @@ import { CreditCard } from 'lucide-react'
 import { PaymentMethodField } from '@/shared/payment/PaymentMethodField'
 import { PAYMENT_METHOD_LABELS } from '@/shared/payment/types'
 import {
-  formatQuotaMinutes,
+  formatUsd,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -66,7 +66,7 @@ export function PaymentConfirmDialog({
                 <div className="flex justify-between text-[13px]" key={quotaType}>
                   <span className="text-slate-500">{QUOTA_LABELS[quotaType]}</span>
                   <span className="font-bold text-slate-900">
-                    {formatQuotaMinutes(quota?.includedQuantity)}
+                    {formatUsd(quota?.includedQuantity)}
                   </span>
                 </div>
               )

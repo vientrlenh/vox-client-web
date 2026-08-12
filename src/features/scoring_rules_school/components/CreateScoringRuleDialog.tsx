@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { CONDITION_TYPE_OPTIONS, ACTION_TYPE_OPTIONS, SEVERITY_OPTIONS, buildParamsValue } from '../constants';
 import { ScoringRuleParamsFields } from './ScoringRuleParamsFields';
 import type { CreateScoringRulePayload } from '../api/useCreateSchoolScoringRuleMutation';
@@ -27,6 +28,7 @@ export function CreateScoringRuleDialog({ isOpen, onClose, onSubmit, isPending }
   const [conditionValues, setConditionValues] = useState<Record<string, string>>({});
   const [actionType, setActionType] = useState('');
   const [actionValues, setActionValues] = useState<Record<string, string>>({});
+  const { showError, feedbackToast } = useFeedbackToast();
 
   if (!isOpen) return null;
 
@@ -36,7 +38,7 @@ export function CreateScoringRuleDialog({ isOpen, onClose, onSubmit, isPending }
     const conditionOption = CONDITION_TYPE_OPTIONS.find((o) => o.value === conditionType);
     const actionOption = ACTION_TYPE_OPTIONS.find((o) => o.value === actionType);
     if (!conditionOption || !actionOption) {
-      alert('Vui lòng chọn Loại điều kiện và Loại hành động!');
+      showError('Vui lòng chọn Loại điều kiện và Loại hành động!');
       return;
     }
 
@@ -60,6 +62,7 @@ export function CreateScoringRuleDialog({ isOpen, onClose, onSubmit, isPending }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative w-full max-w-xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">

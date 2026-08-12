@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
 import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, Edit, Plus, ListChecks, Layers, Calculator, Trash2, Archive, Search, Filter, FileSpreadsheet } from 'lucide-react';
 import { useAppSelector } from '@/app/store/hooks';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 
 import { useSchoolRubricQuery } from '../api/useSchoolRubricQuery';
 import { useSchoolRubricVersionQuery } from '../api/useSchoolRubricVersionQuery';
@@ -147,6 +148,7 @@ export function SchoolAdminRubricVersionDetailPage() {
   const { mutateAsync: updateResultBand, isPending: isUpdatingResultBand } = useUpdateSchoolRubricResultBandMutation(schoolId, editingResultBand?.id);
   const { mutateAsync: deleteResultBand } = useDeleteSchoolRubricResultBandMutation(schoolId, versionId);
 
+  const { showError, feedbackToast } = useFeedbackToast();
 
   // --- 3. CÁC HÀM XỬ LÝ SỰ KIỆN ---
 
@@ -158,7 +160,7 @@ export function SchoolAdminRubricVersionDetailPage() {
     } catch (error) {
       const err = error as Error;
       console.error("Lỗi cập nhật Version:", err);
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật.');
     }
   };
 
@@ -168,7 +170,7 @@ export function SchoolAdminRubricVersionDetailPage() {
       await changeVersionStatus('PUBLISHED');
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi chuyển trạng thái phiên bản.');
+      showError(err.message || 'Có lỗi xảy ra khi chuyển trạng thái phiên bản.');
     }
   };
 
@@ -184,7 +186,7 @@ export function SchoolAdminRubricVersionDetailPage() {
     } catch (error) {
       const err = error as Error;
       console.error("Lỗi xóa Version:", err);
-      alert(err.message || 'Có lỗi xảy ra khi xóa phiên bản.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa phiên bản.');
     }
   };
 
@@ -194,7 +196,7 @@ export function SchoolAdminRubricVersionDetailPage() {
       await archiveVersion();
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi lưu trữ phiên bản.');
+      showError(err.message || 'Có lỗi xảy ra khi lưu trữ phiên bản.');
     }
   };
 
@@ -205,7 +207,7 @@ export function SchoolAdminRubricVersionDetailPage() {
       setIsAddCriterionModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi thêm tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi thêm tiêu chí.');
     }
   };
 
@@ -216,7 +218,7 @@ export function SchoolAdminRubricVersionDetailPage() {
       setEditingCriterion(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
     }
   };
 
@@ -229,7 +231,7 @@ export function SchoolAdminRubricVersionDetailPage() {
       await deleteCriterion(criterion.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
     }
   };
 
@@ -240,7 +242,7 @@ export function SchoolAdminRubricVersionDetailPage() {
       setIsAddResultBandModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi thêm thang điểm.');
+      showError(err.message || 'Có lỗi xảy ra khi thêm thang điểm.');
     }
   };
 
@@ -251,7 +253,7 @@ export function SchoolAdminRubricVersionDetailPage() {
       setEditingResultBand(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật thang điểm.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật thang điểm.');
     }
   };
 
@@ -264,7 +266,7 @@ export function SchoolAdminRubricVersionDetailPage() {
       await deleteResultBand(band.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa thang điểm.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa thang điểm.');
     }
   };
 
@@ -295,6 +297,7 @@ export function SchoolAdminRubricVersionDetailPage() {
   // --- 5. RENDER UI CHÍNH ---
   return (
     <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+      {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}

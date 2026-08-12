@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import type { AddRubricVersionsPayload } from '../api/useAddSystemRubricVersionsMutation';
 
 type Props = {
@@ -31,6 +32,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
     effectiveFrom: '',
     effectiveTo: '',
   });
+  const { showError, feedbackToast } = useFeedbackToast();
 
   if (!isOpen) return null;
 
@@ -39,24 +41,24 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
 
     // --- VALIDATION BẢO VỆ GIAO DIỆN ---
     if (formData.version <= 0) {
-      alert("Lỗi: Số Version phải lớn hơn 0!");
+      showError("Lỗi: Số Version phải lớn hơn 0!");
       return;
     }
 
     if (!formData.name.trim()) {
-      alert("Lỗi: Vui lòng nhập Tên phiên bản!");
+      showError("Lỗi: Vui lòng nhập Tên phiên bản!");
       return;
     }
 
     const min = Number(formData.scoringScaleMin);
     const max = Number(formData.scoringScaleMax);
     if (min >= max) {
-      alert("Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!");
+      showError("Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!");
       return;
     }
     if (formData.effectiveFrom && formData.effectiveTo) {
       if (new Date(formData.effectiveFrom) > new Date(formData.effectiveTo)) {
-        alert("Lỗi: Ngày kết thúc không được nhỏ hơn Ngày áp dụng!");
+        showError("Lỗi: Ngày kết thúc không được nhỏ hơn Ngày áp dụng!");
         return;
       }
     }
@@ -83,6 +85,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative w-full max-w-xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
@@ -98,14 +101,15 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
             {/* Version Number */}
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Số Version (Ví dụ: 1, 2)</label>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 min="1"
-                value={formData.version} 
-                onChange={(e) => setFormData({ ...formData, version: e.target.value === '' ? 1 : parseInt(e.target.value) })} 
-                disabled={isPending} 
-                required 
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" 
+                value={formData.version}
+                onChange={(e) => setFormData({ ...formData, version: e.target.value === '' ? 1 : parseInt(e.target.value) })}
+                onWheel={(e) => e.currentTarget.blur()}
+                disabled={isPending}
+                required
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
               />
             </div>
 
@@ -140,25 +144,27 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
             {/* Min - Max */}
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối thiểu (Min)</label>
-              <input 
-                type="number" step="0.1" 
-                value={formData.scoringScaleMin} 
-                onChange={(e) => setFormData({ ...formData, scoringScaleMin: e.target.value === '' ? 0 : Number(e.target.value) })} 
-                disabled={isPending} 
-                required 
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" 
+              <input
+                type="number" step="0.1" min="0"
+                value={formData.scoringScaleMin}
+                onChange={(e) => setFormData({ ...formData, scoringScaleMin: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)) })}
+                onWheel={(e) => e.currentTarget.blur()}
+                disabled={isPending}
+                required
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
               />
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Điểm tối đa (Max)</label>
-              <input 
-                type="number" step="0.1" 
-                value={formData.scoringScaleMax} 
-                onChange={(e) => setFormData({ ...formData, scoringScaleMax: e.target.value === '' ? 0 : Number(e.target.value) })} 
-                disabled={isPending} 
-                required 
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" 
+              <input
+                type="number" step="0.1" min="0"
+                value={formData.scoringScaleMax}
+                onChange={(e) => setFormData({ ...formData, scoringScaleMax: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)) })}
+                onWheel={(e) => e.currentTarget.blur()}
+                disabled={isPending}
+                required
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
               />
             </div>
 

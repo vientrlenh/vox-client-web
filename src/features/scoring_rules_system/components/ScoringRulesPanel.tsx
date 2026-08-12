@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Search, Filter, Plus } from 'lucide-react';
 import { Pagination } from '@/shared/components/Pagination';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 
 import { useSearchSystemScoringRulesQuery, type SearchScoringRuleFilter } from '../api/useSearchSystemScoringRulesQuery';
 import { useCreateSystemScoringRuleMutation } from '../api/useCreateSystemScoringRuleMutation';
@@ -46,6 +47,7 @@ export function ScoringRulesPanel({ policyId }: Props) {
   const { mutateAsync: createRule, isPending: isCreating } = useCreateSystemScoringRuleMutation(policyId);
   const { mutateAsync: updateRule, isPending: isUpdating } = useUpdateSystemScoringRuleMutation(policyId, editingRule?.id);
   const { mutateAsync: deleteRule } = useDeleteSystemScoringRuleMutation(policyId);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   const handleCreate: React.ComponentProps<typeof CreateScoringRuleDialog>['onSubmit'] = async (payload) => {
     try {
@@ -53,7 +55,7 @@ export function ScoringRulesPanel({ policyId }: Props) {
       setIsCreateModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi thêm Scoring Rule.');
+      showError(err.message || 'Có lỗi xảy ra khi thêm Scoring Rule.');
     }
   };
 
@@ -63,7 +65,7 @@ export function ScoringRulesPanel({ policyId }: Props) {
       setEditingRule(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật Scoring Rule.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật Scoring Rule.');
     }
   };
 
@@ -75,12 +77,13 @@ export function ScoringRulesPanel({ policyId }: Props) {
       await deleteRule(rule.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa Scoring Rule.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa Scoring Rule.');
     }
   };
 
   return (
     <div>
+      {feedbackToast}
       <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:px-6">
         <h2 className="text-lg font-medium text-slate-950">Scoring Rules</h2>
         <button

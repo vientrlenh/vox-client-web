@@ -1,5 +1,5 @@
 export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
-export type PlanStatus = 'ACTIVE' | 'ARCHIVED'
+export type PlanStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
 export type RequestType = 'REGISTRATION' | 'UPGRADE'
 export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -40,7 +40,6 @@ export type SubscriptionPlan = {
   createdAt: string | null
   createdBy: string | null
   replacedByPlanId: string | null
-  hasActiveSubscribers: boolean
   quotas: PlanQuota[]
 }
 
@@ -137,7 +136,6 @@ export type CreatePlanPayload = {
   validityDays: number
   maxTimePerAttemptMin: number | null
   maxStudentCount: number
-  popular: boolean
   quotas: { quotaType: QuotaType; includedQuantity: number; tokenUnitPrice: number }[]
 }
 
@@ -183,18 +181,11 @@ export function formatMinutes(minutes?: number | null) {
   return `${Math.round(minutes)} phút`
 }
 
-// includedQuantity / tokenUnitPrice của quota tính theo GIÂY audio xử lý — quy đổi
-// sang phút khi hiển thị/nhập liệu, chỉ gửi lại giây khi gọi API tạo/sửa gói.
-export function secondsToMinutes(seconds?: number | null) {
-  return Math.round((Number(seconds) || 0) / 60)
-}
-
-export function minutesToSeconds(minutes?: number | null) {
-  return Math.round((Number(minutes) || 0) * 60)
-}
-
-export function formatQuotaMinutes(seconds?: number | null) {
-  return formatMinutes(secondsToMinutes(seconds))
+// includedQuantity / tokenUnitPrice của quota tính theo USD chi phí AI ước tính (xem
+// AI_USAGE_QUOTA_USD_MIGRATION.md) — hiển thị/nhập liệu thẳng, không quy đổi đơn vị.
+export function formatUsd(value?: number | null) {
+  const amount = Number(value) || 0
+  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(amount)}`
 }
 
 export function formatNullableText(value?: string | null) {
@@ -256,6 +247,10 @@ export function getSubscriptionStatusDisplay(
 }
 
 export function getPlanStatusDisplay(status: PlanStatus) {
+  if (status === 'DRAFT') {
+    return { label: 'Nháp', tone: 'warning' as const }
+  }
+
   if (status === 'ACTIVE') {
     return { label: 'Đang áp dụng', tone: 'success' as const }
   }
@@ -289,16 +284,6 @@ export function getInvoiceStatusDisplay(status: InvoiceStatus) {
   }
 
   return { label: 'Thất bại', tone: 'danger' as const }
-}
-
-export function getUsageBarColor(pct: number) {
-  if (pct >= 90) {
-    return '#ef4444'
-  }
-  if (pct >= 75) {
-    return '#f59e0b'
-  }
-  return '#4f46e5'
 }
 
 export function getRequestTypeDisplay(type: RequestType) {
