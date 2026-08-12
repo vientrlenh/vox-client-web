@@ -8,6 +8,9 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { exportQuestions } from '../api/useQuestionExport'
 import { useBulkReviewQuestionMutation } from '../api/useQuestionReviewMutation'
 import { useQuestionsQuery, type QuestionQueryFilters } from '../api/useQuestionsQuery'
+import { formatStatusList, getBulkEligibleStatuses } from '../bulkStatus'
+import type { BulkStatusResult } from '../bulkStatus'
+import { BulkStatusResultDialog } from '../components/BulkStatusResultDialog'
 import { QuestionPageHeader } from '../components/QuestionPageHeader'
 import { QuestionPagination } from '../components/QuestionPagination'
 import { QuestionTable } from '../components/QuestionTable'
@@ -235,6 +238,7 @@ function QuestionsPage({
   const [isExporting, setIsExporting] = useState(false)
   const [isBulkProcessing, setIsBulkProcessing] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [bulkResult, setBulkResult] = useState<BulkStatusResult | null>(null)
   const [bulkSelection, setBulkSelection] = useState<string[]>([])
   const [bulkAction, setBulkAction] = useState<QuestionWorkflowAction>(initialBulkAction)
   const [draftFilters, setDraftFilters] = useState<QuestionQueryFilters>({
@@ -304,6 +308,16 @@ function QuestionsPage({
   const validBulkSelection = bulkSelection.filter((id) =>
     questionsQuery.data?.content.some((question) => question.id === id),
   )
+  const selectedQuestions = (questionsQuery.data?.content ?? []).filter((question) =>
+    validBulkSelection.includes(question.id),
+  )
+  const eligibleStatuses = selectedBulkAction
+    ? getBulkEligibleStatuses(selectedBulkAction.action, actorRole)
+    : []
+  const eligibleQuestions = selectedQuestions.filter((question) =>
+    eligibleStatuses.includes(question.status),
+  )
+  const skippedByStatusCount = selectedQuestions.length - eligibleQuestions.length
 
   async function handleExport() {
     setIsExporting(true)
@@ -337,10 +351,6 @@ function QuestionsPage({
   }
 
   async function handleBulkAction() {
-    const selectedQuestions = (questionsQuery.data?.content ?? []).filter((question) =>
-      validBulkSelection.includes(question.id),
-    )
-
     if (!selectedQuestions.length) {
       setExportError('Hãy chọn ít nhất một câu hỏi để xử lý hàng loạt.')
       return
@@ -351,11 +361,13 @@ function QuestionsPage({
       return
     }
 
-    if (
-      !(await confirm({
-        message: `Bạn có chắc muốn ${selectedBulkAction.confirmVerb} ${selectedQuestions.length} câu hỏi đã chọn không? Các câu không đúng quyền hoặc không đúng trạng thái sẽ bị hệ thống bỏ qua.`,
-      }))
-    ) {
+    // Nói trước con số sẽ bị bỏ qua thay vì để người dùng phát hiện qua bảng lỗi sau khi chạy.
+    const confirmMessage =
+      skippedByStatusCount > 0
+        ? `Trong ${selectedQuestions.length} câu đã chọn, chỉ ${eligibleQuestions.length} câu đang ở trạng thái ${formatStatusList(eligibleStatuses)} nên có thể ${selectedBulkAction.confirmVerb}. ${skippedByStatusCount} câu còn lại sẽ bị bỏ qua và giữ nguyên trạng thái. Tiếp tục?`
+        : `Bạn có chắc muốn ${selectedBulkAction.confirmVerb} ${selectedQuestions.length} câu hỏi đã chọn không? Các câu không đúng quyền sẽ bị hệ thống bỏ qua.`
+
+    if (!(await confirm({ message: confirmMessage }))) {
       return
     }
 
@@ -371,25 +383,22 @@ function QuestionsPage({
         },
       })
 
-      const failedById = new Map(result.failed.map((item) => [item.questionId, item.reason]))
-      const failedQuestions = selectedQuestions.filter((question) => failedById.has(question.id))
-
       await queryClient.invalidateQueries({ queryKey: questionQueryKeys.all })
-      setBulkSelection(failedQuestions.map((question) => question.id))
+      // Giữ lại đúng những câu bị bỏ qua trong vùng chọn để người dùng xử lý tiếp mà không phải
+      // dò lại từ đầu.
+      setBulkSelection(result.failed.map((failure) => failure.questionId))
 
       if (result.updated.length > 0) {
         setToastMessage(`Đã ${selectedBulkAction.successVerb} ${result.updated.length} câu hỏi.`)
       }
 
-      if (failedQuestions.length > 0) {
-        setExportError(
-          failedQuestions
-            .map((question) => {
-              const label = question.code?.trim() || question.questionText.trim()
-              return `${label}: ${failedById.get(question.id)}`
-            })
-            .join(' | '),
-        )
+      if (result.failed.length > 0) {
+        setBulkResult({
+          actionVerb: selectedBulkAction.successVerb,
+          failed: result.failed,
+          totalCount: selectedQuestions.length,
+          updatedCount: result.updated.length,
+        })
       }
     } catch (error) {
       setExportError(
@@ -457,6 +466,7 @@ function QuestionsPage({
         onClose={() => setExportError(null)}
         tone="error"
       />
+      <BulkStatusResultDialog onClose={() => setBulkResult(null)} result={bulkResult} />
       {dialog}
 
       {allowTeacherTabs && view !== 'review' ? (
@@ -592,9 +602,25 @@ function QuestionsPage({
             <span className="font-semibold">
               Đang chọn {validBulkSelection.length} câu hỏi trên trang hiện tại để xử lý hàng loạt.
             </span>
-            <span className="text-indigo-800/80">
-              Backend sẽ tự kiểm tra quyền và trạng thái của từng câu, câu nào không hợp lệ sẽ bị bỏ qua.
-            </span>
+            {selectedBulkAction && validBulkSelection.length > 0 ? (
+              skippedByStatusCount > 0 ? (
+                <span className="font-semibold text-amber-700">
+                  Chỉ {eligibleQuestions.length} câu đang ở trạng thái{' '}
+                  {formatStatusList(eligibleStatuses)} nên có thể {selectedBulkAction.confirmVerb};{' '}
+                  {skippedByStatusCount} câu còn lại sẽ bị bỏ qua và giữ nguyên trạng thái.
+                </span>
+              ) : (
+                <span className="text-indigo-800/80">
+                  Tất cả câu đã chọn đều đúng trạng thái để {selectedBulkAction.confirmVerb}. Quyền
+                  trên từng câu vẫn được hệ thống kiểm tra khi chạy.
+                </span>
+              )
+            ) : (
+              <span className="text-indigo-800/80">
+                Thao tác chỉ áp dụng cho những câu bạn có quyền và đang ở đúng trạng thái. Các câu
+                còn lại được giữ nguyên.
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-2 text-sm font-bold text-indigo-950">
@@ -611,6 +637,15 @@ function QuestionsPage({
                 ))}
               </select>
             </label>
+            {skippedByStatusCount > 0 && eligibleQuestions.length > 0 ? (
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-800 transition hover:bg-amber-100"
+                onClick={() => setBulkSelection(eligibleQuestions.map((question) => question.id))}
+                type="button"
+              >
+                Chỉ chọn {eligibleQuestions.length} câu hợp lệ
+              </button>
+            ) : null}
             <button
               className="inline-flex h-10 items-center justify-center rounded-lg border border-indigo-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
               disabled={!validBulkSelection.length}

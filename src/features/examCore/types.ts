@@ -223,6 +223,7 @@ export type ExamPaperDto = {
   blueprintVersionId?: string | null
   code: string
   createdAt?: string | null
+  createdBy?: string | null
   examId: string
   id: string
   sections: ExamPaperSectionDto[]
@@ -296,6 +297,15 @@ export type ExamBlueprintDto = {
   versions: ExamBlueprintVersionDto[]
 }
 
+// State kèm theo khi một trang khác mở trang blueprint / phiên bản blueprint (vd: tab "Chốt khung đề"
+// của kỳ thi). Trang blueprint không biết ai gọi nó nên nơi gọi tự khai báo đích "quay lại" của mình;
+// `returnState` được truyền nguyên vẹn lại cho trang đích (kỳ thi dùng để mở lại đúng tab).
+export type BlueprintNavState = {
+  returnLabel?: string
+  returnState?: unknown
+  returnTo?: string
+} | null
+
 export type RubricVersionDto = {
   code: string
   id: string
@@ -359,6 +369,17 @@ export type ExamScheduleProctorDto = {
   } | null
 }
 
+/**
+ * Một giáo viên đang vướng lịch: đã gác ca `scheduleId` chạy [startDate, endDate).
+ * Chỉ dùng để làm mờ sẵn người bận ở màn chọn giám thị — luật chặn thật nằm ở backend.
+ */
+export type ProctorBusySlotDto = {
+  endDate?: string | null
+  scheduleId: string
+  startDate?: string | null
+  teacherId: string
+}
+
 export type ExamScheduleDto = {
   candidateCount: number
   endDate?: string | null
@@ -372,6 +393,12 @@ export type ExamScheduleDto = {
   startDate?: string | null
   status: ExamScheduleStatus
 }
+
+/**
+ * Đủ để dựng bước "Xếp lịch" của thanh tiến độ. Trang danh sách kỳ thi chỉ chọn bấy nhiêu field
+ * (`schedules { id status }`) nên đừng ép nó về `ExamScheduleDto` đầy đủ.
+ */
+export type ExamScheduleStatusDto = Pick<ExamScheduleDto, 'id' | 'status'>
 
 export type ExamSecurePoolDto = {
   id: string
@@ -452,6 +479,9 @@ export type ExamDto = {
   blueprint?: ExamBlueprintDto | null
   blueprintId?: string | null
   blueprintVersionId?: string | null
+  // Số thí sinh do BE đếm sẵn (DataLoader examCandidateCountByExamId). Trang danh sách dựa vào nó để
+  // dựng bước "Thêm thí sinh" mà không phải tải cả danh sách thí sinh của từng dòng.
+  candidateCount?: number
   closeAt?: string | null
   code: string
   createdAt?: string | null
@@ -475,6 +505,8 @@ export type ExamDto = {
   requiredStreamType?: ExamRequiredStreamType | null
   requiresOtp: boolean
   resultDecisionMethod?: ResultDecisionMethod | null
+  // Chỉ có ở query danh sách kỳ thi; trang chi tiết dùng useExamSchedulesQuery (đầy đủ phòng/giám thị).
+  schedules?: ExamScheduleStatusDto[]
   schoolClassId?: string | null
   schoolId: string
   securePool?: ExamSecurePoolDto | null

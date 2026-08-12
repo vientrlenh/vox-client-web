@@ -36,8 +36,6 @@ export type ClassTestSectionInput = {
 export type CreateClassTestRequest = {
   assessmentPolicyId?: string | null
   closeAt?: string | null
-  /** Giá trị enum của BE (`STUDENT_DEVICE` | `LAB`), không phải alias `DEVICE` dùng trong UI. */
-  deliveryMode?: 'LAB' | 'STUDENT_DEVICE' | null
   description?: string | null
   maxAttempt?: number | null
   name: string

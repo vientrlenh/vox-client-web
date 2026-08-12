@@ -1,4 +1,8 @@
-export { SchoolAdminExamPaperViewPage, TeacherExamPaperEditPage } from './pages/ExamPaperPages'
+export {
+  SchoolAdminExamPaperEditPage,
+  SchoolAdminExamPaperViewPage,
+  TeacherExamPaperEditPage,
+} from './pages/ExamPaperPages'
 export {
   SchoolAdminBlueprintDetailPage,
   SchoolAdminBlueprintsPage,

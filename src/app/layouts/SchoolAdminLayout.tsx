@@ -3,24 +3,16 @@ import {
   BookOpen,
   ChevronDown,
   ClipboardCheck,
-  CreditCard,
-  DoorOpen,
-  ClipboardList,
   FileQuestion,
-  FileSearch,
   FileSpreadsheet,
-  Gavel,
   GraduationCap,
   Home,
-  Layers,
   LogOut,
   Menu,
   MonitorPlay,
   PenLine,
-  Search,
   ShieldCheck,
   UserRound,
-  Presentation,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -48,84 +40,103 @@ const navigationItems = [
     label: 'Tổng quan',
     to: '/school-admin/dashboard',
   },
-  {
-    icon: MonitorPlay,
-    label: 'Giám sát thi',
-    to: '/school-admin/monitoring',
-  },
-  {
-    icon: ClipboardCheck,
-    label: 'Điểm danh ca thi',
-    to: '/school-admin/proctor-attendance',
-  },
-  {
-    icon: BookOpen,
-    label: 'Quản lý lớp học',
-    to: '/school-admin/classes',
-  },
-  {
-    icon: Layers,
-    label: 'Quản lý khối',
-    to: '/school-admin/grades',
-  },
-  {
-    icon: DoorOpen,
-    label: 'Quản lý phòng học',
-    to: '/school-admin/rooms',
-  },
-  {
-    icon: FileSpreadsheet,
-    label: 'Quản lý import',
-    to: '/school-admin/imports',
-  },
-  {
-    icon: GraduationCap,
-    label: 'Quản lý Học sinh',
-    to: '/school-admin/students',
-  },
-  {
-    icon: GraduationCap,
-    label: 'Khung năng lực',
-    to: '/school-admin/frameworks',
-  },
-  {
-    icon: Presentation,
-    label: 'Quản lý Giáo viên',
-    to: '/school-admin/teachers',
-  },
-  {
-    icon: PenLine,
-    label: 'Phân công chấm bài',
-    to: '/school-admin/grading',
-  },
-  {
-    icon: FileSearch,
-    label: 'Phúc khảo',
-    to: '/school-admin/reevaluation',
-  },
-  {
-    icon: ClipboardList,
-    label: 'Quản lý tiêu chí đánh giá',
-    to: '/school-admin/rubrics',
-  },
-  {
-    icon: ClipboardCheck,
-    label: 'Quản lý chính sách đánh giá',
-    to: '/school-admin/assessment-policies',
-  },
-  {
-    icon: Gavel,
-    label: 'Quản lý quy tắc tính điểm',
-    to: '/school-admin/scoring-rules',
-  },
-  {
-    icon: CreditCard,
-    label: 'Gói dịch vụ',
-    to: '/school-admin/subscription',
-  },
 ]
 
 const navigationGroups: NavigationGroup[] = [
+  {
+    icon: BookOpen,
+    label: 'Lớp học',
+    items: [
+      {
+        label: 'Quản lý lớp học',
+        to: '/school-admin/classes',
+      },
+      {
+        label: 'Quản lý khối',
+        to: '/school-admin/grades',
+      },
+      {
+        label: 'Quản lý phòng học',
+        to: '/school-admin/rooms',
+      },
+    ],
+  },
+  {
+    icon: GraduationCap,
+    label: 'Người dùng',
+    items: [
+      {
+        label: 'Quản lý Học sinh',
+        to: '/school-admin/students',
+      },
+      {
+        label: 'Quản lý Giáo viên',
+        to: '/school-admin/teachers',
+      },
+    ],
+  },
+  {
+    icon: MonitorPlay,
+    label: 'Kỳ thi',
+    items: [
+      {
+        label: 'Giám sát thi',
+        to: '/school-admin/monitoring',
+      },
+      {
+        label: 'Điểm danh ca thi',
+        to: '/school-admin/proctor-attendance',
+      },
+      {
+        label: 'Kiểm tra tập trung',
+        to: '/school-admin/exams',
+      },
+      {
+        label: 'Bài kiểm tra trên lớp',
+        to: '/school-admin/class-tests',
+      },
+      {
+        label: 'Blueprint đề thi',
+        to: '/school-admin/blueprints',
+      },
+    ],
+  },
+  {
+    icon: PenLine,
+    label: 'Chấm bài',
+    items: [
+      {
+        label: 'Phân công chấm bài',
+        to: '/school-admin/grading',
+      },
+      {
+        label: 'Phúc khảo',
+        to: '/school-admin/reevaluation',
+      },
+    ],
+  },
+  {
+    icon: ClipboardCheck,
+    label: 'Đánh giá',
+    items: [
+      {
+        label: 'Khung năng lực',
+        to: '/school-admin/frameworks',
+      },
+      {
+        label: 'Quản lý tiêu chí đánh giá',
+        to: '/school-admin/rubrics',
+      },
+      {
+        label: 'Quản lý chính sách đánh giá',
+        to: '/school-admin/assessment-policies',
+      },
+      {
+        label: 'Quản lý quy tắc tính điểm',
+        to: '/school-admin/scoring-rules',
+      },
+    ],
+  },
   {
     icon: FileQuestion,
     label: 'Câu hỏi',
@@ -145,20 +156,16 @@ const navigationGroups: NavigationGroup[] = [
     ],
   },
   {
-    icon: ClipboardCheck,
-    label: 'Kỳ thi',
+    icon: FileSpreadsheet,
+    label: 'Hệ thống',
     items: [
       {
-        label: 'Kiểm tra tập trung',
-        to: '/school-admin/exams',
+        label: 'Quản lý import',
+        to: '/school-admin/imports',
       },
       {
-        label: 'Bài kiểm tra trên lớp',
-        to: '/school-admin/class-tests',
-      },
-      {
-        label: 'Blueprint đề thi',
-        to: '/school-admin/blueprints',
+        label: 'Gói dịch vụ',
+        to: '/school-admin/subscription',
       },
     ],
   },
@@ -422,20 +429,6 @@ export function SchoolAdminLayout() {
           >
             <Menu aria-hidden="true" className="size-5" />
           </button>
-
-          <div className="relative hidden max-w-2xl flex-1 md:block">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500"
-            />
-            <input
-              aria-label="Tìm kiếm lớp học"
-              className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              placeholder="Tìm theo mã lớp, tên lớp, học viên..."
-              readOnly
-              type="search"
-            />
-          </div>
 
           <div className="ml-auto flex items-center gap-3">
             <NotificationBell />

@@ -292,6 +292,21 @@ export type AssignableTeacher = {
   load: number
 }
 
+/**
+ * Một mục trong bộ lọc kỳ thi của hàng đợi giáo viên. CHỈ những kỳ thi họ đang/đã có bài
+ * — đây không phải danh sách kỳ thi của trường, nên không dùng chung với ExamPickerModal.
+ */
+export type MyGradingExamOption = {
+  id: string
+  /** Tên kỳ thi trùng nhau giữa các đợt, mã thì không. */
+  code?: string | null
+  name?: string | null
+  /** Tổng số bài được giao, gộp cả bốn vòng và cả phân công đã đóng. */
+  taskCount: number
+  /** Trong đó còn phải chấm. */
+  openTaskCount: number
+}
+
 export type GradingPage<T> = {
   content: T[]
   page: number

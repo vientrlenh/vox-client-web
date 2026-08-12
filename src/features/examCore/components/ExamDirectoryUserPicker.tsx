@@ -6,7 +6,7 @@
 // mỗi modal tự gọi query hook của mình, không phải truyền hook qua prop.
 
 import type { UseQueryResult } from '@tanstack/react-query'
-import { Search, UserPlus, X } from 'lucide-react'
+import { CalendarClock, Search, UserPlus, X } from 'lucide-react'
 import { toApiError } from '@/shared/api'
 import type { ExamDirectoryUser } from '../api/examDirectoryQueries'
 import type { Paged } from '../types'
@@ -14,6 +14,9 @@ import type { UserPickerState } from './useUserPickerState'
 
 type ExamDirectoryUserPickerProps = {
   countLabel: string
+  // Người vẫn hiện trong danh sách nhưng không chọn được, kèm lý do (userId -> lý do). Làm mờ chứ
+  // không ẩn: ẩn đi thì người dùng tưởng giáo viên không tồn tại, và số đếm/phân trang sẽ lệch.
+  disabledReasonByUserId?: Map<string, string>
   emptyLabel: string
   excludeUserIds: string[]
   loadingLabel: string
@@ -28,6 +31,7 @@ type ExamDirectoryUserPickerProps = {
 
 export function ExamDirectoryUserPicker({
   countLabel,
+  disabledReasonByUserId,
   emptyLabel,
   excludeUserIds,
   loadingLabel,
@@ -88,20 +92,35 @@ export function ExamDirectoryUserPicker({
             <p className="py-8 text-center text-sm text-slate-400">{loadingLabel}</p>
           ) : users.length ? (
             <div className="grid gap-2.5 py-2">
-              {users.map((user) => (
-                <button
-                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3.5 text-left transition hover:border-indigo-300 hover:bg-indigo-50"
-                  key={user.userId}
-                  onClick={() => onSelect(user)}
-                  type="button"
-                >
-                  <div>
-                    <div className="text-sm font-bold text-slate-900">{user.fullName ?? '-'}</div>
-                    <div className="text-xs text-slate-500">{user.email ?? '-'}</div>
-                  </div>
-                  <UserPlus aria-hidden="true" className="size-4 shrink-0 text-indigo-600" />
-                </button>
-              ))}
+              {users.map((user) => {
+                const disabledReason = disabledReasonByUserId?.get(user.userId)
+
+                return (
+                  <button
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3.5 text-left transition hover:border-indigo-300 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:hover:border-slate-200 disabled:hover:bg-slate-50"
+                    disabled={Boolean(disabledReason)}
+                    key={user.userId}
+                    onClick={() => onSelect(user)}
+                    title={disabledReason}
+                    type="button"
+                  >
+                    <div>
+                      <div className={disabledReason ? 'text-sm font-bold text-slate-400' : 'text-sm font-bold text-slate-900'}>
+                        {user.fullName ?? '-'}
+                      </div>
+                      <div className="text-xs text-slate-500">{user.email ?? '-'}</div>
+                      {disabledReason ? (
+                        <div className="mt-1 text-xs font-semibold text-amber-700">{disabledReason}</div>
+                      ) : null}
+                    </div>
+                    {disabledReason ? (
+                      <CalendarClock aria-hidden="true" className="size-4 shrink-0 text-amber-600" />
+                    ) : (
+                      <UserPlus aria-hidden="true" className="size-4 shrink-0 text-indigo-600" />
+                    )}
+                  </button>
+                )
+              })}
             </div>
           ) : (
             <p className="py-8 text-center text-sm text-slate-400">{emptyLabel}</p>

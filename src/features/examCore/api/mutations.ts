@@ -9,8 +9,6 @@ import type {
   ExamBlueprintSlotType,
   ExamBlueprintVersionDto,
   ExamCandidateDto,
-  ExamDeliveryMode,
-  ExamDto,
   ExamPaperDto,
   ExamPaperItemDto,
   ExamPaperSectionDto,
@@ -26,17 +24,6 @@ import type {
 
 export function unwrap<T>(response: { data: ApiResponse<T> }) {
   return response.data.data
-}
-
-export function useSetExamDeliveryModeMutation() {
-  return useMutation({
-    mutationFn: async ({ deliveryMode, examId }: { deliveryMode: ExamDeliveryMode; examId: string }) => {
-      const response = await apiClient.patch<ApiResponse<ExamDto>>(`/v1/exams/${examId}/delivery-mode`, {
-        deliveryMode: deliveryMode === 'DEVICE' ? 'STUDENT_DEVICE' : 'LAB',
-      })
-      return unwrap(response)
-    },
-  })
 }
 
 export function useReleaseSecurePoolMutation() {
@@ -363,6 +350,31 @@ export function useAssignCandidateScheduleMutation() {
       const response = await apiClient.put<ApiResponse<ExamCandidateDto>>(
         `/v1/exams/${examId}/candidates/${candidateId}/schedule`,
         { scheduleId },
+      )
+      return unwrap(response)
+    },
+  })
+}
+
+/**
+ * Xếp/gỡ cả nhóm trong MỘT request. Không lặp endpoint xếp từng người: N request là N transaction
+ * rời rạc (hỏng giữa chừng để lại trạng thái dở dang) và N lần làm mới toàn bộ cây query.
+ * `scheduleId: null` = gỡ cả nhóm khỏi ca.
+ */
+export function useBulkAssignCandidateScheduleMutation() {
+  return useMutation({
+    mutationFn: async ({
+      candidateIds,
+      examId,
+      scheduleId,
+    }: {
+      candidateIds: string[]
+      examId: string
+      scheduleId: string | null
+    }) => {
+      const response = await apiClient.put<ApiResponse<ExamCandidateDto[]>>(
+        `/v1/exams/${examId}/candidates/schedule`,
+        { candidateIds, scheduleId },
       )
       return unwrap(response)
     },

@@ -66,6 +66,6 @@ export function useSchoolGradeOptionsQuery(schoolId: string | undefined, schoolG
       );
       return data.schoolGrades.content;
     },
-    enabled: Boolean(schoolId),
+    enabled: Boolean(schoolId) && Boolean(schoolGradeLevelId),
   });
 }

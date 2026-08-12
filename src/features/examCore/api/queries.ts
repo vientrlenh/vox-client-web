@@ -11,6 +11,7 @@ import type {
   ExamScheduleDto,
   ExamStatus,
   Paged,
+  ProctorBusySlotDto,
   ProctorCandidateSummaryDto,
   ProctorScheduleSummaryDto,
   SchoolRoomLite,
@@ -39,6 +40,9 @@ const EXAM_PAPER_FIELDS = `
   timeDurationSeconds
   createdAt
   updatedAt
+  # Ai soạn mã đề quyết định nút hiện ra: người quyết định tự soạn thì khoá một bước, còn lại đi
+  # đủ luồng duyệt. Xem resolvePaperActions trong features/exam/utils/examPermissions.ts.
+  createdBy
   sections {
     id
     paperId
@@ -106,6 +110,17 @@ export const EXAM_LIST_FIELDS = `
       }
     }
   }
+  # Chỉ role, đủ cho bước "Phân công" của stepper ở trang danh sách. Field này chạy qua DataLoader
+  # examMembersByExamId nên cả trang chỉ tốn thêm một truy vấn gộp, không phải N+1.
+  members {
+    role
+  }
+  # Chỉ status, đủ cho bước "Xếp lịch" của thanh tiến độ ở CẢ hai trang danh sách (kỳ thi tập trung
+  # và bài trên lớp). Cũng chạy qua DataLoader examSchedulesByExamId nên không phải N+1.
+  schedules {
+    id
+    status
+  }
 `
 
 const EXAM_SUMMARY_FIELDS = `
@@ -147,6 +162,7 @@ const EXAM_PAPERS_SUMMARY_FIELDS = `
   variant
   status
   timeDurationSeconds
+  createdBy
   sections {
     id
     items {
@@ -290,6 +306,17 @@ const EXAM_CANDIDATES_QUERY = `
   query ExamCandidates($examId: ID!, $scheduleId: ID, $status: ExamCandidateStatus) {
     examCandidates(examId: $examId, scheduleId: $scheduleId, status: $status) {
       ${EXAM_CANDIDATE_FIELDS}
+    }
+  }
+`
+
+const PROCTOR_BUSY_SLOTS_QUERY = `
+  query ProctorBusySlots($scheduleId: ID!, $teacherIds: [ID!]!) {
+    proctorBusySlots(scheduleId: $scheduleId, teacherIds: $teacherIds) {
+      teacherId
+      scheduleId
+      startDate
+      endDate
     }
   }
 `
@@ -535,6 +562,8 @@ export const examQueryKeys = {
   examPicker: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'exam-picker', filters] as const,
   examStats: () => [...examQueryKeys.all, 'exam-stats'] as const,
   exams: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'exams', filters] as const,
+  proctorBusySlots: (scheduleId: string | null, teacherIds: string[]) =>
+    [...examQueryKeys.all, 'proctor-busy-slots', scheduleId, teacherIds] as const,
   proctorCandidates: (scheduleId: string | null) => [...examQueryKeys.all, 'proctor-candidates', scheduleId] as const,
   proctorSchedules: () => [...examQueryKeys.all, 'proctor-schedules'] as const,
   schedules: (examId: string | null) => [...examQueryKeys.all, 'schedules', examId] as const,
@@ -682,6 +711,26 @@ export function useExamSchedulesQuery(examId: string | null) {
     enabled: Boolean(examId),
     queryFn: () => fetchExamSchedules(examId as string),
     queryKey: examQueryKeys.schedules(examId),
+  })
+}
+
+/**
+ * Trong nhóm giáo viên đang hiển thị, ai bận vào đúng khung giờ của ca thi này. Chỉ để làm mờ sẵn
+ * kèm lý do — backend mới là chỗ chặn thật (ExamScheduleProctorConflictValidator).
+ */
+async function fetchProctorBusySlots(scheduleId: string, teacherIds: string[]) {
+  const data = await graphQLRequest<{ proctorBusySlots: ProctorBusySlotDto[] }>(PROCTOR_BUSY_SLOTS_QUERY, {
+    scheduleId,
+    teacherIds,
+  })
+  return data.proctorBusySlots
+}
+
+export function useProctorBusySlotsQuery(scheduleId: string | null, teacherIds: string[]) {
+  return useQuery({
+    enabled: Boolean(scheduleId) && teacherIds.length > 0,
+    queryFn: () => fetchProctorBusySlots(scheduleId as string, teacherIds),
+    queryKey: examQueryKeys.proctorBusySlots(scheduleId, teacherIds),
   })
 }
 

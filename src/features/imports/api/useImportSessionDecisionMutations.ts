@@ -35,6 +35,20 @@ export function getAcceptUrl(
     return `/v1/questions/import/${sessionId}/accept`
   }
 
+  // Framework luôn ở phạm vi hệ thống (SYSTEM_ADMIN), không có biến thể theo trường.
+  switch (normalized) {
+    case 'FRAMEWORK_VERSION':
+      return `/v1/frameworks/versions/import/${sessionId}/accept`
+    case 'FRAMEWORK_CRITERION':
+      return `/v1/frameworks/versions/criteria/import/${sessionId}/accept`
+    case 'FRAMEWORK_RESULT_BAND':
+      return `/v1/frameworks/versions/result-bands/import/${sessionId}/accept`
+    case 'FRAMEWORK_CRITERION_BAND':
+      return `/v1/frameworks/versions/criterion-bands/import/${sessionId}/accept`
+    default:
+      break
+  }
+
   // Rubric và chính sách đánh giá có hai phạm vi. Backend gắn cứng schoolId vào
   // phiên lúc preview, nên chính schoolId của phiên quyết định endpoint —
   // không dùng vai trò người đang đăng nhập.

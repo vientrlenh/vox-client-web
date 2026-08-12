@@ -1,11 +1,16 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { toApiError } from '@/shared/api'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { examQueryKeys, useExamBlueprintSummaryQuery, useExamBlueprintVersionQuery } from '../api/queries'
 import { useDuplicateBlueprintVersionMutation } from '../api/mutations'
-import { formatDurationSeconds, getBlueprintVersionStatusDisplay, type ExamBlueprintSectionDto } from '../types'
+import {
+  formatDurationSeconds,
+  getBlueprintVersionStatusDisplay,
+  type BlueprintNavState,
+  type ExamBlueprintSectionDto,
+} from '../types'
 import { getQuestionAttemptSeconds } from '../utils/timeQuota'
 
 type BlueprintVersionPageProps = {
@@ -21,8 +26,10 @@ function sectionDurationSeconds(section: ExamBlueprintSectionDto): number {
 
 function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const { blueprintId, versionId } = useParams()
+  const navState = location.state as BlueprintNavState
   const blueprintQuery = useExamBlueprintSummaryQuery(blueprintId ?? null)
   const versionQuery = useExamBlueprintVersionQuery(versionId ?? null)
   const blueprint = blueprintQuery.data
@@ -60,6 +67,10 @@ function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
 
   const detailPath = `${basePath}/${blueprint.id}`
   const display = getBlueprintVersionStatusDisplay(version.status)
+  // Trang này mở được từ nhiều nơi (danh sách phiên bản của blueprint, tab "Chốt khung đề" của kỳ thi…)
+  // nên nút "←" đi theo đích do nơi gọi khai báo; không có thì mới rơi về trang blueprint.
+  const backPath = navState?.returnTo ?? detailPath
+  const backLabel = navState?.returnLabel ?? blueprint.name
 
   async function handleDuplicate() {
     const duplicated = await duplicateVersionMutation.mutateAsync(version!.id)
@@ -73,10 +84,10 @@ function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
     <section className="mx-auto max-w-240">
       <button
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600"
-        onClick={() => navigate(detailPath)}
+        onClick={() => navigate(backPath, { state: navState?.returnState })}
         type="button"
       >
-        ← {blueprint.name}
+        ← {backLabel}
       </button>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6">

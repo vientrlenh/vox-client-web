@@ -3,15 +3,23 @@ import type { FrameworkFilters } from '../types'
 
 type FrameworkFiltersBarProps = {
   filters: FrameworkFilters
+  hideStatusFilter?: boolean
   onChange: (name: keyof FrameworkFilters, value: string) => void
 }
 
 export function FrameworkFiltersBar({
   filters,
+  hideStatusFilter,
   onChange,
 }: FrameworkFiltersBarProps) {
   return (
-    <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[minmax(220px,1fr)_220px]">
+    <div
+      className={
+        hideStatusFilter
+          ? 'grid gap-3 rounded-lg border border-slate-200 bg-white p-4'
+          : 'grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[minmax(220px,1fr)_220px]'
+      }
+    >
       <label className="grid gap-2 text-sm font-bold text-blue-950">
         Tìm kiếm
         <span className="relative">
@@ -30,19 +38,21 @@ export function FrameworkFiltersBar({
         </span>
       </label>
 
-      <label className="grid gap-2 text-sm font-bold text-blue-950">
-        Trạng thái
-        <select
-          aria-label="Lọc trạng thái khung đánh giá năng lực"
-          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-blue-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-          onChange={(event) => onChange('isActive', event.target.value)}
-          value={filters.isActive}
-        >
-          <option value="">Tất cả</option>
-          <option value="active">Đang hoạt động</option>
-          <option value="inactive">Đã vô hiệu hóa</option>
-        </select>
-      </label>
+      {hideStatusFilter ? null : (
+        <label className="grid gap-2 text-sm font-bold text-blue-950">
+          Trạng thái
+          <select
+            aria-label="Lọc trạng thái khung đánh giá năng lực"
+            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-blue-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+            onChange={(event) => onChange('isActive', event.target.value)}
+            value={filters.isActive}
+          >
+            <option value="">Tất cả</option>
+            <option value="active">Đang hoạt động</option>
+            <option value="inactive">Đã vô hiệu hóa</option>
+          </select>
+        </label>
+      )}
     </div>
   )
 }

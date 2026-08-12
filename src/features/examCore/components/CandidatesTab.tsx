@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { FileUp, Lock, Search, UserPlus } from 'lucide-react'
+import { CalendarClock, FileUp, Lock, Search, UserPlus } from 'lucide-react'
 import { toApiError } from '@/shared/api'
 import { Pagination } from '@/shared/components/Pagination'
 import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
@@ -14,6 +14,7 @@ import type { ExamDirectoryUser } from '../api/examDirectoryQueries'
 import {
   useAddCandidateMutation,
   useAssignCandidateScheduleMutation,
+  useBulkAssignCandidateScheduleMutation,
   useFlagExamSessionMutation,
   useForceEndExamSessionMutation,
   useImportCandidatesByClassMutation,
@@ -89,6 +90,7 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
   const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const unblockExamCandidateMutation = useUnblockExamCandidateMutation()
   const assignCandidateScheduleMutation = useAssignCandidateScheduleMutation()
+  const bulkAssignCandidateScheduleMutation = useBulkAssignCandidateScheduleMutation()
   const removeCandidateMutation = useRemoveExamCandidateMutation()
   const { confirm, confirmWithReason, dialog } = useConfirmationDialog()
   const [search, setSearch] = useState('')
@@ -96,6 +98,8 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
   const [showStudentPicker, setShowStudentPicker] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [assigningCandidate, setAssigningCandidate] = useState<ExamCandidateDto | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -127,9 +131,37 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
   const assignedCount = candidates.filter((candidate) => candidate.scheduleId).length
   const paperAssignedCount = candidates.filter((candidate) => candidate.assignedPaperId).length
 
+  const visibleIds = visibleCandidates.map((candidate) => candidate.id)
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+
   function handleSearchChange(value: string) {
     setSearch(value)
     setPage(1)
+  }
+
+  function toggleSelected(candidateId: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(candidateId)) {
+        next.delete(candidateId)
+      } else {
+        next.add(candidateId)
+      }
+      return next
+    })
+  }
+
+  /** Chỉ đụng tới trang đang hiện — đổi trang/tìm kiếm không được âm thầm bỏ chọn ai. */
+  function toggleAllVisible() {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => next.delete(id))
+      } else {
+        visibleIds.forEach((id) => next.add(id))
+      }
+      return next
+    })
   }
 
   async function invalidateAll() {
@@ -180,6 +212,27 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
       await invalidateAll()
       setAssigningCandidate(null)
       setMessage(`Đã xếp ca thi cho ${candidateName}.`)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  /** Xếp/gỡ cả nhóm đang tick trong MỘT request — `null` là bỏ khỏi ca. */
+  async function handleBulkAssignSchedule(scheduleId: string | null) {
+    const candidateIds = Array.from(selectedIds)
+    if (candidateIds.length === 0) {
+      return
+    }
+    try {
+      await bulkAssignCandidateScheduleMutation.mutateAsync({ candidateIds, examId, scheduleId })
+      await invalidateAll()
+      setSelectedIds(new Set())
+      setShowBulkAssignModal(false)
+      setMessage(
+        scheduleId
+          ? `Đã xếp ${candidateIds.length} thí sinh vào ca thi.`
+          : `Đã bỏ ${candidateIds.length} thí sinh khỏi ca thi.`,
+      )
     } catch (error) {
       setErrorMessage(toApiError(error).message)
     }
@@ -439,6 +492,29 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
           ) : null}
         </div>
 
+        {canEditRoster && selectedIds.size > 0 ? (
+          <div className="mt-3.5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5">
+            <span className="text-xs font-semibold text-indigo-800">Đã chọn {selectedIds.size} thí sinh.</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-4 text-xs font-bold text-white transition hover:bg-indigo-700"
+                onClick={() => setShowBulkAssignModal(true)}
+                type="button"
+              >
+                <CalendarClock aria-hidden="true" className="size-3.5" />
+                Xếp hàng loạt vào ca…
+              </button>
+              <button
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-red-200 bg-white px-4 text-xs font-bold text-red-600 transition hover:bg-red-50"
+                onClick={() => void handleBulkAssignSchedule(null)}
+                type="button"
+              >
+                Bỏ khỏi ca thi
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-3.5 flex flex-wrap gap-2.5">
           <div className="relative min-w-50 flex-1">
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -452,7 +528,18 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
         </div>
 
         <div className="mt-3.5 overflow-hidden rounded-xl border border-slate-200">
-          <div className="grid grid-cols-[1fr_1fr_120px_140px_56px] gap-2.5 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+          <div className="grid grid-cols-[28px_1fr_1fr_120px_140px_56px] gap-2.5 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <span className="flex items-center">
+              {canEditRoster && visibleCandidates.length > 0 ? (
+                <input
+                  aria-label="Chọn tất cả thí sinh trên trang này"
+                  checked={allVisibleSelected}
+                  className="size-3.5 accent-indigo-600"
+                  onChange={toggleAllVisible}
+                  type="checkbox"
+                />
+              ) : null}
+            </span>
             <span>Họ tên</span>
             <span>Ca thi</span>
             <span>Mã đề</span>
@@ -468,9 +555,20 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
 
               return (
                 <div
-                  className="grid grid-cols-[1fr_1fr_120px_140px_56px] items-center gap-2.5 border-t border-slate-100 px-4 py-2.5"
+                  className="grid grid-cols-[28px_1fr_1fr_120px_140px_56px] items-center gap-2.5 border-t border-slate-100 px-4 py-2.5"
                   key={candidate.id}
                 >
+                  <span className="flex items-center">
+                    {canEditRoster ? (
+                      <input
+                        aria-label={`Chọn ${getCandidateName(candidate)}`}
+                        checked={selectedIds.has(candidate.id)}
+                        className="size-3.5 accent-indigo-600"
+                        onChange={() => toggleSelected(candidate.id)}
+                        type="checkbox"
+                      />
+                    ) : null}
+                  </span>
                   <span className="text-[13px] text-slate-900">{getCandidateName(candidate)}</span>
                   <span className="text-[13px] text-slate-500">
                     {candidate.scheduleId ? scheduleLabelById.get(candidate.scheduleId) ?? '-' : '-'}
@@ -509,6 +607,15 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
           currentScheduleId={assigningCandidate.scheduleId}
           onClose={() => setAssigningCandidate(null)}
           onSelect={(scheduleId) => void handleAssignSchedule(scheduleId)}
+          schedules={schedulesQuery.data ?? []}
+        />
+      ) : null}
+
+      {showBulkAssignModal ? (
+        <AssignScheduleModal
+          candidateName={`${selectedIds.size} thí sinh đã chọn`}
+          onClose={() => setShowBulkAssignModal(false)}
+          onSelect={(scheduleId) => void handleBulkAssignSchedule(scheduleId)}
           schedules={schedulesQuery.data ?? []}
         />
       ) : null}

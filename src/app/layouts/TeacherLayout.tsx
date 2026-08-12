@@ -6,11 +6,11 @@ import {
   FileQuestion,
   Gauge,
   GraduationCap,
+  Home,
   LogOut,
   Menu,
   MonitorPlay,
   PenLine,
-  Search,
   ShieldCheck,
   UserRound,
   X,
@@ -35,6 +35,11 @@ type NavigationGroup = {
 }
 
 const navigationItems = [
+  {
+    icon: Home,
+    label: 'Tổng quan',
+    to: '/teacher/dashboard',
+  },
   {
     icon: GraduationCap,
     label: 'Lớp của tôi',
@@ -211,7 +216,7 @@ function TeacherSidebar({
           aria-label="VOX giáo viên"
           className="inline-flex"
           onClick={onNavigate}
-          to="/teacher/monitoring"
+          to="/teacher/dashboard"
         >
           <img alt="VOX" className="h-25 w-auto object-contain" src={logoImage} />
         </NavLink>
@@ -359,20 +364,6 @@ export function TeacherLayout() {
           >
             <Menu aria-hidden="true" className="size-5" />
           </button>
-
-          <div className="relative hidden max-w-2xl flex-1 md:block">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500"
-            />
-            <input
-              aria-label="Tìm kiếm phòng thi"
-              className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              placeholder="Tìm theo mã phòng, tên phòng thi..."
-              readOnly
-              type="search"
-            />
-          </div>
 
           <div className="ml-auto flex items-center gap-3">
             <NotificationBell />

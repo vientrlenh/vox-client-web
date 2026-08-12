@@ -154,7 +154,7 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
   const { data: gradeLevels } = useSchoolGradeLevelOptionsQuery(schoolId);
   const { data: grades } = useSchoolGradeOptionsQuery(schoolId, form.schoolGradeLevelId || undefined);
   const classFilter: ClassFilters = { languageId: '', schoolGradeId: form.schoolGradeId || '', search: '', status: 'ACTIVE' };
-  const { data: classesPage } = useSchoolClassesQuery(1, 100, classFilter);
+  const { data: classesPage } = useSchoolClassesQuery(1, 100, classFilter, { enabled: Boolean(form.schoolGradeId) });
   const classes = classesPage?.content ?? [];
 
   function handleLanguageChange(languageId: string) {
@@ -339,17 +339,19 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
               {gradeLevels?.map((gl) => <option key={gl.id} value={gl.id}>{gl.code} - {gl.name}</option>)}
             </select>
             <select
-              value={form.schoolGradeId} onChange={(e) => handleGradeChange(e.target.value)} disabled={isPending}
+              value={form.schoolGradeId} onChange={(e) => handleGradeChange(e.target.value)}
+              disabled={isPending || !form.schoolGradeLevelId}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
             >
-              <option value="">-- Niên khóa --</option>
+              <option value="">{form.schoolGradeLevelId ? '-- Niên khóa --' : '-- Chọn Khối trước --'}</option>
               {grades?.map((grade) => <option key={grade.id} value={grade.id}>{grade.code || grade.name}</option>)}
             </select>
             <select
-              value={form.schoolClassId} onChange={(e) => onChange({ schoolClassId: e.target.value })} disabled={isPending}
+              value={form.schoolClassId} onChange={(e) => onChange({ schoolClassId: e.target.value })}
+              disabled={isPending || !form.schoolGradeId}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
             >
-              <option value="">-- Lớp --</option>
+              <option value="">{form.schoolGradeId ? '-- Lớp --' : '-- Chọn Niên khóa trước --'}</option>
               {classes.map((schoolClass) => (
                 <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.code} - {schoolClass.name}</option>
               ))}

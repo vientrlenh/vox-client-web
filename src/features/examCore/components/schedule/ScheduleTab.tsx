@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Laptop, Lock, Monitor, Plus, Search, UserPlus, Wand2, X } from 'lucide-react'
+import { CalendarClock, FileText, Lock, ShieldCheck, UserPlus } from 'lucide-react'
 import { toApiError } from '@/shared/api'
 import type { ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
-import { TabPillGroup } from '@/shared/ui/TabPill'
+import { StatCard } from '@/shared/ui/StatCard'
 import type { ExamDirectoryUser } from '../../api/examDirectoryQueries'
 import {
   useAddProctorToScheduleMutation,
+  useApplyPaperAssignmentsMutation,
   useAssignCandidateScheduleMutation,
   useAutoFillCandidatesMutation,
+  useBulkAssignCandidateScheduleMutation,
   useCreateScheduleMutation,
   useDeleteScheduleMutation,
   useRemoveProctorFromScheduleMutation,
@@ -18,20 +20,17 @@ import {
   useUpdateScheduleStatusMutation,
 } from '../../api/mutations'
 import { examQueryKeys, useExamCandidatesQuery, useExamSchedulesQuery } from '../../api/queries'
-import { getCandidateName, getScheduleLabel, type ExamDeliveryMode, type ExamPaperDto, type ExamScheduleDto } from '../../types'
+import { getScheduleLabel, type ExamCandidateDto, type ExamPaperDto, type ExamScheduleDto } from '../../types'
 import { AddStudentToRoomModal } from './AddStudentToRoomModal'
 import { CreateScheduleModal } from './CreateScheduleModal'
 import { ManageProctorsModal } from './ManageProctorsModal'
 import { MoveScheduleModal } from './MoveScheduleModal'
-import { PaperAssignmentPanel } from './PaperAssignmentPanel'
-import { RoomChip } from './RoomChip'
-import { SessionRow } from './SessionRow'
-
-type ScheduleSubTab = 'assign' | 'rooms' | 'sessions'
+import { computeAssignments } from './paperAssignment'
+import { ScheduleSessionDetail } from './ScheduleSessionDetail'
+import { ScheduleSessionsCard } from './ScheduleSessionsCard'
 
 type ScheduleTabProps = {
   canManage: boolean
-  deliveryMode?: ExamDeliveryMode
   // Ba trường dưới đây chỉ để dựng ràng buộc khung giờ trong modal tạo/sửa ca thi —
   // xem CreateScheduleModal. Đều là dữ liệu chỉ đọc của kỳ thi.
   examCloseAt?: string | null
@@ -43,14 +42,12 @@ type ScheduleTabProps = {
   // công bố/hoàn thành/hủy ca vì đó là thao tác vận hành trong lúc thi.
   locked?: boolean
   onGoToPapers: () => void
-  onSetDeliveryMode?: (mode: ExamDeliveryMode) => void
   papers: ExamPaperDto[]
   unlocked: boolean
 }
 
 export function ScheduleTab({
   canManage,
-  deliveryMode,
   examCloseAt,
   examId,
   examOpenAt,
@@ -58,15 +55,17 @@ export function ScheduleTab({
   isClassTest,
   locked = false,
   onGoToPapers,
-  onSetDeliveryMode,
   papers,
   unlocked,
 }: ScheduleTabProps) {
   const queryClient = useQueryClient()
-  const [subTab, setSubTab] = useState<ScheduleSubTab>('sessions')
   const [scheduleSearch, setScheduleSearch] = useState('')
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null)
   const [studentSearch, setStudentSearch] = useState('')
+  const [studentPage, setStudentPage] = useState(1)
+  // Bản nháp phân đề: candidateId -> paperId. Chỉ là lớp phủ lên `candidate.assignedPaperId` của
+  // server cho tới khi bấm "Áp dụng phân đề".
+  const [paperDraft, setPaperDraft] = useState<Map<string, string>>(new Map())
   const [showAddStudentModal, setShowAddStudentModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingSchedule, setEditingSchedule] = useState<ExamScheduleDto | null>(null)
@@ -86,12 +85,13 @@ export function ScheduleTab({
   const removeProctorMutation = useRemoveProctorFromScheduleMutation()
   const autoFillMutation = useAutoFillCandidatesMutation()
   const assignCandidateMutation = useAssignCandidateScheduleMutation()
+  const bulkAssignCandidateMutation = useBulkAssignCandidateScheduleMutation()
+  const applyPaperAssignmentsMutation = useApplyPaperAssignmentsMutation()
 
   const schedules = schedulesQuery.data ?? []
   const candidates = candidatesQuery.data ?? []
   // Quyền sửa lịch = quyền quản lý + kỳ thi chưa bắt đầu.
   const canEdit = canManage && !locked
-  const effectiveMode: ExamDeliveryMode = deliveryMode ?? (isClassTest ? 'DEVICE' : 'LAB')
 
   const totalProctors = schedules.reduce((sum, schedule) => sum + schedule.proctors.length, 0)
   const requiredProctors = schedules.reduce((sum, schedule) => sum + schedule.requiredProctorCount, 0)
@@ -106,16 +106,26 @@ export function ScheduleTab({
   const scheduleCandidates = selectedSchedule
     ? candidates.filter((candidate) => candidate.scheduleId === selectedSchedule.id)
     : []
-  const visibleScheduleCandidates = scheduleCandidates.filter((candidate) => {
-    const keyword = studentSearch.trim().toLowerCase()
-    if (!keyword) {
-      return true
-    }
-    return (
-      getCandidateName(candidate).toLowerCase().includes(keyword) ||
-      (candidate.student?.email ?? '').toLowerCase().includes(keyword)
-    )
-  })
+
+  const lockedPapers = papers.filter((paper) => paper.status === 'LOCKED')
+  const lockedPaperIds = lockedPapers.map((paper) => paper.id)
+  // Backend đòi mọi mã đề LOCKED mới cho phân đề — chặn sớm ở đây thay vì để bấm rồi lỗi.
+  const paperAssignmentBlockedReason =
+    papers.length === 0 || lockedPapers.length !== papers.length
+      ? 'Cần khóa tất cả mã đề ở tab Đề bài trước khi phân đề.'
+      : undefined
+
+  function resolvePaperId(candidate: ExamCandidateDto) {
+    return paperDraft.get(candidate.id) ?? candidate.assignedPaperId ?? null
+  }
+
+  function mergePaperDraft(assignments: Map<string, string>) {
+    setPaperDraft((current) => {
+      const next = new Map(current)
+      assignments.forEach((paperId, candidateId) => next.set(candidateId, paperId))
+      return next
+    })
+  }
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.all })
@@ -154,7 +164,7 @@ export function ScheduleTab({
     const confirmMessages: Record<'PUBLISH' | 'COMPLETE' | 'CANCEL', string> = {
       CANCEL: `Hủy ${getScheduleLabel(schedule)}? Hành động này không thể hoàn tác.`,
       COMPLETE: `Đánh dấu ${getScheduleLabel(schedule)} đã hoàn thành?`,
-      PUBLISH: `Công bố ${getScheduleLabel(schedule)}? Học sinh và giám thị sẽ thấy ca thi này.`,
+      PUBLISH: `Công bố ${getScheduleLabel(schedule)}? Học sinh và giám thị sẽ thấy ca thi này, và không sửa được phòng/khung giờ nữa.`,
     }
     if (!(await confirm({ message: confirmMessages[action], title: 'Xác nhận thao tác' }))) {
       return
@@ -165,6 +175,39 @@ export function ScheduleTab({
       setMessage('Đã cập nhật trạng thái ca thi.')
     } catch (error) {
       handleError(error)
+    }
+  }
+
+  /**
+   * Công bố hàng loạt các ca còn Bản nháp. Cả hai loại bài đều đòi mọi ca đã công bố mới lên lịch
+   * được (UpdateExamStatusUseCase), nên mở từng menu để bấm "Công bố" là việc lặp không cần thiết.
+   * Chạy tuần tự để lỗi của ca nào hiện đúng message của ca đó — ca thiếu giám thị sẽ bị BE từ chối.
+   */
+  async function handlePublishAllSchedules() {
+    const draftSchedules = schedules.filter((schedule) => schedule.status === 'DRAFT')
+    if (draftSchedules.length === 0) {
+      return
+    }
+    if (
+      !(await confirm({
+        message: `Công bố ${draftSchedules.length} ca thi? Học sinh và giám thị sẽ thấy các ca này, và không sửa được phòng/khung giờ nữa.`,
+        title: 'Công bố tất cả ca thi',
+      }))
+    ) {
+      return
+    }
+    let publishedCount = 0
+    try {
+      for (const schedule of draftSchedules) {
+        await updateStatusMutation.mutateAsync({ examId, payload: { action: 'PUBLISH' }, scheduleId: schedule.id })
+        publishedCount += 1
+      }
+      setMessage(`Đã công bố ${publishedCount} ca thi.`)
+    } catch (error) {
+      handleError(error)
+    } finally {
+      // Ca nào đã công bố xong vẫn phải hiện đúng trạng thái mới, kể cả khi ca sau ném lỗi.
+      await invalidate()
     }
   }
 
@@ -235,13 +278,36 @@ export function ScheduleTab({
     }
   }
 
-  async function handleAssignCandidate(candidateId: string) {
-    if (!selectedSchedule) {
+  /** Rải đều học sinh chưa có ca ra TẤT CẢ ca (backend round-robin theo thứ tự giờ bắt đầu). */
+  async function handleAutoFillAllSchedules() {
+    const unassignedCount = candidates.filter((candidate) => !candidate.scheduleId).length
+    if (
+      !(await confirm({
+        message: `Chia đều ${unassignedCount} học sinh chưa xếp ca ra tất cả ca thi? Học sinh đã có ca giữ nguyên, không bị xáo trộn.`,
+        title: 'Tự động chia đều',
+      }))
+    ) {
       return
     }
     try {
-      await assignCandidateMutation.mutateAsync({ candidateId, examId, scheduleId: selectedSchedule.id })
+      // Không truyền scheduleIds = mọi ca DRAFT/PUBLISHED của kỳ thi.
+      await autoFillMutation.mutateAsync({ examId })
       await invalidate()
+      setMessage('Đã chia đều học sinh vào các ca thi.')
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleAssignCandidates(candidateIds: string[]) {
+    if (!selectedSchedule || candidateIds.length === 0) {
+      return
+    }
+    try {
+      await bulkAssignCandidateMutation.mutateAsync({ candidateIds, examId, scheduleId: selectedSchedule.id })
+      await invalidate()
+      setShowAddStudentModal(false)
+      setMessage(`Đã xếp ${candidateIds.length} học sinh vào ${getScheduleLabel(selectedSchedule)}.`)
     } catch (error) {
       handleError(error)
     }
@@ -251,6 +317,50 @@ export function ScheduleTab({
     try {
       await assignCandidateMutation.mutateAsync({ candidateId, examId, scheduleId: null })
       await invalidate()
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  async function handleRemoveManyFromSchedule(candidateIds: string[]) {
+    if (candidateIds.length === 0) {
+      return
+    }
+    try {
+      await bulkAssignCandidateMutation.mutateAsync({ candidateIds, examId, scheduleId: null })
+      await invalidate()
+      setMessage(`Đã gỡ ${candidateIds.length} học sinh khỏi ca thi.`)
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  /** Chia đều mã đề trong đúng ca đang chọn. */
+  function handleAssignPapersForSchedule() {
+    if (!selectedSchedule) {
+      return
+    }
+    mergePaperDraft(computeAssignments(scheduleCandidates, lockedPaperIds, false, true))
+  }
+
+  /** Chia đều mã đề trong TỪNG ca cho toàn kỳ thi (thí sinh chưa có ca thì không phân). */
+  function handleAssignPapersForAllSchedules() {
+    const assignable = candidates.filter((candidate) => candidate.scheduleId)
+    mergePaperDraft(computeAssignments(assignable, lockedPaperIds, true, true))
+  }
+
+  async function handleApplyPaperDraft() {
+    const assignments = Array.from(paperDraft.entries())
+      .filter(([, paperId]) => Boolean(paperId))
+      .map(([candidateId, paperId]) => ({ candidateId, paperId }))
+    if (assignments.length === 0) {
+      return
+    }
+    try {
+      await applyPaperAssignmentsMutation.mutateAsync({ assignments, examId })
+      await invalidate()
+      setPaperDraft(new Map())
+      setMessage(`Đã phân đề cho ${assignments.length} học sinh.`)
     } catch (error) {
       handleError(error)
     }
@@ -315,67 +425,6 @@ export function ScheduleTab({
     return items
   }
 
-  const deviceModeSection = onSetDeliveryMode ? (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center rounded-[10px] bg-indigo-50 text-indigo-600">
-          <Monitor aria-hidden="true" className="size-4.5" />
-        </span>
-        <div>
-          <div className="text-sm font-extrabold text-slate-900">Hình thức làm bài</div>
-          <div className="text-xs text-slate-500">
-            Chọn máy thí sinh dùng để làm bài. Cả hai hình thức đều thi tại phòng, có ca thi và giám thị — không có
-            hình thức làm bài ở nhà.
-          </div>
-        </div>
-      </div>
-      <div className="mt-3.5 flex flex-wrap gap-2.5">
-        <button
-          className={[
-            'min-w-55 flex-1 rounded-xl border p-3.5 text-left transition',
-            effectiveMode === 'DEVICE' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
-          ].join(' ')}
-          onClick={() => onSetDeliveryMode('DEVICE')}
-          type="button"
-        >
-          <div className="flex items-center gap-2">
-            <Laptop aria-hidden="true" className="size-4.5 text-indigo-600" />
-            <span className="text-[13px] font-bold text-slate-900">Thiết bị học sinh</span>
-            {effectiveMode === 'DEVICE' ? (
-              <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
-                Đang chọn
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-1.5 text-xs leading-5 text-slate-600">
-            Thí sinh làm bài trên máy cá nhân mang tới phòng thi. Vẫn xếp ca thi, phòng và giám thị như thi tập trung.
-          </div>
-        </button>
-        <button
-          className={[
-            'min-w-55 flex-1 rounded-xl border p-3.5 text-left transition',
-            effectiveMode === 'LAB' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
-          ].join(' ')}
-          onClick={() => onSetDeliveryMode('LAB')}
-          type="button"
-        >
-          <div className="flex items-center gap-2">
-            <Monitor aria-hidden="true" className="size-4.5 text-slate-500" />
-            <span className="text-[13px] font-bold text-slate-900">Thiết bị nhà trường</span>
-            {effectiveMode === 'LAB' ? (
-              <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
-                Đang chọn
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-1.5 text-xs leading-5 text-slate-600">
-            Thí sinh làm bài trên máy vi tính tại phòng máy của trường. Xếp ca thi, phòng và giám thị.
-          </div>
-        </button>
-      </div>
-    </div>
-  ) : null
-
   const toasts = (
     <>
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
@@ -388,7 +437,6 @@ export function ScheduleTab({
     return (
       <div className="mt-4 grid gap-4">
         {toasts}
-        {deviceModeSection}
         <div className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-8 py-12 text-center">
           <span className="flex size-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
             <Lock aria-hidden="true" className="size-7" />
@@ -412,28 +460,23 @@ export function ScheduleTab({
   return (
     <div className="mt-4 grid gap-4">
       {toasts}
-      {deviceModeSection}
 
-      <div className="grid gap-3.5 sm:grid-cols-4">
-        <StatBlock label="Ca thi" value={schedules.length} />
-        <StatBlock label="Thí sinh" value={candidates.length} />
-        <StatBlock label="Đã phân đề" value={candidates.filter((candidate) => candidate.assignedPaperId).length} />
-        <StatBlock label="Giám thị" value={`${totalProctors} / ${requiredProctors}`} />
+      <div className="grid gap-3 sm:grid-cols-4">
+        <StatCard icon={<CalendarClock size={19} />} iconTone="indigo" label="Ca thi" value={schedules.length} />
+        <StatCard icon={<UserPlus size={19} />} iconTone="emerald" label="Thí sinh" value={candidates.length} />
+        <StatCard
+          icon={<FileText size={19} />}
+          iconTone="violet"
+          label="Đã phân đề"
+          value={candidates.filter((candidate) => candidate.assignedPaperId).length}
+        />
+        <StatCard
+          icon={<ShieldCheck size={19} />}
+          iconTone="amber"
+          label="Giám thị"
+          value={`${totalProctors} / ${requiredProctors}`}
+        />
       </div>
-
-      <TabPillGroup
-        items={[
-          { label: '1 · Ca thi', value: 'sessions' },
-          { label: '2 · Xếp học sinh', value: 'rooms' },
-          { label: '3 · Phân đề', value: 'assign' },
-        ]}
-        onChange={setSubTab}
-        value={subTab}
-      />
-
-      <p className="text-[13px] text-slate-500">
-        Quy trình: Tạo ca thi (gắn phòng &amp; khung giờ) → công bố ca → xếp học sinh vào ca → phân đề cho học sinh.
-      </p>
 
       {canManage && locked ? (
         <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-semibold text-amber-800">
@@ -442,166 +485,66 @@ export function ScheduleTab({
         </div>
       ) : null}
 
-      {subTab === 'sessions' ? (
-        <div className="grid gap-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] text-slate-500">Mỗi ca gắn với đúng một phòng thi, khung giờ và giám thị phụ trách.</p>
-            {canEdit ? (
-              <button
-                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
-                onClick={() => setShowCreateModal(true)}
-                type="button"
-              >
-                <Plus aria-hidden="true" className="size-4" />
-                Thêm ca thi
-              </button>
-            ) : null}
-          </div>
-          {schedules.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-[13px] text-slate-400">
-              Chưa có ca thi nào.
-            </div>
-          ) : (
-            schedules.map((schedule) => (
-              <SessionRow actions={getScheduleActions(schedule)} key={schedule.id} schedule={schedule} />
-            ))
-          )}
-        </div>
-      ) : null}
+      <ScheduleSessionsCard
+        canEdit={canEdit}
+        getActions={getScheduleActions}
+        onAutoAssignPapers={canEdit ? handleAssignPapersForAllSchedules : undefined}
+        onAutoFillAllSchedules={
+          canEdit && hasUnassignedCandidates ? () => void handleAutoFillAllSchedules() : undefined
+        }
+        onCreate={() => setShowCreateModal(true)}
+        onPublishAllSchedules={
+          canManage && schedules.some((schedule) => schedule.status === 'DRAFT')
+            ? () => void handlePublishAllSchedules()
+            : undefined
+        }
+        onSearchChange={setScheduleSearch}
+        onSelect={(scheduleId) => {
+          setSelectedScheduleId(scheduleId)
+          setStudentPage(1)
+        }}
+        paperAssignmentBlockedReason={paperAssignmentBlockedReason}
+        schedules={filteredSchedules}
+        search={scheduleSearch}
+        selectedScheduleId={selectedSchedule?.id}
+        totalCount={schedules.length}
+      />
 
-      {subTab === 'rooms' ? (
-        <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-          <div className="grid gap-2.5 self-start">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Chọn ca thi</p>
-            <div className="relative">
-              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-              <input
-                className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
-                onChange={(event) => setScheduleSearch(event.target.value)}
-                placeholder="Tìm ca theo phòng…"
-                value={scheduleSearch}
-              />
-            </div>
-            <div className="grid gap-2">
-              {filteredSchedules.length === 0 ? (
-                <p className="px-1 text-xs text-slate-400">Không tìm thấy ca thi phù hợp.</p>
-              ) : (
-                filteredSchedules.map((schedule) => (
-                  <RoomChip
-                    active={selectedSchedule?.id === schedule.id}
-                    key={schedule.id}
-                    onClick={() => setSelectedScheduleId(schedule.id)}
-                    schedule={schedule}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {selectedSchedule ? (
-            <div className="grid gap-3.5 self-start rounded-2xl border border-slate-200 bg-white p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-lg font-extrabold text-slate-900">{getScheduleLabel(selectedSchedule)}</div>
-                  <div className="mt-1 text-[13px] text-slate-500">{selectedSchedule.candidateCount} học sinh</div>
-                </div>
-                {canEdit ? (
-                  <div className="flex flex-wrap gap-2">
-                    {hasUnassignedCandidates ? (
-                      <button
-                        className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                        onClick={() => void handleAutoFill()}
-                        type="button"
-                      >
-                        <Wand2 aria-hidden="true" className="size-3.5" />
-                        Tự động xếp
-                      </button>
-                    ) : null}
-                    <button
-                      className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-4 text-[13px] font-semibold text-white"
-                      onClick={() => setShowAddStudentModal(true)}
-                      type="button"
-                    >
-                      <UserPlus aria-hidden="true" className="size-4" />
-                      Thêm học sinh vào ca
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="relative">
-                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  className="h-9.5 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-[13px] text-slate-900 outline-none focus:border-indigo-400"
-                  onChange={(event) => setStudentSearch(event.target.value)}
-                  placeholder="Tìm theo tên hoặc email…"
-                  value={studentSearch}
-                />
-              </div>
-
-              <div className="overflow-hidden rounded-xl border border-slate-200">
-                <div className="grid grid-cols-[1fr_100px_36px] gap-2.5 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                  <span>Họ tên</span>
-                  <span>Mã đề</span>
-                  <span />
-                </div>
-                <div className="max-h-100 overflow-y-auto">
-                  {visibleScheduleCandidates.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-xs text-slate-400">Chưa có học sinh nào trong ca này.</div>
-                  ) : (
-                    visibleScheduleCandidates.map((candidate) => {
-                      const candidatePaper = papers.find((paper) => paper.id === candidate.assignedPaperId)
-                      return (
-                        <div
-                          className="grid grid-cols-[1fr_100px_36px] items-center gap-2.5 border-t border-slate-100 px-4 py-2.5"
-                          key={candidate.id}
-                        >
-                          <span className="text-[13px] text-slate-900">{getCandidateName(candidate)}</span>
-                          <span className="text-[13px] font-semibold text-indigo-700">
-                            {candidatePaper ? candidatePaper.code : '-'}
-                          </span>
-                          {canEdit ? (
-                            <button
-                              aria-label={`Bỏ ${getCandidateName(candidate)} khỏi ca`}
-                              className="inline-flex size-6 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-red-600"
-                              onClick={() => void handleRemoveFromSchedule(candidate.id)}
-                              type="button"
-                            >
-                              <X aria-hidden="true" className="size-4" />
-                            </button>
-                          ) : null}
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-[13px] text-slate-400">
-              Chưa có ca thi nào. Thêm ca thi để bắt đầu xếp học sinh.
-            </div>
-          )}
-        </div>
-      ) : null}
-
-      {subTab === 'assign' ? (
-        <PaperAssignmentPanel
-          canManage={canEdit}
-          candidates={candidates}
-          examId={examId}
-          onApplied={() => void invalidate()}
-          papers={papers}
-          schedules={schedules}
+      {selectedSchedule ? (
+        <ScheduleSessionDetail
+          canEdit={canEdit}
+          candidates={scheduleCandidates}
+          hasUnassignedCandidates={hasUnassignedCandidates}
+          lockedPapers={lockedPapers}
+          onAddStudent={() => setShowAddStudentModal(true)}
+          onApplyPaperDraft={() => void handleApplyPaperDraft()}
+          onAssignPapersForSchedule={handleAssignPapersForSchedule}
+          onAutoFill={() => void handleAutoFill()}
+          onChangePaper={(candidateId, paperId) => mergePaperDraft(new Map([[candidateId, paperId]]))}
+          onPageChange={setStudentPage}
+          onRemoveCandidate={(candidateId) => void handleRemoveFromSchedule(candidateId)}
+          onRemoveCandidates={(candidateIds) => void handleRemoveManyFromSchedule(candidateIds)}
+          onSearchChange={(value) => {
+            setStudentSearch(value)
+            setStudentPage(1)
+          }}
+          page={studentPage}
+          paperAssignmentBlockedReason={paperAssignmentBlockedReason}
+          paperDraftCount={paperDraft.size}
+          resolvePaperId={resolvePaperId}
+          schedule={selectedSchedule}
+          search={studentSearch}
         />
       ) : null}
 
       {showAddStudentModal && selectedSchedule ? (
         <AddStudentToRoomModal
           candidates={candidates}
-          onAssign={(candidateId) => void handleAssignCandidate(candidateId)}
+          onAssign={(candidateIds) => void handleAssignCandidates(candidateIds)}
           onClose={() => setShowAddStudentModal(false)}
           schedule={selectedSchedule}
+          schedules={schedules}
+          submitting={bulkAssignCandidateMutation.isPending}
         />
       ) : null}
 
@@ -654,15 +597,6 @@ export function ScheduleTab({
           schedules={schedules}
         />
       ) : null}
-    </div>
-  )
-}
-
-function StatBlock({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className="mt-1.5 text-[22px] font-extrabold text-slate-900">{value}</div>
     </div>
   )
 }

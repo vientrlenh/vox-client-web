@@ -8,7 +8,6 @@ import {
   Gauge,
   LogOut,
   Menu,
-  Search,
   UserRound,
   X,
 } from 'lucide-react'
@@ -196,20 +195,6 @@ export function StudentLayout() {
           >
             <Menu aria-hidden="true" className="size-5" />
           </button>
-
-          <div className="relative hidden max-w-2xl flex-1 md:block">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500"
-            />
-            <input
-              aria-label="Tìm kiếm bài thi"
-              className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              placeholder="Danh sách bài thi và kết quả của bạn"
-              readOnly
-              type="search"
-            />
-          </div>
 
           <div className="ml-auto flex items-center gap-3">
             <NotificationBell />

@@ -204,6 +204,30 @@ export type UpdateFrameworkResultBandResponse = string
 
 export type DeleteFrameworkResultBandResponse = void
 
+// Preview/Accept của cả 4 luồng import (version/criterion/result-band/criterion-band)
+// dùng chung một shape — backend trả về y hệt nhau, chỉ khác endpoint.
+export type PreviewFrameworkImportResponse = {
+  expiresAt: string
+  fileName: string
+  importSessionId: string
+  originalHeaders: string[]
+  sampleRows: Record<string, string>[]
+  suggestedMapping: Record<string, string>
+  totalRows: number
+}
+
+export type AcceptFrameworkImportRequest = {
+  confirmedMapping: Record<string, string>
+}
+
+export type AcceptFrameworkImportResponse = {
+  importedRows: number
+  invalidRows: number
+  sessionId: string
+  skippedRows: number
+  totalRows: number
+}
+
 export type MutationResult<TData> = {
   data: TData
   message: string

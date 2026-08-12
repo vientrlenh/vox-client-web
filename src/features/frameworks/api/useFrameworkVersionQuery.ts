@@ -73,32 +73,29 @@ const SCHOOL_FRAMEWORK_VERSION_QUERY = `
   }
 `
 
+export type FrameworkVersionQueryScope = 'system' | 'school'
+
 type FrameworkVersionQueryData = {
-  frameworkVersion: FrameworkVersionDetail | null
+  frameworkVersion?: FrameworkVersionDetail | null
+  schoolFrameworkVersion?: FrameworkVersionDetail | null
 }
 
-type SchoolFrameworkVersionQueryData = {
-  schoolFrameworkVersion: FrameworkVersionDetail | null
-}
-
-export async function fetchFrameworkVersion(id: string, isSchoolAdmin = false) {
-  if (isSchoolAdmin) {
-    const data = await graphQLRequest<SchoolFrameworkVersionQueryData>(
-      SCHOOL_FRAMEWORK_VERSION_QUERY,
-      { id },
-    )
-    return data.schoolFrameworkVersion
-  }
-
+export async function fetchFrameworkVersion(
+  id: string,
+  scope: FrameworkVersionQueryScope = 'system',
+) {
   const data = await graphQLRequest<FrameworkVersionQueryData>(
-    FRAMEWORK_VERSION_QUERY,
+    scope === 'school' ? SCHOOL_FRAMEWORK_VERSION_QUERY : FRAMEWORK_VERSION_QUERY,
     { id },
   )
 
-  return data.frameworkVersion
+  return (scope === 'school' ? data.schoolFrameworkVersion : data.frameworkVersion) ?? null
 }
 
-export function useFrameworkVersionQuery(id: string | null, isSchoolAdmin = false) {
+export function useFrameworkVersionQuery(
+  id: string | null,
+  scope: FrameworkVersionQueryScope = 'system',
+) {
   return useQuery({
     enabled: Boolean(id),
     queryFn: () => {
@@ -106,8 +103,8 @@ export function useFrameworkVersionQuery(id: string | null, isSchoolAdmin = fals
         throw new Error('Framework version id is required')
       }
 
-      return fetchFrameworkVersion(id, isSchoolAdmin)
+      return fetchFrameworkVersion(id, scope)
     },
-    queryKey: [...frameworkQueryKeys.version(id), isSchoolAdmin ? 'school' : 'system'] as const,
+    queryKey: [...frameworkQueryKeys.version(id), scope] as const,
   })
 }

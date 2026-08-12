@@ -124,6 +124,11 @@ export type QuestionDto = {
   createdAt: string | null
   updatedAt: string | null
   createdBy: string | null
+  createdByUser?: {
+    email?: string | null
+    fullName?: string | null
+    id: string
+  } | null
   updatedBy: string | null
   usableInExam?: boolean
   topic?: QuestionTopicRefDto | null
@@ -251,6 +256,12 @@ export type BulkUpdateQuestionStatusRequest = {
 
 export type BulkUpdateQuestionStatusFailure = {
   questionId: string
+  /** null khi backend không tìm thấy câu hỏi. */
+  questionCode: string | null
+  /** Trạng thái tại thời điểm bị từ chối; null khi không tìm thấy câu hỏi. */
+  currentStatus: QuestionStatus | null
+  /** Mã lý do ổn định (RejectionCode phía backend) — dùng để gom nhóm thay vì so khớp chuỗi. */
+  reasonCode: string
   reason: string
 }
 
@@ -309,6 +320,17 @@ export function formatQuestionDate(value?: string | null) {
 
 export function formatNullableText(value?: string | null) {
   return value?.trim() ? value : '-'
+}
+
+export function formatQuestionCreator(user?: QuestionDto['createdByUser']) {
+  const fullName = user?.fullName?.trim()
+  const email = user?.email?.trim()
+
+  if (!fullName) {
+    return null
+  }
+
+  return email ? `${fullName} (${email})` : fullName
 }
 
 export function formatDuration(seconds?: number | null) {

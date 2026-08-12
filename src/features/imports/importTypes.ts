@@ -16,12 +16,20 @@ export const IMPORT_TYPE_VALUES = [
   'RUBRIC_CRITERION_BAND',
   'RUBRIC_RESULT_BAND',
   'ASSESSMENT_POLICY',
+  'FRAMEWORK_VERSION',
+  'FRAMEWORK_CRITERION',
+  'FRAMEWORK_CRITERION_BAND',
+  'FRAMEWORK_RESULT_BAND',
 ] as const
 
 export type ImportTypeValue = (typeof IMPORT_TYPE_VALUES)[number]
 
 export const IMPORT_TYPE_LABELS: Record<ImportTypeValue, string> = {
   ASSESSMENT_POLICY: 'Chính sách đánh giá',
+  FRAMEWORK_CRITERION: 'Tiêu chí khung đánh giá',
+  FRAMEWORK_CRITERION_BAND: 'Mức đánh giá tiêu chí khung',
+  FRAMEWORK_RESULT_BAND: 'Thang kết quả khung đánh giá',
+  FRAMEWORK_VERSION: 'Phiên bản khung đánh giá',
   QUESTION: 'Câu hỏi',
   RUBRIC_CRITERION: 'Tiêu chí rubric',
   RUBRIC_CRITERION_BAND: 'Mức điểm tiêu chí',
@@ -61,6 +69,15 @@ export const IMPORT_TYPE_GROUPS: ImportTypeGroup[] = [
       'RUBRIC_CRITERION',
       'RUBRIC_CRITERION_BAND',
       'RUBRIC_RESULT_BAND',
+    ],
+  },
+  {
+    label: 'Khung đánh giá năng lực',
+    types: [
+      'FRAMEWORK_VERSION',
+      'FRAMEWORK_CRITERION',
+      'FRAMEWORK_RESULT_BAND',
+      'FRAMEWORK_CRITERION_BAND',
     ],
   },
   {

@@ -5,6 +5,7 @@ import {
   fetchGradingAssignments,
   fetchGradingStats,
   fetchGradingTaskDetail,
+  fetchMyGradingExams,
   fetchMyGradingTasks,
   fetchResultStatusHistory,
 } from './useGradingQueries'
@@ -134,6 +135,31 @@ describe('grading GraphQL queries', () => {
       size: 20,
       status: 'ASSIGNED',
     })
+  })
+
+  it('narrows my grading tasks by exam, and drops the filter when cleared', async () => {
+    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+    mockedPost.mockResolvedValue({ data: { data: { myGradingTasks: page } } })
+
+    await fetchMyGradingTasks({ examId: 'ex-1', page: 0, size: 20 })
+    expect(bodyOf().variables.examId).toBe('ex-1')
+
+    // Chuỗi rỗng là "tất cả kỳ thi" — gửi xuống server thì thành lọc theo id rỗng.
+    await fetchMyGradingTasks({ examId: '', page: 0, size: 20 })
+    expect(bodyOf(1).variables.examId).toBeUndefined()
+  })
+
+  it('fetches the exam options from the assignments, not from the school exam list', async () => {
+    const options = [{ code: 'EX-1', id: 'ex-1', name: 'Kỳ thi cuối kỳ', openTaskCount: 2, taskCount: 3 }]
+    mockedPost.mockResolvedValue({ data: { data: { myGradingExams: options } } })
+
+    await expect(fetchMyGradingExams()).resolves.toEqual(options)
+
+    const body = bodyOf()
+    expect(body.query).toContain('myGradingExams')
+    // Đếm được cả hai loại thì dropdown khỏi bắn thêm một query size=1 cho mỗi kỳ thi.
+    expect(body.query).toContain('taskCount')
+    expect(body.query).toContain('openTaskCount')
   })
 
   it('fetches the teacher task detail with the flags that drive the screen', async () => {

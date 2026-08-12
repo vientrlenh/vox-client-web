@@ -140,11 +140,6 @@ function QuestionTopicDetailPage({
             label="Ngân hàng câu hỏi"
             value={formatNullableText(bankName || topic.bank?.name || topic.questionBankId)}
           />
-          <DetailItem label="Mã định danh chủ đề" value={topic.id} />
-          <DetailItem
-            label="Mã định danh ngân hàng"
-            value={topic.questionBankId}
-          />
         </div>
 
         <div>

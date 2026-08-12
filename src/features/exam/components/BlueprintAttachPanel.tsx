@@ -1,25 +1,31 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Eye } from 'lucide-react'
-import { useAppSelector } from '@/app/store/hooks'
+import { Eye, Lock } from 'lucide-react'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { toApiError } from '@/shared/api'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { examQueryKeys, useExamBlueprintSummaryQuery, useExamBlueprintsQuery } from '@/features/examCore/api/queries'
-import { formatDurationSeconds, getBlueprintVersionStatusDisplay, type ExamMemberDto } from '@/features/examCore/types'
+import { formatDurationSeconds, getBlueprintVersionStatusDisplay } from '@/features/examCore/types'
 import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useAttachExamBlueprintMutation } from '../api/useExamMutations'
+import type { ExamAuthority } from '@/features/examCore/utils/examPermissions'
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
 type BlueprintAttachPanelProps = {
+  /** Quyền đã giải sẵn ở trang chi tiết — panel không tự suy lại để hai chỗ không lệch nhau. */
+  authority: ExamAuthority
   blueprintId?: string | null
   blueprintVersionId?: string | null
   examId: string
   hasPapers: boolean
-  members: ExamMemberDto[]
+  /**
+   * Kỳ thi đã bắt đầu trở đi (`isExamLockedForEditing`) thì khung đề coi như chốt cứng — đổi blueprint
+   * hay chốt sang phiên bản khác lúc này là làm lệch mã đề thí sinh đang làm.
+   */
+  locked?: boolean
   onCreateVersion: (blueprintId: string) => void
   onOpenBlueprint: (blueprintId: string, versionId?: string) => void
   optional?: boolean
@@ -30,36 +36,50 @@ const PAPERS_EXIST_MESSAGE =
 
 /**
  * Nút "Đổi blueprint khác" bị `disabled` trông gần như nút thường, nên lý do phải hiện thành chữ chứ
- * không nấp trong tooltip. Quản trị trường lại không quản lý mã đề (`canManagePapers={false}` ở
- * `SchoolAdminExamDetailPage`) nên phải nói rõ ai xóa được, tránh bế tắc không lối thoát.
+ * không nấp trong tooltip — kèm luôn lối thoát, vì người đọc dòng này đang bị chặn.
  */
-function BlueprintLockedByPapersHint() {
+function BlueprintLockedByPapersHint({ canManagePapers }: { canManagePapers: boolean }) {
   return (
     <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-600">
-      {PAPERS_EXIST_MESSAGE} Quản trị trường không quản lý mã đề — nhờ giáo viên soạn đề hoặc chủ tịch
-      hội đồng xóa giúp ở tab <b className="text-slate-900">Mã đề</b>.
+      {PAPERS_EXIST_MESSAGE}{' '}
+      {canManagePapers ? (
+        <>
+          Sang tab <b className="text-slate-900">Tạo mã đề</b> để xóa.
+        </>
+      ) : (
+        <>
+          Nhờ chủ tịch hội đồng hoặc quản trị trường xóa giúp ở tab <b className="text-slate-900">Tạo mã đề</b>.
+        </>
+      )}
     </p>
   )
 }
 
 export function BlueprintAttachPanel({
+  authority,
   blueprintId,
   blueprintVersionId,
   examId,
   hasPapers,
-  members,
+  locked = false,
   onCreateVersion,
   onOpenBlueprint,
   optional = false,
 }: BlueprintAttachPanelProps) {
   const queryClient = useQueryClient()
-  const user = useAppSelector((state) => state.auth.user)
-  const isSchoolAdmin = user?.roles.includes('SCHOOL_ADMIN') ?? false
-  const myRole = members.find((member) => member.userId === user?.userId)?.role
-  const canAttach = isSchoolAdmin || myRole === 'AUTHOR'
-  const canApproveVersion = isSchoolAdmin || myRole === 'CHAIR'
+  // Gộp `locked` ngay vào hai cờ gốc: mọi nút ghi trong panel đều dẫn xuất từ chúng, nên không có
+  // đường nào lọt lưới khi thêm nút mới về sau.
+  const canAttach = authority.canAttachBlueprint && !locked
+  const canApproveVersion = authority.canFinalizeBlueprintVersion && !locked
   const canChangeBlueprint = canAttach && !hasPapers
   const canChangeVersion = canApproveVersion && !hasPapers
+  const lockedNotice =
+    locked && (authority.canAttachBlueprint || authority.canFinalizeBlueprintVersion) ? (
+      <div className="mb-3.5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[13px] font-semibold text-amber-800">
+        <Lock aria-hidden="true" className="size-4 shrink-0" />
+        Kỳ thi đã bắt đầu — khung đề đã chốt, không thể đổi blueprint hay chốt sang phiên bản khác nữa.
+      </div>
+    ) : null
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [forceReselect, setForceReselect] = useState(false)
@@ -160,6 +180,7 @@ export function BlueprintAttachPanel({
     return (
       <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5.5">
         <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+        {lockedNotice}
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-[15px] font-extrabold text-slate-900">Chọn blueprint để gắn vào kỳ thi</h3>
           {forceReselect ? (
@@ -173,11 +194,13 @@ export function BlueprintAttachPanel({
           ) : null}
         </div>
         <p className="mt-1 text-[13px] text-slate-500">
-          {hasPapers
-            ? PAPERS_EXIST_MESSAGE
-            : canAttach
-              ? 'Bạn là người ra đề của kỳ thi này nên có thể chọn blueprint có sẵn hoặc tạo mới bên dưới.'
-              : 'Chỉ người ra đề của kỳ thi (hoặc quản trị trường) mới gắn được blueprint — bạn có thể xem danh sách nhưng không chọn được.'}
+          {locked
+            ? 'Kỳ thi đã bắt đầu — chỉ xem lại được danh sách blueprint, không gắn thêm được nữa.'
+            : hasPapers
+              ? PAPERS_EXIST_MESSAGE
+              : canAttach
+                ? 'Bạn là người ra đề của kỳ thi này nên có thể chọn blueprint có sẵn hoặc tạo mới bên dưới.'
+                : 'Chỉ người ra đề của kỳ thi (hoặc quản trị trường) mới gắn được blueprint — bạn có thể xem danh sách nhưng không chọn được.'}
           {optional ? ' Bước này không bắt buộc — có thể bỏ qua và thêm câu hỏi trực tiếp ở tab Đề bài.' : ''}
         </p>
         {blueprintsQuery.isError ? (
@@ -386,16 +409,19 @@ export function BlueprintAttachPanel({
     return (
       <div className="mt-4 rounded-2xl border border-violet-200 bg-white p-5.5">
         <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+        {lockedNotice}
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-[15px] font-extrabold text-slate-900">Chốt phiên bản blueprint</h3>
             <p className="mt-1 text-[13px] text-slate-500">
               Đã gắn <b className="text-slate-900">{blueprint.name}</b>.{' '}
-              {hasPapers
-                ? PAPERS_EXIST_MESSAGE
-                : canApproveVersion
-                  ? 'Chọn một phiên bản đã xuất bản bên dưới để chốt dùng cho kỳ thi.'
-                  : 'Chỉ chủ tịch hội đồng của kỳ thi (hoặc quản trị trường) mới chốt được phiên bản — bạn có thể xem trước.'}
+              {locked
+                ? 'Kỳ thi đã bắt đầu — không chốt được phiên bản khác nữa, chỉ xem lại.'
+                : hasPapers
+                  ? PAPERS_EXIST_MESSAGE
+                  : canApproveVersion
+                    ? 'Chọn một phiên bản đã xuất bản bên dưới để chốt dùng cho kỳ thi.'
+                    : 'Chỉ chủ tịch hội đồng của kỳ thi (hoặc quản trị trường) mới chốt được phiên bản — bạn có thể xem trước.'}
             </p>
           </div>
           {showVersionPicker ? (
@@ -550,11 +576,14 @@ export function BlueprintAttachPanel({
   )
   const otherPublishedVersions = otherActiveVersions.filter((version) => version.status === 'PUBLISHED')
   const otherDraftVersions = otherActiveVersions.filter((version) => version.status === 'DRAFT')
-  const showNewerVersionHint = !hasPapers && otherActiveVersions.length > 0
+  // Khi kỳ thi đã khóa thì "còn phiên bản khác chưa chốt" chỉ là thông tin gây tiếc nuối — không còn
+  // thao tác nào đi kèm nên không hiện.
+  const showNewerVersionHint = !hasPapers && !locked && otherActiveVersions.length > 0
 
   return (
     <div className="mt-4 rounded-2xl border border-emerald-200 bg-white p-5.5">
       <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+      {lockedNotice}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5">
@@ -597,7 +626,7 @@ export function BlueprintAttachPanel({
           ) : null}
         </div>
       </div>
-      {canAttach && hasPapers ? <BlueprintLockedByPapersHint /> : null}
+      {canAttach && hasPapers ? <BlueprintLockedByPapersHint canManagePapers={authority.canManagePapers} /> : null}
       {showNewerVersionHint ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5">
           <p className="text-[13px] text-amber-800">

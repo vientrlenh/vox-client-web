@@ -156,7 +156,7 @@ function QuestionBanksPage({
       await refreshBanks()
       setPageMessage(
         result.archivedInstead
-          ? `${result.message}. Backend đã archive thay vì xóa.`
+          ? `${result.message}. Hệ thống đã lưu trữ thay vì xóa.`
           : result.message,
       )
     } catch (error) {

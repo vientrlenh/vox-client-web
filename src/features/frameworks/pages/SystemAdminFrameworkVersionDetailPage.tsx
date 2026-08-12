@@ -85,8 +85,10 @@ function FrameworkVersionDetailPage({ basePath }: { basePath: string }) {
   const location = useLocation()
   const user = useAppSelector((state) => state.auth.user)
   const canManageRole = canManageFramework(getFrameworkActorRole(user?.roles))
-  const isSchoolAdmin = basePath === '/school-admin'
-  const versionQuery = useFrameworkVersionQuery(versionId ?? null, isSchoolAdmin)
+  const versionQuery = useFrameworkVersionQuery(
+    versionId ?? null,
+    basePath === '/school-admin' ? 'school' : 'system',
+  )
   const version = versionQuery.data ?? null
   const canManage = canManageRole && version?.status === 'DRAFT'
 
@@ -588,6 +590,16 @@ function FrameworkVersionDetailPage({ basePath }: { basePath: string }) {
       <FrameworkResultBandsSection
         canManage={canManage}
         errorMessage={getErrorMessage(versionQuery.error)}
+        headerExtra={
+          basePath === '/system-admin' ? (
+            <Link
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+              to={`${basePath}/frameworks/${frameworkId ?? ''}/versions/${versionId ?? ''}/result-bands/import`}
+            >
+              Import hàng loạt
+            </Link>
+          ) : null
+        }
         isError={versionQuery.isError}
         isLoading={versionQuery.isLoading}
         onAddResultBand={() => setIsAddingResultBand(true)}
@@ -601,6 +613,24 @@ function FrameworkVersionDetailPage({ basePath }: { basePath: string }) {
         canManage={canManage}
         criteria={version?.criteria ?? []}
         errorMessage={getErrorMessage(versionQuery.error)}
+        headerExtra={
+          basePath === '/system-admin' ? (
+            <>
+              <Link
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+                to={`${basePath}/frameworks/${frameworkId ?? ''}/versions/${versionId ?? ''}/criteria/import`}
+              >
+                Import tiêu chí
+              </Link>
+              <Link
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+                to={`${basePath}/frameworks/${frameworkId ?? ''}/versions/${versionId ?? ''}/criterion-bands/import`}
+              >
+                Import mức đánh giá
+              </Link>
+            </>
+          ) : null
+        }
         isError={versionQuery.isError}
         isLoading={versionQuery.isLoading}
         onAddCriterion={() => setIsAddingCriterion(true)}

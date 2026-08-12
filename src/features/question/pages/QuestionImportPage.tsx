@@ -78,8 +78,8 @@ Không có dữ liệu mẫu để hiển thị.
         <h2 className="text-lg font-black text-slate-950">Dữ liệu mẫu</h2>
         <p className="mt-1 text-sm font-medium text-slate-500">
           Kiểm tra nhanh một số dòng đầu tiên trước khi import. Hệ thống tự nhận
-          diện cột theo tên header, không cần tự ghép tay - nếu sai cột/ Thiếu
-          trường bắt buộc, BE sẽ báo lỗi cụ thể khi xác nhận.
+          diện cột theo tên tiêu đề, không cần tự ghép tay - nếu sai cột hoặc
+          thiếu trường bắt buộc, hệ thống sẽ báo lỗi cụ thể khi bạn xác nhận.
         </p>
       </div>
       <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -227,8 +227,8 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-slate-600">
             Chọn ngân hàng và chủ đề, rồi tải file lên. Hệ thống tự nhận diện cột theo
-            tên header và gửi xuống server. Nếu sai đầu mục hay nhầm cột, backend sẽ
-            báo lỗi cụ thể từng dòng. Câu hỏi tạo từ import sẽ vào hàng đợi chờ duyệt.
+            tên tiêu đề. Nếu sai đầu mục hay nhầm cột, hệ thống sẽ báo lỗi cụ thể từng
+            dòng. Câu hỏi tạo từ import sẽ vào hàng đợi chờ duyệt.
           </p>
         </div>
         <div className="flex gap-3">
