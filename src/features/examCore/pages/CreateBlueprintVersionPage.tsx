@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { QuestionDto } from '@/features/question/types'
+import { getQuestionTypeDisplay, type QuestionDto } from '@/features/question/types'
 import { toApiError } from '@/shared/api'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { distributeEvenlyWeights } from '@/shared/weightDistribution'
@@ -15,7 +15,7 @@ import {
   type CreateBlueprintVersionSectionInput,
   type CreateBlueprintVersionSlotInput,
 } from '../api/mutations'
-import { formatDurationSeconds, type ExamBlueprintSlotType } from '../types'
+import { formatDurationSeconds, getQuestionDifficultyDisplay, type ExamBlueprintSlotType } from '../types'
 
 const QUESTION_TYPE_OPTIONS = ['SHORT_ANSWER', 'LONG_ANSWER', 'OPINION', 'DESCRIPTION'] as const
 const DEFAULT_QUESTION_TYPE = 'SHORT_ANSWER'
@@ -475,7 +475,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
                       >
                         {QUESTION_TYPE_OPTIONS.map((option) => (
                           <option key={option} value={option}>
-                            {option}
+                            {getQuestionTypeDisplay(option)}
                           </option>
                         ))}
                       </select>
@@ -486,7 +486,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
                       >
                         {DIFFICULTY_OPTIONS.map((option) => (
                           <option key={option} value={option}>
-                            {option}
+                            {getQuestionDifficultyDisplay(option)}
                           </option>
                         ))}
                       </select>

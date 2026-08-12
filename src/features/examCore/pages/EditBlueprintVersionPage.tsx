@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
+import { getQuestionTypeDisplay } from '@/features/question/types'
 import { toApiError } from '@/shared/api'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { distributeEvenlyWeights } from '@/shared/weightDistribution'
@@ -16,6 +17,7 @@ import {
 } from '../api/mutations'
 import {
   formatDurationSeconds,
+  getQuestionDifficultyDisplay,
   toDateTimeLocalValue,
   toIsoDateTime,
   type ExamBlueprintDto,
@@ -598,7 +600,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                       >
                         {QUESTION_TYPE_OPTIONS.map((option) => (
                           <option key={option} value={option}>
-                            {option}
+                            {getQuestionTypeDisplay(option)}
                           </option>
                         ))}
                       </select>
@@ -609,7 +611,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                       >
                         {DIFFICULTY_OPTIONS.map((option) => (
                           <option key={option} value={option}>
-                            {option}
+                            {getQuestionDifficultyDisplay(option)}
                           </option>
                         ))}
                       </select>
