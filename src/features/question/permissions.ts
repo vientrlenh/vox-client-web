@@ -50,20 +50,35 @@ function getCurrentUserPermission(
   return collaborator?.permission ?? null
 }
 
+/**
+ * `createdBy` có thể là userId hoặc email tùy nguồn dữ liệu, nên phải so cả hai.
+ * Tách riêng khỏi {@link isQuestionOwner} để chỗ nào chỉ có mỗi `createdBy` (vd bản chụp
+ * lựa chọn hàng loạt) vẫn dùng đúng một quy tắc so khớp.
+ */
+export function isCreatedBy(
+  createdBy?: string | null,
+  userId?: string | null,
+  email?: string | null,
+) {
+  if (!createdBy) {
+    return false
+  }
+
+  const normalizedCreatedBy = createdBy.trim().toLowerCase()
+  const normalizedUserId = userId?.trim().toLowerCase()
+  const normalizedEmail = email?.trim().toLowerCase()
+
+  return (
+    normalizedCreatedBy === normalizedUserId || normalizedCreatedBy === normalizedEmail
+  )
+}
+
 function isQuestionOwner(
   question: QuestionDto | null | undefined,
   userId?: string | null,
   email?: string | null,
 ) {
-  if (!question?.createdBy) {
-    return false
-  }
-
-  const createdBy = question.createdBy.trim().toLowerCase()
-  const normalizedUserId = userId?.trim().toLowerCase()
-  const normalizedEmail = email?.trim().toLowerCase()
-
-  return createdBy === normalizedUserId || createdBy === normalizedEmail
+  return isCreatedBy(question?.createdBy, userId, email)
 }
 
 export function getQuestionActorRole(
