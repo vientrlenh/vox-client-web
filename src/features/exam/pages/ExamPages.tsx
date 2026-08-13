@@ -186,7 +186,7 @@ function ExamListPage({ allowCreate, basePath, title }: ExamListPageProps) {
               { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
               exam.blueprintId
                 ? { icon: <LayoutList aria-hidden="true" className="size-3.5" />, label: formatNullableText(exam.description) }
-                : { icon: <Clock4 aria-hidden="true" className="size-3.5" />, label: 'Chưa gắn blueprint', tone: 'warning' as const },
+                : { icon: <Clock4 aria-hidden="true" className="size-3.5" />, label: 'Chưa gắn khung đề', tone: 'warning' as const },
               // Ba con số dưới đây là phần "kỳ thi đã tới đâu": mã đề, thí sinh, ca thi. Để tone mặc
               // định — bước đang kẹt đã được thanh tiến độ và dòng "Tiếp theo" chỉ ra rồi.
               {
@@ -379,7 +379,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   return (
     <section className="mx-auto max-w-160">
       <h1 className="text-[26px] font-extrabold text-slate-900">Tạo kỳ thi</h1>
-      <p className="mt-1.5 text-sm text-slate-500">Nhập thông tin cơ bản, sau đó gắn blueprint và thêm hội đồng đề.</p>
+      <p className="mt-1.5 text-sm text-slate-500">Nhập thông tin cơ bản, sau đó gắn khung đề và thêm hội đồng đề.</p>
       <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
       {dialog}
 
@@ -618,7 +618,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
     const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
     const quotaWarning =
       source === 'blueprint'
-        ? buildTimeQuotaWarning('Mã đề tạo từ blueprint', currentBlueprintVersion?.totalTimeLimitSeconds, maxTimePerAttemptMin)
+        ? buildTimeQuotaWarning('Mã đề tạo từ khung đề', currentBlueprintVersion?.totalTimeLimitSeconds, maxTimePerAttemptMin)
         : buildTimeQuotaWarning('Mã đề sao chép', sourcePaper?.timeDurationSeconds, maxTimePerAttemptMin)
     if (quotaWarning) {
       setErrorMessage(`${quotaWarning} Không thể tạo mã đề vượt quota của trường.`)
@@ -735,7 +735,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
   const currentBlueprintVersion = attachedBlueprint?.versions.find((version) => version.id === exam.blueprintVersionId)
   const createFromBlueprintQuotaWarning = buildTimeQuotaWarning(
-    'Mã đề tạo từ blueprint',
+    'Mã đề tạo từ khung đề',
     currentBlueprintVersion?.totalTimeLimitSeconds,
     maxTimePerAttemptMin,
   )
@@ -965,7 +965,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
                     type="button"
                   >
                     <Plus aria-hidden="true" className="size-4" />
-                    {createPaperMutation.isPending ? 'Đang tạo…' : 'Tạo mã đề từ blueprint'}
+                    {createPaperMutation.isPending ? 'Đang tạo…' : 'Tạo mã đề từ khung đề'}
                   </button>
                   {createFromBlueprintQuotaWarning ? (
                     <div className="basis-full rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700">

@@ -116,10 +116,6 @@ const navigationGroups: NavigationGroup[] = [
         label: 'Gói dịch vụ',
         to: '/system-admin/subscription',
       },
-      {
-        label: 'Cài đặt hệ thống',
-        to: '/system-admin/settings',
-      },
     ],
   },
 ]

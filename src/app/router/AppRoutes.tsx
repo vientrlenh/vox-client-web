@@ -1172,6 +1172,9 @@ export function AppRoutes() {
             <Route path="teacher/class-tests/:examId/reevaluation" element={<ClassTestReevaluationPage />} />
             <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
             <Route path="teacher/exam-papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
+            {/* Kỳ thi đã khóa thì tab mã đề trỏ sang đường dẫn không có /edit. Thiếu route này là
+                rơi vào catch-all và bị đá về trang chủ. Trang tự chuyển read-only theo quyền. */}
+            <Route path="teacher/exam-papers/:paperId" element={<TeacherExamPaperEditPage />} />
             <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
             <Route path="teacher/exams" element={<TeacherExamsPage />} />
             <Route path="teacher/exam-results" element={<TeacherExamResultsListPage />} />

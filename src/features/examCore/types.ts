@@ -746,6 +746,19 @@ export function getAssessmentPolicyStrictnessLabel(strictness?: AssessmentPolicy
   }
 }
 
+export function getQuestionDifficultyDisplay(difficulty?: string | null): string {
+  switch (difficulty) {
+    case 'EASY':
+      return 'Dễ'
+    case 'MEDIUM':
+      return 'Trung bình'
+    case 'HARD':
+      return 'Khó'
+    default:
+      return '-'
+  }
+}
+
 export function getCandidateStatusDisplay(status?: string | null): { tone: StatusTone; label: string } {
   switch (status) {
     case 'ASSIGNED':
