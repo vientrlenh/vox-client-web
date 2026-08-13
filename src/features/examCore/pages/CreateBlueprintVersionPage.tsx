@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { QuestionDto } from '@/features/question/types'
+import { getQuestionTypeDisplay, type QuestionDto } from '@/features/question/types'
 import { toApiError } from '@/shared/api'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { distributeEvenlyWeights } from '@/shared/weightDistribution'
@@ -15,7 +15,7 @@ import {
   type CreateBlueprintVersionSectionInput,
   type CreateBlueprintVersionSlotInput,
 } from '../api/mutations'
-import { formatDurationSeconds, type ExamBlueprintSlotType } from '../types'
+import { formatDurationSeconds, getQuestionDifficultyDisplay, type ExamBlueprintSlotType } from '../types'
 
 const QUESTION_TYPE_OPTIONS = ['SHORT_ANSWER', 'LONG_ANSWER', 'OPINION', 'DESCRIPTION'] as const
 const DEFAULT_QUESTION_TYPE = 'SHORT_ANSWER'
@@ -123,7 +123,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
   const weightSum = sections.reduce((sum, section) => sum + sectionWeightOf(section), 0)
   const totalDurationSeconds = sections.reduce((sum, section) => sum + sectionDurationSeconds(section), 0)
   const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
-  const quotaWarning = buildTimeQuotaWarning('Phiên bản blueprint này', totalDurationSeconds, maxTimePerAttemptMin)
+  const quotaWarning = buildTimeQuotaWarning('Phiên bản khung đề này', totalDurationSeconds, maxTimePerAttemptMin)
 
   function sectionSlotWeightSum(section: SectionDraft): number {
     return section.slots.reduce((sum, slot) => sum + (slot.weight.trim() ? Number(slot.weight) : 1), 0)
@@ -153,7 +153,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
 
   function handleSelectFixedQuestion(sectionKey: string, slotKey: string, question: QuestionDto) {
     const nextDurationSeconds = totalDurationIfQuestionSelected(slotKey, question)
-    const nextQuotaWarning = buildTimeQuotaWarning('Phiên bản blueprint này', nextDurationSeconds, maxTimePerAttemptMin)
+    const nextQuotaWarning = buildTimeQuotaWarning('Phiên bản khung đề này', nextDurationSeconds, maxTimePerAttemptMin)
     if (nextQuotaWarning) {
       setErrorMessage(`${nextQuotaWarning} Bạn vẫn có thể đổi câu, nhưng không thể tạo cho tới khi giảm thời lượng.`)
     }
@@ -300,7 +300,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
   }
 
   if (!blueprint) {
-    return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy blueprint.</section>
+    return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy khung đề.</section>
   }
 
   const activeSlot = pickerForSlotKey
@@ -328,7 +328,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
         <h1 className="text-xl font-extrabold text-slate-900">Tạo phiên bản mới</h1>
         <p className="mt-1 text-sm text-slate-500">Xây cấu trúc đề: các phần và ô câu hỏi. Phiên bản mới luôn ở trạng thái bản nháp.</p>
         <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3.5 py-2.5 text-sm font-semibold text-cyan-800">
-          Thời lượng blueprint version dự kiến: {formatDurationSeconds(totalDurationSeconds)}.
+          Thời lượng phiên bản khung đề dự kiến: {formatDurationSeconds(totalDurationSeconds)}.
           <span className="ml-1 text-xs font-medium text-cyan-700">
             Tính từ câu cố định đã chọn; ô chọn ngẫu nhiên sẽ cộng thêm khi gán câu vào mã đề.
           </span>
@@ -475,7 +475,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
                       >
                         {QUESTION_TYPE_OPTIONS.map((option) => (
                           <option key={option} value={option}>
-                            {option}
+                            {getQuestionTypeDisplay(option)}
                           </option>
                         ))}
                       </select>
@@ -486,7 +486,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
                       >
                         {DIFFICULTY_OPTIONS.map((option) => (
                           <option key={option} value={option}>
-                            {option}
+                            {getQuestionDifficultyDisplay(option)}
                           </option>
                         ))}
                       </select>

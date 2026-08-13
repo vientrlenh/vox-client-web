@@ -32,7 +32,6 @@ import {
 import type { CreateQuestionBankRequest, QuestionBankDto } from '../types'
 import { useAppSelector } from '@/app/store/hooks'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
-import { QUESTION_MODULE_DEFAULT_LANGUAGE_ID } from '@/features/question/constants'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
@@ -84,15 +83,21 @@ function QuestionBanksPage({
   const effectiveSelectedId = selectedListBank?.id ?? null
   const selectedBankQuery = useQuestionBankQuery(effectiveSelectedId)
   const selectedBank = selectedBankQuery.data ?? selectedListBank
-  // Ngân hàng hệ thống bắt buộc chọn ngôn ngữ (backend validate @NotNull); ngân hàng trường vẫn
-  // dùng ngôn ngữ mặc định của module nên không cần nạp danh sách.
-  const needsLanguagePicker = scope === 'admin'
+  // MỌI scope đều phải chọn ngôn ngữ, kể cả ngân hàng của trường.
+  //
+  // Trước đây scope trường gán cứng QUESTION_MODULE_DEFAULT_LANGUAGE_ID -- một UUID viết thẳng
+  // trong mã nguồn. Cách đó hỏng theo kiểu im lặng: hằng số ấy trùng khít từng ký tự với
+  // QUESTION_MODULE_DEFAULT_SCHOOL_ID (id của một TRƯỜNG, bảng khác hẳn), nên ít nhất một trong
+  // hai đang trỏ sai bảng. Ngân hàng tạo ra vẫn lưu thành công, chỉ là gắn vào một hàng không
+  // phải ngôn ngữ -- không lỗi, không cảnh báo, chỉ sai.
+  //
+  // Bắt chọn thì id luôn đến từ danh sách server trả về, không thể trỏ nhầm bảng.
   const languagesQuery = useSupportedLanguagesQuery(
     1,
     LANGUAGE_OPTIONS_PAGE_SIZE,
     { isActive: 'active', search: '' },
     // Chỉ nạp khi thật sự mở form tạo, không phải mỗi lần vào trang danh sách.
-    needsLanguagePicker && dialogMode === 'create',
+    dialogMode === 'create',
   )
   const createMutation = useCreateQuestionBankMutation()
   const updateMutation = useUpdateQuestionBankMutation()
@@ -119,9 +124,7 @@ function QuestionBanksPage({
         const payload: CreateQuestionBankRequest = {
           code: values.code,
           description: values.description || null,
-          languageId: needsLanguagePicker
-            ? values.languageId
-            : QUESTION_MODULE_DEFAULT_LANGUAGE_ID,
+          languageId: values.languageId,
           name: values.name,
         }
 
@@ -306,7 +309,7 @@ function QuestionBanksPage({
           void handleSubmit(mode, payload)
         }}
         questionBank={dialogMode === 'edit' ? selectedBank ?? dialogTarget : null}
-        showLanguageField={needsLanguagePicker}
+        showLanguageField
       />
     </section>
   )

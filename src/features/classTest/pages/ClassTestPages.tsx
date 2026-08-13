@@ -42,6 +42,7 @@ import { FilterChips } from '@/shared/ui/FilterChips'
 import { WarningBanner } from '@/shared/ui/WarningBanner'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
+import { AiConfidenceThresholdField } from '@/features/examCore/components/AiConfidenceThresholdField'
 import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
 import { QuestionPicker } from '@/features/examCore/components/QuestionPicker'
 import { RubricPolicyPicker, type RubricPolicySelection } from '@/features/examCore/components/RubricPolicyPicker'
@@ -395,6 +396,8 @@ type SelectedRubricVersion = { code: string; id: string; languageId: string; nam
 
 /** Chỉ metadata: soạn đề đã chuyển hẳn sang trang chi tiết nên không còn gì về đề để mang theo. */
 type ClassTestCreateDraft = {
+  /** Mang theo qua bước chọn rubric; thiếu nó thì người dùng nhập xong lại mất khi quay lại. */
+  aiConfidenceThresholdPercent: number | null
   closeAt: string
   description: string
   maxAttempt: string
@@ -442,6 +445,9 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   // tạo bài, và bỏ trống nghĩa là học sinh không vào thi được nếu ứng dụng thi vẫn xin stream token.
   const [streamSetup, setStreamSetup] = useState<ExamStreamSetup>(draft?.streamSetup ?? 'BOTH_REQUIRED')
   const [requiresOtp, setRequiresOtp] = useState(draft?.requiresOtp ?? false)
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number | null>(
+    draft?.aiConfidenceThresholdPercent ?? null,
+  )
   const { confirm, dialog } = useConfirmationDialog()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -467,6 +473,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
     navigate('/teacher/rubric-versions/select', {
       state: {
         draft: {
+          aiConfidenceThresholdPercent: confidenceThreshold,
           closeAt,
           description,
           maxAttempt,
@@ -536,6 +543,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
     try {
       const created = await createMutation.mutateAsync({
         payload: {
+          aiConfidenceThresholdPercent: confidenceThreshold,
           assessmentPolicyId,
           closeAt: closeAtIso,
           description: description || null,
@@ -684,6 +692,8 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
             </p>
           </div>
 
+          <AiConfidenceThresholdField onChange={setConfidenceThreshold} value={confidenceThreshold} />
+
           <ExamStreamSetupField
             description="Quyết định học sinh phải chia sẻ những gì trong lúc làm bài."
             onChange={setStreamSetup}
@@ -795,7 +805,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-4">
           <p className="text-[13px] font-bold text-slate-700">Soạn đề ở bước sau</p>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Sau khi tạo, bạn vào tab <b>Đề bài</b> của bài này để soạn mã đề — chọn câu hỏi trực tiếp, sinh từ blueprint
+            Sau khi tạo, bạn vào tab <b>Đề bài</b> của bài này để soạn mã đề — chọn câu hỏi trực tiếp, sinh từ khung đề
             có sẵn, hoặc sao chép mã đề đã có. Tạo nhiều mã đề thì phân đề cho học sinh ở tab Xếp lịch.
           </p>
         </div>
@@ -863,17 +873,17 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
   async function handleSwitch(newBlueprintId: string, newVersionId: string) {
     const version = browsingBlueprint?.versions.find((candidate) => candidate.id === newVersionId)
     const quotaWarning = buildTimeQuotaWarning(
-      `Phiên bản blueprint ${version?.code ?? ''}`.trim(),
+      `Phiên bản khung đề ${version?.code ?? ''}`.trim(),
       version?.totalTimeLimitSeconds,
       maxTimePerAttemptMin,
     )
     if (quotaWarning) {
-      setErrorMessage(`${quotaWarning} Không thể gắn blueprint này.`)
+      setErrorMessage(`${quotaWarning} Không thể gắn khung đề này.`)
       return
     }
     if (
       !(await confirm({
-        message: 'Đổi blueprint sẽ xóa toàn bộ câu hỏi hiện tại của mã đề và tạo lại theo blueprint mới. Tiếp tục?',
+        message: 'Đổi khung đề sẽ xóa toàn bộ câu hỏi hiện tại của mã đề và tạo lại theo khung đề mới. Tiếp tục?',
       }))
     ) {
       return
@@ -891,7 +901,7 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
   async function handleDetach() {
     if (
       !(await confirm({
-        message: 'Gỡ blueprint sẽ xóa toàn bộ câu hỏi hiện tại của mã đề — bạn sẽ cần soạn lại từ đầu. Tiếp tục?',
+        message: 'Gỡ khung đề sẽ xóa toàn bộ câu hỏi hiện tại của mã đề — bạn sẽ cần soạn lại từ đầu. Tiếp tục?',
       }))
     ) {
       return
@@ -911,7 +921,7 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
       {!showPicker ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-[15px] font-extrabold text-slate-900">Blueprint (tuỳ chọn)</h3>
+            <h3 className="text-[15px] font-extrabold text-slate-900">Khung đề (tuỳ chọn)</h3>
             {currentBlueprint && currentVersion ? (
               <p className="mt-1 text-[13px] text-slate-500">
                 Đang dùng <b className="text-slate-900">{currentBlueprint.name}</b> · {currentBlueprint.code} · phiên bản{' '}
@@ -919,7 +929,7 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
               </p>
             ) : (
               <p className="mt-1 text-[13px] text-slate-500">
-                Bài này đang soạn câu hỏi trực tiếp, không dùng blueprint dùng chung nào.
+                Bài này đang soạn câu hỏi trực tiếp, không dùng khung đề dùng chung nào.
               </p>
             )}
           </div>
@@ -942,7 +952,7 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
                     onClick={() => setShowPicker(true)}
                     type="button"
                   >
-                    Đổi blueprint khác
+                    Đổi khung đề khác
                   </button>
                   {currentBlueprint ? (
                     <button
@@ -950,7 +960,7 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
                       onClick={() => void handleDetach()}
                       type="button"
                     >
-                      Gỡ blueprint
+                      Gỡ khung đề
                     </button>
                   ) : null}
                 </>
@@ -975,14 +985,14 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
           <div className="mt-2.5 grid gap-2">
             {browsingBlueprint.versions.filter((version) => version.status === 'PUBLISHED').length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
-                Blueprint này chưa có phiên bản nào được xuất bản.
+                Khung đề này chưa có phiên bản nào được xuất bản.
               </div>
             ) : (
               browsingBlueprint.versions
                 .filter((version) => version.status === 'PUBLISHED')
                 .map((version) => {
                   const quotaWarning = buildTimeQuotaWarning(
-                    `Phiên bản blueprint ${version.code}`,
+                    `Phiên bản khung đề ${version.code}`,
                     version.totalTimeLimitSeconds,
                     maxTimePerAttemptMin,
                   )
@@ -1009,7 +1019,7 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
       ) : (
         <div>
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[13px] font-extrabold text-slate-900">Chọn blueprint</h3>
+            <h3 className="text-[13px] font-extrabold text-slate-900">Chọn khung đề</h3>
             <button
               className="shrink-0 text-xs font-bold text-slate-400 hover:text-slate-600"
               onClick={() => setShowPicker(false)}
@@ -1024,13 +1034,13 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
               setKeyword(event.target.value)
               setPage(1)
             }}
-            placeholder="Tìm blueprint theo mã hoặc tên…"
+            placeholder="Tìm khung đề theo mã hoặc tên…"
             value={keyword}
           />
           <div className="mt-2.5 grid gap-2">
             {blueprintsQuery.data?.content.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-xs text-slate-400">
-                Không tìm thấy blueprint phù hợp.
+                Không tìm thấy khung đề phù hợp.
               </div>
             ) : (
               blueprintsQuery.data?.content.map((blueprint) => (
@@ -1051,7 +1061,7 @@ function ClassTestBlueprintTab({ blueprintId, blueprintVersionId, canEdit, canMa
           </div>
           {blueprintsQuery.data && blueprintsQuery.data.totalElements > 0 ? (
             <div className="mt-2.5 flex items-center justify-between text-xs font-semibold text-slate-500">
-              <span>{blueprintsQuery.data.totalElements} blueprint</span>
+              <span>{blueprintsQuery.data.totalElements} khung đề</span>
               <div className="flex gap-2">
                 <button
                   className="h-8 rounded-lg border border-slate-200 px-3 disabled:opacity-40"
@@ -1445,12 +1455,15 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
   /**
    * Phân đề yêu cầu mọi mã đề đã khoá. Bài trên lớp không có luồng duyệt nên khoá là một bước.
+   *
+   * <p>Khoá mã đề cuối cùng là lúc backend tự phân đề cho học sinh chưa có đề
+   * (`ExamPaperAutoAssigner.backfillExam`), còn mở lại thì gỡ đề của học sinh đang dùng mã đề đó.
    */
   async function handleUpdatePaperStatus(paperId: string, action: 'LOCK' | 'REOPEN') {
     const confirmMessage =
       action === 'LOCK'
-        ? 'Khoá mã đề này? Sau khi khoá bạn mới phân đề được cho học sinh. Vẫn có thể mở lại để sửa.'
-        : 'Mở lại mã đề này để sửa? Bạn sẽ phải khoá lại trước khi phân đề.'
+        ? 'Khoá mã đề này? Khoá xong hệ thống sẽ tự phân đề cho học sinh chưa có đề. Vẫn có thể mở lại để sửa.'
+        : 'Mở lại mã đề này để sửa? Học sinh đang được gán mã đề này sẽ trở về "chưa phân đề". Khoá lại thì hệ thống tự phân đề cho họ.'
     if (!(await confirm({ message: confirmMessage }))) {
       return
     }
@@ -1563,7 +1576,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const roleBasePath = canManage ? '/teacher' : '/school-admin'
   // Khớp rule backend: nội dung/ngày giờ chỉ khóa khi bài đã bắt đầu.
   const canEditContent = canManage && (exam.status === 'DRAFT' || exam.status === 'SCHEDULED')
-  // Chỉ soạn câu hỏi trực tiếp được khi KHÔNG có blueprint dùng chung nào đang gắn (dùng "Đổi blueprint khác" nếu có).
+  // Chỉ soạn câu hỏi trực tiếp được khi KHÔNG có khung đề dùng chung nào đang gắn (dùng "Đổi khung đề khác" nếu có).
   const canEditFreeQuestions = canEditContent && !exam.blueprintId
   /**
    * Nút bước kế LUÔN hiện theo trạng thái bài. Trước đây nó lặng lẽ biến mất khi bài còn DRAFT mà
@@ -1864,7 +1877,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         <TabPillGroup
           // Cùng bộ icon với thanh quy trình (classTestWorkflow.tsx) để hai chỗ đọc ra một bước.
           items={[
-            { icon: <LayoutList aria-hidden="true" className="size-4" />, label: 'Blueprint (tuỳ chọn)', value: 'blueprint' },
+            { icon: <LayoutList aria-hidden="true" className="size-4" />, label: 'Khung đề (tuỳ chọn)', value: 'blueprint' },
             { icon: <FilePenLine aria-hidden="true" className="size-4" />, label: 'Đề bài', value: 'papers' },
             { icon: <UserPlus aria-hidden="true" className="size-4" />, label: 'Học sinh', value: 'students' },
             { icon: <Calendar aria-hidden="true" className="size-4" />, label: 'Xếp lịch', value: 'schedule' },
@@ -1904,7 +1917,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                 }`}
               >
                 {papers.length === 0
-                  ? 'Bài chưa có mã đề nào. Soạn câu hỏi trực tiếp, hoặc sinh mã đề từ blueprint nếu bài đã gắn blueprint.'
+                  ? 'Bài chưa có mã đề nào. Soạn câu hỏi trực tiếp, hoặc sinh mã đề từ khung đề nếu bài đã gắn khung đề.'
                   : papers.length === 1
                     ? 'Một mã đề là đủ để mở bài — hệ thống tự gán cho cả lớp, không cần phân đề. Muốn mỗi em một đề khác nhau thì tạo thêm mã đề.'
                     : unlockedPaperCount > 0
@@ -1935,7 +1948,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                   type="button"
                 >
                   <Plus aria-hidden="true" className="size-4" />
-                  Từ blueprint
+                  Từ khung đề
                 </button>
               ) : (
                 <button
@@ -2066,7 +2079,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
                     </p>
                   ) : exam.blueprintId ? (
                     <p className="text-xs font-semibold text-amber-700">
-                      Bài đang dùng blueprint dùng chung — vào tab Blueprint để đổi/gỡ blueprint thay vì sửa trực tiếp ở đây.
+                      Bài đang dùng khung đề dùng chung — vào tab Khung đề để đổi/gỡ khung đề thay vì sửa trực tiếp ở đây.
                     </p>
                   ) : paper.status === 'LOCKED' ? (
                     <p className="text-xs font-semibold text-slate-500">

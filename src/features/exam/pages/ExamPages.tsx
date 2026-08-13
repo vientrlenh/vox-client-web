@@ -32,6 +32,7 @@ import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
+import { AiConfidenceThresholdField } from '@/features/examCore/components/AiConfidenceThresholdField'
 import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
@@ -186,7 +187,7 @@ function ExamListPage({ allowCreate, basePath, title }: ExamListPageProps) {
               { icon: <Hash aria-hidden="true" className="size-3.5" />, label: exam.code },
               exam.blueprintId
                 ? { icon: <LayoutList aria-hidden="true" className="size-3.5" />, label: formatNullableText(exam.description) }
-                : { icon: <Clock4 aria-hidden="true" className="size-3.5" />, label: 'Chưa gắn blueprint', tone: 'warning' as const },
+                : { icon: <Clock4 aria-hidden="true" className="size-3.5" />, label: 'Chưa gắn khung đề', tone: 'warning' as const },
               // Ba con số dưới đây là phần "kỳ thi đã tới đâu": mã đề, thí sinh, ca thi. Để tone mặc
               // định — bước đang kẹt đã được thanh tiến độ và dòng "Tiếp theo" chỉ ra rồi.
               {
@@ -249,6 +250,9 @@ export function SchoolAdminExamsPage() {
 }
 
 type ExamCreateDraft = {
+  // Ghi ở goToSelectRubricVersion, đọc lại ở useState của confidenceThreshold -- phải có
+  // trong type thì vòng đi/về mới type-check được.
+  aiConfidenceThresholdPercent: number | null
   closeAt: string
   code: string
   description: string
@@ -281,6 +285,10 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   const [name, setName] = useState(locationState?.draft?.name ?? '')
   const [code, setCode] = useState(locationState?.draft?.code ?? '')
   const [description, setDescription] = useState(locationState?.draft?.description ?? '')
+  // Đọc lại từ draft khi quay về từ trang chọn rubric -- xem chỗ dựng draft bên dưới.
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number | null>(
+    locationState?.draft?.aiConfidenceThresholdPercent ?? null,
+  )
   const [languageId, setLanguageId] = useState(locationState?.draft?.languageId ?? '')
   const [maxAttempt] = useState(locationState?.draft?.maxAttempt ?? '1')
   const [openAt, setOpenAt] = useState(locationState?.draft?.openAt ?? '')
@@ -310,7 +318,19 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   function goToSelectRubricVersion() {
     navigate('/school-admin/rubric-versions/select', {
       state: {
-        draft: { closeAt, code, description, languageId, maxAttempt, name, openAt },
+        // Ngưỡng phải đi theo draft: bấm chọn rubric là rời trang, quay lại thì state dựng lại
+        // từ draft này. Thiếu nó thì số vừa nhập biến mất mà không báo gì -- người dùng chỉ phát
+        // hiện khi mở lại kỳ thi và thấy ô trống.
+        draft: {
+          aiConfidenceThresholdPercent: confidenceThreshold,
+          closeAt,
+          code,
+          description,
+          languageId,
+          maxAttempt,
+          name,
+          openAt,
+        },
         languageId,
         returnTo: '/school-admin/exams/create',
       },
@@ -361,6 +381,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
         name,
         openAt: openAtIso,
         requiresOtp: true,
+        aiConfidenceThresholdPercent: confidenceThreshold,
         // Chỉ 1 lượt thi nên mọi cách chốt điểm đều cho ra cùng kết quả — cố định HIGHEST thay vì
         // bắt người dùng chọn giữa 5 phương án tương đương.
         resultDecisionMethod: 'HIGHEST',
@@ -379,7 +400,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   return (
     <section className="mx-auto max-w-160">
       <h1 className="text-[26px] font-extrabold text-slate-900">Tạo kỳ thi</h1>
-      <p className="mt-1.5 text-sm text-slate-500">Nhập thông tin cơ bản, sau đó gắn blueprint và thêm hội đồng đề.</p>
+      <p className="mt-1.5 text-sm text-slate-500">Nhập thông tin cơ bản, sau đó gắn khung đề và thêm hội đồng đề.</p>
       <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
       {dialog}
 
@@ -448,6 +469,8 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             />
           </label>
         </div>
+
+        <AiConfidenceThresholdField onChange={setConfidenceThreshold} value={confidenceThreshold} />
 
         <ExamStreamSetupField
           description="Quyết định học viên phải chia sẻ những gì trong lúc thi."
@@ -618,7 +641,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
     const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
     const quotaWarning =
       source === 'blueprint'
-        ? buildTimeQuotaWarning('Mã đề tạo từ blueprint', currentBlueprintVersion?.totalTimeLimitSeconds, maxTimePerAttemptMin)
+        ? buildTimeQuotaWarning('Mã đề tạo từ khung đề', currentBlueprintVersion?.totalTimeLimitSeconds, maxTimePerAttemptMin)
         : buildTimeQuotaWarning('Mã đề sao chép', sourcePaper?.timeDurationSeconds, maxTimePerAttemptMin)
     if (quotaWarning) {
       setErrorMessage(`${quotaWarning} Không thể tạo mã đề vượt quota của trường.`)
@@ -735,7 +758,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
   const currentBlueprintVersion = attachedBlueprint?.versions.find((version) => version.id === exam.blueprintVersionId)
   const createFromBlueprintQuotaWarning = buildTimeQuotaWarning(
-    'Mã đề tạo từ blueprint',
+    'Mã đề tạo từ khung đề',
     currentBlueprintVersion?.totalTimeLimitSeconds,
     maxTimePerAttemptMin,
   )
@@ -965,7 +988,7 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
                     type="button"
                   >
                     <Plus aria-hidden="true" className="size-4" />
-                    {createPaperMutation.isPending ? 'Đang tạo…' : 'Tạo mã đề từ blueprint'}
+                    {createPaperMutation.isPending ? 'Đang tạo…' : 'Tạo mã đề từ khung đề'}
                   </button>
                   {createFromBlueprintQuotaWarning ? (
                     <div className="basis-full rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700">

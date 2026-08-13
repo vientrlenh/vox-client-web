@@ -111,11 +111,11 @@ export function getExamWorkflowSteps(
       done: blueprintDone,
       label: 'Chốt khung đề',
       pendingIcon: <LayoutList size={24} />,
-      sublabel: blueprintDone ? 'Đã chốt' : exam.blueprintId ? 'Chờ chủ tịch hội đồng chốt phiên bản' : 'Chưa gắn blueprint',
+      sublabel: blueprintDone ? 'Đã chốt' : exam.blueprintId ? 'Chờ chủ tịch hội đồng chốt phiên bản' : 'Chưa gắn khung đề',
       tab: 'blueprint',
       todo: exam.blueprintId
         ? 'Chọn phiên bản đã xuất bản để chủ tịch hội đồng chốt dùng cho kỳ thi.'
-        : 'Gắn blueprint rồi chốt phiên bản dùng cho kỳ thi.',
+        : 'Gắn khung đề rồi chốt phiên bản dùng cho kỳ thi.',
     },
     {
       cta: 'Tạo mã đề',

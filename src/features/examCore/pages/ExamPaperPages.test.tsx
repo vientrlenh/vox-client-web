@@ -148,7 +148,7 @@ describe('TeacherExamPaperEditPage', () => {
     mockGraphQL([item('item-1', { slotType: 'FIXED' })])
     renderPage()
 
-    expect(await screen.findByText('Cố định theo blueprint')).toBeInTheDocument()
+    expect(await screen.findByText('Cố định theo khung đề')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Gán câu hỏi' })).not.toBeInTheDocument()
   })
 
@@ -158,7 +158,7 @@ describe('TeacherExamPaperEditPage', () => {
     renderPage()
 
     expect(await screen.findByRole('button', { name: 'Gán câu hỏi' })).toBeInTheDocument()
-    expect(screen.queryByText('Cố định theo blueprint')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cố định theo khung đề')).not.toBeInTheDocument()
   })
 
   it('mở picker với bộ lọc theo tiêu chí của ô', async () => {
