@@ -26,6 +26,7 @@ import { Pagination } from '@/shared/components/Pagination'
 import {
   buildValidityRulesForDisplay,
   criterionScorePercentage,
+  formatScaleMax,
   getResultScoreTone,
 } from '@/shared/lib/aiEvaluation'
 import { formatPublishedResult } from '@/shared/lib/resultScore'
@@ -88,8 +89,37 @@ function getPendingRowStatus(candidateStatus?: string | null) {
   }
 }
 
-function getResultScoreTextClass(value?: number | null) {
-  const tone = getResultScoreTone(value)
+/**
+ * Hậu tố " / 100" cho một con số điểm. Không biết thang thì KHÔNG hiện gì -- một con số trần vẫn
+ * đúng, còn đoán bừa mẫu số thì sai. Trước 2026-08-11 tổng điểm hiện trần không mẫu số, người xem
+ * phải tự đoán thang.
+ */
+function scaleSuffixOf(scaleMax?: number | null) {
+  const formatted = formatScaleMax(scaleMax)
+  return formatted === null ? '' : ` / ${formatted}`
+}
+
+function scaleSuffix(result: Pick<ExamCandidateResultDto, 'scoringScaleMax'>) {
+  const formatted = formatScaleMax(result.scoringScaleMax)
+  return formatted === null ? null : <span className="text-slate-400"> / {formatted}</span>
+}
+
+/**
+ * Màu chữ cho một điểm số, quy đổi về phần trăm theo THANG THẬT trước khi so ngưỡng 80/45.
+ *
+ * Ngưỡng đó chỉ đúng trên thang phần trăm; truyền điểm thô vào là sai với mọi rubric không phải
+ * 0-100 (thang 0-10 thì mọi điểm đều < 45, bài 10/10 cũng đỏ). Đó chính là lỗi có sẵn ở đây trước
+ * 2026-08-11 -- thang 0-100 làm điểm trùng phần trăm nên không ai thấy.
+ *
+ * `criterionScorePercentage` trả nguyên giá trị khi thiếu thang, nên chỗ nào chưa truyền thang
+ * vẫn chạy y như cũ thay vì đổi màu bất ngờ.
+ */
+function getResultScoreTextClass(
+  value?: number | null,
+  scaleMin?: number | null,
+  scaleMax?: number | null,
+) {
+  const tone = getResultScoreTone(criterionScorePercentage(value, scaleMin, scaleMax))
   if (tone === 'success') {
     return 'text-emerald-600'
   }
@@ -141,7 +171,10 @@ function ResultBand({
 
   return (
     <div>
-      <p className={`text-[13px] font-bold ${getResultScoreTextClass(officialScore)}`}>{formatScore(officialScore)}</p>
+      <p className={`text-[13px] font-bold ${getResultScoreTextClass(officialScore, attempt?.scoringScaleMin, attempt?.scoringScaleMax)}`}>
+        {formatScore(officialScore)}
+        {scaleSuffixOf(attempt?.scoringScaleMax)}
+      </p>
       <p className="text-xs text-slate-500">{formatPublishedResult(attempt)}</p>
     </div>
   )
@@ -203,7 +236,10 @@ function AttemptRows({
               <StatusBadge label={attemptStatus.label} tone={attemptStatus.tone} />
             </span>
             <div>
-              <p className={`text-sm font-bold ${getResultScoreTextClass(attempt.totalScore)}`}>{formatScore(attempt.totalScore)}</p>
+              <p className={`text-sm font-bold ${getResultScoreTextClass(attempt.totalScore, attempt.scoringScaleMin, attempt.scoringScaleMax)}`}>
+                {formatScore(attempt.totalScore)}
+                {scaleSuffixOf(attempt.scoringScaleMax)}
+              </p>
               <p className="text-xs text-slate-500">
                 {formatPublishedResult(attempt)}
               </p>
@@ -211,8 +247,9 @@ function AttemptRows({
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <StatusBadge label="Chính thức" tone="violet" />
                   {officialScore != null && officialScore !== attempt.totalScore ? (
-                    <span className={`text-xs ${getResultScoreTextClass(officialScore)}`}>
+                    <span className={`text-xs ${getResultScoreTextClass(officialScore, attempt.scoringScaleMin, attempt.scoringScaleMax)}`}>
                       Điểm chính thức: {formatScore(officialScore)}
+                      {scaleSuffixOf(attempt.scoringScaleMax)}
                     </span>
                   ) : null}
                 </div>
@@ -317,6 +354,12 @@ function ExamResultsListPage({
     gradedRows.length === 0
       ? null
       : gradedRows.reduce((sum, row) => sum + (row.candidate.officialScore ?? 0), 0) / gradedRows.length
+  // Trang này là kết quả của MỘT kỳ thi, mà một kỳ gắn đúng một assessment policy nên đúng một
+  // rubric version -- mọi thí sinh ở đây cùng thang. Lấy thang của lượt đầu tiên tra được là đủ,
+  // không cần (và không nên) trung bình các thang khác nhau.
+  const examScale = gradedRows
+    .flatMap((row) => row.candidate.attempts ?? [])
+    .find((attempt) => typeof attempt.scoringScaleMax === 'number')
 
   if (!examId) {
     return (
@@ -361,7 +404,12 @@ function ExamResultsListPage({
           icon={<Gauge size={19} />}
           iconTone="violet"
           label="Điểm trung bình"
-          value={<span className={getResultScoreTextClass(averageScoreValue)}>{formatScore(averageScoreValue)}</span>}
+          value={(
+            <span className={getResultScoreTextClass(averageScoreValue, examScale?.scoringScaleMin, examScale?.scoringScaleMax)}>
+              {formatScore(averageScoreValue)}
+              {scaleSuffixOf(examScale?.scoringScaleMax)}
+            </span>
+          )}
         />
       </div>
 
@@ -487,7 +535,10 @@ function SectionOverview({ result }: { result: ExamCandidateResultDto }) {
       {result.sections.map((section) => (
         <div className="rounded-2xl border border-slate-200 bg-white p-4" key={section.sectionId}>
           <p className="text-sm font-bold text-slate-900">{section.title ?? 'Section'}</p>
-          <p className={`mt-2 text-2xl font-extrabold ${getResultScoreTextClass(section.score)}`}>{formatScore(section.score)}</p>
+          <p className={`mt-2 text-2xl font-extrabold ${getResultScoreTextClass(section.score, result.scoringScaleMin, result.scoringScaleMax)}`}>
+            {formatScore(section.score)}
+            {scaleSuffix(result)}
+          </p>
           <p className="mt-1 text-xs text-slate-500">Điểm quy đổi của phần này</p>
         </div>
       ))}
@@ -502,11 +553,16 @@ export function QuestionEvaluationCard({
   onToggle,
   questionCode,
   questionText,
+  scoringScaleMax,
+  scoringScaleMin,
   variant = 'full',
 }: {
   evaluation: ExamItemEvaluationDto | null | undefined
   itemResult: ExamCandidateResultDto['items'][number] | undefined
   onToggle: () => void
+  /** Thang điểm của rubric, để tô màu theo mức đạt thật. Không truyền thì giữ hành vi cũ. */
+  scoringScaleMax?: number | null
+  scoringScaleMin?: number | null
   open: boolean
   questionCode?: string | null
   questionText?: string | null
@@ -546,7 +602,12 @@ export function QuestionEvaluationCard({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {itemResult ? (
-            <StatusBadge label={`Điểm câu ${formatScore(itemResult.itemScore)}`} tone={getResultScoreTone(itemResult.itemScore)} />
+            <StatusBadge
+              label={`Điểm câu ${formatScore(itemResult.itemScore)}${scaleSuffixOf(scoringScaleMax)}`}
+              tone={getResultScoreTone(
+                criterionScorePercentage(itemResult.itemScore, scoringScaleMin, scoringScaleMax),
+              )}
+            />
           ) : null}
           {itemResult ? (
             <StatusBadge label={`Quy đổi ${formatScore(itemResult.weightedScore)}`} tone="violet" />
@@ -730,6 +791,13 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const retryGradingMutation = useRetryGradingExamSessionMutation()
   const regradeForTestMutation = useRegradeExamSessionForTestMutation()
+  // Đã gửi yêu cầu chấm lại trong lần xem này chưa.
+  //
+  // `isPending` chỉ phủ lúc lời gọi còn bay. Chấm xong lời gọi là mutation hết pending, nhưng
+  // phiên phải chờ agents xử lý xong mới rời GRADING_FAILED -- giữa hai mốc đó nút mở lại và
+  // bấm thêm được, mỗi lần lại tốn một lượt gọi LLM cho cùng một bài. Cờ này khoá tới khi tải
+  // lại trang, lúc đó trạng thái phiên đã phản ánh thực tế.
+  const [regradeRequested, setRegradeRequested] = useState(false)
   const session = sessionQuery.data
   const result = resultQuery.data
   const examId = session?.examId ?? result?.examId ?? null
@@ -781,14 +849,21 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   // Chỉ ẩn khi backend nói rõ điểm không được phép hiển thị cho user hiện tại.
   const hiddenPendingReview = Boolean(result && result.status === 'PENDING_REVIEW' && !result.scoreVisible)
   const canRetry = session?.status === 'GRADING_FAILED' && examQuery.data?.status !== 'RESULTS_PUBLISHED'
+  // Chỉ chấm lại bằng AI khi lần chấm trước ĐÃ HỎNG.
+  //
+  // Chấm lại là ghi ĐÈ (upsert): bấm trên bài đã chấm xong sẽ xoá điểm giáo viên sửa tay và thay
+  // bằng điểm AI mới, không hoàn tác được. GRADING_FAILED là lúc duy nhất chưa có gì để mất, vì
+  // chấm chưa từng thành công.
   const regradeForTestBlockedReason =
-    examQuery.data?.kind === 'CENTRALIZED' && candidate?.status !== 'ATTENDED'
-      ? 'Kỳ thi tập trung chỉ chấm lại bằng AI khi thí sinh đã được điểm danh có mặt.'
-      : result && result.items.length === 0
-        ? 'Phiên này không có câu trả lời được ghi nhận nên không có dữ liệu để gửi AI chấm lại.'
-        : session?.status === 'IN_PROGRESS' || session?.status === 'INTERRUPTED'
-          ? 'Chỉ chấm lại khi phiên đã nộp, hết giờ, đã chấm hoặc lỗi chấm.'
-          : null
+    session?.status !== 'GRADING_FAILED'
+      ? 'Chỉ chấm lại bằng AI khi lần chấm trước bị lỗi.'
+      : examQuery.data?.status === 'RESULTS_PUBLISHED'
+        ? 'Kỳ thi đã công bố kết quả, không thể chấm lại.'
+        : examQuery.data?.kind === 'CENTRALIZED' && candidate?.status !== 'ATTENDED'
+          ? 'Kỳ thi tập trung chỉ chấm lại bằng AI khi thí sinh đã được điểm danh có mặt.'
+          : result && result.items.length === 0
+            ? 'Phiên này không có câu trả lời được ghi nhận nên không có dữ liệu để gửi AI chấm lại.'
+            : null
 
   if (!sessionId) {
     return null
@@ -890,8 +965,8 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   async function handleRegradeForTest() {
     if (
       !(await confirm({
-        message: 'Chấm lại phiên thi này bằng AI từ đầu (test)? Điểm và confidence cũ sẽ bị ghi đè.',
-        title: 'Test: chấm lại bằng AI',
+        message: 'Chấm lại phiên thi này bằng AI từ đầu? Điểm và confidence cũ sẽ bị ghi đè.',
+        title: 'Xác nhận chấm lại bằng AI',
       }))
     ) {
       return
@@ -899,10 +974,12 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
 
     try {
       await regradeForTestMutation.mutateAsync(currentSessionId)
+      setRegradeRequested(true)
       await invalidateDetail()
-      setMessage('Đã gửi yêu cầu chấm lại bằng AI (test). Chờ pipeline xử lý rồi tải lại trang.')
+      setMessage('Đã gửi yêu cầu chấm lại bằng AI. Chờ hệ thống chấm xong rồi tải lại trang.')
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể chấm lại phiên thi (test).')
+      // KHÔNG khoá nút khi hỏng: gửi không thành công thì phải cho thử lại.
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể chấm lại phiên thi.')
     }
   }
 
@@ -959,16 +1036,28 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
                 Chấm lại
               </button>
             ) : null}
-            <button
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-dashed border-amber-400 bg-amber-50 px-4 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
-              disabled={regradeForTestMutation.isPending || Boolean(regradeForTestBlockedReason)}
-              onClick={() => void handleRegradeForTest()}
-              title={regradeForTestBlockedReason ?? undefined}
-              type="button"
-            >
-              🔧 Test: Chấm lại AI
-            </button>
-            {regradeForTestBlockedReason ? <span className="max-w-80 text-xs font-semibold text-amber-700">{regradeForTestBlockedReason}</span> : null}
+            <>
+                <button
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-dashed border-amber-400 bg-amber-50 px-4 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                  disabled={
+                    regradeForTestMutation.isPending ||
+                    regradeRequested ||
+                    Boolean(regradeForTestBlockedReason)
+                  }
+                  onClick={() => void handleRegradeForTest()}
+                  title={regradeForTestBlockedReason ?? undefined}
+                  type="button"
+                >
+                  {regradeForTestMutation.isPending
+                    ? 'Đang gửi...'
+                    : regradeRequested
+                      ? 'Đã gửi yêu cầu'
+                      : 'Chấm lại AI'}
+                </button>
+                {regradeForTestBlockedReason ? (
+                  <span className="max-w-80 text-xs font-semibold text-amber-700">{regradeForTestBlockedReason}</span>
+                ) : null}
+            </>
           </div>
         }
         metaItems={[
@@ -1015,7 +1104,12 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
               icon={<Gauge size={19} />}
               iconTone="indigo"
               label="Tổng điểm"
-              value={<span className={getResultScoreTextClass(result.totalScore)}>{formatScore(result.totalScore)}</span>}
+              value={(
+                <span className={getResultScoreTextClass(result.totalScore, result.scoringScaleMin, result.scoringScaleMax)}>
+                  {formatScore(result.totalScore)}
+                  {scaleSuffix(result)}
+                </span>
+              )}
             />
             <StatCard icon={<Target size={19} />} iconTone="violet" label="Xếp loại" value={formatPublishedResult(result)} />
             <StatCard icon={<ClipboardList size={19} />} iconTone="amber" label="Band mục tiêu" value={result.targetFrameworkBandLabel ?? result.targetFrameworkBandCode ?? '-'} />
@@ -1047,6 +1141,8 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
                 const open = expandedItems[item.id] ?? true
                 return (
                   <QuestionEvaluationCard
+                    scoringScaleMax={result.scoringScaleMax}
+                    scoringScaleMin={result.scoringScaleMin}
                     evaluation={evaluation}
                     itemResult={itemResult}
                     key={item.id}

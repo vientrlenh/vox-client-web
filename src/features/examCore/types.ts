@@ -416,6 +416,12 @@ export type ExamAttemptSummaryDto = {
   resultStatus?: string | null
   rubricResultBandCode?: string | null
   rubricResultBandName?: string | null
+  /**
+   * Thang điểm của rubric đã chấm ĐÚNG lượt này. Danh sách lượt thi trộn nhiều kỳ, mỗi kỳ có thể
+   * dùng rubric khác thang, nên không suy chung được -- phải đọc theo từng dòng.
+   */
+  scoringScaleMax?: number | null
+  scoringScaleMin?: number | null
   sessionId: string
   startedAt?: string | null
   status: string
@@ -504,6 +510,8 @@ export type ExamDto = {
   // mà UI thao tác, đừng đọc thẳng hai trường này ra form.
   requiredStreamType?: ExamRequiredStreamType | null
   requiresOtp: boolean
+  /** Ngưỡng tin cậy AI theo phần trăm (0-100); null = nhà trường không đặt. */
+  aiConfidenceThresholdPercent?: number | null
   resultDecisionMethod?: ResultDecisionMethod | null
   // Chỉ có ở query danh sách kỳ thi; trang chi tiết dùng useExamSchedulesQuery (đầy đủ phòng/giám thị).
   schedules?: ExamScheduleStatusDto[]
@@ -516,6 +524,8 @@ export type ExamDto = {
 }
 
 export type UpdateExamRequest = {
+  /** Ngưỡng tin cậy AI theo phần trăm (0-100). Bỏ trống = GIỮ NGUYÊN giá trị hiện có. */
+  aiConfidenceThresholdPercent?: number | null
   assessmentPolicyId?: string | null
   closeAt?: string | null
   description?: string | null

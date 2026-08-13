@@ -69,6 +69,8 @@ const EXAM_SESSION_RESULT_QUERY = `
       flagReason
       scoreVisible
       totalScore
+      scoringScaleMin
+      scoringScaleMax
       targetFrameworkBandId
       targetFrameworkBandCode
       targetFrameworkBandLabel

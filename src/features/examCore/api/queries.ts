@@ -143,6 +143,7 @@ const EXAM_SUMMARY_FIELDS = `
   maxAttempt
   resultDecisionMethod
   requiresOtp
+  aiConfidenceThresholdPercent
   requiredStreamType
   streamTypePermission
   securePool {
@@ -180,6 +181,7 @@ const EXAM_DETAIL_FIELDS = `
   examTimeDurationSecond
   resultDecisionMethod
   requiresOtp
+  aiConfidenceThresholdPercent
   requiredStreamType
   streamTypePermission
   securePool {
@@ -242,6 +244,8 @@ const EXAM_CANDIDATE_FIELDS = `
     flagged
     flagReason
     totalScore
+    scoringScaleMin
+    scoringScaleMax
     rubricResultBandCode
     rubricResultBandName
     resultStatus
@@ -254,6 +258,8 @@ const EXAM_CANDIDATE_FIELDS = `
     flagged
     flagReason
     totalScore
+    scoringScaleMin
+    scoringScaleMax
     rubricResultBandCode
     rubricResultBandName
     resultStatus

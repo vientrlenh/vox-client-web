@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { toApiError } from '@/shared/api'
+import { AiConfidenceThresholdField } from '@/features/examCore/components/AiConfidenceThresholdField'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
 import { RubricPolicyPicker, type RubricPolicySelection } from '@/features/examCore/components/RubricPolicyPicker'
@@ -34,6 +35,9 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
     isBlocked: false,
   })
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number | null>(
+    exam.aiConfidenceThresholdPercent ?? null,
+  )
 
   async function handleSubmit() {
     setErrorMessage(null)
@@ -60,6 +64,9 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
           name: name.trim(),
           openAt: openIso,
           requiresOtp: true,
+          // Gửi kể cả khi null: lệnh sửa hiểu vắng mặt là "giữ nguyên", mà null ở đây là giá trị
+          // hợp lệ ("không đặt ngưỡng") -- hai thứ khác nhau.
+          aiConfidenceThresholdPercent: confidenceThreshold,
           // Chỉ 1 lượt thi nên mọi cách chốt điểm đều cho ra cùng kết quả — cố định HIGHEST thay vì
           // bắt người dùng chọn giữa 5 phương án tương đương.
           resultDecisionMethod: 'HIGHEST',
@@ -130,6 +137,8 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
             onChange={setStreamSetup}
             value={streamSetup}
           />
+
+          <AiConfidenceThresholdField onChange={setConfidenceThreshold} value={confidenceThreshold} />
 
           <RubricPolicyPicker languageId={exam.languageId} onChange={setPolicySelection} scope="school" />
         </div>

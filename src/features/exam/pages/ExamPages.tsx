@@ -32,6 +32,7 @@ import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
+import { AiConfidenceThresholdField } from '@/features/examCore/components/AiConfidenceThresholdField'
 import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
 import { PaperCard } from '@/features/examCore/components/PaperCard'
 import { ScheduleTab } from '@/features/examCore/components/schedule/ScheduleTab'
@@ -249,6 +250,9 @@ export function SchoolAdminExamsPage() {
 }
 
 type ExamCreateDraft = {
+  // Ghi ở goToSelectRubricVersion, đọc lại ở useState của confidenceThreshold -- phải có
+  // trong type thì vòng đi/về mới type-check được.
+  aiConfidenceThresholdPercent: number | null
   closeAt: string
   code: string
   description: string
@@ -281,6 +285,10 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   const [name, setName] = useState(locationState?.draft?.name ?? '')
   const [code, setCode] = useState(locationState?.draft?.code ?? '')
   const [description, setDescription] = useState(locationState?.draft?.description ?? '')
+  // Đọc lại từ draft khi quay về từ trang chọn rubric -- xem chỗ dựng draft bên dưới.
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number | null>(
+    locationState?.draft?.aiConfidenceThresholdPercent ?? null,
+  )
   const [languageId, setLanguageId] = useState(locationState?.draft?.languageId ?? '')
   const [maxAttempt] = useState(locationState?.draft?.maxAttempt ?? '1')
   const [openAt, setOpenAt] = useState(locationState?.draft?.openAt ?? '')
@@ -310,7 +318,19 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   function goToSelectRubricVersion() {
     navigate('/school-admin/rubric-versions/select', {
       state: {
-        draft: { closeAt, code, description, languageId, maxAttempt, name, openAt },
+        // Ngưỡng phải đi theo draft: bấm chọn rubric là rời trang, quay lại thì state dựng lại
+        // từ draft này. Thiếu nó thì số vừa nhập biến mất mà không báo gì -- người dùng chỉ phát
+        // hiện khi mở lại kỳ thi và thấy ô trống.
+        draft: {
+          aiConfidenceThresholdPercent: confidenceThreshold,
+          closeAt,
+          code,
+          description,
+          languageId,
+          maxAttempt,
+          name,
+          openAt,
+        },
         languageId,
         returnTo: '/school-admin/exams/create',
       },
@@ -361,6 +381,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
         name,
         openAt: openAtIso,
         requiresOtp: true,
+        aiConfidenceThresholdPercent: confidenceThreshold,
         // Chỉ 1 lượt thi nên mọi cách chốt điểm đều cho ra cùng kết quả — cố định HIGHEST thay vì
         // bắt người dùng chọn giữa 5 phương án tương đương.
         resultDecisionMethod: 'HIGHEST',
@@ -448,6 +469,8 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             />
           </label>
         </div>
+
+        <AiConfidenceThresholdField onChange={setConfidenceThreshold} value={confidenceThreshold} />
 
         <ExamStreamSetupField
           description="Quyết định học viên phải chia sẻ những gì trong lúc thi."
