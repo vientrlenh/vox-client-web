@@ -31,7 +31,6 @@ import {
 } from '../permissions'
 import type { CreateQuestionBankRequest, QuestionBankDto } from '../types'
 import { useAppSelector } from '@/app/store/hooks'
-import { QUESTION_MODULE_DEFAULT_LANGUAGE_ID } from '@/features/question/constants'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
@@ -107,7 +106,7 @@ function QuestionBanksPage({
         const payload: CreateQuestionBankRequest = {
           code: values.code,
           description: values.description || null,
-          languageId: QUESTION_MODULE_DEFAULT_LANGUAGE_ID,
+          languageId: values.languageId,
           name: values.name,
         }
 

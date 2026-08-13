@@ -19,6 +19,14 @@ export {
 } from '@/features/examCore/types'
 
 export type CreateExamRequest = {
+  /**
+   * Ngưỡng tin cậy AI theo PHẦN TRĂM (0-100). Bỏ trống = không đặt, hệ thống dùng bộ luật ngưỡng
+   * mặc định như trước.
+   *
+   * <p>Đặt rồi thì bài nào AI chấm với độ tin cậy thấp hơn ngưỡng sẽ chuyển sang chờ giáo viên
+   * duyệt, và các luật mặc định bị bỏ qua -- nhà trường tự quyết mức chấp nhận được.
+   */
+  aiConfidenceThresholdPercent?: number | null
   assessmentPolicyId?: string | null
   blueprintId?: string | null
   closeAt?: string | null

@@ -791,6 +791,13 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const retryGradingMutation = useRetryGradingExamSessionMutation()
   const regradeForTestMutation = useRegradeExamSessionForTestMutation()
+  // Đã gửi yêu cầu chấm lại trong lần xem này chưa.
+  //
+  // `isPending` chỉ phủ lúc lời gọi còn bay. Chấm xong lời gọi là mutation hết pending, nhưng
+  // phiên phải chờ agents xử lý xong mới rời GRADING_FAILED -- giữa hai mốc đó nút mở lại và
+  // bấm thêm được, mỗi lần lại tốn một lượt gọi LLM cho cùng một bài. Cờ này khoá tới khi tải
+  // lại trang, lúc đó trạng thái phiên đã phản ánh thực tế.
+  const [regradeRequested, setRegradeRequested] = useState(false)
   const session = sessionQuery.data
   const result = resultQuery.data
   const examId = session?.examId ?? result?.examId ?? null
@@ -842,14 +849,21 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   // Chỉ ẩn khi backend nói rõ điểm không được phép hiển thị cho user hiện tại.
   const hiddenPendingReview = Boolean(result && result.status === 'PENDING_REVIEW' && !result.scoreVisible)
   const canRetry = session?.status === 'GRADING_FAILED' && examQuery.data?.status !== 'RESULTS_PUBLISHED'
+  // Chỉ chấm lại bằng AI khi lần chấm trước ĐÃ HỎNG.
+  //
+  // Chấm lại là ghi ĐÈ (upsert): bấm trên bài đã chấm xong sẽ xoá điểm giáo viên sửa tay và thay
+  // bằng điểm AI mới, không hoàn tác được. GRADING_FAILED là lúc duy nhất chưa có gì để mất, vì
+  // chấm chưa từng thành công.
   const regradeForTestBlockedReason =
-    examQuery.data?.kind === 'CENTRALIZED' && candidate?.status !== 'ATTENDED'
-      ? 'Kỳ thi tập trung chỉ chấm lại bằng AI khi thí sinh đã được điểm danh có mặt.'
-      : result && result.items.length === 0
-        ? 'Phiên này không có câu trả lời được ghi nhận nên không có dữ liệu để gửi AI chấm lại.'
-        : session?.status === 'IN_PROGRESS' || session?.status === 'INTERRUPTED'
-          ? 'Chỉ chấm lại khi phiên đã nộp, hết giờ, đã chấm hoặc lỗi chấm.'
-          : null
+    session?.status !== 'GRADING_FAILED'
+      ? 'Chỉ chấm lại bằng AI khi lần chấm trước bị lỗi.'
+      : examQuery.data?.status === 'RESULTS_PUBLISHED'
+        ? 'Kỳ thi đã công bố kết quả, không thể chấm lại.'
+        : examQuery.data?.kind === 'CENTRALIZED' && candidate?.status !== 'ATTENDED'
+          ? 'Kỳ thi tập trung chỉ chấm lại bằng AI khi thí sinh đã được điểm danh có mặt.'
+          : result && result.items.length === 0
+            ? 'Phiên này không có câu trả lời được ghi nhận nên không có dữ liệu để gửi AI chấm lại.'
+            : null
 
   if (!sessionId) {
     return null
@@ -951,8 +965,8 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   async function handleRegradeForTest() {
     if (
       !(await confirm({
-        message: 'Chấm lại phiên thi này bằng AI từ đầu (test)? Điểm và confidence cũ sẽ bị ghi đè.',
-        title: 'Test: chấm lại bằng AI',
+        message: 'Chấm lại phiên thi này bằng AI từ đầu? Điểm và confidence cũ sẽ bị ghi đè.',
+        title: 'Xác nhận chấm lại bằng AI',
       }))
     ) {
       return
@@ -960,10 +974,12 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
 
     try {
       await regradeForTestMutation.mutateAsync(currentSessionId)
+      setRegradeRequested(true)
       await invalidateDetail()
-      setMessage('Đã gửi yêu cầu chấm lại bằng AI (test). Chờ pipeline xử lý rồi tải lại trang.')
+      setMessage('Đã gửi yêu cầu chấm lại bằng AI. Chờ hệ thống chấm xong rồi tải lại trang.')
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể chấm lại phiên thi (test).')
+      // KHÔNG khoá nút khi hỏng: gửi không thành công thì phải cho thử lại.
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể chấm lại phiên thi.')
     }
   }
 
@@ -1020,16 +1036,28 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
                 Chấm lại
               </button>
             ) : null}
-            <button
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-dashed border-amber-400 bg-amber-50 px-4 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
-              disabled={regradeForTestMutation.isPending || Boolean(regradeForTestBlockedReason)}
-              onClick={() => void handleRegradeForTest()}
-              title={regradeForTestBlockedReason ?? undefined}
-              type="button"
-            >
-              🔧 Test: Chấm lại AI
-            </button>
-            {regradeForTestBlockedReason ? <span className="max-w-80 text-xs font-semibold text-amber-700">{regradeForTestBlockedReason}</span> : null}
+            <>
+                <button
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-dashed border-amber-400 bg-amber-50 px-4 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                  disabled={
+                    regradeForTestMutation.isPending ||
+                    regradeRequested ||
+                    Boolean(regradeForTestBlockedReason)
+                  }
+                  onClick={() => void handleRegradeForTest()}
+                  title={regradeForTestBlockedReason ?? undefined}
+                  type="button"
+                >
+                  {regradeForTestMutation.isPending
+                    ? 'Đang gửi...'
+                    : regradeRequested
+                      ? 'Đã gửi yêu cầu'
+                      : 'Chấm lại AI'}
+                </button>
+                {regradeForTestBlockedReason ? (
+                  <span className="max-w-80 text-xs font-semibold text-amber-700">{regradeForTestBlockedReason}</span>
+                ) : null}
+            </>
           </div>
         }
         metaItems={[

@@ -42,6 +42,7 @@ import { FilterChips } from '@/shared/ui/FilterChips'
 import { WarningBanner } from '@/shared/ui/WarningBanner'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
+import { AiConfidenceThresholdField } from '@/features/examCore/components/AiConfidenceThresholdField'
 import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
 import { QuestionPicker } from '@/features/examCore/components/QuestionPicker'
 import { RubricPolicyPicker, type RubricPolicySelection } from '@/features/examCore/components/RubricPolicyPicker'
@@ -394,6 +395,8 @@ type SelectedRubricVersion = { code: string; id: string; languageId: string; nam
 
 /** Chỉ metadata: soạn đề đã chuyển hẳn sang trang chi tiết nên không còn gì về đề để mang theo. */
 type ClassTestCreateDraft = {
+  /** Mang theo qua bước chọn rubric; thiếu nó thì người dùng nhập xong lại mất khi quay lại. */
+  aiConfidenceThresholdPercent: number | null
   closeAt: string
   description: string
   maxAttempt: string
@@ -441,6 +444,9 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   // tạo bài, và bỏ trống nghĩa là học sinh không vào thi được nếu ứng dụng thi vẫn xin stream token.
   const [streamSetup, setStreamSetup] = useState<ExamStreamSetup>(draft?.streamSetup ?? 'BOTH_REQUIRED')
   const [requiresOtp, setRequiresOtp] = useState(draft?.requiresOtp ?? false)
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number | null>(
+    draft?.aiConfidenceThresholdPercent ?? null,
+  )
   const { confirm, dialog } = useConfirmationDialog()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -466,6 +472,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
     navigate('/teacher/rubric-versions/select', {
       state: {
         draft: {
+          aiConfidenceThresholdPercent: confidenceThreshold,
           closeAt,
           description,
           maxAttempt,
@@ -535,6 +542,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
     try {
       const created = await createMutation.mutateAsync({
         payload: {
+          aiConfidenceThresholdPercent: confidenceThreshold,
           assessmentPolicyId,
           closeAt: closeAtIso,
           description: description || null,
@@ -682,6 +690,8 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
               Có thể chọn sau ở tab Xếp lịch, nhưng phải có phòng thì mới lên lịch được.
             </p>
           </div>
+
+          <AiConfidenceThresholdField onChange={setConfidenceThreshold} value={confidenceThreshold} />
 
           <ExamStreamSetupField
             description="Quyết định học sinh phải chia sẻ những gì trong lúc làm bài."
