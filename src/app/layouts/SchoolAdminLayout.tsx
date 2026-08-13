@@ -96,7 +96,7 @@ const navigationGroups: NavigationGroup[] = [
         to: '/school-admin/class-tests',
       },
       {
-        label: 'Blueprint đề thi',
+        label: 'Khung đề thi',
         to: '/school-admin/blueprints',
       },
     ],

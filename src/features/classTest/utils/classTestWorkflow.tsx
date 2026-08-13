@@ -150,7 +150,7 @@ export function getClassTestWorkflowSteps(
             : `${paperCount} mã đề đã khoá, sẵn sàng phân đề`
           : 'Đã có câu hỏi trong đề',
       tab: 'papers',
-      todo: 'Bấm "Thêm câu hỏi" ở tab Đề bài để soạn trực tiếp, hoặc gắn blueprint (không bắt buộc) ở tab Blueprint.',
+      todo: 'Bấm "Thêm câu hỏi" ở tab Đề bài để soạn trực tiếp, hoặc gắn khung đề (không bắt buộc) ở tab Khung đề.',
     },
     {
       cta: 'Xem danh sách học sinh',

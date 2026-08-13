@@ -164,7 +164,7 @@ function EditBlueprintVersionPage({ basePath }: { basePath: string }) {
 
   if (!blueprint || !version) {
     return (
-      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy phiên bản blueprint.</section>
+      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy phiên bản khung đề.</section>
     )
   }
 
@@ -216,7 +216,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
     ? Math.max(knownDurationSeconds, version.totalTimeLimitSeconds ?? 0)
     : knownDurationSeconds
   const maxTimePerAttemptMin = subscriptionQuery.data?.plan?.maxTimePerAttemptMin ?? null
-  const quotaWarning = buildTimeQuotaWarning('Phiên bản blueprint này', totalDurationSeconds, maxTimePerAttemptMin)
+  const quotaWarning = buildTimeQuotaWarning('Phiên bản khung đề này', totalDurationSeconds, maxTimePerAttemptMin)
 
   function sectionSlotWeightSum(section: SectionDraft): number {
     return section.slots.reduce((sum, slot) => sum + (slot.weight.trim() ? Number(slot.weight) : 1), 0)
@@ -252,7 +252,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
 
   function handleSelectFixedQuestion(sectionKey: string, slotKey: string, question: FixedQuestionRef) {
     const nextDurationSeconds = totalDurationIfQuestionSelected(slotKey, question)
-    const nextQuotaWarning = buildTimeQuotaWarning('Phiên bản blueprint này', nextDurationSeconds, maxTimePerAttemptMin)
+    const nextQuotaWarning = buildTimeQuotaWarning('Phiên bản khung đề này', nextDurationSeconds, maxTimePerAttemptMin)
     if (nextQuotaWarning) {
       setErrorMessage(`${nextQuotaWarning} Bạn vẫn có thể đổi câu, nhưng không thể lưu cho tới khi giảm thời lượng.`)
     }
@@ -421,7 +421,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
         <h1 className="text-xl font-extrabold text-slate-900">Cập nhật phiên bản {version.code}</h1>
         <p className="mt-1 text-sm text-slate-500">Chỉnh sửa cấu trúc đề và thông tin phiên bản (chỉ áp dụng khi đang là bản nháp).</p>
         <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3.5 py-2.5 text-sm font-semibold text-cyan-800">
-          Thời lượng blueprint version dự kiến: {formatDurationSeconds(totalDurationSeconds)}.
+          Thời lượng phiên bản khung đề dự kiến: {formatDurationSeconds(totalDurationSeconds)}.
           <span className="ml-1 text-xs font-medium text-cyan-700">
             Tính từ câu cố định đã chọn; ô chọn ngẫu nhiên sẽ cộng thêm khi gán câu vào mã đề.
             {hasHiddenFixedQuestions ? ' Một số câu cố định bị ẩn nội dung nên đang dùng tổng thời lượng server trả về.' : ''}

@@ -386,14 +386,14 @@ function ExamPaperPage({ rolePath }: ExamPaperPageProps) {
                     {isFixedSlot ? (
                       <span
                         className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600"
-                        title="Câu hỏi này cố định theo blueprint, không đổi được ở đây"
+                        title="Câu hỏi này cố định theo khung đề, không đổi được ở đây"
                       >
-                        Cố định theo blueprint
+                        Cố định theo khung đề
                       </span>
                     ) : isSelectionSlot ? (
                       <span
                         className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700"
-                        title="Blueprint chỉ quy định tiêu chí cho ô này — bạn tự chọn câu hỏi phù hợp"
+                        title="Khung đề chỉ quy định tiêu chí cho ô này — bạn tự chọn câu hỏi phù hợp"
                       >
                         Chọn theo tiêu chí
                       </span>
