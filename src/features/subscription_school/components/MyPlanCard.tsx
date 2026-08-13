@@ -54,7 +54,7 @@ export function MyPlanCard({
   return (
     <div className="rounded-2xl border border-slate-200 bg-linear-to-br from-cyan-950 via-blue-900 to-indigo-900 p-7 text-white">
       <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
-      <h2 className="mt-3 text-2xl font-extrabold">Gói {subscription.plan.name}</h2>
+      <h2 className="mt-3 text-2xl font-black">Gói {subscription.plan.name}</h2>
       <p className="mt-1.5 text-sm text-white/75">
         {formatDate(subscription.startDate)} – {formatDate(subscription.endDate)}
       </p>

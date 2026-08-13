@@ -158,7 +158,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   ];
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+    <section className="relative grid gap-6 overflow-hidden">
       {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
@@ -178,7 +178,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
           >
             <ChevronLeft className="size-5" />
           </button>
-          <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
             <ClipboardCheck className="size-[26px] text-indigo-600" /> Chi tiết Chính sách Đánh giá
           </h1>
         </div>

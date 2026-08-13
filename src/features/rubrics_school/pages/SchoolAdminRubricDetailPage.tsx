@@ -166,7 +166,7 @@ export function SchoolAdminRubricDetailPage() {
   }
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+    <section className="relative grid gap-6 overflow-hidden">
       {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
@@ -187,7 +187,7 @@ export function SchoolAdminRubricDetailPage() {
           >
             <ChevronLeft className="size-5" />
           </button>
-          <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
             <ClipboardList className="size-[26px] text-indigo-600" /> Chi tiết Rubric
           </h1>
         </div>
@@ -255,7 +255,7 @@ export function SchoolAdminRubricDetailPage() {
       {/* DANH SÁCH PHIÊN BẢN (VERSIONS) */}
       <div className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:px-6">
-          <h2 className="text-lg font-medium text-slate-950">
+          <h2 className="text-lg font-black text-blue-950">
             Danh sách phiên bản (Versions)
           </h2>
 

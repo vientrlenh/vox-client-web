@@ -203,7 +203,7 @@ export function SystemAdminAssessmentPoliciesPage() {
   };
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+    <section className="relative grid gap-6 overflow-hidden">
       {feedbackToast}
       {/* vox background decoration — đồng bộ với gradient nút */}
       <div
@@ -217,7 +217,7 @@ export function SystemAdminAssessmentPoliciesPage() {
 
       {/* HEADER */}
       <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
+        <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
           <ClipboardCheck className="size-[26px] text-indigo-600" /> Quản lý Chính Sách Đánh Giá
         </h1>
 
@@ -264,7 +264,7 @@ export function SystemAdminAssessmentPoliciesPage() {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="size-4 text-indigo-600" />
-            <span className="text-sm font-bold text-slate-800">Bộ lọc</span>
+            <span className="text-sm font-bold text-blue-950">Bộ lọc</span>
           </div>
           {hasActiveFilters && (
             <button

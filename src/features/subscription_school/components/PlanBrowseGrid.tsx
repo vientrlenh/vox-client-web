@@ -83,7 +83,7 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
               </span>
             ) : null}
 
-            <h3 className="text-lg font-extrabold text-blue-950">{plan.name}</h3>
+            <h3 className="text-lg font-black text-blue-950">{plan.name}</h3>
             <p className="mt-1 min-h-9.5 text-[12.5px] leading-5 text-slate-500">{plan.tagline ?? ''}</p>
 
             <div className="mt-3.5 flex items-baseline gap-1.5">

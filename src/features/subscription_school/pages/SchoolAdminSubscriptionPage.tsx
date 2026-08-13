@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Diamond, Receipt, ShoppingBag, Users } from 'lucide-react'
+import { AlertTriangle, Diamond, Receipt, ShoppingBag, Users } from 'lucide-react'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
@@ -25,6 +25,7 @@ import {
 } from '../api/usePaymentLinkMutations'
 import { useCancelMySubscriptionMutation } from '../api/useCancelMySubscriptionMutation'
 import { useInvoicesQuery } from '../api/useInvoicesQuery'
+import { useMyDebtEventsQuery } from '../api/useMyDebtEventsQuery'
 import {
   useClassTestQuotaAllocationsQuery,
   usePracticeQuotaAllocationsQuery,
@@ -40,6 +41,7 @@ import { TokenTopUpPanel } from '../components/TokenTopUpPanel'
 import { PaymentConfirmDialog } from '../components/PaymentConfirmDialog'
 import { PlanChangeConfirmDialog } from '../components/PlanChangeConfirmDialog'
 import { InvoicesTable } from '../components/InvoicesTable'
+import { DebtEventsTable } from '../components/DebtEventsTable'
 import { QuotaAllocationPanel } from '../components/QuotaAllocationPanel'
 import {
   formatVnd,
@@ -50,7 +52,7 @@ import {
   type TokenTopUpState,
 } from '../types'
 
-type SchoolSubscriptionTab = 'plan' | 'browse' | 'quota' | 'invoices'
+type SchoolSubscriptionTab = 'plan' | 'browse' | 'quota' | 'invoices' | 'debt'
 type QuotaAllocationTab = 'teachers' | 'students'
 
 const DEFAULT_PAGE = 1
@@ -73,6 +75,7 @@ export function SchoolAdminSubscriptionPage() {
   )
   const [renewalPreview, setRenewalPreview] = useState<RenewalPreview | null>(null)
   const [invoicesPage, setInvoicesPage] = useState(DEFAULT_PAGE)
+  const [debtEventsPage, setDebtEventsPage] = useState(DEFAULT_PAGE)
   // Một state duy nhất cho mọi luồng thanh toán trên trang: người dùng chọn cổng ở đâu thì các
   // luồng còn lại cũng ghi nhớ lựa chọn đó, khỏi phải chọn lại từ đầu mỗi lần.
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(DEFAULT_PAYMENT_METHOD)
@@ -83,6 +86,7 @@ export function SchoolAdminSubscriptionPage() {
   const usageQuery = useMySubscriptionUsageQuery()
   const plansQuery = useSubscriptionPlansQuery(DEFAULT_PAGE, 50)
   const invoicesQuery = useInvoicesQuery(invoicesPage, 10)
+  const debtEventsQuery = useMyDebtEventsQuery(debtEventsPage, 10)
   const classTestQuotaQuery = useClassTestQuotaAllocationsQuery()
   const practiceQuotaQuery = usePracticeQuotaAllocationsQuery()
 
@@ -261,7 +265,7 @@ export function SchoolAdminSubscriptionPage() {
   return (
     <section aria-labelledby="school-admin-subscription-title" className="grid gap-6">
       <div>
-        <h1 className="text-[26px] font-extrabold tracking-tight text-blue-950" id="school-admin-subscription-title">
+        <h1 className="text-2xl font-black text-blue-950 sm:text-3xl" id="school-admin-subscription-title">
           Gói dịch vụ của trường
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
@@ -275,6 +279,7 @@ export function SchoolAdminSubscriptionPage() {
           { icon: <ShoppingBag className="size-4" />, label: 'Đăng ký / Nâng cấp', value: 'browse' },
           { icon: <Users className="size-4" />, label: 'Phân bổ hạn mức', value: 'quota' },
           { icon: <Receipt className="size-4" />, label: 'Hóa đơn', value: 'invoices' },
+          { icon: <AlertTriangle className="size-4" />, label: 'Lịch sử nợ', value: 'debt' },
         ]}
         onChange={setTab}
         value={tab}
@@ -293,7 +298,7 @@ export function SchoolAdminSubscriptionPage() {
           />
           {subscription?.plan ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <h2 className="text-[17px] font-extrabold text-blue-950">Mức sử dụng</h2>
+              <h2 className="text-lg font-black text-blue-950">Mức sử dụng</h2>
               <div className="mt-4">
                 <UsageBarsGrid isLoading={usageQuery.isLoading} usage={usageQuery.data ?? []} />
               </div>
@@ -378,6 +383,25 @@ export function SchoolAdminSubscriptionPage() {
           isError={invoicesQuery.isError}
           isLoading={invoicesQuery.isLoading}
           onRetry={() => void invoicesQuery.refetch()}
+        />
+      ) : null}
+
+      {tab === 'debt' ? (
+        <DebtEventsTable
+          errorMessage={getErrorMessage(debtEventsQuery.error)}
+          events={debtEventsQuery.data?.content ?? []}
+          footer={
+            <Pagination
+              currentPage={debtEventsPage}
+              itemName="sự kiện"
+              onPageChange={setDebtEventsPage}
+              totalElements={debtEventsQuery.data?.totalElements ?? 0}
+              totalPages={debtEventsQuery.data?.totalPages ?? 0}
+            />
+          }
+          isError={debtEventsQuery.isError}
+          isLoading={debtEventsQuery.isLoading}
+          onRetry={() => void debtEventsQuery.refetch()}
         />
       ) : null}
 

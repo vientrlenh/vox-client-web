@@ -4,6 +4,7 @@ export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
 export type RequestType = 'REGISTRATION' | 'UPGRADE'
 export type InvoiceStatus = 'PAID' | 'PENDING' | 'FAILED' | 'CANCELLED'
+export type SchoolDebtEventType = 'LOCKED' | 'CAP_EXCEEDED' | 'CLEARED'
 
 export const QUOTA_TYPES: QuotaType[] = ['GRADING', 'CLASS_TEST', 'PRACTICE']
 
@@ -98,6 +99,28 @@ export type Invoice = {
 
 export type InvoicePage = {
   content: Invoice[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+// Sổ audit "nguyên nhân nợ hạn mức AI" của chính trường mình -- xem ViewSchoolDebtEventsUseCase.
+export type SchoolDebtEvent = {
+  id: string
+  subscriptionId: string
+  eventType: SchoolDebtEventType
+  quotaType: QuotaType
+  triggerExamSessionId: string | null
+  triggerAmountUsd: number | null
+  totalAllocatedUsd: number
+  usedQuantityUsd: number
+  overageUsd: number
+  occurredAt: string | null
+}
+
+export type SchoolDebtEventPage = {
+  content: SchoolDebtEvent[]
   page: number
   size: number
   totalElements: number
@@ -259,4 +282,30 @@ export function getInvoiceStatusDisplay(status: InvoiceStatus) {
   }
 
   return { label: 'Thất bại', tone: 'danger' as const }
+}
+
+export function getDebtEventDisplay(eventType: SchoolDebtEventType) {
+  if (eventType === 'LOCKED') {
+    return { label: 'Khóa do nợ', tone: 'danger' as const }
+  }
+
+  if (eventType === 'CAP_EXCEEDED') {
+    return { label: 'Vượt trần cảnh báo', tone: 'warning' as const }
+  }
+
+  return { label: 'Đã hết nợ', tone: 'success' as const }
+}
+
+// overageUsd = usedQuantityUsd - totalAllocatedUsd (xem SchoolDebtNotificationService.logDebtEvent) --
+// dương nghĩa là đang vượt hạn mức, âm nghĩa là đã hết nợ và còn dư bấy nhiêu USD hạn mức.
+export function getOverageDisplay(overageUsd: number) {
+  if (overageUsd > 0) {
+    return { label: `Vượt ${formatUsd(overageUsd)}`, tone: 'danger' as const }
+  }
+
+  if (overageUsd < 0) {
+    return { label: `Còn dư ${formatUsd(Math.abs(overageUsd))}`, tone: 'success' as const }
+  }
+
+  return { label: formatUsd(0), tone: 'neutral' as const }
 }

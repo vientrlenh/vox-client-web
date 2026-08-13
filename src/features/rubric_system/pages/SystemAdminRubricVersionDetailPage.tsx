@@ -292,7 +292,7 @@ export function SystemAdminRubricVersionDetailPage() {
 
   // --- 5. RENDER UI CHÍNH ---
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+    <section className="relative grid gap-6 overflow-hidden">
       {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
@@ -313,7 +313,7 @@ export function SystemAdminRubricVersionDetailPage() {
           >
             <ChevronLeft className="size-5" />
           </button>
-          <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
             <GitMerge className="size-[26px] text-indigo-600" /> Chi tiết Phiên bản
           </h1>
         </div>
@@ -426,7 +426,7 @@ export function SystemAdminRubricVersionDetailPage() {
 
         {/* TOOLBAR */}
         <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:px-6">
-          <h2 className="text-lg font-medium text-slate-950">
+          <h2 className="text-lg font-black text-blue-950">
             {activeTab === 'criteria' ? 'Tiêu chí đánh giá' : 'Cấu hình Thang điểm (Result Bands)'}
           </h2>
           <div className="flex items-center gap-2">

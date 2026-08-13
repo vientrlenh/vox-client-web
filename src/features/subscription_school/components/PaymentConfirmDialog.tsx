@@ -47,7 +47,7 @@ export function PaymentConfirmDialog({
         <div className="flex size-13 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
           <CreditCard aria-hidden="true" className="size-6.5" />
         </div>
-        <h2 className="mt-4 text-xl font-extrabold text-blue-950" id="payment-confirm-title">
+        <h2 className="mt-4 text-xl font-black text-blue-950" id="payment-confirm-title">
           Xác nhận {modeLabel}
         </h2>
         <p className="mt-1.5 text-sm leading-6 text-slate-500">

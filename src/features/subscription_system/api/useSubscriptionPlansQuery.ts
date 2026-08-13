@@ -22,6 +22,7 @@ const PLAN_FIELDS = `
   createdAt
   createdBy
   replacedByPlanId
+  serviceFeeRatio
   quotas {
     id
     quotaType

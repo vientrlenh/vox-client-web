@@ -85,7 +85,7 @@ export function ScoringRulesPanel({ policyId }: Props) {
     <div>
       {feedbackToast}
       <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:px-6">
-        <h2 className="text-lg font-medium text-slate-950">Scoring Rules</h2>
+        <h2 className="text-lg font-black text-blue-950">Scoring Rules</h2>
         <button
           type="button"
           onClick={() => setIsCreateModalOpen(true)}

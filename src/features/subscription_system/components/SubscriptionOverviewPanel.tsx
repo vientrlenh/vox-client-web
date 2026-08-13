@@ -77,7 +77,7 @@ export function SubscriptionOverviewPanel({
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-[17px] font-extrabold text-blue-950">Doanh thu theo gói</h2>
+          <h2 className="text-lg font-black text-blue-950">Doanh thu theo gói</h2>
           <p className="mt-1 text-sm text-slate-500">
             Tổng hợp theo giá trị gói (pricePaidSnapshot) của các trường đang hoạt động.
           </p>
@@ -107,7 +107,7 @@ export function SubscriptionOverviewPanel({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-[17px] font-extrabold text-blue-950">Yêu cầu gần đây</h2>
+          <h2 className="text-lg font-black text-blue-950">Yêu cầu gần đây</h2>
           <p className="mt-1 text-sm text-slate-500">Đăng ký / nâng cấp gói mới nhất từ các trường.</p>
 
           <div className="mt-5 grid gap-4">

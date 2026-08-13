@@ -53,7 +53,7 @@ export function CreateRubricDialog({ isOpen, onClose, onSubmit, isPending, frame
 
       <div className="relative w-full max-w-lg rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">Thêm mới Rubric</h2>
+          <h2 className="text-lg font-black text-blue-950">Thêm mới Rubric</h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
             <X className="size-5" />
           </button>

@@ -53,7 +53,7 @@ export function TokenTopUpPanel({
           <Coins aria-hidden="true" className="size-5" />
         </span>
         <div>
-          <h3 className="text-lg font-extrabold text-blue-950">Mua thêm hạn mức xử lý cho gói đang dùng</h3>
+          <h3 className="text-lg font-black text-blue-950">Mua thêm hạn mức xử lý cho gói đang dùng</h3>
           <p className="mt-0.5 text-sm text-slate-500">
             Gói <span className="font-bold text-indigo-700">{plan.name}</span> — giá theo $1 hạn mức tính riêng cho từng loại
           </p>

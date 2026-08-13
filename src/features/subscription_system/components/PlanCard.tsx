@@ -71,7 +71,7 @@ export function PlanCard({ getPlanName, onArchive, onDeleteDraft, onEdit, onPubl
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-extrabold text-blue-950">{plan.name}</h3>
+              <h3 className="text-lg font-black text-blue-950">{plan.name}</h3>
               <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
             </div>
             <p className="mt-1 max-w-52 text-[12.5px] text-slate-500">{plan.tagline ?? 'Chưa có mô tả'}</p>

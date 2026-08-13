@@ -320,7 +320,7 @@ export function SystemAdminSubscriptionPage() {
     <section aria-labelledby="system-admin-subscription-title" className="grid gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight text-blue-950" id="system-admin-subscription-title">
+          <h1 className="text-2xl font-black text-blue-950 sm:text-3xl" id="system-admin-subscription-title">
             Quản lý gói subscription
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">

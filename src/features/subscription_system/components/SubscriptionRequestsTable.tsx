@@ -59,7 +59,7 @@ export function SubscriptionRequestsTable({
         <div className="overflow-x-auto">
           <table className="w-full min-w-225 border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold text-blue-950">
+              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
                 <th className="px-6 py-3.5">Trường</th>
                 <th className="px-4 py-3.5">Loại</th>
                 <th className="px-4 py-3.5">Gói yêu cầu</th>

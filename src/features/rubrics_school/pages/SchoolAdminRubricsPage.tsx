@@ -96,7 +96,7 @@ export function SchoolAdminRubricsPage() {
   };
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+    <section className="relative grid gap-6 overflow-hidden">
       {feedbackToast}
       {/* vox background decoration — đồng bộ với gradient nút */}
       <div
@@ -110,7 +110,7 @@ export function SchoolAdminRubricsPage() {
 
       {/* HEADER */}
       <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
+        <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
           <ClipboardList className="size-[26px] text-indigo-600" /> Quản lý Rubric
         </h1>
 
