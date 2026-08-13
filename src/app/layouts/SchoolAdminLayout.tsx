@@ -45,7 +45,7 @@ const navigationItems = [
 const navigationGroups: NavigationGroup[] = [
   {
     icon: BookOpen,
-    label: 'Lớp học',
+    label: 'Trường học',
     items: [
       {
         label: 'Quản lý lớp học',
@@ -96,7 +96,7 @@ const navigationGroups: NavigationGroup[] = [
         to: '/school-admin/class-tests',
       },
       {
-        label: 'Blueprint đề thi',
+        label: 'Khung đề thi',
         to: '/school-admin/blueprints',
       },
     ],

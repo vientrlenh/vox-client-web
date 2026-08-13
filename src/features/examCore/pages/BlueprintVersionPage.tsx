@@ -44,7 +44,7 @@ function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
     const error = blueprintQuery.error ?? versionQuery.error
     return (
       <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-        Không tải được phiên bản blueprint: {toApiError(error).message}
+        Không tải được phiên bản khung đề: {toApiError(error).message}
         <button
           className="ml-2 font-bold underline"
           onClick={() => {
@@ -61,7 +61,7 @@ function BlueprintVersionPage({ basePath }: BlueprintVersionPageProps) {
 
   if (!blueprint || !version || version.blueprintId !== blueprint.id) {
     return (
-      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy phiên bản blueprint.</section>
+      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy phiên bản khung đề.</section>
     )
   }
 

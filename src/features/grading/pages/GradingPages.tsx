@@ -145,6 +145,13 @@ const ADMIN_TABS: SegmentItem[] = [
   { label: 'Chất lượng AI', value: 'ai' },
 ]
 
+/**
+ * Nút `Phân công tự động` mờ đi khi đang lọc `Tất cả kỳ thi`, nhưng chỉ mờ thôi thì người
+ * dùng không đoán được vì sao — nên nói thẳng lý do lẫn cách bật lại.
+ */
+const AUTO_ASSIGN_DISABLED_HINT =
+  'Đang xem tất cả kỳ thi nên chưa phân công tự động được — hãy chọn một kỳ thi ở bộ lọc bên dưới.'
+
 function ResultCode({ code }: { code: string }) {
   return (
     <span className="inline-flex h-5.5 items-center rounded-md border border-slate-200 bg-slate-50 px-2 font-mono text-xs font-bold tracking-wide text-slate-900">
@@ -581,21 +588,32 @@ export function SchoolAdminGradingPage({
           <b className="font-semibold text-slate-700">xét lại</b> bài bị vô hiệu và{' '}
           <b className="font-semibold text-slate-700">phúc khảo</b> theo đơn học sinh.
         </PageHeading>
-        <div className="flex items-center gap-2">
-          {readOnly ? null : (
-            <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-cyan-600 px-4 text-[13px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              // BE bắt buộc phạm vi: phân công tự động luôn chạy trong một kỳ thi hoặc ca thi.
-              disabled={!examId}
-              onClick={() => setAutoAssignOpen(true)}
-              title={examId ? undefined : 'Chọn kỳ thi trước khi phân công tự động'}
-              type="button"
-            >
-              <UsersRound className="size-4" />
-              Phân công tự động
-            </button>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-2">
+            {readOnly ? null : (
+              // `title` phải nằm ở thẻ bọc: trình duyệt không bắn sự kiện chuột lên
+              // <button disabled> nên tooltip gắn thẳng vào nút sẽ không bao giờ hiện.
+              <span title={examId ? undefined : AUTO_ASSIGN_DISABLED_HINT}>
+                <button
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-cyan-600 px-4 text-[13px] font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  // BE bắt buộc phạm vi: phân công tự động luôn chạy trong một kỳ thi hoặc ca thi.
+                  disabled={!examId}
+                  onClick={() => setAutoAssignOpen(true)}
+                  type="button"
+                >
+                  <UsersRound className="size-4" />
+                  Phân công tự động
+                </button>
+              </span>
+            )}
+            <ActionMenuButton ariaLabel="Thao tác khác cho kỳ thi" items={headerMenuItems} />
+          </div>
+          {readOnly || examId ? null : (
+            <p className="flex max-w-xs items-start gap-1.5 text-right text-[12px] font-semibold leading-snug text-amber-700">
+              <Info aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+              <span>{AUTO_ASSIGN_DISABLED_HINT}</span>
+            </p>
           )}
-          <ActionMenuButton ariaLabel="Thao tác khác cho kỳ thi" items={headerMenuItems} />
         </div>
       </div>
 

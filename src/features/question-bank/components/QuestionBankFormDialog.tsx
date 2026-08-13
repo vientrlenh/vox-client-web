@@ -1,23 +1,8 @@
 import type { FormEvent } from 'react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Check, ChevronLeft, X } from 'lucide-react'
-import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
+import type { SupportedLanguage } from '@/features/languages/types'
 import type { QuestionBankDto } from '../types'
-
-/** Chỉ mời chọn ngôn ngữ ĐANG BẬT: ngôn ngữ đã tắt còn trong bảng để dữ liệu cũ tham chiếu, nhưng
- *  tạo ngân hàng MỚI trên một ngôn ngữ quản trị vừa cố ý ngừng dùng thì không hợp lý. */
-const ACTIVE_LANGUAGE_FILTERS = {
-  isActive: 'active',
-  search: '',
-} as const
-
-/** Cùng cách hiển thị với dropdown ngôn ngữ ở màn lớp học: có mã thì kèm mã cho dễ phân biệt. */
-function getLanguageLabel(language: { code?: string | null; name?: string | null }) {
-  if (language.name && language.code) {
-    return `${language.name} (${language.code})`
-  }
-  return language.name ?? language.code ?? ''
-}
 
 export type QuestionBankFormMode = 'create' | 'edit'
 
@@ -30,11 +15,15 @@ export type QuestionBankFormValues = {
 
 type QuestionBankFormDialogProps = {
   errorMessage?: string
+  isLanguagesLoading?: boolean
   isSubmitting: boolean
+  languages?: SupportedLanguage[]
   mode: QuestionBankFormMode | null
   onClose: () => void
   onSubmit: (mode: QuestionBankFormMode, payload: QuestionBankFormValues) => void
   questionBank: QuestionBankDto | null
+  /** Ngân hàng hệ thống phải chọn ngôn ngữ; ngân hàng trường dùng ngôn ngữ mặc định của module. */
+  showLanguageField?: boolean
 }
 
 function createFormState(bank: QuestionBankDto | null): QuestionBankFormValues {
@@ -57,34 +46,28 @@ function trimFormState(state: QuestionBankFormValues): QuestionBankFormValues {
 
 export function QuestionBankFormDialog({
   errorMessage,
+  isLanguagesLoading = false,
   isSubmitting,
+  languages = [],
   mode,
   questionBank,
   onClose,
   onSubmit,
+  showLanguageField = false,
 }: QuestionBankFormDialogProps) {
   const [form, setForm] = useState(() => createFormState(questionBank))
   const [step, setStep] = useState<'confirm' | 'form'>('form')
   const [validationMessage, setValidationMessage] = useState<string | null>(null)
-  const languagesQuery = useSupportedLanguagesQuery(1, 100, ACTIVE_LANGUAGE_FILTERS)
-  const languages = languagesQuery.data?.content ?? []
-
-  // Chỉ CÓ MỘT ngôn ngữ thì chọn sẵn -- bắt người dùng mở dropdown để chọn lựa chọn duy nhất là
-  // thao tác thừa. Nhiều hơn một thì để trống, buộc chọn có ý thức thay vì mặc định một cái rồi
-  // họ bấm qua mà không đọc.
-  useEffect(() => {
-    if (languages.length === 1) {
-      setForm((current) =>
-        current.languageId ? current : { ...current, languageId: languages[0].id },
-      )
-    }
-  }, [languages])
 
   if (!mode) {
     return null
   }
 
   const isCreateMode = mode === 'create'
+  // Ngôn ngữ chỉ đặt được lúc tạo: đổi ngôn ngữ của ngân hàng đã có câu hỏi là đổi ý nghĩa của
+  // toàn bộ dữ liệu bên trong, nên backend cũng không cho sửa qua API cập nhật.
+  const needsLanguage = isCreateMode && showLanguageField
+  const selectedLanguage = languages.find((language) => language.id === form.languageId)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -95,15 +78,13 @@ export function QuestionBankFormDialog({
       return
     }
 
-    // Backend khai @NotNull cho languageId; chặn ở đây để người dùng thấy lỗi ngay tại ô nhập
-    // thay vì phải qua bước xác nhận rồi mới nhận lỗi 400 chung chung.
-    if (isCreateMode && !values.languageId) {
-      setValidationMessage('Vui lòng chọn ngôn ngữ cho ngân hàng câu hỏi.')
+    if (!values.name) {
+      setValidationMessage('Tên ngân hàng không được để trống.')
       return
     }
 
-    if (!values.name) {
-      setValidationMessage('Tên ngân hàng không được để trống.')
+    if (needsLanguage && !values.languageId) {
+      setValidationMessage('Vui lòng chọn ngôn ngữ cho ngân hàng câu hỏi.')
       return
     }
 
@@ -163,44 +144,33 @@ export function QuestionBankFormDialog({
                 value={form.name}
               />
 
-              {/* Chỉ ở chế độ TẠO: backend không nhận languageId trong lệnh cập nhật, nên hiện ô
-                  này lúc sửa là hứa một thứ không lưu được. */}
-              {isCreateMode ? (
+              {needsLanguage ? (
                 <label className="grid gap-2 text-sm font-bold text-slate-700">
                   <span>
                     Ngôn ngữ
                     <span className="text-red-500"> *</span>
                   </span>
                   <select
-                    className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-400"
-                    disabled={isSubmitting || languagesQuery.isLoading}
+                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-500"
+                    disabled={isSubmitting || isLanguagesLoading}
                     onChange={(event) => {
-                      const { value } = event.target
-                      setForm((current) => ({ ...current, languageId: value }))
+                      setForm((current) => ({
+                        ...current,
+                        languageId: event.target.value,
+                      }))
                       setValidationMessage(null)
                     }}
                     value={form.languageId}
                   >
                     <option value="">
-                      {languagesQuery.isLoading ? 'Đang tải ngôn ngữ...' : '-- Chọn ngôn ngữ --'}
+                      {isLanguagesLoading ? 'Đang tải...' : 'Chọn ngôn ngữ'}
                     </option>
                     {languages.map((language) => (
                       <option key={language.id} value={language.id}>
-                        {getLanguageLabel(language) || language.id}
+                        {language.name ?? language.code ?? language.id}
                       </option>
                     ))}
                   </select>
-                  {languagesQuery.isError ? (
-                    <span className="text-xs font-semibold text-red-600">
-                      Không tải được danh sách ngôn ngữ. Tải lại trang rồi thử lại.
-                    </span>
-                  ) : null}
-                  {!languagesQuery.isLoading && !languagesQuery.isError && languages.length === 0 ? (
-                    <span className="text-xs font-semibold text-amber-700">
-                      Chưa có ngôn ngữ nào đang bật. Cần bật ít nhất một ngôn ngữ trước khi tạo
-                      ngân hàng câu hỏi.
-                    </span>
-                  ) : null}
                 </label>
               ) : null}
 
@@ -255,18 +225,13 @@ export function QuestionBankFormDialog({
                 {isCreateMode ? (
                   <ConfirmItem label="Mã ngân hàng" value={form.code || '-'} />
                 ) : null}
-                {isCreateMode ? (
+                <ConfirmItem label="Tên ngân hàng" value={form.name || '-'} />
+                {needsLanguage ? (
                   <ConfirmItem
                     label="Ngôn ngữ"
-                    value={
-                      (() => {
-                        const picked = languages.find((item) => item.id === form.languageId)
-                        return picked ? getLanguageLabel(picked) : form.languageId || '-'
-                      })()
-                    }
+                    value={selectedLanguage?.name ?? selectedLanguage?.code ?? '-'}
                   />
                 ) : null}
-                <ConfirmItem label="Tên ngân hàng" value={form.name || '-'} />
                 <ConfirmItem label="Mô tả" value={form.description || '-'} />
               </dl>
 

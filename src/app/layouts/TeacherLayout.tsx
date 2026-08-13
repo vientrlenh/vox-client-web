@@ -104,7 +104,7 @@ const navigationGroups: NavigationGroup[] = [
         to: '/teacher/exams',
       },
       {
-        label: 'Blueprint đề thi',
+        label: 'Khung đề thi',
         to: '/teacher/blueprints',
       },
       {

@@ -3,14 +3,23 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
+import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
+import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
+import { FilterChips } from '@/shared/ui/FilterChips'
 import { exportQuestions } from '../api/useQuestionExport'
 import { useBulkReviewQuestionMutation } from '../api/useQuestionReviewMutation'
+import { useQuestionStatusCountsQuery } from '../api/useQuestionStatusCountsQuery'
 import { useQuestionsQuery, type QuestionQueryFilters } from '../api/useQuestionsQuery'
-import { formatStatusList, getBulkEligibleStatuses } from '../bulkStatus'
-import type { BulkStatusResult } from '../bulkStatus'
+import { formatSkipGroups, planBulkAction } from '../bulkStatus'
+import type { BulkSelectionCandidate, BulkStatusResult } from '../bulkStatus'
 import { BulkStatusResultDialog } from '../components/BulkStatusResultDialog'
+import {
+  QuestionBulkActionBar,
+  type BulkActionOption,
+} from '../components/QuestionBulkActionBar'
+import { QuestionFiltersForm } from '../components/QuestionFiltersForm'
 import { QuestionPageHeader } from '../components/QuestionPageHeader'
 import { QuestionPagination } from '../components/QuestionPagination'
 import { QuestionTable } from '../components/QuestionTable'
@@ -19,20 +28,17 @@ import {
   canEditQuestion,
   getQuestionActorRole,
   getTeacherQuestionContext,
+  isCreatedBy,
   type QuestionActorRole,
   type QuestionWorkflowAction,
 } from '../permissions'
-import type {
-  QuestionScope,
-  QuestionSharing,
-  QuestionStatus,
-  QuestionType,
-} from '../types'
+import type { QuestionDto, QuestionScope, QuestionStatus } from '../types'
 import { questionQueryKeys } from '../api/useQuestionsQuery'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
+const REFERENCE_OPTIONS_PAGE_SIZE = 100
 
 const EMPTY_FILTERS: QuestionQueryFilters = {
   keyword: '',
@@ -45,113 +51,84 @@ const EMPTY_FILTERS: QuestionQueryFilters = {
   type: '',
 }
 
-type BulkActionOption = {
-  action: QuestionWorkflowAction
-  buttonLabel: string
-  confirmVerb: string
-  label: string
-  successVerb: string
-}
+type StatusTab = { label: string; value: '' | QuestionStatus }
 
-const QUESTION_STATUS_OPTIONS: Array<{ label: string; value: '' | QuestionStatus }> = [
-  { label: 'Tất cả trạng thái', value: '' },
+/**
+ * Trạng thái là "tab quy trình" của màn hình chứ không phải một bộ lọc ngang hàng với loại câu
+ * hỏi: mỗi màn hình chỉ bày ra những trạng thái thuộc về công việc của nó. Hàng đợi duyệt mà cho
+ * chọn "Bản nháp" thì nó không còn là hàng đợi, và thao tác duyệt hàng loạt sau đó trượt toàn bộ.
+ */
+const LIST_STATUS_TABS: StatusTab[] = [
+  { label: 'Tất cả', value: '' },
   { label: 'Bản nháp', value: 'DRAFT' },
-  { label: 'Chờ duyệt', value: 'SUBMITTED_FOR_REVIEW' },
   { label: 'Yêu cầu sửa', value: 'REVISION_REQUESTED' },
+  { label: 'Chờ duyệt', value: 'SUBMITTED_FOR_REVIEW' },
   { label: 'Đã duyệt', value: 'APPROVED' },
-  { label: 'Bị từ chối', value: 'REJECTED' },
   { label: 'Đã xuất bản', value: 'PUBLISHED' },
+  { label: 'Bị từ chối', value: 'REJECTED' },
   { label: 'Lưu trữ', value: 'ARCHIVED' },
 ]
 
-const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: '' | QuestionType }> = [
-  { label: 'Tất cả loại', value: '' },
-  { label: 'Trả lời ngắn', value: 'SHORT_ANSWER' },
-  { label: 'Trả lời dài', value: 'LONG_ANSWER' },
-  { label: 'Ý kiến', value: 'OPINION' },
-  { label: 'Mô tả', value: 'DESCRIPTION' },
+const REVIEW_STATUS_TABS: StatusTab[] = [
+  { label: 'Chờ duyệt', value: 'SUBMITTED_FOR_REVIEW' },
+  { label: 'Đã duyệt', value: 'APPROVED' },
+  { label: 'Yêu cầu sửa', value: 'REVISION_REQUESTED' },
+  { label: 'Bị từ chối', value: 'REJECTED' },
 ]
 
-const QUESTION_SHARING_OPTIONS: Array<{ label: string; value: '' | QuestionSharing }> = [
-  { label: 'Tất cả chia sẻ', value: '' },
-  { label: 'Riêng tư', value: 'PRIVATE' },
-  { label: 'Chia sẻ trong trường', value: 'SCHOOL_SHARED' },
-]
+/** Những thao tác chạy được theo lô — REJECT/REQUEST_REVISION bắt buộc nhập lý do riêng từng câu. */
+type BulkCapableAction = Extract<QuestionWorkflowAction, 'APPROVE' | 'PUBLISH' | 'SUBMIT'>
 
-const BULK_ACTION_OPTIONS_BY_ROLE: Record<
-  Exclude<QuestionActorRole, null>,
-  BulkActionOption[]
-> = {
-  SCHOOL_ADMIN: [
-    {
-      action: 'APPROVE',
-      buttonLabel: 'Duyệt hàng loạt',
-      confirmVerb: 'duyệt',
-      label: 'Duyệt',
-      successVerb: 'duyệt',
-    },
-    {
-      action: 'PUBLISH',
-      buttonLabel: 'Xuất bản hàng loạt',
-      confirmVerb: 'xuất bản',
-      label: 'Xuất bản',
-      successVerb: 'xuất bản',
-    },
-  ],
-  SYSTEM_ADMIN: [
-    {
-      action: 'SUBMIT',
-      buttonLabel: 'Gửi duyệt hàng loạt',
-      confirmVerb: 'gửi duyệt',
-      label: 'Gửi duyệt',
-      successVerb: 'gửi duyệt',
-    },
-    {
-      action: 'APPROVE',
-      buttonLabel: 'Duyệt hàng loạt',
-      confirmVerb: 'duyệt',
-      label: 'Duyệt',
-      successVerb: 'duyệt',
-    },
-    {
-      action: 'PUBLISH',
-      buttonLabel: 'Xuất bản hàng loạt',
-      confirmVerb: 'xuất bản',
-      label: 'Xuất bản',
-      successVerb: 'xuất bản',
-    },
-  ],
-  TEACHER: [
-    {
-      action: 'SUBMIT',
-      buttonLabel: 'Gửi duyệt hàng loạt',
-      confirmVerb: 'gửi duyệt',
-      label: 'Gửi duyệt',
-      successVerb: 'gửi duyệt',
-    },
-    {
-      action: 'APPROVE',
-      buttonLabel: 'Duyệt hàng loạt',
-      confirmVerb: 'duyệt',
-      label: 'Duyệt',
-      successVerb: 'duyệt',
-    },
-    {
-      action: 'PUBLISH',
-      buttonLabel: 'Xuất bản hàng loạt',
-      confirmVerb: 'xuất bản',
-      label: 'Xuất bản',
-      successVerb: 'xuất bản',
-    },
-  ],
+const BULK_ACTION_DEFINITIONS: Record<BulkCapableAction, BulkActionOption> = {
+  APPROVE: {
+    action: 'APPROVE',
+    buttonLabel: 'Duyệt hàng loạt',
+    confirmVerb: 'duyệt',
+    label: 'Duyệt',
+    successVerb: 'duyệt',
+  },
+  PUBLISH: {
+    action: 'PUBLISH',
+    buttonLabel: 'Xuất bản hàng loạt',
+    confirmVerb: 'xuất bản',
+    label: 'Xuất bản',
+    successVerb: 'xuất bản',
+  },
+  SUBMIT: {
+    action: 'SUBMIT',
+    buttonLabel: 'Gửi duyệt hàng loạt',
+    confirmVerb: 'gửi duyệt',
+    label: 'Gửi duyệt',
+    successVerb: 'gửi duyệt',
+  },
 }
 
-function getBulkActionOptions(role: QuestionActorRole) {
+/**
+ * Thao tác hàng loạt được chia theo *việc của màn hình*, không chỉ theo vai trò.
+ *
+ * Trang danh sách là không gian của tác giả (gửi duyệt bài mình), trang duyệt là không gian của
+ * người duyệt. Trước đây cả hai màn hình cùng bày đủ Gửi duyệt / Duyệt / Xuất bản, nên trên hàng
+ * đợi duyệt — vốn lọc sẵn "Chờ duyệt" — chọn nhầm "Xuất bản" là hỏng toàn bộ lô. Riêng giáo viên
+ * không có "Duyệt" ở trang danh sách: backend không cho tác giả tự duyệt bài mình (SELF_REVIEW),
+ * nên nút đó chắc chắn thất bại.
+ */
+const BULK_ACTIONS_BY_ROLE: Record<
+  Exclude<QuestionActorRole, null>,
+  { list: BulkCapableAction[]; review: BulkCapableAction[] }
+> = {
+  SCHOOL_ADMIN: { list: ['PUBLISH'], review: ['APPROVE', 'PUBLISH'] },
+  SYSTEM_ADMIN: { list: ['SUBMIT', 'PUBLISH'], review: ['APPROVE', 'PUBLISH'] },
+  TEACHER: { list: ['SUBMIT', 'PUBLISH'], review: ['APPROVE'] },
+}
+
+function getBulkActionOptions(role: QuestionActorRole, view: QuestionListView) {
   if (!role) {
     return []
   }
 
-  return BULK_ACTION_OPTIONS_BY_ROLE[role]
+  return BULK_ACTIONS_BY_ROLE[role][view === 'review' ? 'review' : 'list'].map(
+    (action) => BULK_ACTION_DEFINITIONS[action],
+  )
 }
 
 function getErrorMessage(error: unknown) {
@@ -193,7 +170,7 @@ function getDescription(
   }
 
   if (view === 'review') {
-    return 'Hàng đợi các câu hỏi cần bạn duyệt hoặc phản hồi.'
+    return 'Hàng đợi các câu hỏi bạn có quyền duyệt hoặc phản hồi.'
   }
 
   if (teacherScopeTab === 'MINE') {
@@ -205,6 +182,28 @@ function getDescription(
   }
 
   return 'Tất cả câu hỏi bạn được phép xem trong trường.'
+}
+
+/**
+ * Chụp lại những gì cần để dự đoán kết quả thao tác hàng loạt ngay lúc người dùng tích chọn:
+ * lựa chọn được giữ xuyên trang nên câu đã chọn có thể không còn nằm trong trang đang hiển thị.
+ */
+function toBulkCandidate(
+  question: QuestionDto,
+  userId?: string | null,
+  email?: string | null,
+): BulkSelectionCandidate {
+  return {
+    code: question.code ?? null,
+    editorCollaborator:
+      question.collaborators?.some(
+        (collaborator) =>
+          collaborator.userId === userId && collaborator.permission === 'CAN_EDIT',
+      ) ?? false,
+    id: question.id,
+    owner: isCreatedBy(question.createdBy, userId, email),
+    status: question.status,
+  }
 }
 
 type QuestionListView = 'all' | 'my' | 'review'
@@ -229,31 +228,37 @@ function QuestionsPage({
   const [searchParams] = useSearchParams()
   const bulkReviewMutation = useBulkReviewQuestionMutation()
   const { confirm, dialog } = useConfirmationDialog()
-  const initialStatus: '' | QuestionStatus =
-    view === 'review' ? 'SUBMITTED_FOR_REVIEW' : ''
-  const initialBulkAction: QuestionWorkflowAction =
-    view === 'review' ? 'APPROVE' : 'SUBMIT'
+
+  const statusTabs = view === 'review' ? REVIEW_STATUS_TABS : LIST_STATUS_TABS
+  const defaultStatus: '' | QuestionStatus = statusTabs[0].value
+
+  const urlBankId = searchParams.get('bankId') ?? ''
+  const urlTopicId = searchParams.get('topicId') ?? ''
+  const urlTopicName = searchParams.get('topicName') ?? ''
+  const isScopedToTopic = Boolean(urlBankId && urlTopicId)
+
   const [page, setPage] = useState(DEFAULT_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [isExporting, setIsExporting] = useState(false)
   const [isBulkProcessing, setIsBulkProcessing] = useState(false)
-  const [exportError, setExportError] = useState<string | null>(null)
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const [bulkResult, setBulkResult] = useState<BulkStatusResult | null>(null)
-  const [bulkSelection, setBulkSelection] = useState<string[]>([])
-  const [bulkAction, setBulkAction] = useState<QuestionWorkflowAction>(initialBulkAction)
+  const [bulkSelection, setBulkSelection] = useState<
+    Record<string, BulkSelectionCandidate>
+  >({})
+  const [status, setStatus] = useState<'' | QuestionStatus>(defaultStatus)
+  const [bulkAction, setBulkAction] = useState<QuestionWorkflowAction | null>(null)
   const [draftFilters, setDraftFilters] = useState<QuestionQueryFilters>({
     ...EMPTY_FILTERS,
-    questionBankId: searchParams.get('bankId') ?? '',
-    questionTopicId: searchParams.get('topicId') ?? '',
-    status: initialStatus,
-    topicName: searchParams.get('topicName') ?? '',
+    questionBankId: urlBankId,
+    questionTopicId: urlTopicId,
+    topicName: urlTopicName,
   })
   const [filters, setFilters] = useState<QuestionQueryFilters>({
     ...EMPTY_FILTERS,
-    questionBankId: searchParams.get('bankId') ?? '',
-    questionTopicId: searchParams.get('topicId') ?? '',
-    status: initialStatus,
-    topicName: searchParams.get('topicName') ?? '',
+    questionBankId: urlBankId,
+    questionTopicId: urlTopicId,
+    topicName: urlTopicName,
   })
 
   const teacherScopeTab = useMemo<QuestionScope>(() => {
@@ -276,11 +281,46 @@ function QuestionsPage({
     return view === 'all' ? 'ALL' : 'MINE'
   }, [allowTeacherTabs, searchParams, view])
 
+  // Hai khối dưới đây là mẫu "điều chỉnh state khi giá trị dẫn xuất đổi" của React: chạy ngay trong
+  // lúc render thay vì useEffect, để không tốn thêm một vòng render với dữ liệu cũ.
+
+  // Điều hướng tới cùng route với chủ đề khác (vd từ trang chủ đề B sang chủ đề C) không remount
+  // component, nên phải đồng bộ lại thủ công. Chỉ chạy khi giá trị trên URL *đổi* để không ghi đè
+  // thao tác người dùng vừa làm trên form.
+  const urlFilterKey = `${urlBankId}|${urlTopicId}|${urlTopicName}`
+  const [lastUrlFilterKey, setLastUrlFilterKey] = useState(urlFilterKey)
+
+  if (lastUrlFilterKey !== urlFilterKey) {
+    const fromUrl = {
+      questionBankId: urlBankId,
+      questionTopicId: urlTopicId,
+      topicName: urlTopicName,
+    }
+    setLastUrlFilterKey(urlFilterKey)
+    setPage(DEFAULT_PAGE)
+    setDraftFilters((current) => ({ ...current, ...fromUrl }))
+    setFilters((current) => ({ ...current, ...fromUrl }))
+  }
+
+  // Đổi tab phạm vi (Của tôi / Được chia sẻ / Tất cả) mà giữ nguyên số trang thì rất dễ rơi vào
+  // trang trống: tab mới thường có ít câu hơn tab cũ.
+  const [lastScopeTab, setLastScopeTab] = useState(teacherScopeTab)
+
+  if (lastScopeTab !== teacherScopeTab) {
+    setLastScopeTab(teacherScopeTab)
+    setPage(DEFAULT_PAGE)
+  }
+
   const actorRole = getQuestionActorRole(user?.roles)
   const teacherContext = getTeacherQuestionContext(view)
-  const bulkActionOptions = useMemo(() => getBulkActionOptions(actorRole), [actorRole])
+  const bulkActionOptions = useMemo(
+    () => getBulkActionOptions(actorRole, view),
+    [actorRole, view],
+  )
   const selectedBulkAction =
-    bulkActionOptions.find((option) => option.action === bulkAction) ?? bulkActionOptions[0] ?? null
+    bulkActionOptions.find((option) => option.action === bulkAction) ??
+    bulkActionOptions[0] ??
+    null
 
   const effectiveFilters: QuestionQueryFilters = {
     ...filters,
@@ -288,11 +328,49 @@ function QuestionsPage({
       allowTeacherTabs && view !== 'review'
         ? teacherScopeTab
         : scope === 'teacher' && view === 'review'
-          ? 'COLLABORATING'
+          ? 'REVIEWING'
           : filters.scope,
+    status,
   }
 
   const questionsQuery = useQuestionsQuery(scope, view, page, pageSize, effectiveFilters)
+  const questions = useMemo(
+    () => questionsQuery.data?.content ?? [],
+    [questionsQuery.data],
+  )
+
+  const statusCountsQuery = useQuestionStatusCountsQuery(scope, view, effectiveFilters)
+  const statusCounts = statusCountsQuery.data
+  // Chỉ gắn số khi đã có dữ liệu: nhãn nhảy từ "Chờ duyệt (0)" sang "Chờ duyệt (12)" trong lúc tải
+  // còn khó chịu hơn là chưa hiện số.
+  const statusTabItems = useMemo(
+    () =>
+      statusTabs.map((tab) => {
+        if (!statusCounts) {
+          return tab
+        }
+
+        const count =
+          tab.value === '' ? statusCounts.total : statusCounts.byStatus[tab.value] ?? 0
+
+        return { label: `${tab.label} (${count})`, value: tab.value }
+      }),
+    [statusCounts, statusTabs],
+  )
+
+  const banksQuery = useQuestionBanksQuery(scope, 0, REFERENCE_OPTIONS_PAGE_SIZE)
+  const topicsQuery = useQuestionTopicsQuery(
+    scope,
+    draftFilters.questionBankId ?? '',
+    0,
+    REFERENCE_OPTIONS_PAGE_SIZE,
+    Boolean(draftFilters.questionBankId),
+  )
+  const topics = useMemo(() => topicsQuery.data?.content ?? [], [topicsQuery.data])
+  const selectedTopicName =
+    topics.find((topic) => topic.id === filters.questionTopicId)?.name ??
+    filters.topicName
+
   const flashMessage =
     (location.state as { successMessage?: string } | null)?.successMessage ?? null
   const [toastMessage, setToastMessage] = useState<string | null>(flashMessage)
@@ -305,27 +383,58 @@ function QuestionsPage({
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
   }, [flashMessage, location.pathname, location.search, navigate])
 
-  const validBulkSelection = bulkSelection.filter((id) =>
-    questionsQuery.data?.content.some((question) => question.id === id),
+  const selectedCandidates = useMemo(
+    () => Object.values(bulkSelection),
+    [bulkSelection],
   )
-  const selectedQuestions = (questionsQuery.data?.content ?? []).filter((question) =>
-    validBulkSelection.includes(question.id),
+  const selectedOnPageCount = questions.filter(
+    (question) => bulkSelection[question.id],
+  ).length
+  const plan = useMemo(
+    () =>
+      planBulkAction(
+        selectedBulkAction?.action ?? 'SUBMIT',
+        actorRole,
+        selectedCandidates,
+      ),
+    [actorRole, selectedBulkAction, selectedCandidates],
   )
-  const eligibleStatuses = selectedBulkAction
-    ? getBulkEligibleStatuses(selectedBulkAction.action, actorRole)
-    : []
-  const eligibleQuestions = selectedQuestions.filter((question) =>
-    eligibleStatuses.includes(question.status),
+  // Số câu hợp lệ của từng thao tác, để người dùng thấy ngay "Duyệt (8/20 câu)" mà không phải
+  // chọn thử từng thao tác rồi đọc cảnh báo.
+  const actionOptionsWithCount = useMemo(
+    () =>
+      bulkActionOptions.map((option) => ({
+        ...option,
+        eligibleCount: planBulkAction(option.action, actorRole, selectedCandidates)
+          .eligible.length,
+      })),
+    [actorRole, bulkActionOptions, selectedCandidates],
   )
-  const skippedByStatusCount = selectedQuestions.length - eligibleQuestions.length
+
+  function selectQuestions(nextQuestions: QuestionDto[], checked: boolean) {
+    setBulkSelection((current) => {
+      const next = { ...current }
+
+      nextQuestions.forEach((question) => {
+        if (checked) {
+          next[question.id] = toBulkCandidate(question, user?.userId, user?.email)
+          return
+        }
+
+        delete next[question.id]
+      })
+
+      return next
+    })
+  }
 
   async function handleExport() {
     setIsExporting(true)
-    setExportError(null)
+    setFeedbackError(null)
     try {
       await exportQuestions(effectiveFilters)
     } catch (error) {
-      setExportError(getErrorMessage(error) ?? 'Không thể xuất file. Vui lòng thử lại.')
+      setFeedbackError(getErrorMessage(error) ?? 'Không thể xuất file. Vui lòng thử lại.')
     } finally {
       setIsExporting(false)
     }
@@ -338,70 +447,76 @@ function QuestionsPage({
   }
 
   function handleFilterReset() {
-    const next = {
-      ...EMPTY_FILTERS,
-      questionBankId: searchParams.get('bankId') ?? '',
-      questionTopicId: searchParams.get('topicId') ?? '',
-      status: initialStatus,
-      topicName: searchParams.get('topicName') ?? '',
-    }
+    // Xoá sạch, kể cả chủ đề đến từ URL: trước đây "Đặt lại" đọc lại searchParams nên người dùng
+    // vào từ trang chủ đề thì không có cách nào bỏ được bộ lọc chủ đề.
     setPage(DEFAULT_PAGE)
-    setDraftFilters(next)
-    setFilters(next)
+    setStatus(defaultStatus)
+    setDraftFilters(EMPTY_FILTERS)
+    setFilters(EMPTY_FILTERS)
   }
 
   async function handleBulkAction() {
-    if (!selectedQuestions.length) {
-      setExportError('Hãy chọn ít nhất một câu hỏi để xử lý hàng loạt.')
-      return
-    }
-
     if (!selectedBulkAction) {
-      setExportError('Không có thao tác hàng loạt phù hợp cho vai trò hiện tại.')
+      setFeedbackError('Không có thao tác hàng loạt phù hợp cho vai trò hiện tại.')
       return
     }
 
-    // Nói trước con số sẽ bị bỏ qua thay vì để người dùng phát hiện qua bảng lỗi sau khi chạy.
+    if (!plan.eligible.length) {
+      setFeedbackError(
+        `Không có câu hỏi nào ${selectedBulkAction.confirmVerb} được trong lựa chọn hiện tại.`,
+      )
+      return
+    }
+
     const confirmMessage =
-      skippedByStatusCount > 0
-        ? `Trong ${selectedQuestions.length} câu đã chọn, chỉ ${eligibleQuestions.length} câu đang ở trạng thái ${formatStatusList(eligibleStatuses)} nên có thể ${selectedBulkAction.confirmVerb}. ${skippedByStatusCount} câu còn lại sẽ bị bỏ qua và giữ nguyên trạng thái. Tiếp tục?`
-        : `Bạn có chắc muốn ${selectedBulkAction.confirmVerb} ${selectedQuestions.length} câu hỏi đã chọn không? Các câu không đúng quyền sẽ bị hệ thống bỏ qua.`
+      plan.skipped.length > 0
+        ? `Bạn có chắc muốn ${selectedBulkAction.confirmVerb} ${plan.eligible.length} câu hỏi không? ${plan.skipped.length} câu còn lại trong lựa chọn sẽ được giữ nguyên: ${formatSkipGroups(plan.skippedGroups)}.`
+        : `Bạn có chắc muốn ${selectedBulkAction.confirmVerb} ${plan.eligible.length} câu hỏi đã chọn không?`
 
     if (!(await confirm({ message: confirmMessage }))) {
       return
     }
 
     setIsBulkProcessing(true)
-    setExportError(null)
+    setFeedbackError(null)
 
     try {
+      // Chỉ gửi những câu đã biết là chạy được. Gửi cả câu sai trạng thái chỉ làm bảng lỗi trả về
+      // lẫn lộn giữa lỗi đã cảnh báo trước và lỗi thật sự cần người dùng xử lý.
       const result = await bulkReviewMutation.mutateAsync({
         payload: {
           action: selectedBulkAction.action,
           note: null,
-          questionIds: selectedQuestions.map((question) => question.id),
+          questionIds: plan.eligible.map((candidate) => candidate.id),
         },
       })
 
       await queryClient.invalidateQueries({ queryKey: questionQueryKeys.all })
-      // Giữ lại đúng những câu bị bỏ qua trong vùng chọn để người dùng xử lý tiếp mà không phải
-      // dò lại từ đầu.
-      setBulkSelection(result.failed.map((failure) => failure.questionId))
+      // Bỏ khỏi vùng chọn đúng những câu đã đổi trạng thái; phần còn lại (bị bỏ qua hoặc thất bại)
+      // vẫn ở đó để người dùng đổi thao tác và chạy tiếp mà không phải dò lại từ đầu.
+      const updatedIds = new Set(result.updated.map((question) => question.id))
+      setBulkSelection((current) =>
+        Object.fromEntries(
+          Object.entries(current).filter(([questionId]) => !updatedIds.has(questionId)),
+        ),
+      )
 
       if (result.updated.length > 0) {
-        setToastMessage(`Đã ${selectedBulkAction.successVerb} ${result.updated.length} câu hỏi.`)
+        setToastMessage(
+          `Đã ${selectedBulkAction.successVerb} ${result.updated.length} câu hỏi.`,
+        )
       }
 
       if (result.failed.length > 0) {
         setBulkResult({
           actionVerb: selectedBulkAction.successVerb,
           failed: result.failed,
-          totalCount: selectedQuestions.length,
+          totalCount: plan.eligible.length,
           updatedCount: result.updated.length,
         })
       }
     } catch (error) {
-      setExportError(
+      setFeedbackError(
         getErrorMessage(error) ?? 'Không thể cập nhật trạng thái hàng loạt. Vui lòng thử lại.',
       )
     } finally {
@@ -413,14 +528,10 @@ function QuestionsPage({
     <section aria-labelledby="questions-title" className="grid gap-6">
       <QuestionPageHeader
         createLabel="Tạo câu hỏi mới"
-        description={getDescription(view, teacherScopeTab, filters.topicName)}
+        description={getDescription(view, teacherScopeTab, selectedTopicName)}
         isExporting={isExporting}
         isRefreshing={questionsQuery.isFetching}
-        onBack={
-          filters.questionBankId && filters.questionTopicId
-            ? () => navigate(-1)
-            : undefined
-        }
+        onBack={isScopedToTopic ? () => navigate(-1) : undefined}
         onCreate={
           canCreateQuestion(actorRole)
             ? () => {
@@ -434,8 +545,8 @@ function QuestionsPage({
                 if (filters.questionTopicId) {
                   url.searchParams.set('topicId', filters.questionTopicId)
                 }
-                if (filters.topicName) {
-                  url.searchParams.set('topicName', filters.topicName)
+                if (selectedTopicName) {
+                  url.searchParams.set('topicName', selectedTopicName)
                 }
 
                 navigate(`${url.pathname}${url.search}`)
@@ -462,8 +573,8 @@ function QuestionsPage({
         tone="success"
       />
       <FeedbackToast
-        message={exportError}
-        onClose={() => setExportError(null)}
+        message={feedbackError}
+        onClose={() => setFeedbackError(null)}
         tone="error"
       />
       <BulkStatusResultDialog onClose={() => setBulkResult(null)} result={bulkResult} />
@@ -491,183 +602,50 @@ function QuestionsPage({
         </div>
       ) : null}
 
-      <form
-        className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5"
+      {/* FilterChips tự có mt-6 cho layout không dùng gap; ở đây parent đã là grid gap-6. */}
+      <div className="[&>div]:mt-0">
+        <FilterChips
+          items={statusTabItems}
+          onChange={(value) => {
+            setStatus(value)
+            setPage(DEFAULT_PAGE)
+          }}
+          value={status}
+        />
+      </div>
+
+      <QuestionFiltersForm
+        banks={banksQuery.data?.content ?? []}
+        draftFilters={draftFilters}
+        isBanksLoading={banksQuery.isLoading}
+        isTopicsLoading={topicsQuery.isLoading}
+        onDraftChange={setDraftFilters}
+        onReset={handleFilterReset}
         onSubmit={handleFilterSubmit}
-      >
-        <div>
-          <h2 className="text-base font-black text-blue-950">Tìm kiếm câu hỏi</h2>
-          <p className="text-sm text-slate-600">
-            Lọc danh sách theo trạng thái, loại, chia sẻ và từ khóa.
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Từ khóa
-            <input
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              onChange={(event) =>
-                setDraftFilters((current) => ({
-                  ...current,
-                  keyword: event.target.value,
-                }))
-              }
-              placeholder="Mã, nội dung, prompt..."
-              value={draftFilters.keyword}
-            />
-          </label>
-
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Trạng thái
-            <select
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              onChange={(event) =>
-                setDraftFilters((current) => ({
-                  ...current,
-                  status: event.target.value as QuestionQueryFilters['status'],
-                }))
-              }
-              value={draftFilters.status}
-            >
-              {QUESTION_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Loại câu hỏi
-            <select
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              onChange={(event) =>
-                setDraftFilters((current) => ({
-                  ...current,
-                  type: event.target.value as QuestionQueryFilters['type'],
-                }))
-              }
-              value={draftFilters.type}
-            >
-              {QUESTION_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Chia sẻ
-            <select
-              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              onChange={(event) =>
-                setDraftFilters((current) => ({
-                  ...current,
-                  sharing: event.target.value as QuestionQueryFilters['sharing'],
-                }))
-              }
-              value={draftFilters.sharing}
-            >
-              {QUESTION_SHARING_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="flex flex-wrap justify-end gap-3">
-          <button
-            className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-            onClick={handleFilterReset}
-            type="button"
-          >
-            Đặt lại
-          </button>
-          <button
-            className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
-            type="submit"
-          >
-            Tìm kiếm
-          </button>
-        </div>
-      </form>
+        topics={topics}
+      />
 
       {bulkActionOptions.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
-          <div className="grid gap-1 text-sm text-indigo-900">
-            <span className="font-semibold">
-              Đang chọn {validBulkSelection.length} câu hỏi trên trang hiện tại để xử lý hàng loạt.
-            </span>
-            {selectedBulkAction && validBulkSelection.length > 0 ? (
-              skippedByStatusCount > 0 ? (
-                <span className="font-semibold text-amber-700">
-                  Chỉ {eligibleQuestions.length} câu đang ở trạng thái{' '}
-                  {formatStatusList(eligibleStatuses)} nên có thể {selectedBulkAction.confirmVerb};{' '}
-                  {skippedByStatusCount} câu còn lại sẽ bị bỏ qua và giữ nguyên trạng thái.
-                </span>
-              ) : (
-                <span className="text-indigo-800/80">
-                  Tất cả câu đã chọn đều đúng trạng thái để {selectedBulkAction.confirmVerb}. Quyền
-                  trên từng câu vẫn được hệ thống kiểm tra khi chạy.
-                </span>
-              )
-            ) : (
-              <span className="text-indigo-800/80">
-                Thao tác chỉ áp dụng cho những câu bạn có quyền và đang ở đúng trạng thái. Các câu
-                còn lại được giữ nguyên.
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-sm font-bold text-indigo-950">
-              <span>Thao tác</span>
-              <select
-                className="h-10 rounded-lg border border-indigo-200 bg-white px-3 text-sm font-semibold text-indigo-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                onChange={(event) => setBulkAction(event.target.value as QuestionWorkflowAction)}
-                value={selectedBulkAction?.action ?? bulkAction}
-              >
-                {bulkActionOptions.map((option) => (
-                  <option key={option.action} value={option.action}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {skippedByStatusCount > 0 && eligibleQuestions.length > 0 ? (
-              <button
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-800 transition hover:bg-amber-100"
-                onClick={() => setBulkSelection(eligibleQuestions.map((question) => question.id))}
-                type="button"
-              >
-                Chỉ chọn {eligibleQuestions.length} câu hợp lệ
-              </button>
-            ) : null}
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-indigo-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
-              disabled={!validBulkSelection.length}
-              onClick={() => setBulkSelection([])}
-              type="button"
-            >
-              Bỏ chọn
-            </button>
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:bg-slate-300"
-              disabled={!validBulkSelection.length || isBulkProcessing || !selectedBulkAction}
-              onClick={() => {
-                void handleBulkAction()
-              }}
-              type="button"
-            >
-              {isBulkProcessing
-                ? 'Đang xử lý...'
-                : (selectedBulkAction?.buttonLabel ?? 'Xử lý hàng loạt')}
-            </button>
-          </div>
-        </div>
+        <QuestionBulkActionBar
+          actionOptions={actionOptionsWithCount}
+          isProcessing={isBulkProcessing}
+          onActionChange={setBulkAction}
+          onClear={() => setBulkSelection({})}
+          onKeepEligible={() =>
+            setBulkSelection(
+              Object.fromEntries(
+                plan.eligible.map((candidate) => [candidate.id, candidate]),
+              ),
+            )
+          }
+          onRun={() => {
+            void handleBulkAction()
+          }}
+          plan={plan}
+          selectedAction={selectedBulkAction}
+          selectedCount={selectedCandidates.length}
+          selectedOnPageCount={selectedOnPageCount}
+        />
       ) : null}
 
       <QuestionTable
@@ -700,12 +678,7 @@ function QuestionsPage({
           })
         }}
         onSelectAllQuestions={(checked) => {
-          if (!checked) {
-            setBulkSelection([])
-            return
-          }
-
-          setBulkSelection((questionsQuery.data?.content ?? []).map((question) => question.id))
+          selectQuestions(questions, checked)
         }}
         onRetry={() => {
           void questionsQuery.refetch()
@@ -716,14 +689,14 @@ function QuestionsPage({
           })
         }}
         onToggleQuestionSelection={(questionId, checked) => {
-          setBulkSelection((current) =>
-            checked
-              ? [...current, questionId].filter((value, index, array) => array.indexOf(value) === index)
-              : current.filter((id) => id !== questionId),
-          )
+          const question = questions.find((item) => item.id === questionId)
+
+          if (question) {
+            selectQuestions([question], checked)
+          }
         }}
-        questions={questionsQuery.data?.content ?? []}
-        selectedIds={validBulkSelection}
+        questions={questions}
+        selectedIds={Object.keys(bulkSelection)}
         selectedId={null}
       />
     </section>

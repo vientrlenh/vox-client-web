@@ -26,7 +26,15 @@ export type QuestionCollaboratorPermission =
   | 'CAN_USE'
   | 'CAN_EDIT'
 
-export type QuestionScope = 'MINE' | 'COLLABORATING' | 'ALL'
+/**
+ * Khớp với enum QuestionScope ở backend.
+ *
+ * REVIEWING hẹp hơn COLLABORATING: chỉ những câu mà người dùng là cộng tác viên có quyền
+ * CAN_EDIT — đúng tập câu mà thao tác duyệt chạy được. Hàng đợi duyệt phải dùng REVIEWING,
+ * nếu dùng COLLABORATING thì danh sách gồm cả câu chỉ được xem, và mọi thao tác duyệt trên
+ * chúng đều trả về NO_PERMISSION.
+ */
+export type QuestionScope = 'MINE' | 'COLLABORATING' | 'REVIEWING' | 'ALL'
 
 export type QuestionAssetType = 'AUDIO' | 'IMAGE' | 'VIDEO' | 'TEXT_PASSAGE'
 

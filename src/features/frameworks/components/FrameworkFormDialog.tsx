@@ -196,7 +196,7 @@ export function FrameworkFormDialog({
                   onChange={(event) =>
                     updateField('code', event.target.value.toUpperCase())
                   }
-                  placeholder="Ví dụ: THPT_2024"
+                  placeholder="Ví dụ: KNLNNVN"
                   required
                   value={form.code}
                 />
@@ -216,7 +216,7 @@ export function FrameworkFormDialog({
                 disabled={isSubmitting}
                 maxLength={200}
                 onChange={(event) => updateField('name', event.target.value)}
-                placeholder="Ví dụ: Khung đánh giá năng lực KNLNNVN"
+                placeholder="Ví dụ: Khung đánh giá năng lực ngoại ngữ Việt Nam"
                 required
                 value={form.name}
               />

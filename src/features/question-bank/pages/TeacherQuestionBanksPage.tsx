@@ -31,9 +31,12 @@ import {
 } from '../permissions'
 import type { CreateQuestionBankRequest, QuestionBankDto } from '../types'
 import { useAppSelector } from '@/app/store/hooks'
+import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
+import { QUESTION_MODULE_DEFAULT_LANGUAGE_ID } from '@/features/question/constants'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
+const LANGUAGE_OPTIONS_PAGE_SIZE = 100
 
 function getErrorMessage(error: unknown) {
   if (
@@ -81,6 +84,16 @@ function QuestionBanksPage({
   const effectiveSelectedId = selectedListBank?.id ?? null
   const selectedBankQuery = useQuestionBankQuery(effectiveSelectedId)
   const selectedBank = selectedBankQuery.data ?? selectedListBank
+  // Ngân hàng hệ thống bắt buộc chọn ngôn ngữ (backend validate @NotNull); ngân hàng trường vẫn
+  // dùng ngôn ngữ mặc định của module nên không cần nạp danh sách.
+  const needsLanguagePicker = scope === 'admin'
+  const languagesQuery = useSupportedLanguagesQuery(
+    1,
+    LANGUAGE_OPTIONS_PAGE_SIZE,
+    { isActive: 'active', search: '' },
+    // Chỉ nạp khi thật sự mở form tạo, không phải mỗi lần vào trang danh sách.
+    needsLanguagePicker && dialogMode === 'create',
+  )
   const createMutation = useCreateQuestionBankMutation()
   const updateMutation = useUpdateQuestionBankMutation()
   const deleteMutation = useDeleteQuestionBankMutation()
@@ -106,7 +119,9 @@ function QuestionBanksPage({
         const payload: CreateQuestionBankRequest = {
           code: values.code,
           description: values.description || null,
-          languageId: values.languageId,
+          languageId: needsLanguagePicker
+            ? values.languageId
+            : QUESTION_MODULE_DEFAULT_LANGUAGE_ID,
           name: values.name,
         }
 
@@ -275,7 +290,9 @@ function QuestionBanksPage({
       <QuestionBankFormDialog
         key={`${dialogMode ?? 'closed'}-${dialogTarget?.id ?? selectedBank?.id ?? 'new'}`}
         errorMessage={dialogError ?? undefined}
+        isLanguagesLoading={languagesQuery.isLoading}
         isSubmitting={isSubmitting}
+        languages={languagesQuery.data?.content ?? []}
         mode={dialogMode}
         onClose={() => {
           if (isSubmitting) {
@@ -289,6 +306,7 @@ function QuestionBanksPage({
           void handleSubmit(mode, payload)
         }}
         questionBank={dialogMode === 'edit' ? selectedBank ?? dialogTarget : null}
+        showLanguageField={needsLanguagePicker}
       />
     </section>
   )

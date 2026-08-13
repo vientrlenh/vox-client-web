@@ -119,6 +119,18 @@ function ExamPaperPage({ rolePath }: ExamPaperPageProps) {
       setErrorMessage(`${quotaWarning} Không thể ${STATUS_ACTION_LABEL[action].toLowerCase()} cho tới khi giảm thời lượng.`)
       return
     }
+    // Mở lại mã đề gỡ luôn đề của mọi thí sinh đang dùng nó (UpdateExamPaperStatusUseCase.REOPEN) —
+    // mã đề sắp bị sửa dưới chân họ. Phải nói trước, vì nhìn nút thì không đoán ra được.
+    if (
+      action === 'REOPEN' &&
+      !(await confirm({
+        message:
+          'Mở lại mã đề này để sửa? Học sinh đang được gán mã đề này sẽ trở về "chưa phân đề". Khóa lại thì hệ thống tự phân đề cho họ.',
+        title: 'Xác nhận mở lại mã đề',
+      }))
+    ) {
+      return
+    }
     try {
       await updateStatusMutation.mutateAsync({ paperId, payload: { action, note } })
       await invalidate()
@@ -374,14 +386,14 @@ function ExamPaperPage({ rolePath }: ExamPaperPageProps) {
                     {isFixedSlot ? (
                       <span
                         className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600"
-                        title="Câu hỏi này cố định theo blueprint, không đổi được ở đây"
+                        title="Câu hỏi này cố định theo khung đề, không đổi được ở đây"
                       >
-                        Cố định theo blueprint
+                        Cố định theo khung đề
                       </span>
                     ) : isSelectionSlot ? (
                       <span
                         className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700"
-                        title="Blueprint chỉ quy định tiêu chí cho ô này — bạn tự chọn câu hỏi phù hợp"
+                        title="Khung đề chỉ quy định tiêu chí cho ô này — bạn tự chọn câu hỏi phù hợp"
                       >
                         Chọn theo tiêu chí
                       </span>
