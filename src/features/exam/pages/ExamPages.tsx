@@ -456,7 +456,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
         />
 
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-          <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá (Rubric Version)</span>
+          <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá</span>
           <p className="text-xs text-slate-500">
             Bắt buộc — chọn để tự động gắn chính sách đánh giá phù hợp cho kỳ thi.
           </p>

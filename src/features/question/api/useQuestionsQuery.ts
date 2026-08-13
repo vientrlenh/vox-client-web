@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import type {
@@ -170,13 +170,17 @@ export const questionQueryKeys = {
   ) => [...questionQueryKeys.all, 'list', view, page, size, filters] as const,
 }
 
-function resolveScopeForView(
+/**
+ * Danh sách và bảng đếm phải nhìn cùng một phạm vi, nếu không con số trên tab sẽ không khớp với
+ * số dòng người dùng thấy — nên hai bên dùng chung đúng hàm này.
+ */
+export function resolveScopeForView(
   scope: QuestionModuleScope,
   view: QuestionListView,
   filters: QuestionQueryFilters,
 ) {
   if (view === 'review' && scope === 'teacher') {
-    return 'COLLABORATING'
+    return 'REVIEWING'
   }
 
   if (view === 'my') {
@@ -224,6 +228,9 @@ export function useQuestionsQuery(
   }
 
   return useQuery({
+    // Giữ dữ liệu trang trước trong lúc tải trang mới: lựa chọn hàng loạt được giữ xuyên trang nên
+    // người dùng chuyển trang liên tục, thay cả bảng bằng khối "Đang tải" mỗi lần làm nhảy layout.
+    placeholderData: keepPreviousData,
     queryFn: () =>
       fetchQuestions({
         filters: resolvedFilters,

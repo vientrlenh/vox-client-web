@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { Check, ChevronLeft, X } from 'lucide-react'
+import type { SupportedLanguage } from '@/features/languages/types'
 import type { QuestionBankDto } from '../types'
 
 export type QuestionBankFormMode = 'create' | 'edit'
@@ -8,22 +9,28 @@ export type QuestionBankFormMode = 'create' | 'edit'
 export type QuestionBankFormValues = {
   code: string
   description: string
+  languageId: string
   name: string
 }
 
 type QuestionBankFormDialogProps = {
   errorMessage?: string
+  isLanguagesLoading?: boolean
   isSubmitting: boolean
+  languages?: SupportedLanguage[]
   mode: QuestionBankFormMode | null
   onClose: () => void
   onSubmit: (mode: QuestionBankFormMode, payload: QuestionBankFormValues) => void
   questionBank: QuestionBankDto | null
+  /** Ngân hàng hệ thống phải chọn ngôn ngữ; ngân hàng trường dùng ngôn ngữ mặc định của module. */
+  showLanguageField?: boolean
 }
 
 function createFormState(bank: QuestionBankDto | null): QuestionBankFormValues {
   return {
     code: bank?.code ?? '',
     description: bank?.description ?? '',
+    languageId: bank?.languageId ?? '',
     name: bank?.name ?? bank?.bankName ?? '',
   }
 }
@@ -32,17 +39,21 @@ function trimFormState(state: QuestionBankFormValues): QuestionBankFormValues {
   return {
     code: state.code.trim(),
     description: state.description.trim(),
+    languageId: state.languageId,
     name: state.name.trim(),
   }
 }
 
 export function QuestionBankFormDialog({
   errorMessage,
+  isLanguagesLoading = false,
   isSubmitting,
+  languages = [],
   mode,
   questionBank,
   onClose,
   onSubmit,
+  showLanguageField = false,
 }: QuestionBankFormDialogProps) {
   const [form, setForm] = useState(() => createFormState(questionBank))
   const [step, setStep] = useState<'confirm' | 'form'>('form')
@@ -53,6 +64,10 @@ export function QuestionBankFormDialog({
   }
 
   const isCreateMode = mode === 'create'
+  // Ngôn ngữ chỉ đặt được lúc tạo: đổi ngôn ngữ của ngân hàng đã có câu hỏi là đổi ý nghĩa của
+  // toàn bộ dữ liệu bên trong, nên backend cũng không cho sửa qua API cập nhật.
+  const needsLanguage = isCreateMode && showLanguageField
+  const selectedLanguage = languages.find((language) => language.id === form.languageId)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -65,6 +80,11 @@ export function QuestionBankFormDialog({
 
     if (!values.name) {
       setValidationMessage('Tên ngân hàng không được để trống.')
+      return
+    }
+
+    if (needsLanguage && !values.languageId) {
+      setValidationMessage('Vui lòng chọn ngôn ngữ cho ngân hàng câu hỏi.')
       return
     }
 
@@ -124,6 +144,36 @@ export function QuestionBankFormDialog({
                 value={form.name}
               />
 
+              {needsLanguage ? (
+                <label className="grid gap-2 text-sm font-bold text-slate-700">
+                  <span>
+                    Ngôn ngữ
+                    <span className="text-red-500"> *</span>
+                  </span>
+                  <select
+                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-500"
+                    disabled={isSubmitting || isLanguagesLoading}
+                    onChange={(event) => {
+                      setForm((current) => ({
+                        ...current,
+                        languageId: event.target.value,
+                      }))
+                      setValidationMessage(null)
+                    }}
+                    value={form.languageId}
+                  >
+                    <option value="">
+                      {isLanguagesLoading ? 'Đang tải...' : 'Chọn ngôn ngữ'}
+                    </option>
+                    {languages.map((language) => (
+                      <option key={language.id} value={language.id}>
+                        {language.name ?? language.code ?? language.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
               <label className="grid gap-2 text-sm font-bold text-slate-700">
                 Mô tả
                 <textarea
@@ -176,6 +226,12 @@ export function QuestionBankFormDialog({
                   <ConfirmItem label="Mã ngân hàng" value={form.code || '-'} />
                 ) : null}
                 <ConfirmItem label="Tên ngân hàng" value={form.name || '-'} />
+                {needsLanguage ? (
+                  <ConfirmItem
+                    label="Ngôn ngữ"
+                    value={selectedLanguage?.name ?? selectedLanguage?.code ?? '-'}
+                  />
+                ) : null}
                 <ConfirmItem label="Mô tả" value={form.description || '-'} />
               </dl>
 
