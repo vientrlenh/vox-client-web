@@ -1,22 +1,16 @@
 import { CalendarDays } from 'lucide-react'
 import { useMemo } from 'react'
 import { ScheduleCalendar } from '@/shared/ui/ScheduleCalendar'
-import { StatusBadge, type StatusTone } from '@/shared/ui/StatusBadge'
+import { scheduleStatusView } from '@/shared/lib/scheduleStatus'
+import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { useStudentScheduleQuery } from '../api/useStudentScheduleQuery'
-
-// BE chỉ trả về ca PUBLISHED/COMPLETED/CANCELLED cho học sinh — ca nháp và ca đã dời đã bị lọc.
-function scheduleStatus(status: string): { label: string; tone: StatusTone } {
-  switch (status) {
-    case 'COMPLETED': return { label: 'Đã kết thúc', tone: 'neutral' }
-    case 'CANCELLED': return { label: 'Đã hủy', tone: 'danger' }
-    default: return { label: 'Sắp diễn ra', tone: 'info' }
-  }
-}
 
 export function StudentSchedulePage() {
   const schedulesQuery = useStudentScheduleQuery()
   const events = useMemo(() => (schedulesQuery.data ?? []).map((schedule) => {
-    const status = scheduleStatus(schedule.status)
+    // BE chỉ trả ca PUBLISHED/COMPLETED/CANCELLED cho học sinh — nhưng KHÔNG có job nào tự
+    // chuyển PUBLISHED sang COMPLETED khi hết giờ, nên phải suy theo giờ của ca.
+    const status = scheduleStatusView(schedule.status, schedule.startDate, schedule.endDate)
     const isClassTest = schedule.exam?.kind === 'CLASS_TEST'
     return {
       id: schedule.id,

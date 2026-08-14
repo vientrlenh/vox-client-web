@@ -91,7 +91,7 @@ function MappingPanel({ mapping, onChange, preview }: MappingPanelProps) {
   return (
     <section className="grid gap-5 rounded-[14px] border border-slate-200 bg-white p-6">
       <div>
-        <h2 className="text-lg font-medium text-slate-950">Ghép cột dữ liệu</h2>
+        <h2 className="text-lg font-black text-blue-950">Ghép cột dữ liệu</h2>
         <p className="mt-1 text-sm text-slate-500">
           Chọn trường hệ thống tương ứng với từng cột trong file.
         </p>
@@ -140,7 +140,7 @@ function SampleRowsTable({ preview }: SampleRowsTableProps) {
   return (
     <section className="grid gap-5 rounded-[14px] border border-slate-200 bg-white p-6">
       <div>
-        <h2 className="text-lg font-medium text-slate-950">Dữ liệu mẫu</h2>
+        <h2 className="text-lg font-black text-blue-950">Dữ liệu mẫu</h2>
         <p className="mt-1 text-sm text-slate-500">
           Kiểm tra nhanh một số dòng đầu tiên trước khi import.
         </p>
@@ -262,7 +262,7 @@ export function SystemAdminAssessmentPolicyImportPage() {
   const backToListUrl = '/system-admin/assessment-policies';
 
   return (
-    <section aria-labelledby="system-assessment-policy-import-title" className="grid gap-6 font-['Be_Vietnam_Pro',sans-serif] text-slate-950">
+    <section aria-labelledby="system-assessment-policy-import-title" className="grid gap-6 text-slate-950">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <nav aria-label="Đường dẫn" className="flex items-center gap-2 text-sm font-bold text-slate-500">
@@ -272,7 +272,7 @@ export function SystemAdminAssessmentPolicyImportPage() {
             <span aria-hidden="true" className="text-slate-300">/</span>
             <span className="text-slate-950">Import hàng loạt</span>
           </nav>
-          <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-950" id="system-assessment-policy-import-title">
+          <h1 className="mt-4 text-2xl font-black text-blue-950 sm:text-3xl" id="system-assessment-policy-import-title">
             Import Chính Sách Đánh Giá hàng loạt
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-500">
@@ -308,7 +308,7 @@ export function SystemAdminAssessmentPolicyImportPage() {
             <FileSpreadsheet aria-hidden="true" className="size-5" />
           </span>
           <div>
-            <h2 className="text-lg font-medium text-slate-950">Chọn file import</h2>
+            <h2 className="text-lg font-black text-blue-950">Chọn file import</h2>
             <p className="mt-1 text-sm text-slate-500">Hỗ trợ file .csv, .xlsx và .xls.</p>
           </div>
         </div>

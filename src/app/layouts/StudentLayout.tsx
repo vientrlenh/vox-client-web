@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  Bell,
   BookOpenCheck,
   CalendarDays,
   ChevronDown,
@@ -9,7 +8,6 @@ import {
   Gauge,
   LogOut,
   Menu,
-  Search,
   UserRound,
   X,
 } from 'lucide-react'
@@ -18,6 +16,7 @@ import logoImage from '@/assets/images/logo.png'
 import { clearAuthState } from '@/app/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import { clearAuthTokens } from '@/features/auth/session/authSession'
+import { NotificationBell, unregisterPushDevice } from '@/features/notifications'
 import { useProfileQuery } from '@/features/profile'
 
 function getEmailInitials(email?: string) {
@@ -151,9 +150,12 @@ export function StudentLayout() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const studentInitials = getEmailInitials(user?.email ?? 'unknown')
 
-  function handleLogout() {
+  async function handleLogout() {
     setIsMobileMenuOpen(false)
     setIsUserMenuOpen(false)
+    // Gỡ thiết bị nhận thông báo TRƯỚC khi xoá token: request cần header
+    // Authorization, và backend không có endpoint đăng xuất nào dọn giúp việc này.
+    await unregisterPushDevice()
     clearAuthTokens()
     dispatch(clearAuthState())
     navigate('/login', { replace: true })
@@ -194,28 +196,8 @@ export function StudentLayout() {
             <Menu aria-hidden="true" className="size-5" />
           </button>
 
-          <div className="relative hidden max-w-2xl flex-1 md:block">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500"
-            />
-            <input
-              aria-label="Tìm kiếm bài thi"
-              className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              placeholder="Danh sách bài thi và kết quả của bạn"
-              readOnly
-              type="search"
-            />
-          </div>
-
           <div className="ml-auto flex items-center gap-3">
-            <button
-              aria-label="Thông báo"
-              className="relative inline-flex size-11 items-center justify-center rounded-lg border border-transparent text-slate-950 transition hover:border-slate-200 hover:bg-slate-50"
-              type="button"
-            >
-              <Bell aria-hidden="true" className="size-5" />
-            </button>
+            <NotificationBell />
 
             <div className="relative">
               <button

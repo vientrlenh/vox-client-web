@@ -66,6 +66,13 @@ function getTodayValue(): string {
 export function DateField({ disabled }: { disabled?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null)
 
+  /**
+   * Chỉ nút lịch bên phải gọi hàm này, KHÔNG gắn lên chính ô nhập.
+   *
+   * Gắn onClick lên input thì mỗi lần bấm vào ô là lịch bật ra, người dùng không đặt được con
+   * trỏ vào ô ngày/tháng/năm để gõ -- thành ra bắt buộc phải chọn bằng chuột. Bỏ đi thì ô
+   * type="date" hoạt động đúng bản chất: gõ thẳng từ bàn phím, còn muốn lịch thì bấm nút.
+   */
   function openCalendar() {
     const input = inputRef.current
     if (!input || disabled) {
@@ -95,7 +102,6 @@ export function DateField({ disabled }: { disabled?: boolean }) {
           max={getTodayValue()}
           min={MIN_BIRTH_DATE}
           name="dateOfBirth"
-          onClick={openCalendar}
           ref={inputRef}
           required
           type="date"

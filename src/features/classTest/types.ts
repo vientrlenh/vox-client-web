@@ -34,10 +34,16 @@ export type ClassTestSectionInput = {
  * trang chi tiết, qua `POST /v1/exams/:examId/papers` — giống hệt kỳ thi tập trung.
  */
 export type CreateClassTestRequest = {
+  /**
+   * Ngưỡng tin cậy AI theo PHẦN TRĂM (0-100). Bỏ trống = không đặt, hệ thống dùng bộ luật ngưỡng
+   * mặc định như trước.
+   *
+   * <p>Đặt rồi thì bài nào AI chấm với độ tin cậy thấp hơn ngưỡng sẽ chuyển sang chờ giáo viên
+   * duyệt, và các luật mặc định bị bỏ qua -- nhà trường tự quyết mức chấp nhận được.
+   */
+  aiConfidenceThresholdPercent?: number | null
   assessmentPolicyId?: string | null
   closeAt?: string | null
-  /** Giá trị enum của BE (`STUDENT_DEVICE` | `LAB`), không phải alias `DEVICE` dùng trong UI. */
-  deliveryMode?: 'LAB' | 'STUDENT_DEVICE' | null
   description?: string | null
   maxAttempt?: number | null
   name: string

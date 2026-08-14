@@ -2,7 +2,7 @@ import { ArrowRight, ClipboardList, FileCheck2, Headphones, Star } from 'lucide-
 import { Link } from 'react-router'
 import { useSubscriptionPlansQuery } from '@/features/subscription_system/api/useSubscriptionPlansQuery'
 import {
-  formatQuotaMinutes,
+  formatUsd,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -99,7 +99,7 @@ export function AIPlansSection() {
                             </span>
                             <span className="flex-1 text-[13px] text-slate-600">{QUOTA_LABELS[quotaType]}</span>
                             <span className="text-sm font-extrabold text-slate-900">
-                              {formatQuotaMinutes(quota?.includedQuantity)}
+                              {formatUsd(quota?.includedQuantity)}
                             </span>
                           </div>
                         )

@@ -1,7 +1,7 @@
 import { CheckCircle2, ClipboardList, FileCheck2, Headphones, Star } from 'lucide-react'
 import {
   formatMinutes,
-  formatQuotaMinutes,
+  formatUsd,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -32,9 +32,17 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
   const hasActivePlan = currentSubscription?.status === 'ACTIVE' && currentSubscription.plan
   const activePlan = hasActivePlan ? currentSubscription!.plan! : null
 
+  // Gói đang dùng luôn hiện đầu tiên — sort ổn định (stable) nên các gói còn lại vẫn giữ nguyên
+  // thứ tự cũ (createdAt DESC từ BE) so với nhau, chỉ mỗi gói hiện tại được kéo lên trước.
+  const sortedPlans = [...plans].sort((a, b) => {
+    const aIsCurrent = activePlan?.id === a.id ? 0 : 1
+    const bIsCurrent = activePlan?.id === b.id ? 0 : 1
+    return aIsCurrent - bIsCurrent
+  })
+
   return (
     <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-      {plans.map((plan) => {
+      {sortedPlans.map((plan) => {
         const isCurrent = activePlan?.id === plan.id
         let ctaLabel = 'Đăng ký'
         let requestType: RequestType = 'REGISTRATION'
@@ -75,7 +83,7 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
               </span>
             ) : null}
 
-            <h3 className="text-lg font-extrabold text-blue-950">{plan.name}</h3>
+            <h3 className="text-lg font-black text-blue-950">{plan.name}</h3>
             <p className="mt-1 min-h-9.5 text-[12.5px] leading-5 text-slate-500">{plan.tagline ?? ''}</p>
 
             <div className="mt-3.5 flex items-baseline gap-1.5">
@@ -93,7 +101,7 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
                     <Icon aria-hidden="true" className="size-4.5 text-indigo-600" />
                     <span className="flex-1 text-[13px] text-slate-600">{QUOTA_LABELS[quotaType]}</span>
                     <span className="text-sm font-extrabold text-slate-900">
-                      {formatQuotaMinutes(quota?.includedQuantity)}
+                      {formatUsd(quota?.includedQuantity)}
                     </span>
                   </div>
                 )

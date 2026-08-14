@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Pencil, Plus, X } from 'lucide-react'
 import type { FrameworkCriterion, FrameworkResultBand, FrameworkSignal } from '../types'
 import { formatNullableText } from '../types'
@@ -49,6 +50,8 @@ type FrameworkCriteriaSectionProps = {
   canManage?: boolean
   criteria: FrameworkCriterion[]
   errorMessage?: string
+  // Nút phụ (VD: link "Import hàng loạt") hiển thị cạnh nút thêm thủ công.
+  headerExtra?: ReactNode
   isError: boolean
   isLoading: boolean
   onAddCriterion?: () => void
@@ -71,6 +74,7 @@ export function FrameworkCriteriaSection({
   canManage = false,
   criteria,
   errorMessage,
+  headerExtra,
   isError,
   isLoading,
   onAddCriterion,
@@ -90,14 +94,17 @@ export function FrameworkCriteriaSection({
       <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
         <h2 className="text-lg font-black text-blue-950">Tiêu chí đánh giá</h2>
         {canManage ? (
-          <button
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
-            onClick={onAddCriterion}
-            type="button"
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Thêm tiêu chí
-          </button>
+          <div className="flex items-center gap-2">
+            {headerExtra}
+            <button
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+              onClick={onAddCriterion}
+              type="button"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              Thêm tiêu chí
+            </button>
+          </div>
         ) : null}
       </div>
 

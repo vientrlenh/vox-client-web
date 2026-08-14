@@ -176,12 +176,8 @@ function QuestionBankInfoTab({
       <div className="grid gap-4 md:grid-cols-2">
         <DetailItem label="Tên ngân hàng" value={formatNullableText(questionBank.name)} />
         <DetailItem label="Phạm vi sở hữu" value={formatNullableText(questionBank.ownerType)} />
-        <DetailItem label="Mã định danh ngôn ngữ" value={formatNullableText(questionBank.languageId)} />
-        <DetailItem label="Mã định danh trường" value={formatNullableText(questionBank.schoolId)} />
         <DetailItem label="Ngày tạo" value={formatQuestionBankDate(questionBank.createdAt)} />
         <DetailItem label="Cập nhật" value={formatQuestionBankDate(questionBank.updatedAt)} />
-        <DetailItem label="Người tạo" value={formatNullableText(questionBank.createdBy)} />
-        <DetailItem label="Người cập nhật" value={formatNullableText(questionBank.updatedBy)} />
       </div>
 
       <div>

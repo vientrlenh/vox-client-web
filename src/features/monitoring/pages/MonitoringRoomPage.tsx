@@ -126,9 +126,16 @@ export function MonitoringRoomPage() {
     return (
         <section aria-labelledby="monitoring-room-title" className="grid gap-6">
             <div className="flex flex-col gap-3">
+                {/*
+                  Cùng lý do với MonitoringExamSchedulesPage: `to=".."` giải theo ROUTE nên
+                  văng ra trang chủ. Theo PATH, bỏ 2 đoạn từ
+                  `/teacher/monitoring/exams/:examId/schedules/:scheduleId` ra đúng
+                  `/teacher/monitoring/exams/:examId` -- danh sách ca thi của kỳ thi này.
+                */}
                 <Link
                     className="inline-flex w-fit items-center gap-2 text-sm font-bold text-cyan-700 transition hover:text-cyan-800"
-                    to=".."
+                    relative="path"
+                    to="../.."
                 >
                     <ArrowLeft aria-hidden="true" className="size-4" />
                     Quay lại danh sách ca thi

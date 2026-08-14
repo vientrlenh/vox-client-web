@@ -31,10 +31,11 @@ import {
 } from '../permissions'
 import type { CreateQuestionBankRequest, QuestionBankDto } from '../types'
 import { useAppSelector } from '@/app/store/hooks'
-import { QUESTION_MODULE_DEFAULT_LANGUAGE_ID } from '@/features/question/constants'
+import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
+const LANGUAGE_OPTIONS_PAGE_SIZE = 100
 
 function getErrorMessage(error: unknown) {
   if (
@@ -82,6 +83,22 @@ function QuestionBanksPage({
   const effectiveSelectedId = selectedListBank?.id ?? null
   const selectedBankQuery = useQuestionBankQuery(effectiveSelectedId)
   const selectedBank = selectedBankQuery.data ?? selectedListBank
+  // MỌI scope đều phải chọn ngôn ngữ, kể cả ngân hàng của trường.
+  //
+  // Trước đây scope trường gán cứng QUESTION_MODULE_DEFAULT_LANGUAGE_ID -- một UUID viết thẳng
+  // trong mã nguồn. Cách đó hỏng theo kiểu im lặng: hằng số ấy trùng khít từng ký tự với
+  // QUESTION_MODULE_DEFAULT_SCHOOL_ID (id của một TRƯỜNG, bảng khác hẳn), nên ít nhất một trong
+  // hai đang trỏ sai bảng. Ngân hàng tạo ra vẫn lưu thành công, chỉ là gắn vào một hàng không
+  // phải ngôn ngữ -- không lỗi, không cảnh báo, chỉ sai.
+  //
+  // Bắt chọn thì id luôn đến từ danh sách server trả về, không thể trỏ nhầm bảng.
+  const languagesQuery = useSupportedLanguagesQuery(
+    1,
+    LANGUAGE_OPTIONS_PAGE_SIZE,
+    { isActive: 'active', search: '' },
+    // Chỉ nạp khi thật sự mở form tạo, không phải mỗi lần vào trang danh sách.
+    dialogMode === 'create',
+  )
   const createMutation = useCreateQuestionBankMutation()
   const updateMutation = useUpdateQuestionBankMutation()
   const deleteMutation = useDeleteQuestionBankMutation()
@@ -107,7 +124,7 @@ function QuestionBanksPage({
         const payload: CreateQuestionBankRequest = {
           code: values.code,
           description: values.description || null,
-          languageId: QUESTION_MODULE_DEFAULT_LANGUAGE_ID,
+          languageId: values.languageId,
           name: values.name,
         }
 
@@ -156,7 +173,7 @@ function QuestionBanksPage({
       await refreshBanks()
       setPageMessage(
         result.archivedInstead
-          ? `${result.message}. Backend đã archive thay vì xóa.`
+          ? `${result.message}. Hệ thống đã lưu trữ thay vì xóa.`
           : result.message,
       )
     } catch (error) {
@@ -276,7 +293,9 @@ function QuestionBanksPage({
       <QuestionBankFormDialog
         key={`${dialogMode ?? 'closed'}-${dialogTarget?.id ?? selectedBank?.id ?? 'new'}`}
         errorMessage={dialogError ?? undefined}
+        isLanguagesLoading={languagesQuery.isLoading}
         isSubmitting={isSubmitting}
+        languages={languagesQuery.data?.content ?? []}
         mode={dialogMode}
         onClose={() => {
           if (isSubmitting) {
@@ -290,6 +309,7 @@ function QuestionBanksPage({
           void handleSubmit(mode, payload)
         }}
         questionBank={dialogMode === 'edit' ? selectedBank ?? dialogTarget : null}
+        showLanguageField
       />
     </section>
   )

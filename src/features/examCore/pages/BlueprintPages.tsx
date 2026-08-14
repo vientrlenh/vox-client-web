@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, LayoutList, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { toApiError } from '@/shared/api'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { Pagination } from '@/shared/components/Pagination'
@@ -13,6 +13,7 @@ import { useCreateBlueprintMutation, useDeleteBlueprintVersionMutation, useUpdat
 import {
   formatNullableText,
   getBlueprintVersionStatusDisplay,
+  type BlueprintNavState,
   type ExamBlueprintDto,
   type ExamBlueprintVersionDto,
   type ExamBlueprintVersionStatus,
@@ -48,7 +49,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
       return
     }
     if (!name.trim() || !code.trim() || !languageId) {
-      setErrorMessage('Vui lòng nhập tên, mã blueprint và ngôn ngữ.')
+      setErrorMessage('Vui lòng nhập tên, mã khung đề và ngôn ngữ.')
       return
     }
     setErrorMessage(null)
@@ -73,7 +74,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
       <section className="w-full max-w-md rounded-2xl bg-white shadow-2xl" role="dialog">
         <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-          <h2 className="text-lg font-black text-slate-900">Tạo blueprint mới</h2>
+          <h2 className="text-lg font-black text-slate-900">Tạo khung đề mới</h2>
           <button
             aria-label="Đóng"
             className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
@@ -85,7 +86,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
         </div>
         <div className="grid gap-3.5 px-6 py-5">
           <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-            Tên blueprint
+            Tên khung đề
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
               onChange={(event) => setName(event.target.value)}
@@ -139,7 +140,7 @@ function CreateBlueprintModal({ onClose, onCreated }: CreateBlueprintModalProps)
             onClick={() => void handleSubmit()}
             type="button"
           >
-            {createMutation.isPending ? 'Đang tạo…' : 'Tạo blueprint'}
+            {createMutation.isPending ? 'Đang tạo…' : 'Tạo khung đề'}
           </button>
         </div>
       </section>
@@ -160,7 +161,7 @@ function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
 
   return (
     <section className="mx-auto max-w-290">
-      <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">Blueprint đề thi</h1>
+      <h1 className="text-[30px] font-extrabold tracking-tight text-slate-900">Khung đề thi</h1>
       <p className="mt-2 text-[15px] text-slate-500">Khuôn mẫu cấu trúc đề: phần, ô câu hỏi, trọng số và thời lượng.</p>
       {canCreate ? (
         <button
@@ -169,11 +170,11 @@ function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
           type="button"
         >
           <Plus aria-hidden="true" className="size-4.5" />
-          Tạo blueprint
+          Tạo khung đề
         </button>
       ) : (
         <p className="mt-5 text-[13px] text-slate-400">
-          Giáo viên tạo blueprint mới ngay trong lúc gắn vào kỳ thi (tab Blueprint của kỳ thi bạn là người ra đề).
+          Giáo viên tạo khung đề mới ngay trong lúc gắn vào kỳ thi (tab Chốt khung đề của kỳ thi bạn là người ra đề).
         </p>
       )}
 
@@ -201,7 +202,7 @@ function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
               </div>
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
                 <span>{blueprint.sectionCount ?? 0} phần</span>·
-                <span>{blueprint.versionCount ?? 0} phien ban</span>
+                <span>{blueprint.versionCount ?? 0} phiên bản</span>
               </div>
               {versionDisplay ? (
                 <StatusBadge label={`${latestVersion.code} · ${versionDisplay.label.toLowerCase()}`} tone={versionDisplay.tone} />
@@ -214,7 +215,7 @@ function BlueprintListPage({ basePath, canCreate }: BlueprintListPageProps) {
       {blueprintsQuery.data ? (
         <Pagination
           currentPage={page}
-          itemName="blueprint"
+          itemName="khung đề"
           onPageChange={setPage}
           totalElements={blueprintsQuery.data.totalElements}
           totalPages={blueprintsQuery.data.totalPages}
@@ -306,8 +307,10 @@ type BlueprintDetailPageProps = {
 
 function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const { blueprintId } = useParams()
+  const navState = location.state as BlueprintNavState
   const blueprintQuery = useExamBlueprintSummaryQuery(blueprintId ?? null)
   const blueprint = blueprintQuery.data
   const updateVersionStatusMutation = useUpdateBlueprintVersionStatusMutation()
@@ -327,7 +330,7 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
   if (blueprintQuery.isError) {
     return (
       <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-        Không tải được blueprint: {toApiError(blueprintQuery.error).message}
+        Không tải được khung đề: {toApiError(blueprintQuery.error).message}
         <button className="ml-2 font-bold underline" onClick={() => void blueprintQuery.refetch()} type="button">
           Thử lại
         </button>
@@ -336,7 +339,7 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
   }
 
   if (!blueprint) {
-    return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy blueprint.</section>
+    return <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">Không tìm thấy khung đề.</section>
   }
 
   async function handlePublish(version: ExamBlueprintVersionDto) {
@@ -382,10 +385,10 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
     <section className="mx-auto max-w-290">
       <button
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600"
-        onClick={() => navigate(-1)}
+        onClick={() => (navState?.returnTo ? navigate(navState.returnTo, { state: navState.returnState }) : navigate(-1))}
         type="button"
       >
-        ← Blueprint đề thi
+        ← {navState?.returnLabel ?? 'Khung đề thi'}
       </button>
 
       <FeedbackToast message={message} onClose={() => setMessage(null)} tone="success" />
@@ -457,7 +460,17 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
                         <button
                           aria-label={`Chi tiết phiên bản ${version.code}`}
                           className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                          onClick={() => navigate(`${basePath}/${blueprint.id}/versions/${version.id}`)}
+                          onClick={() =>
+                            // Trang phiên bản quay lại đúng trang này, và mang theo cả đích quay lại của
+                            // trang này (vd: kỳ thi đã mở blueprint) để chuỗi "←" không bị đứt.
+                            navigate(`${basePath}/${blueprint.id}/versions/${version.id}`, {
+                              state: {
+                                returnLabel: blueprint.name,
+                                returnState: navState,
+                                returnTo: `${basePath}/${blueprint.id}`,
+                              } satisfies BlueprintNavState,
+                            })
+                          }
                           title="Chi tiết"
                           type="button"
                         >
@@ -495,7 +508,7 @@ function BlueprintDetailPage({ basePath, canManage }: BlueprintDetailPageProps) 
             </table>
           </div>
         ) : (
-          <p className="mt-4 text-sm text-slate-400">Blueprint chưa có phiên bản nào.</p>
+          <p className="mt-4 text-sm text-slate-400">Khung đề chưa có phiên bản nào.</p>
         )}
       </div>
     </section>

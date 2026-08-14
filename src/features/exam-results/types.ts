@@ -47,6 +47,12 @@ export type ExamResultSectionDto = {
 export type ExamResultItemDto = {
   itemScore: number
   paperItemId: string
+  /**
+   * Đề bài, do BE trả thẳng từ bảng questions. Đừng quay lại cách cũ là suy ra từ
+   * `turns[].promptText`: turn đầu tiên là lời dẫn của AI ("You have 10 seconds to prepare…"),
+   * không phải đề bài, và nó chỉ được nạp khi người dùng mở thẻ ra.
+   */
+  questionText?: string | null
   responseId: string
   sectionId: string
   weightedScore: number
@@ -66,6 +72,8 @@ export type ExamCandidateResultDto = {
   rubricResultBandName?: string | null
   sections: ExamResultSectionDto[]
   sessionId: string
+  scoringScaleMax?: number | null
+  scoringScaleMin?: number | null
   status: string
   targetFrameworkBandCode?: string | null
   targetFrameworkBandId?: string | null

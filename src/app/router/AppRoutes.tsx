@@ -108,6 +108,30 @@ const SchoolAdminFrameworksPage = lazy(() =>
   })),
 )
 
+const SystemAdminFrameworkVersionImportPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.FrameworkVersionImportPage,
+  })),
+)
+
+const SystemAdminFrameworkCriterionImportPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.FrameworkCriterionImportPage,
+  })),
+)
+
+const SystemAdminFrameworkResultBandImportPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.FrameworkResultBandImportPage,
+  })),
+)
+
+const SystemAdminFrameworkCriterionBandImportPage = lazy(() =>
+  import('@/features/frameworks').then((module) => ({
+    default: module.FrameworkCriterionBandImportPage,
+  })),
+)
+
 const SchoolAdminFrameworkDetailPage = lazy(() =>
   import('@/features/frameworks').then((module) => ({
     default: module.SchoolAdminFrameworkDetailPage,
@@ -243,6 +267,18 @@ const TeacherImportSessionDetailPage = lazy(() =>
 const SystemAdminSchoolsPage = lazy(() =>
   import("@/features/school").then((module) => ({
     default: module.SystemAdminSchoolsPage,
+  })),
+);
+
+const SystemAdminCreateSchoolPage = lazy(() =>
+  import("@/features/school").then((module) => ({
+    default: module.SystemAdminCreateSchoolPage,
+  })),
+);
+
+const SystemAdminUsersPage = lazy(() =>
+  import("@/features/system-users").then((module) => ({
+    default: module.SystemAdminUsersPage,
   })),
 );
 
@@ -511,6 +547,9 @@ const TeacherExamPaperEditPage = lazy(() =>
 const SchoolAdminExamPaperViewPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.SchoolAdminExamPaperViewPage })),
 );
+const SchoolAdminExamPaperEditPage = lazy(() =>
+  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminExamPaperEditPage })),
+);
 const TeacherBlueprintsPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.TeacherBlueprintsPage })),
 );
@@ -730,11 +769,20 @@ const PaymentResultPage = lazy(() =>
   })),
 );
 
+const PrivacyPolicyPage = lazy(() =>
+  import("@/features/legal").then((module) => ({
+    default: module.PrivacyPolicyPage,
+  })),
+);
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route index element={<HomePage />} />
+        {/* Trang cong khai, KHONG dat sau guard dang nhap: Google Play doi URL chinh
+            sach bao mat mo duoc ma khong can tai khoan. */}
+        <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="oauth2-callback" element={<OAuth2CallbackPage/>}/>
         <Route path="register" element={<RegisterPage />} />
@@ -796,6 +844,14 @@ export function AppRoutes() {
               path="system-admin/schools"
               element={<SystemAdminSchoolsPage />}
             />
+            <Route
+              path="system-admin/schools/create"
+              element={<SystemAdminCreateSchoolPage />}
+            />
+            <Route
+              path="system-admin/users"
+              element={<SystemAdminUsersPage />}
+            />
             <Route path="system-admin/question-banks" element={<SystemAdminQuestionBanksPage />} />
             <Route path="system-admin/question-banks/:bankId" element={<SystemAdminQuestionBankDetailPage />} />
             <Route path="system-admin/question-topics/:topicId" element={<SystemAdminQuestionTopicDetailPage />} />
@@ -814,8 +870,24 @@ export function AppRoutes() {
               element={<SystemAdminFrameworkDetailPage />}
             />
             <Route
+              path="system-admin/frameworks/:frameworkId/versions/import"
+              element={<SystemAdminFrameworkVersionImportPage />}
+            />
+            <Route
               path="system-admin/frameworks/:frameworkId/versions/:versionId"
               element={<SystemAdminFrameworkVersionDetailPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId/versions/:versionId/criteria/import"
+              element={<SystemAdminFrameworkCriterionImportPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId/versions/:versionId/result-bands/import"
+              element={<SystemAdminFrameworkResultBandImportPage />}
+            />
+            <Route
+              path="system-admin/frameworks/:frameworkId/versions/:versionId/criterion-bands/import"
+              element={<SystemAdminFrameworkCriterionBandImportPage />}
             />
             <Route
               path="system-admin/rubrics"
@@ -918,6 +990,16 @@ export function AppRoutes() {
               path="school-admin/grades/import"
               element={<SchoolAdminGradeLevelImportPage />}
             />
+            {/*
+              Import năm học KHÔNG cần chọn khối trước: một file nạp được nhiều khối khác nhau,
+              và trang import cũng không gửi gradeLevelId lên server -- nó chỉ dùng id đó cho
+              nút quay lại. Giữ cả hai đường: vào thẳng từ danh sách khối, hoặc vào từ trong một
+              khối (khi đó vẫn quay lại đúng khối đó).
+            */}
+            <Route
+              path="school-admin/grades/years/import"
+              element={<SchoolAdminGradeImportPage />}
+            />
             <Route
               path="school-admin/grades/:gradeLevelId/grades/import"
               element={<SchoolAdminGradeImportPage />}
@@ -983,6 +1065,7 @@ export function AppRoutes() {
             <Route path="school-admin/class-tests/:examId/papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/class-tests/:examId/grading" element={<ClassTestGradingBoardPage />} />
             <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
+            <Route path="school-admin/exam-papers/:paperId/edit" element={<SchoolAdminExamPaperEditPage />} />
             <Route path="school-admin/exam-papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
             <Route path="school-admin/rubric-versions/select" element={<SchoolAdminSelectRubricVersionPage />} />
@@ -1004,9 +1087,6 @@ export function AppRoutes() {
             />
             <Route path="school-admin/blueprints/:blueprintId" element={<SchoolAdminBlueprintDetailPage />} />
             <Route path="school-admin/blueprints" element={<SchoolAdminBlueprintsPage />} />
-            <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
-            <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
-            <Route path="school-admin/class-tests" element={<SchoolAdminClassTestsPage />} />
             <Route path="school-admin/class-tests/:examId" element={<SchoolAdminClassTestDetailPage />} />
             <Route
               path="school-admin/rubrics"
@@ -1121,6 +1201,9 @@ export function AppRoutes() {
             <Route path="teacher/class-tests/:examId/reevaluation" element={<ClassTestReevaluationPage />} />
             <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
             <Route path="teacher/exam-papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
+            {/* Kỳ thi đã khóa thì tab mã đề trỏ sang đường dẫn không có /edit. Thiếu route này là
+                rơi vào catch-all và bị đá về trang chủ. Trang tự chuyển read-only theo quyền. */}
+            <Route path="teacher/exam-papers/:paperId" element={<TeacherExamPaperEditPage />} />
             <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
             <Route path="teacher/exams" element={<TeacherExamsPage />} />
             <Route path="teacher/exam-results" element={<TeacherExamResultsListPage />} />

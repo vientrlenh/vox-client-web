@@ -34,8 +34,10 @@ import { RubricVersionTable } from "../components/RubricVersionTable";
 import { RubricFormDialog } from "../components/RubricFormDialog";
 import { AddRubricVersionDialog } from "../components/AddRubricVersionDialog"; // IMPORT MODAL
 import { Pagination } from "@/shared/components/Pagination";
+import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 
 export function SchoolAdminRubricDetailPage() {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { rubricId } = useParams<{ rubricId: string }>();
   const navigate = useNavigate();
 
@@ -98,30 +100,32 @@ export function SchoolAdminRubricDetailPage() {
 
   // 4. Hàm xử lý submit Form Cập nhật Rubric
   const handleUpdateRubric = async (formData: { name: string; description: string; }) => {
+    setErrorMessage(null);
     try {
       await updateRubric(formData);
       setIsEditModalOpen(false);
     } catch (error: unknown) {
       console.error("Chi tiết lỗi từ BE:", error);
-      alert((error as { message?: string }).message || "Có lỗi xảy ra khi lưu thay đổi. Vui lòng thử lại.");
+      setErrorMessage((error as { message?: string }).message || "Có lỗi xảy ra khi lưu thay đổi. Vui lòng thử lại.");
     }
   };
 
   // 5. Hàm xử lý submit Form Thêm Version mới
   const handleAddVersion = async (payload: AddRubricVersionsPayload) => {
+    setErrorMessage(null);
     try {
       await addVersions(payload);
       setIsAddModalOpen(false); // Thành công thì đóng popup
     } catch (error: unknown) {
       console.error("Lỗi thêm Version:", error);
-      alert((error as { message?: string }).message || "Có lỗi xảy ra khi thêm phiên bản mới.");
+      setErrorMessage((error as { message?: string }).message || "Có lỗi xảy ra khi thêm phiên bản mới.");
     }
   };
 
   if (isLoading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3">
-        <RefreshCw className="size-8 animate-spin text-cyan-600" />
+        <RefreshCw className="size-8 animate-spin text-indigo-600" />
         <p className="text-sm text-slate-500">Đang tải thông tin chi tiết...</p>
       </div>
     );
@@ -132,11 +136,11 @@ export function SchoolAdminRubricDetailPage() {
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
         <AlertTriangle className="size-12 text-red-500" />
         <p className="text-slate-600">
-          Không tìm thấy Rubric hoặc có lỗi xảy ra.
+          Không tìm thấy tiêu chí đánh giá hoặc có lỗi xảy ra.
         </p>
         <button
           onClick={() => refetch()}
-          className="rounded-lg bg-cyan-600 px-4 py-2 font-bold text-white hover:bg-cyan-700"
+          className="rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700"
         >
           Thử lại
         </button>
@@ -145,15 +149,8 @@ export function SchoolAdminRubricDetailPage() {
   }
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
-      <div
-        className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
-        style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}
-      />
-      <div
-        className="pointer-events-none absolute -bottom-48 -left-36 size-[420px] rounded-full blur-[10px]"
-        style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.12), rgba(139,92,246,0.08) 55%, transparent 75%)' }}
-      />
+    <section className="grid gap-6">
+      <ErrorBanner message={errorMessage} />
 
       {/* HEADER BAR */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -161,22 +158,22 @@ export function SchoolAdminRubricDetailPage() {
           <button
             onClick={() => navigate("/school-admin/rubrics")}
             aria-label="Quay lại"
-            className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-950 transition hover:bg-slate-50"
+            className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
           >
             <ChevronLeft className="size-5" />
           </button>
-          <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
-            <ClipboardList className="size-[26px] text-indigo-600" /> Chi tiết Rubric
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
+            <ClipboardList className="size-6 text-indigo-600" /> Chi tiết tiêu chí đánh giá
           </h1>
         </div>
       </div>
 
       {/* THÔNG TIN CHUNG */}
-      <div className="rounded-[14px] border border-slate-200 bg-white p-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-6">
         <div className="grid gap-6 md:grid-cols-2">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Tên Rubric
+              Tên tiêu chí đánh giá
             </p>
             <p className="mt-1 text-lg font-bold text-slate-950">
               {rubric.name}
@@ -213,7 +210,7 @@ export function SchoolAdminRubricDetailPage() {
           <button
             type="button"
             onClick={() => setIsEditModalOpen(true)}
-            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 px-5 text-sm font-medium text-white transition hover:opacity-90"
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
           >
             <Edit className="size-4" /> Chỉnh sửa thông tin
           </button>
@@ -221,7 +218,7 @@ export function SchoolAdminRubricDetailPage() {
       </div>
 
       {/* DANH SÁCH PHIÊN BẢN (VERSIONS) */}
-      <div className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:px-6">
           <h2 className="text-lg font-medium text-slate-950">
             Danh sách phiên bản (Versions)
@@ -231,7 +228,7 @@ export function SchoolAdminRubricDetailPage() {
             <button
               type="button"
               onClick={() => navigate(`/school-admin/rubrics/${rubricId}/versions/import`)}
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
             >
               <Upload className="size-4" /> Import Excel/CSV
             </button>
@@ -239,7 +236,7 @@ export function SchoolAdminRubricDetailPage() {
             <button
               type="button"
               onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 px-5 text-sm font-medium text-white transition hover:opacity-90"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
             >
               <Plus className="size-4" /> Tạo Version mới
             </button>
@@ -257,7 +254,7 @@ export function SchoolAdminRubricDetailPage() {
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               placeholder="Tìm theo mã hoặc tên phiên bản..."
-              className="w-full rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
           </div>
           <div className="relative min-w-50">
@@ -270,7 +267,7 @@ export function SchoolAdminRubricDetailPage() {
                 setSelectedStatus(e.target.value);
                 setPage(1);
               }}
-              className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+              className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             >
               <option value="">Tất cả trạng thái</option>
               <option value="DRAFT">DRAFT</option>

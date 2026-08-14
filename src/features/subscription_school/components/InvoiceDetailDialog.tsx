@@ -42,7 +42,7 @@ export function InvoiceDetailDialog({ invoice, onClose }: InvoiceDetailDialogPro
           </button>
         </div>
 
-        <h2 className="mt-4 font-mono text-lg font-extrabold text-blue-950" id="invoice-detail-title">
+        <h2 className="mt-4 font-mono text-lg font-black text-blue-950" id="invoice-detail-title">
           {invoice.invoiceNumber}
         </h2>
         <div className="mt-2">

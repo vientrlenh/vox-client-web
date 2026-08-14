@@ -15,14 +15,13 @@ const PLAN_FIELDS = `
   pricePerYear
   validityDays
   maxTimePerAttemptMin
-  maxStudentCount
   popular
   status
   version
   createdAt
   createdBy
   replacedByPlanId
-  hasActiveSubscribers
+  serviceFeeRatio
   quotas {
     id
     quotaType

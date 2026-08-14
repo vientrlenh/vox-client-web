@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 import type { AddRubricVersionsPayload } from '../api/useAddSystemRubricVersionsMutation';
 
 type Props = {
@@ -21,6 +22,7 @@ const toBackendDate = (value?: string, endOfDay = false) => {
 };
 
 export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }: Props) {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // State khởi tạo rỗng
   const [formData, setFormData] = useState({
     version: 1, // Khởi tạo mặc định version = 1
@@ -32,31 +34,39 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
     effectiveTo: '',
   });
 
+  // Xoá lỗi cũ mỗi lần mở lại, để banner không tố cáo một lỗi đã không còn đúng.
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    setErrorMessage(null);
+  }
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
 
     // --- VALIDATION BẢO VỆ GIAO DIỆN ---
     if (formData.version <= 0) {
-      alert("Lỗi: Số Version phải lớn hơn 0!");
+      setErrorMessage("Lỗi: Số Version phải lớn hơn 0!");
       return;
     }
 
     if (!formData.name.trim()) {
-      alert("Lỗi: Vui lòng nhập Tên phiên bản!");
+      setErrorMessage("Lỗi: Vui lòng nhập Tên phiên bản!");
       return;
     }
 
     const min = Number(formData.scoringScaleMin);
     const max = Number(formData.scoringScaleMax);
     if (min >= max) {
-      alert("Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!");
+      setErrorMessage("Lỗi: Điểm tối thiểu (Min) phải nhỏ hơn Điểm tối đa (Max)!");
       return;
     }
     if (formData.effectiveFrom && formData.effectiveTo) {
       if (new Date(formData.effectiveFrom) > new Date(formData.effectiveTo)) {
-        alert("Lỗi: Ngày kết thúc không được nhỏ hơn Ngày áp dụng!");
+        setErrorMessage("Lỗi: Ngày kết thúc không được nhỏ hơn Ngày áp dụng!");
         return;
       }
     }
@@ -84,7 +94,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={!isPending ? onClose : undefined} />
 
-      <div className="relative w-full max-w-xl rounded-xl bg-white shadow-2xl">
+      <div className="relative w-full max-w-xl rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h2 className="text-lg font-bold text-slate-900">Thêm Phiên bản Mới</h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
@@ -93,6 +103,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
+          <ErrorBanner className="mb-5" message={errorMessage} />
           <div className="grid gap-5 sm:grid-cols-2">
             
             {/* Version Number */}
@@ -105,7 +116,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
                 onChange={(e) => setFormData({ ...formData, version: e.target.value === '' ? 1 : parseInt(e.target.value) })} 
                 disabled={isPending} 
                 required 
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" 
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50" 
               />
             </div>
 
@@ -118,7 +129,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 disabled={isPending}
                 required
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50"
               />
             </div>
 
@@ -130,7 +141,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
                 onChange={(e) => setFormData({ ...formData, totalScoreMethod: e.target.value })} 
                 disabled={isPending} 
                 required 
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50"
               >
                 <option value="SUM">Cộng dồn (SUM)</option>
                 <option value="WEIGHTED_AVERAGE">Trung bình có trọng số (WEIGHTED_AVERAGE)</option>
@@ -146,7 +157,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
                 onChange={(e) => setFormData({ ...formData, scoringScaleMin: e.target.value === '' ? 0 : Number(e.target.value) })} 
                 disabled={isPending} 
                 required 
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" 
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50" 
               />
             </div>
 
@@ -158,7 +169,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
                 onChange={(e) => setFormData({ ...formData, scoringScaleMax: e.target.value === '' ? 0 : Number(e.target.value) })} 
                 disabled={isPending} 
                 required 
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" 
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50" 
               />
             </div>
 
@@ -171,7 +182,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
                 onChange={(e) => setFormData({ ...formData, effectiveFrom: e.target.value })} 
                 disabled={isPending} 
                 required 
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" 
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50" 
               />
             </div>
 
@@ -182,7 +193,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
                 value={formData.effectiveTo} 
                 onChange={(e) => setFormData({ ...formData, effectiveTo: e.target.value })} 
                 disabled={isPending} 
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50" 
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50" 
               />
             </div>
 
@@ -192,7 +203,7 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
             <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50">
               Hủy bỏ
             </button>
-            <button type="submit" disabled={isPending} className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50">
+            <button type="submit" disabled={isPending} className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50">
               {isPending ? <Loader2 className="size-4 animate-spin" /> : 'Lưu Phiên bản'}
             </button>
           </div>

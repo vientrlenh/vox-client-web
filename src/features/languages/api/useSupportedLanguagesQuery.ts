@@ -85,8 +85,10 @@ export function useSupportedLanguagesQuery(
   page: number,
   size: number,
   filters: LanguageFilters,
+  enabled = true,
 ) {
   return useQuery({
+    enabled,
     queryFn: () => fetchSupportedLanguages({ filters, page, size }),
     queryKey: languageQueryKeys.languages(page, size, filters),
   })

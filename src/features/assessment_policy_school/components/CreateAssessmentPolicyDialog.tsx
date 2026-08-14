@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useAllFrameworkVersionsQuery, useFrameworkVersionCriteriaQuery } from '../api/useFrameworkVersionOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
@@ -153,7 +154,7 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
   const { data: gradeLevels } = useSchoolGradeLevelOptionsQuery(schoolId);
   const { data: grades } = useSchoolGradeOptionsQuery(schoolId, form.schoolGradeLevelId || undefined);
   const classFilter: ClassFilters = { languageId: '', schoolGradeId: form.schoolGradeId || '', search: '', status: 'ACTIVE' };
-  const { data: classesPage } = useSchoolClassesQuery(1, 100, classFilter);
+  const { data: classesPage } = useSchoolClassesQuery(1, 100, classFilter, { enabled: Boolean(form.schoolGradeId) });
   const classes = classesPage?.content ?? [];
 
   function handleLanguageChange(languageId: string) {
@@ -338,17 +339,19 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
               {gradeLevels?.map((gl) => <option key={gl.id} value={gl.id}>{gl.code} - {gl.name}</option>)}
             </select>
             <select
-              value={form.schoolGradeId} onChange={(e) => handleGradeChange(e.target.value)} disabled={isPending}
+              value={form.schoolGradeId} onChange={(e) => handleGradeChange(e.target.value)}
+              disabled={isPending || !form.schoolGradeLevelId}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
             >
-              <option value="">-- Niên khóa --</option>
+              <option value="">{form.schoolGradeLevelId ? '-- Niên khóa --' : '-- Chọn Khối trước --'}</option>
               {grades?.map((grade) => <option key={grade.id} value={grade.id}>{grade.code || grade.name}</option>)}
             </select>
             <select
-              value={form.schoolClassId} onChange={(e) => onChange({ schoolClassId: e.target.value })} disabled={isPending}
+              value={form.schoolClassId} onChange={(e) => onChange({ schoolClassId: e.target.value })}
+              disabled={isPending || !form.schoolGradeId}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
             >
-              <option value="">-- Lớp --</option>
+              <option value="">{form.schoolGradeId ? '-- Lớp --' : '-- Chọn Niên khóa trước --'}</option>
               {classes.map((schoolClass) => (
                 <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.code} - {schoolClass.name}</option>
               ))}
@@ -411,6 +414,7 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
 
 export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubmit, isPending }: CreateAssessmentPolicyDialogProps) {
   const [forms, setForms] = useState<PolicyFormState[]>([makeEmptyPolicyForm(0)]);
+  const { showError, feedbackToast } = useFeedbackToast();
 
   // Reset form mỗi khi mở lại dialog
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -452,13 +456,13 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
     e.preventDefault();
 
     if (forms.some(validateForm)) {
-      alert('Vui lòng nhập đầy đủ các trường bắt buộc cho tất cả Chính Sách Đánh Giá!');
+      showError('Vui lòng nhập đầy đủ các trường bắt buộc cho tất cả Chính Sách Đánh Giá!');
       return;
     }
 
     for (const form of forms) {
       if (form.effectiveTo && new Date(form.effectiveFrom) > new Date(form.effectiveTo)) {
-        alert('Ngày kết thúc không được nhỏ hơn Ngày áp dụng!');
+        showError('Ngày kết thúc không được nhỏ hơn Ngày áp dụng!');
         return;
       }
 
@@ -466,7 +470,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
         const range = getEffectiveScoreRange(form.rubricVersionIds, form.rubricVersionScales);
         const score = Number(form.passingScore);
         if (range && (score < range.min || score > range.max)) {
-          alert(`Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${range.min} – ${range.max})!`);
+          showError(`Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${range.min} – ${range.max})!`);
           return;
         }
       }
@@ -503,10 +507,11 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition-opacity" onClick={!isPending ? onClose : undefined} />
+      {feedbackToast}
 
       <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-2xl">
         <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">Thêm mới Chính Sách Đánh Giá</h2>
+          <h2 className="text-lg font-black text-blue-950">Thêm mới Chính Sách Đánh Giá</h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
             <X className="size-5" />
           </button>

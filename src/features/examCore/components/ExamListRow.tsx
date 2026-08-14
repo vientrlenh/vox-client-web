@@ -12,16 +12,27 @@ const accentClassByTone: Record<StatusTone, string> = {
   warning: 'bg-amber-500',
 }
 
+/** Tóm tắt bước đang dở, hiện kèm thanh tiến độ để nhìn dòng là biết kỳ thi đang kẹt ở đâu. */
+type ExamListRowProgress = {
+  completedCount: number
+  /** Bước chưa xong đầu tiên; null khi đã đủ các bước. */
+  currentLabel: string | null
+  /** Chi tiết của bước đó ("2 / 3 mã đề đã khóa"…). */
+  currentSublabel?: string
+  totalCount: number
+}
+
 type ExamListRowProps = {
   metaItems: Array<{ icon: ReactNode; label: string; tone?: 'default' | 'warning' }>
   onClick: () => void
+  progress?: ExamListRowProgress
   statusLabel: string
   statusTone: StatusTone
   steps: WorkflowStep[]
   title: string
 }
 
-export function ExamListRow({ metaItems, onClick, statusLabel, statusTone, steps, title }: ExamListRowProps) {
+export function ExamListRow({ metaItems, onClick, progress, statusLabel, statusTone, steps, title }: ExamListRowProps) {
   return (
     <button
       className="flex w-full overflow-hidden rounded-2xl border border-slate-200 bg-white text-left transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-950/8"
@@ -50,7 +61,27 @@ export function ExamListRow({ metaItems, onClick, statusLabel, statusTone, steps
             ))}
           </span>
         </span>
-        <WorkflowStepper steps={steps} variant="compact" />
+        {/* shrink-0 giữ thanh tiến độ đủ chỗ; phần tên/thông tin bên trái mới là chỗ được co lại. */}
+        <span className="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
+          {progress ? (
+            <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-slate-400">
+              Hoàn thành {progress.completedCount} / {progress.totalCount} bước
+            </span>
+          ) : null}
+          <WorkflowStepper steps={steps} variant="compact" />
+          {progress ? (
+            <span
+              className={[
+                'max-w-70 text-[12px] font-semibold sm:text-right',
+                progress.currentLabel ? 'text-indigo-600' : 'text-emerald-600',
+              ].join(' ')}
+            >
+              {progress.currentLabel
+                ? `Tiếp theo: ${progress.currentLabel}${progress.currentSublabel ? ` · ${progress.currentSublabel}` : ''}`
+                : 'Đã xong quy trình chuẩn bị'}
+            </span>
+          ) : null}
+        </span>
         <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-slate-300" />
       </span>
     </button>

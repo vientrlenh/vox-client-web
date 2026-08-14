@@ -56,14 +56,22 @@ function getErrorMessage(error: unknown) {
   return undefined
 }
 
-function FrameworksPage({ basePath }: { basePath: string }) {
+function FrameworksPage({
+  basePath,
+  restrictToActive,
+}: {
+  basePath: string
+  restrictToActive?: boolean
+}) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const user = useAppSelector((state) => state.auth.user)
   const canManage = canManageFramework(getFrameworkActorRole(user?.roles))
   const [page, setPage] = useState(DEFAULT_PAGE)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [filters, setFilters] = useState<FrameworkFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useState<FrameworkFilters>(
+    restrictToActive ? { ...EMPTY_FILTERS, isActive: 'active' } : EMPTY_FILTERS,
+  )
   const [formMode, setFormMode] = useState<FrameworkFormMode | null>(null)
   const [formTarget, setFormTarget] = useState<Framework | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
@@ -86,6 +94,10 @@ function FrameworksPage({ basePath }: { basePath: string }) {
   const isMutating = isSaving || deleteMutation.isPending
 
   function handleFilterChange(name: keyof FrameworkFilters, value: string) {
+    if (restrictToActive && name === 'isActive') {
+      return
+    }
+
     setFilters((current) => ({ ...current, [name]: value }))
     setPage(DEFAULT_PAGE)
   }
@@ -244,7 +256,11 @@ function FrameworksPage({ basePath }: { basePath: string }) {
         tone={pageMessage?.tone ?? 'error'}
       />
 
-      <FrameworkFiltersBar filters={filters} onChange={handleFilterChange} />
+      <FrameworkFiltersBar
+        filters={filters}
+        hideStatusFilter={restrictToActive}
+        onChange={handleFilterChange}
+      />
 
       <FrameworkTable
         errorMessage={getErrorMessage(frameworksQuery.error)}
@@ -320,5 +336,5 @@ export function SystemAdminFrameworksPage() {
 }
 
 export function SchoolAdminFrameworksPage() {
-  return <FrameworksPage basePath="/school-admin" />
+  return <FrameworksPage basePath="/school-admin" restrictToActive />
 }

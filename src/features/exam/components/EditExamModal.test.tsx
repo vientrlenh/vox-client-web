@@ -49,7 +49,6 @@ describe('EditExamModal', () => {
 
     expect(screen.getByLabelText(/Tên kỳ thi/)).toHaveValue('Kỳ thi giữa kỳ')
     expect(screen.getByLabelText(/Mô tả/)).toHaveValue('Mô tả cũ')
-    expect(screen.getByLabelText(/Cách chốt điểm/)).toHaveValue('HIGHEST')
   })
 
   // Mở form ra mà thấy sai mức giám sát thì bấm Lưu là hạ mức giám sát của một kỳ thi thật.
@@ -114,6 +113,20 @@ describe('EditExamModal', () => {
     await waitFor(() => expect(mockedPut).toHaveBeenCalled())
     expect(payloadOfLastPut()).toMatchObject({ maxAttempt: 1, requiresOtp: true })
     expect(screen.queryByLabelText(/Số lượt thi/)).not.toBeInTheDocument()
+  })
+
+  // Hệ quả của H.8: đúng 1 lượt thi thì HIGHEST/LATEST/FIRST/AVERAGE/LOWEST cho ra cùng kết quả,
+  // nên không hỏi người dùng nữa — nhưng vẫn phải gửi giá trị lên để hành vi là hiển nhiên.
+  it('không hỏi cách chốt điểm nhưng vẫn gửi HIGHEST', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<EditExamModal exam={exam()} onClose={jest.fn()} onSaved={jest.fn()} />)
+
+    expect(screen.queryByLabelText(/Cách chốt điểm/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Lưu' }))
+
+    await waitFor(() => expect(mockedPut).toHaveBeenCalled())
+    expect(payloadOfLastPut()).toMatchObject({ resultDecisionMethod: 'HIGHEST' })
   })
 
   it('chặn lưu khi thời gian mở không nhỏ hơn thời gian đóng', async () => {

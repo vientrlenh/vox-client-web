@@ -1,20 +1,23 @@
 import { useState } from 'react'
 import { ClipboardList, ExternalLink, FileCheck2, Headphones, Inbox, X } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
+import { UsageProgressBar } from '@/shared/ui/UsageProgressBar'
 import { Pagination } from '@/shared/components/Pagination'
 import { useSchoolSubscriptionUsageQuery } from '../api/useSchoolSubscriptionUsageQuery'
 import { useSchoolInvoicesQuery } from '../api/useSchoolInvoicesQuery'
+import { useSchoolDebtEventsQuery } from '../api/useSchoolDebtEventsQuery'
 import type { SchoolLookupEntry } from '../api/useSchoolLookup'
 import {
   formatDate,
-  formatQuotaMinutes,
+  formatDateTime,
+  formatUsd,
   formatVnd,
+  getDebtEventDisplay,
   getInvoiceStatusDisplay,
+  getOverageDisplay,
   getSubscriptionStatusDisplay,
-  getUsageBarColor,
   QUOTA_LABELS,
   QUOTA_TYPES,
-  secondsToMinutes,
   type QuotaType,
   type SchoolSubscription,
 } from '../types'
@@ -32,6 +35,7 @@ const SOURCE_LABELS = {
 } as const
 
 const INVOICES_PAGE_SIZE = 5
+const DEBT_EVENTS_PAGE_SIZE = 5
 const DEFAULT_PAGE = 1
 
 type SchoolSubscriptionDetailDrawerProps = {
@@ -48,10 +52,12 @@ export function SchoolSubscriptionDetailDrawer({
   subscription,
 }: SchoolSubscriptionDetailDrawerProps) {
   const [invoicesPage, setInvoicesPage] = useState(DEFAULT_PAGE)
+  const [debtEventsPage, setDebtEventsPage] = useState(DEFAULT_PAGE)
   const schoolId = subscription?.schoolId ?? null
 
   const usageQuery = useSchoolSubscriptionUsageQuery(isOpen ? schoolId : null)
   const invoicesQuery = useSchoolInvoicesQuery(isOpen ? schoolId : null, invoicesPage, INVOICES_PAGE_SIZE)
+  const debtEventsQuery = useSchoolDebtEventsQuery(isOpen ? schoolId : null, debtEventsPage, DEBT_EVENTS_PAGE_SIZE)
 
   if (!isOpen || !subscription) {
     return null
@@ -134,8 +140,6 @@ export function SchoolSubscriptionDetailDrawer({
                   const planQuota = quotaByType.get(quotaType)
                   const total = usage?.totalAllocated ?? planQuota?.includedQuantity ?? 0
                   const used = usage?.usedQuantity ?? 0
-                  const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
-                  const color = getUsageBarColor(pct)
 
                   return (
                     <div className="rounded-lg border border-slate-200 p-4" key={quotaType}>
@@ -144,31 +148,7 @@ export function SchoolSubscriptionDetailDrawer({
                         <span className="text-sm font-bold text-blue-950">{QUOTA_LABELS[quotaType]}</span>
                       </div>
 
-                      {usageQuery.isLoading ? (
-                        <p className="mt-3 text-xs font-semibold text-slate-400">Đang tải...</p>
-                      ) : (
-                        <>
-                          <div className="mt-3 flex items-baseline gap-1.5">
-                            <span className="text-xl font-extrabold text-slate-900">
-                              {new Intl.NumberFormat('vi-VN').format(secondsToMinutes(used))}
-                            </span>
-                            <span className="text-xs text-slate-400">
-                              / {new Intl.NumberFormat('vi-VN').format(secondsToMinutes(total))} phút
-                            </span>
-                          </div>
-                          <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full" style={{ backgroundColor: color, width: `${pct}%` }} />
-                          </div>
-                          <div className="mt-1.5 flex items-center justify-between">
-                            <span className="text-xs text-slate-500">
-                              Còn lại {formatQuotaMinutes(Math.max(0, total - used))}
-                            </span>
-                            <span className="text-xs font-extrabold" style={{ color }}>
-                              {pct}%
-                            </span>
-                          </div>
-                        </>
-                      )}
+                      <UsageProgressBar isLoading={usageQuery.isLoading} total={total} used={used} />
                     </div>
                   )
                 })}
@@ -180,7 +160,7 @@ export function SchoolSubscriptionDetailDrawer({
               <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
                 <table className="w-full min-w-[520px] border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold text-blue-950">
+                    <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
                       <th className="px-4 py-3">Mã hóa đơn</th>
                       <th className="px-3 py-3">Ngày</th>
                       <th className="px-3 py-3">Loại</th>
@@ -254,6 +234,79 @@ export function SchoolSubscriptionDetailDrawer({
                   onPageChange={setInvoicesPage}
                   totalElements={invoicesQuery.data?.totalElements ?? 0}
                   totalPages={invoicesQuery.data?.totalPages ?? 0}
+                />
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-black text-blue-950">Lịch sử nợ hạn mức</p>
+              <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+                <table className="w-full min-w-[640px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
+                      <th className="px-4 py-3">Thời điểm</th>
+                      <th className="px-3 py-3">Hạn mức</th>
+                      <th className="px-3 py-3">Sự kiện</th>
+                      <th className="px-3 py-3">Kích hoạt (USD)</th>
+                      <th className="px-3 py-3">Đã dùng / Hạn mức (USD)</th>
+                      <th className="px-3 py-3">Chênh lệch</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {debtEventsQuery.isLoading ? (
+                      <tr>
+                        <td className="px-4 py-8 text-center text-xs font-semibold text-slate-500" colSpan={6}>
+                          Đang tải lịch sử nợ...
+                        </td>
+                      </tr>
+                    ) : null}
+
+                    {!debtEventsQuery.isLoading && (debtEventsQuery.data?.content.length ?? 0) === 0 ? (
+                      <tr>
+                        <td className="px-4 py-8 text-center" colSpan={6}>
+                          <Inbox aria-hidden="true" className="mx-auto size-7 text-slate-300" />
+                          <p className="mt-1.5 text-xs font-semibold text-slate-500">Chưa từng nợ hạn mức</p>
+                        </td>
+                      </tr>
+                    ) : null}
+
+                    {!debtEventsQuery.isLoading
+                      ? (debtEventsQuery.data?.content ?? []).map((event) => {
+                          const eventDisplay = getDebtEventDisplay(event.eventType)
+                          const overageDisplay = getOverageDisplay(event.overageUsd)
+
+                          return (
+                            <tr className="border-b border-slate-100" key={event.id}>
+                              <td className="px-4 py-3 text-xs text-slate-600">{formatDateTime(event.occurredAt)}</td>
+                              <td className="px-3 py-3 text-xs font-bold text-indigo-700">
+                                {QUOTA_LABELS[event.quotaType]}
+                              </td>
+                              <td className="px-3 py-3">
+                                <StatusBadge label={eventDisplay.label} tone={eventDisplay.tone} />
+                              </td>
+                              <td className="px-3 py-3 text-xs font-semibold text-slate-900">
+                                {event.triggerAmountUsd === null ? '-' : formatUsd(event.triggerAmountUsd)}
+                              </td>
+                              <td className="px-3 py-3 text-xs font-semibold text-slate-900">
+                                {formatUsd(event.usedQuantityUsd)} / {formatUsd(event.totalAllocatedUsd)}
+                              </td>
+                              <td className="px-3 py-3">
+                                <StatusBadge label={overageDisplay.label} tone={overageDisplay.tone} />
+                              </td>
+                            </tr>
+                          )
+                        })
+                      : null}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3">
+                <Pagination
+                  currentPage={debtEventsPage}
+                  itemName="sự kiện"
+                  onPageChange={setDebtEventsPage}
+                  totalElements={debtEventsQuery.data?.totalElements ?? 0}
+                  totalPages={debtEventsQuery.data?.totalPages ?? 0}
                 />
               </div>
             </div>

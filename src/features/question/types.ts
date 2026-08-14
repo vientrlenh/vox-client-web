@@ -26,7 +26,15 @@ export type QuestionCollaboratorPermission =
   | 'CAN_USE'
   | 'CAN_EDIT'
 
-export type QuestionScope = 'MINE' | 'COLLABORATING' | 'ALL'
+/**
+ * Khớp với enum QuestionScope ở backend.
+ *
+ * REVIEWING hẹp hơn COLLABORATING: chỉ những câu mà người dùng là cộng tác viên có quyền
+ * CAN_EDIT — đúng tập câu mà thao tác duyệt chạy được. Hàng đợi duyệt phải dùng REVIEWING,
+ * nếu dùng COLLABORATING thì danh sách gồm cả câu chỉ được xem, và mọi thao tác duyệt trên
+ * chúng đều trả về NO_PERMISSION.
+ */
+export type QuestionScope = 'MINE' | 'COLLABORATING' | 'REVIEWING' | 'ALL'
 
 export type QuestionAssetType = 'AUDIO' | 'IMAGE' | 'VIDEO' | 'TEXT_PASSAGE'
 
@@ -124,6 +132,11 @@ export type QuestionDto = {
   createdAt: string | null
   updatedAt: string | null
   createdBy: string | null
+  createdByUser?: {
+    email?: string | null
+    fullName?: string | null
+    id: string
+  } | null
   updatedBy: string | null
   usableInExam?: boolean
   topic?: QuestionTopicRefDto | null
@@ -251,6 +264,12 @@ export type BulkUpdateQuestionStatusRequest = {
 
 export type BulkUpdateQuestionStatusFailure = {
   questionId: string
+  /** null khi backend không tìm thấy câu hỏi. */
+  questionCode: string | null
+  /** Trạng thái tại thời điểm bị từ chối; null khi không tìm thấy câu hỏi. */
+  currentStatus: QuestionStatus | null
+  /** Mã lý do ổn định (RejectionCode phía backend) — dùng để gom nhóm thay vì so khớp chuỗi. */
+  reasonCode: string
   reason: string
 }
 
@@ -309,6 +328,17 @@ export function formatQuestionDate(value?: string | null) {
 
 export function formatNullableText(value?: string | null) {
   return value?.trim() ? value : '-'
+}
+
+export function formatQuestionCreator(user?: QuestionDto['createdByUser']) {
+  const fullName = user?.fullName?.trim()
+  const email = user?.email?.trim()
+
+  if (!fullName) {
+    return null
+  }
+
+  return email ? `${fullName} (${email})` : fullName
 }
 
 export function formatDuration(seconds?: number | null) {

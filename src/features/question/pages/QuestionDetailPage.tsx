@@ -25,6 +25,7 @@ import {
   type QuestionDto,
   formatDuration,
   formatNullableText,
+  formatQuestionCreator,
   formatQuestionDate,
   getQuestionAssetTypeDisplay,
   getQuestionCollaboratorPermissionDisplay,
@@ -199,7 +200,10 @@ function QuestionDetailPage({ basePath }: QuestionDetailPageProps) {
               />
               <DetailItem label="Ngày tạo" value={formatQuestionDate(question.createdAt)} />
               <DetailItem label="Cập nhật" value={formatQuestionDate(question.updatedAt)} />
-              <DetailItem label="Người tạo" value={formatNullableText(question.createdBy)} />
+              <DetailItem
+                label="Người tạo"
+                value={formatNullableText(formatQuestionCreator(question.createdByUser))}
+              />
             </div>
 
             <DetailBlock label="Nội dung câu hỏi" value={question.questionText} />

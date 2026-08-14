@@ -79,17 +79,38 @@ export function formatConfidencePercent(value?: number | null) {
   return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`
 }
 
-export function getResultScoreTone(value?: number | null): StatusTone {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
+/**
+ * Màu theo mức đạt, nhận PHẦN TRĂM 0–100 — không phải điểm thô.
+ *
+ * Ngưỡng 80/45 chỉ có nghĩa trên thang phần trăm. Trước 2026-08-11 điều đó không được nói ra ở
+ * đâu cả, và một nửa số chỗ gọi truyền thẳng điểm thô vào: đúng trên rubric thang 0–100 (điểm
+ * trùng phần trăm) nhưng sai hẳn trên thang khác — rubric 0–10 thì mọi điểm đều < 45, kể cả bài
+ * 10/10 cũng tô đỏ.
+ *
+ * Quy đổi bằng {@link criterionScorePercentage} trước khi gọi. Hai chỗ chấm theo tiêu chí vốn đã
+ * làm đúng như vậy từ đầu; phần còn lại đã được sửa cho khớp.
+ */
+export function getResultScoreTone(percentage?: number | null): StatusTone {
+  if (typeof percentage !== 'number' || Number.isNaN(percentage)) {
     return 'neutral'
   }
-  if (value > 80) {
+  if (percentage > 80) {
     return 'success'
   }
-  if (value >= 45) {
+  if (percentage >= 45) {
     return 'warning'
   }
   return 'danger'
+}
+
+/**
+ * "0–100" -> "100". Mẫu số của thang gần như luôn là số tròn, để nguyên ".00" nhìn như điểm lẻ.
+ */
+export function formatScaleMax(value?: number | null) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null
+  }
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
 }
 
 export function criterionScorePercentage(

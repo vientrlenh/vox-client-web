@@ -12,15 +12,17 @@ export default defineConfig({
     },
   },
   server: {
+    host: true, 
+    port: 5173,
     proxy: {
       '/api': {
         changeOrigin: true,
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
       },
       // Thêm proxy cho GraphQL tại đây
       '/graphql': {
         changeOrigin: true,
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
       },
     },
   },

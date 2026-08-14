@@ -1,65 +1,85 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Eye } from 'lucide-react'
-import { useAppSelector } from '@/app/store/hooks'
+import { Eye, Lock } from 'lucide-react'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { toApiError } from '@/shared/api'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { examQueryKeys, useExamBlueprintSummaryQuery, useExamBlueprintsQuery } from '@/features/examCore/api/queries'
-import { formatDurationSeconds, getBlueprintVersionStatusDisplay, type ExamMemberDto } from '@/features/examCore/types'
+import { formatDurationSeconds, getBlueprintVersionStatusDisplay } from '@/features/examCore/types'
 import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useAttachExamBlueprintMutation } from '../api/useExamMutations'
+import type { ExamAuthority } from '@/features/examCore/utils/examPermissions'
 
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
 type BlueprintAttachPanelProps = {
+  /** Quyền đã giải sẵn ở trang chi tiết — panel không tự suy lại để hai chỗ không lệch nhau. */
+  authority: ExamAuthority
   blueprintId?: string | null
   blueprintVersionId?: string | null
   examId: string
   hasPapers: boolean
-  members: ExamMemberDto[]
+  /**
+   * Kỳ thi đã bắt đầu trở đi (`isExamLockedForEditing`) thì khung đề coi như chốt cứng — đổi khung đề
+   * hay chốt sang phiên bản khác lúc này là làm lệch mã đề thí sinh đang làm.
+   */
+  locked?: boolean
   onCreateVersion: (blueprintId: string) => void
   onOpenBlueprint: (blueprintId: string, versionId?: string) => void
   optional?: boolean
 }
 
 const PAPERS_EXIST_MESSAGE =
-  'Kỳ thi đã có mã đề — phải xóa hết mã đề hiện có trước khi đổi blueprint hoặc chốt sang phiên bản khác.'
+  'Kỳ thi đã có mã đề — phải xóa hết mã đề hiện có trước khi đổi khung đề hoặc chốt sang phiên bản khác.'
 
 /**
- * Nút "Đổi blueprint khác" bị `disabled` trông gần như nút thường, nên lý do phải hiện thành chữ chứ
- * không nấp trong tooltip. Quản trị trường lại không quản lý mã đề (`canManagePapers={false}` ở
- * `SchoolAdminExamDetailPage`) nên phải nói rõ ai xóa được, tránh bế tắc không lối thoát.
+ * Nút "Đổi khung đề khác" bị `disabled` trông gần như nút thường, nên lý do phải hiện thành chữ chứ
+ * không nấp trong tooltip — kèm luôn lối thoát, vì người đọc dòng này đang bị chặn.
  */
-function BlueprintLockedByPapersHint() {
+function BlueprintLockedByPapersHint({ canManagePapers }: { canManagePapers: boolean }) {
   return (
     <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-600">
-      {PAPERS_EXIST_MESSAGE} Quản trị trường không quản lý mã đề — nhờ giáo viên soạn đề hoặc chủ tịch
-      hội đồng xóa giúp ở tab <b className="text-slate-900">Mã đề</b>.
+      {PAPERS_EXIST_MESSAGE}{' '}
+      {canManagePapers ? (
+        <>
+          Sang tab <b className="text-slate-900">Tạo mã đề</b> để xóa.
+        </>
+      ) : (
+        <>
+          Nhờ chủ tịch hội đồng hoặc quản trị trường xóa giúp ở tab <b className="text-slate-900">Tạo mã đề</b>.
+        </>
+      )}
     </p>
   )
 }
 
 export function BlueprintAttachPanel({
+  authority,
   blueprintId,
   blueprintVersionId,
   examId,
   hasPapers,
-  members,
+  locked = false,
   onCreateVersion,
   onOpenBlueprint,
   optional = false,
 }: BlueprintAttachPanelProps) {
   const queryClient = useQueryClient()
-  const user = useAppSelector((state) => state.auth.user)
-  const isSchoolAdmin = user?.roles.includes('SCHOOL_ADMIN') ?? false
-  const myRole = members.find((member) => member.userId === user?.userId)?.role
-  const canAttach = isSchoolAdmin || myRole === 'AUTHOR'
-  const canApproveVersion = isSchoolAdmin || myRole === 'CHAIR'
+  // Gộp `locked` ngay vào hai cờ gốc: mọi nút ghi trong panel đều dẫn xuất từ chúng, nên không có
+  // đường nào lọt lưới khi thêm nút mới về sau.
+  const canAttach = authority.canAttachBlueprint && !locked
+  const canApproveVersion = authority.canFinalizeBlueprintVersion && !locked
   const canChangeBlueprint = canAttach && !hasPapers
   const canChangeVersion = canApproveVersion && !hasPapers
+  const lockedNotice =
+    locked && (authority.canAttachBlueprint || authority.canFinalizeBlueprintVersion) ? (
+      <div className="mb-3.5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[13px] font-semibold text-amber-800">
+        <Lock aria-hidden="true" className="size-4 shrink-0" />
+        Kỳ thi đã bắt đầu — khung đề đã chốt, không thể đổi khung đề hay chốt sang phiên bản khác nữa.
+      </div>
+    ) : null
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [forceReselect, setForceReselect] = useState(false)
@@ -104,7 +124,7 @@ export function BlueprintAttachPanel({
     }
     const version = attachedBlueprintQuery.data?.versions.find((candidate) => candidate.id === versionId)
     const quotaWarning = buildTimeQuotaWarning(
-      `Phiên bản blueprint ${version?.code ?? ''}`.trim(),
+      `Phiên bản khung đề ${version?.code ?? ''}`.trim(),
       version?.totalTimeLimitSeconds,
       maxTimePerAttemptMin,
     )
@@ -129,7 +149,7 @@ export function BlueprintAttachPanel({
       return
     }
     if (!newName.trim() || !newLanguageId) {
-      setErrorMessage('Vui lòng nhập tên và chọn ngôn ngữ cho blueprint mới.')
+      setErrorMessage('Vui lòng nhập tên và chọn ngôn ngữ cho khung đề mới.')
       return
     }
     attachLockedRef.current = true
@@ -160,8 +180,9 @@ export function BlueprintAttachPanel({
     return (
       <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5.5">
         <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+        {lockedNotice}
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-[15px] font-extrabold text-slate-900">Chọn blueprint để gắn vào kỳ thi</h3>
+          <h3 className="text-[15px] font-extrabold text-slate-900">Chọn khung đề để gắn vào kỳ thi</h3>
           {forceReselect ? (
             <button
               className="shrink-0 text-xs font-bold text-slate-400 hover:text-slate-600"
@@ -173,16 +194,18 @@ export function BlueprintAttachPanel({
           ) : null}
         </div>
         <p className="mt-1 text-[13px] text-slate-500">
-          {hasPapers
-            ? PAPERS_EXIST_MESSAGE
-            : canAttach
-              ? 'Bạn là người ra đề của kỳ thi này nên có thể chọn blueprint có sẵn hoặc tạo mới bên dưới.'
-              : 'Chỉ người ra đề của kỳ thi (hoặc quản trị trường) mới gắn được blueprint — bạn có thể xem danh sách nhưng không chọn được.'}
+          {locked
+            ? 'Kỳ thi đã bắt đầu — chỉ xem lại được danh sách khung đề, không gắn thêm được nữa.'
+            : hasPapers
+              ? PAPERS_EXIST_MESSAGE
+              : canAttach
+                ? 'Bạn là người ra đề của kỳ thi này nên có thể chọn khung đề có sẵn hoặc tạo mới bên dưới.'
+                : 'Chỉ người ra đề của kỳ thi (hoặc quản trị trường) mới gắn được khung đề — bạn có thể xem danh sách nhưng không chọn được.'}
           {optional ? ' Bước này không bắt buộc — có thể bỏ qua và thêm câu hỏi trực tiếp ở tab Đề bài.' : ''}
         </p>
         {blueprintsQuery.isError ? (
           <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">
-            Không tải được danh sách blueprint: {toApiError(blueprintsQuery.error).message}
+            Không tải được danh sách khung đề: {toApiError(blueprintsQuery.error).message}
             <button className="ml-2 underline" onClick={() => void blueprintsQuery.refetch()} type="button">
               Thử lại
             </button>
@@ -194,7 +217,7 @@ export function BlueprintAttachPanel({
             setKeyword(event.target.value)
             setPage(1)
           }}
-          placeholder="Tìm blueprint theo mã hoặc tên…"
+          placeholder="Tìm khung đề theo mã hoặc tên…"
           value={keyword}
         />
 
@@ -213,7 +236,7 @@ export function BlueprintAttachPanel({
               {blueprintsQuery.data?.content.length === 0 ? (
                 <tr>
                   <td className="py-4 text-center text-sm text-slate-400" colSpan={5}>
-                    Không tìm thấy blueprint phù hợp.
+                    Không tìm thấy khung đề phù hợp.
                   </td>
                 </tr>
               ) : (
@@ -254,7 +277,7 @@ export function BlueprintAttachPanel({
 
         {blueprintsQuery.data && blueprintsQuery.data.totalElements > 0 ? (
           <div className="mt-3.5 flex items-center justify-between text-xs font-semibold text-slate-500">
-            <span>{blueprintsQuery.data.totalElements} blueprint</span>
+            <span>{blueprintsQuery.data.totalElements} khung đề</span>
             <div className="flex gap-2">
               <button
                 className="h-8 rounded-lg border border-slate-200 px-3 disabled:opacity-40"
@@ -281,7 +304,7 @@ export function BlueprintAttachPanel({
             {showCreateForm ? (
               <div className="grid gap-2.5 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 p-3.5">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-[13px] font-extrabold text-slate-900">Tạo blueprint mới cho kỳ thi này</h4>
+                  <h4 className="text-[13px] font-extrabold text-slate-900">Tạo khung đề mới cho kỳ thi này</h4>
                   <button
                     className="text-xs font-bold text-slate-400 hover:text-slate-600"
                     onClick={() => setShowCreateForm(false)}
@@ -291,7 +314,7 @@ export function BlueprintAttachPanel({
                   </button>
                 </div>
                 <label className="grid gap-1 text-xs font-bold text-slate-700">
-                  Tên blueprint
+                  Tên khung đề
                   <input
                     className="h-9.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900"
                     onChange={(event) => setNewName(event.target.value)}
@@ -339,7 +362,7 @@ export function BlueprintAttachPanel({
                     onClick={() => void handleCreateAndAttach()}
                     type="button"
                   >
-                    {attachMutation.isPending ? 'Đang tạo…' : 'Tạo & gắn blueprint'}
+                    {attachMutation.isPending ? 'Đang tạo…' : 'Tạo & gắn khung đề'}
                   </button>
                 </div>
               </div>
@@ -349,7 +372,7 @@ export function BlueprintAttachPanel({
                 onClick={() => setShowCreateForm(true)}
                 type="button"
               >
-                + Tạo blueprint mới cho kỳ thi này
+                + Tạo khung đề mới cho kỳ thi này
               </button>
             )}
           </div>
@@ -363,7 +386,7 @@ export function BlueprintAttachPanel({
   if (attachedBlueprintQuery.isError) {
     return (
       <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-5.5 text-sm text-red-700">
-        Không tải được blueprint đang gắn: {toApiError(attachedBlueprintQuery.error).message}
+        Không tải được khung đề đang gắn: {toApiError(attachedBlueprintQuery.error).message}
         <button className="ml-2 font-bold underline" onClick={() => void attachedBlueprintQuery.refetch()} type="button">
           Thử lại
         </button>
@@ -374,7 +397,7 @@ export function BlueprintAttachPanel({
   if (!blueprint) {
     return (
       <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5.5 text-sm text-slate-400">
-        Đang tải blueprint…
+        Đang tải khung đề…
       </div>
     )
   }
@@ -386,16 +409,19 @@ export function BlueprintAttachPanel({
     return (
       <div className="mt-4 rounded-2xl border border-violet-200 bg-white p-5.5">
         <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+        {lockedNotice}
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-[15px] font-extrabold text-slate-900">Chốt phiên bản blueprint</h3>
+            <h3 className="text-[15px] font-extrabold text-slate-900">Chốt phiên bản khung đề</h3>
             <p className="mt-1 text-[13px] text-slate-500">
               Đã gắn <b className="text-slate-900">{blueprint.name}</b>.{' '}
-              {hasPapers
-                ? PAPERS_EXIST_MESSAGE
-                : canApproveVersion
-                  ? 'Chọn một phiên bản đã xuất bản bên dưới để chốt dùng cho kỳ thi.'
-                  : 'Chỉ chủ tịch hội đồng của kỳ thi (hoặc quản trị trường) mới chốt được phiên bản — bạn có thể xem trước.'}
+              {locked
+                ? 'Kỳ thi đã bắt đầu — không chốt được phiên bản khác nữa, chỉ xem lại.'
+                : hasPapers
+                  ? PAPERS_EXIST_MESSAGE
+                  : canApproveVersion
+                    ? 'Chọn một phiên bản đã xuất bản bên dưới để chốt dùng cho kỳ thi.'
+                    : 'Chỉ chủ tịch hội đồng của kỳ thi (hoặc quản trị trường) mới chốt được phiên bản — bạn có thể xem trước.'}
             </p>
           </div>
           {showVersionPicker ? (
@@ -414,7 +440,7 @@ export function BlueprintAttachPanel({
               title={hasPapers ? PAPERS_EXIST_MESSAGE : undefined}
               type="button"
             >
-              Đổi blueprint khác
+              Đổi khung đề khác
             </button>
           ) : null}
         </div>
@@ -422,10 +448,10 @@ export function BlueprintAttachPanel({
           <div className="mt-3 grid gap-2">
             <p className="text-sm text-amber-700">
               {blueprint.versions.length === 0
-                ? 'Blueprint chưa có phiên bản nào — tạo phiên bản mới bên dưới.'
+                ? 'Khung đề chưa có phiên bản nào — tạo phiên bản mới bên dưới.'
                 : canApproveVersion
                   ? `Có ${blueprint.versions.length} phiên bản đang ở dạng bản nháp, chưa xuất bản — bấm "Xem chi tiết" để duyệt và xuất bản trước khi chốt dùng cho kỳ thi.`
-                  : 'Blueprint chưa có phiên bản nào được xuất bản — chủ tịch hội đồng cần xem chi tiết để duyệt và xuất bản một phiên bản trước.'}
+                  : 'Khung đề chưa có phiên bản nào được xuất bản — chủ tịch hội đồng cần xem chi tiết để duyệt và xuất bản một phiên bản trước.'}
             </p>
             <div className="flex flex-wrap gap-2">
               {blueprint.versions.length > 0 ? (
@@ -481,7 +507,7 @@ export function BlueprintAttachPanel({
                 {publishedVersions.map((version) => {
                   const isCurrentlyChotted = version.id === blueprintVersionId
                   const quotaWarning = buildTimeQuotaWarning(
-                    `Phiên bản blueprint ${version.code}`,
+                    `Phiên bản khung đề ${version.code}`,
                     version.totalTimeLimitSeconds,
                     maxTimePerAttemptMin,
                   )
@@ -550,11 +576,14 @@ export function BlueprintAttachPanel({
   )
   const otherPublishedVersions = otherActiveVersions.filter((version) => version.status === 'PUBLISHED')
   const otherDraftVersions = otherActiveVersions.filter((version) => version.status === 'DRAFT')
-  const showNewerVersionHint = !hasPapers && otherActiveVersions.length > 0
+  // Khi kỳ thi đã khóa thì "còn phiên bản khác chưa chốt" chỉ là thông tin gây tiếc nuối — không còn
+  // thao tác nào đi kèm nên không hiện.
+  const showNewerVersionHint = !hasPapers && !locked && otherActiveVersions.length > 0
 
   return (
     <div className="mt-4 rounded-2xl border border-emerald-200 bg-white p-5.5">
       <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+      {lockedNotice}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5">
@@ -592,16 +621,16 @@ export function BlueprintAttachPanel({
               title={hasPapers ? PAPERS_EXIST_MESSAGE : undefined}
               type="button"
             >
-              Đổi blueprint khác
+              Đổi khung đề khác
             </button>
           ) : null}
         </div>
       </div>
-      {canAttach && hasPapers ? <BlueprintLockedByPapersHint /> : null}
+      {canAttach && hasPapers ? <BlueprintLockedByPapersHint canManagePapers={authority.canManagePapers} /> : null}
       {showNewerVersionHint ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5">
           <p className="text-[13px] text-amber-800">
-            Blueprint có {otherActiveVersions.length} phiên bản khác chưa được chốt cho kỳ thi này
+            Khung đề có {otherActiveVersions.length} phiên bản khác chưa được chốt cho kỳ thi này
             {otherDraftVersions.length > 0 ? ' (một số đang ở dạng bản nháp, chờ duyệt)' : ''}.
           </p>
           {otherDraftVersions.length > 0 && canApproveVersion ? (

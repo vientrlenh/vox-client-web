@@ -28,7 +28,7 @@ export function RubricVersionTable({
   if (isLoading) {
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3">
-        <RefreshCw className="size-6 animate-spin text-cyan-600" />
+        <RefreshCw className="size-6 animate-spin text-indigo-600" />
         <p className="text-sm text-slate-500">Đang tải danh sách phiên bản...</p>
       </div>
     );
@@ -38,7 +38,7 @@ export function RubricVersionTable({
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3 text-center">
         <p className="text-sm font-semibold text-red-600">Đã có lỗi xảy ra khi tải dữ liệu.</p>
-        <button onClick={onRetry} className="text-sm font-bold text-cyan-600 underline hover:text-cyan-700">
+        <button onClick={onRetry} className="text-sm font-bold text-indigo-600 underline hover:text-indigo-700">
           Thử lại
         </button>
       </div>
@@ -57,7 +57,7 @@ export function RubricVersionTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm text-slate-700">
-        <thead className="bg-slate-50/75 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
           <tr>
             <th className="px-4 py-3">Mã phiên bản</th>
             <th className="px-4 py-3">Tên phiên bản</th>
@@ -67,15 +67,15 @@ export function RubricVersionTable({
             <th className="px-4 py-3 text-right">Chi tiết</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200">
+        <tbody className="divide-y divide-slate-100">
           {versions.map((v) => (
             <tr
               key={v.id}
               onClick={() => onViewCriteria(v)}
               // Hiệu ứng click cả dòng giống hệt bảng Rubric
-              className="group cursor-pointer transition hover:bg-cyan-50"
+              className="group cursor-pointer transition hover:bg-indigo-50"
             >
-              <td className="px-4 py-3 font-mono font-bold text-slate-900 group-hover:text-cyan-700">
+              <td className="px-4 py-3 font-mono font-bold text-slate-900 group-hover:text-indigo-700">
                 v{v.version}
               </td>
               <td className="px-4 py-3 font-medium text-slate-900">{v.name}</td>
@@ -98,7 +98,7 @@ export function RubricVersionTable({
               </td>
               <td className="px-4 py-3 text-right">
                 {/* Icon mũi tên sáng lên khi hover dòng */}
-                <div className="inline-flex size-8 items-center justify-center rounded-full text-slate-400 transition group-hover:bg-white group-hover:text-cyan-600 group-hover:shadow-sm">
+                <div className="inline-flex size-8 items-center justify-center rounded-full text-slate-400 transition group-hover:bg-white group-hover:text-indigo-600 group-hover:shadow-sm">
                   <ChevronRight className="size-5" />
                 </div>
               </td>

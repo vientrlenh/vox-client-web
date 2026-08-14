@@ -11,6 +11,8 @@ import { useUpdateSchoolRubricCriterionMutation, type UpdateRubricCriterionPaylo
 import { useDeleteSchoolRubricCriterionMutation } from '../api/useDeleteSchoolRubricCriterionMutation';
 
 import { UpdateRubricCriterionDialog } from '../components/UpdateRubricCriterionDialog';
+import { ErrorBanner } from '@/shared/ui/ErrorBanner';
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
 
 type ExampleItem = { transcript: string; explanation: string; expectedScore: number };
 
@@ -41,6 +43,8 @@ function parseExamplesReadOnly(examplesJson?: string | null): ExampleItem[] {
 }
 
 export function SchoolAdminRubricCriterionDetailPage() {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirmationDialog();
   const { rubricId, versionId, criterionId } = useParams<{ rubricId: string; versionId: string; criterionId: string }>();
   const navigate = useNavigate();
 
@@ -62,33 +66,40 @@ export function SchoolAdminRubricCriterionDetailPage() {
   const { mutateAsync: deleteCriterion, isPending: isDeletingCriterion } = useDeleteSchoolRubricCriterionMutation(schoolId, versionId);
 
   const handleUpdateCriterion = async (payload: UpdateRubricCriterionPayload) => {
+    setErrorMessage(null);
     try {
       await updateCriterion(payload);
       setIsEditModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
     }
   };
 
   const handleDeleteCriterion = async () => {
     if (!criterionId) return;
-    const isConfirm = window.confirm('Bạn có chắc chắn muốn xóa tiêu chí này? Hành động này không thể hoàn tác!');
-    if (!isConfirm) return;
+    const isConfirmed = await confirm({
+      confirmLabel: 'Xóa',
+      message: 'Bạn có chắc chắn muốn xóa tiêu chí này? Hành động này không thể hoàn tác!',
+      title: 'Xác nhận xóa',
+    });
+    if (!isConfirmed) return;
+
+    setErrorMessage(null);
 
     try {
       await deleteCriterion(criterionId);
       navigate(`/school-admin/rubrics/${rubricId}/versions/${versionId}`);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
     }
   };
 
   if (isCriterionLoading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3">
-        <RefreshCw className="size-8 animate-spin text-cyan-600" />
+        <RefreshCw className="size-8 animate-spin text-indigo-600" />
         <p className="text-sm text-slate-500">Đang tải thông tin Tiêu chí...</p>
       </div>
     );
@@ -99,7 +110,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
         <AlertTriangle className="size-12 text-red-500" />
         <p className="text-slate-600">Không tìm thấy Tiêu chí hoặc bạn không có quyền truy cập.</p>
-        <button onClick={() => refetchCriterion()} className="rounded-lg bg-cyan-600 px-4 py-2 font-bold text-white hover:bg-cyan-700">
+        <button onClick={() => refetchCriterion()} className="rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700">
           Thử lại
         </button>
       </div>
@@ -109,15 +120,9 @@ export function SchoolAdminRubricCriterionDetailPage() {
   const examples = parseExamplesReadOnly(criterion.examplesJson);
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
-      <div
-        className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
-        style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}
-      />
-      <div
-        className="pointer-events-none absolute -bottom-48 -left-36 size-[420px] rounded-full blur-[10px]"
-        style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.12), rgba(139,92,246,0.08) 55%, transparent 75%)' }}
-      />
+    <section className="grid gap-6">
+      {dialog}
+      <ErrorBanner message={errorMessage} />
 
       {/* HEADER BAR */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -125,18 +130,18 @@ export function SchoolAdminRubricCriterionDetailPage() {
           <button
             onClick={() => navigate(`/school-admin/rubrics/${rubricId}/versions/${versionId}`)}
             aria-label="Quay lại"
-            className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-950 transition hover:bg-slate-50"
+            className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
           >
             <ChevronLeft className="size-5" />
           </button>
-          <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
-            <ListChecks className="size-[26px] text-indigo-600" /> Chi tiết Tiêu chí
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
+            <ListChecks className="size-6 text-indigo-600" /> Chi tiết Tiêu chí
           </h1>
         </div>
       </div>
 
       {/* THÔNG TIN CHUNG CỦA TIÊU CHÍ */}
-      <div className="rounded-[14px] border border-slate-200 bg-white p-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-6">
         <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-4">
           <div className="md:col-span-2">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Tên Tiêu chí</p>
@@ -156,7 +161,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
             <p className="mt-2 text-sm text-slate-700 whitespace-pre-line">{criterion.description || 'Không có mô tả'}</p>
           </div>
 
-          <div className="rounded-[10px] bg-slate-50 p-3 ring-1 ring-inset ring-slate-200">
+          <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-inset ring-slate-200">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Điểm số</p>
             <div className="mt-2 space-y-1 text-sm text-slate-700">
               <p><span className="font-medium">Thang:</span> {criterion.minScore} - {criterion.maxScore}</p>
@@ -171,7 +176,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Ví dụ minh họa</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {examples.map((example, index) => (
-                <div key={index} className="rounded-[10px] border border-slate-200 p-3">
+                <div key={index} className="rounded-lg border border-slate-200 p-3">
                   <p className="text-sm font-medium text-slate-950">{example.transcript}</p>
                   {example.explanation && (
                     <p className="mt-1 text-xs text-slate-500">{example.explanation}</p>
@@ -201,7 +206,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
             type="button"
             onClick={handleDeleteCriterion}
             disabled={isDeletingCriterion}
-            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-5 text-sm font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-red-200 bg-white px-4 text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
           >
             {isDeletingCriterion ? <RefreshCw className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
             Xóa Tiêu chí
@@ -210,7 +215,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
           <button
             type="button"
             onClick={() => setIsEditModalOpen(true)}
-            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 px-5 text-sm font-medium text-white transition hover:opacity-90"
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
           >
             <Edit className="size-4" /> Chỉnh sửa Tiêu chí
           </button>

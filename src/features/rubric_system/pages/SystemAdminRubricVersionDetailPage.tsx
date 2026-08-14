@@ -37,8 +37,12 @@ import { UpdateRubricResultBandDialog } from '../components/UpdateRubricResultBa
 import { ViewRubricResultBandDialog } from '../components/ViewRubricResultBandDialog';
 import { Pagination } from '@/shared/components/Pagination';
 import type { RubricCriterion, RubricResultBand } from '../types';
+import { ErrorBanner } from '@/shared/ui/ErrorBanner';
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
 
 export function SystemAdminRubricVersionDetailPage() {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirmationDialog();
   const { rubricId, versionId } = useParams<{ rubricId: string; versionId: string }>();
   const navigate = useNavigate();
 
@@ -148,30 +152,38 @@ export function SystemAdminRubricVersionDetailPage() {
 
   // Hàm xử lý Update Version
   const handleUpdateVersion = async (formData: UpdateRubricVersionPayload) => {
+    setErrorMessage(null);
     try {
       await updateVersion(formData);
       setIsEditModalOpen(false);
     } catch (error) {
       const err = error as Error;
       console.error("Lỗi cập nhật Version:", err);
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật.');
     }
   };
 
   // Hàm xử lý Chuyển trạng thái Version (hiện chỉ hỗ trợ DRAFT -> PUBLISHED)
   const handlePublishVersion = async () => {
+    setErrorMessage(null);
     try {
       await changeVersionStatus('PUBLISHED');
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi chuyển trạng thái phiên bản.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi chuyển trạng thái phiên bản.');
     }
   };
 
   // Hàm xử lý Delete Version (chỉ áp dụng khi DRAFT)
   const handleDeleteVersion = async () => {
-    const isConfirm = window.confirm("Bạn có chắc chắn muốn xóa vĩnh viễn phiên bản DRAFT này? Hành động này không thể hoàn tác!");
-    if (!isConfirm || !versionId) return;
+    const isConfirmed = await confirm({
+      confirmLabel: 'Xóa',
+      message: "Bạn có chắc chắn muốn xóa vĩnh viễn phiên bản DRAFT này? Hành động này không thể hoàn tác!",
+      title: 'Xác nhận xóa',
+    });
+    if (!isConfirmed || !versionId) return;
+
+    setErrorMessage(null);
 
     try {
       await deleteVersion(versionId);
@@ -180,87 +192,104 @@ export function SystemAdminRubricVersionDetailPage() {
     } catch (error) {
       const err = error as Error;
       console.error("Lỗi xóa Version:", err);
-      alert(err.message || 'Có lỗi xảy ra khi xóa phiên bản.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi xóa phiên bản.');
     }
   };
 
   // Hàm xử lý Lưu trữ (ARCHIVE) Version (chỉ áp dụng khi PUBLISHED)
   const handleArchiveVersion = async () => {
+    setErrorMessage(null);
     try {
       await archiveVersion();
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi lưu trữ phiên bản.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi lưu trữ phiên bản.');
     }
   };
 
   // Hàm xử lý Thêm Tiêu chí
   const handleAddCriterion = async (payload: AddRubricCriteriaPayload) => {
+    setErrorMessage(null);
     try {
       await addCriteria(payload);
       setIsAddCriterionModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi thêm tiêu chí.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi thêm tiêu chí.');
     }
   };
 
   // Hàm xử lý Sửa Tiêu chí
   const handleUpdateCriterion = async (payload: UpdateRubricCriterionPayload) => {
+    setErrorMessage(null);
     try {
       await updateCriterion(payload);
       setEditingCriterion(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
     }
   };
 
   // Hàm xử lý Xóa Tiêu chí
   const handleDeleteCriterion = async (criterion: RubricCriterion) => {
-    const isConfirm = window.confirm(`Bạn có chắc chắn muốn xóa tiêu chí "${criterion.name}"?`);
-    if (!isConfirm) return;
+    const isConfirmed = await confirm({
+      confirmLabel: 'Xóa',
+      message: `Bạn có chắc chắn muốn xóa tiêu chí "${criterion.name}"?`,
+      title: 'Xác nhận xóa',
+    });
+    if (!isConfirmed) return;
+
+    setErrorMessage(null);
 
     try {
       await deleteCriterion(criterion.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi xóa tiêu chí.');
     }
   };
 
   // Hàm xử lý Thêm Thang điểm
   const handleAddResultBand = async (payload: AddRubricResultBandsPayload) => {
+    setErrorMessage(null);
     try {
       await addResultBands(payload);
       setIsAddResultBandModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi thêm thang điểm.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi thêm thang điểm.');
     }
   };
 
   // Hàm xử lý Sửa Thang điểm
   const handleUpdateResultBand = async (payload: UpdateRubricResultBandPayload) => {
+    setErrorMessage(null);
     try {
       await updateResultBand(payload);
       setEditingResultBand(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật thang điểm.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật thang điểm.');
     }
   };
 
   // Hàm xử lý Xóa Thang điểm
   const handleDeleteResultBand = async (band: RubricResultBand) => {
-    const isConfirm = window.confirm(`Bạn có chắc chắn muốn xóa thang điểm "${band.name}"?`);
-    if (!isConfirm) return;
+    const isConfirmed = await confirm({
+      confirmLabel: 'Xóa',
+      message: `Bạn có chắc chắn muốn xóa thang điểm "${band.name}"?`,
+      title: 'Xác nhận xóa',
+    });
+    if (!isConfirmed) return;
+
+    setErrorMessage(null);
 
     try {
       await deleteResultBand(band.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa thang điểm.');
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi xóa thang điểm.');
     }
   };
 
@@ -269,7 +298,7 @@ export function SystemAdminRubricVersionDetailPage() {
   if (isVersionLoading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3">
-        <RefreshCw className="size-8 animate-spin text-cyan-600" />
+        <RefreshCw className="size-8 animate-spin text-indigo-600" />
         <p className="text-sm text-slate-500">Đang tải thông tin Version...</p>
       </div>
     );
@@ -280,7 +309,7 @@ export function SystemAdminRubricVersionDetailPage() {
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
         <AlertTriangle className="size-12 text-red-500" />
         <p className="text-slate-600">Không tìm thấy Version hoặc bạn không có quyền truy cập.</p>
-        <button onClick={() => refetchVersion()} className="rounded-lg bg-cyan-600 px-4 py-2 font-bold text-white hover:bg-cyan-700">
+        <button onClick={() => refetchVersion()} className="rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700">
           Thử lại
         </button>
       </div>
@@ -290,15 +319,9 @@ export function SystemAdminRubricVersionDetailPage() {
 
   // --- 5. RENDER UI CHÍNH ---
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
-      <div
-        className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
-        style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}
-      />
-      <div
-        className="pointer-events-none absolute -bottom-48 -left-36 size-[420px] rounded-full blur-[10px]"
-        style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.12), rgba(139,92,246,0.08) 55%, transparent 75%)' }}
-      />
+    <section className="grid gap-6">
+      {dialog}
+      <ErrorBanner message={errorMessage} />
 
       {/* HEADER BAR */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -306,18 +329,18 @@ export function SystemAdminRubricVersionDetailPage() {
           <button
             onClick={() => navigate(`/system-admin/rubrics/${rubricId}`)}
             aria-label="Quay lại"
-            className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-950 transition hover:bg-slate-50"
+            className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
           >
             <ChevronLeft className="size-5" />
           </button>
-          <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
-            <GitMerge className="size-[26px] text-indigo-600" /> Chi tiết Phiên bản
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
+            <GitMerge className="size-6 text-indigo-600" /> Chi tiết Phiên bản
           </h1>
         </div>
       </div>
 
       {/* THÔNG TIN CHUNG CỦA VERSION */}
-      <div className="rounded-[14px] border border-slate-200 bg-white p-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-6">
         <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-4">
           <div className="md:col-span-2">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Tên Phiên Bản</p>
@@ -338,7 +361,7 @@ export function SystemAdminRubricVersionDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-[10px] bg-slate-50 p-3 ring-1 ring-inset ring-slate-200">
+          <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-inset ring-slate-200">
              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
                <Calculator className="size-4" /> Điểm số
              </p>
@@ -373,7 +396,7 @@ export function SystemAdminRubricVersionDetailPage() {
               type="button"
               onClick={handleDeleteVersion}
               disabled={isDeleting}
-              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-5 text-sm font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-red-200 bg-white px-4 text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
             >
               {isDeleting ? <RefreshCw className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
               Xóa Version
@@ -385,7 +408,7 @@ export function SystemAdminRubricVersionDetailPage() {
               type="button"
               onClick={handleArchiveVersion}
               disabled={isArchiving}
-              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
             >
               {isArchiving ? <RefreshCw className="size-4 animate-spin" /> : <Archive className="size-4" />}
               Lưu trữ Version
@@ -395,7 +418,7 @@ export function SystemAdminRubricVersionDetailPage() {
           <button
             type="button"
             onClick={() => setIsEditModalOpen(true)}
-            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 px-5 text-sm font-medium text-white transition hover:opacity-90"
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
           >
             <Edit className="size-4" /> Chỉnh sửa Version
           </button>
@@ -403,7 +426,7 @@ export function SystemAdminRubricVersionDetailPage() {
       </div>
 
       {/* KHU VỰC TABS & BẢNG DANH SÁCH */}
-      <div className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
 
         {/* TABS HEADER */}
         <div className="flex items-center border-b border-slate-200 bg-slate-50/50 px-4 sm:px-6">
@@ -431,7 +454,7 @@ export function SystemAdminRubricVersionDetailPage() {
               <button
                 type="button"
                 onClick={() => navigate(`/system-admin/rubrics/${rubricId}/versions/${versionId}/criteria/import`)}
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
               >
                 <FileSpreadsheet className="size-4" /> Nhập từ Excel/CSV
               </button>
@@ -439,7 +462,7 @@ export function SystemAdminRubricVersionDetailPage() {
             <button
               type="button"
               onClick={() => activeTab === 'criteria' ? setIsAddCriterionModalOpen(true) : setIsAddResultBandModalOpen(true)}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 px-4 text-sm font-medium text-white transition hover:opacity-90"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
             >
               <Plus className="size-4" /> {activeTab === 'criteria' ? 'Thêm Tiêu chí' : 'Thêm Thang điểm'}
             </button>
@@ -458,7 +481,7 @@ export function SystemAdminRubricVersionDetailPage() {
                 value={criteriaKeyword}
                 onChange={(e) => setCriteriaKeyword(e.target.value)}
                 placeholder="Tìm theo mã hoặc tên tiêu chí..."
-                className="w-full rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
               />
             </div>
             <div className="relative min-w-50">
@@ -468,7 +491,7 @@ export function SystemAdminRubricVersionDetailPage() {
               <select
                 value={criteriaIsRequired}
                 onChange={(e) => { setCriteriaIsRequired(e.target.value); setCriteriaPage(1); }}
-                className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
               >
                 <option value="">Tất cả</option>
                 <option value="true">Bắt buộc</option>
@@ -487,7 +510,7 @@ export function SystemAdminRubricVersionDetailPage() {
                 value={bandsKeyword}
                 onChange={(e) => setBandsKeyword(e.target.value)}
                 placeholder="Tìm theo mã hoặc tên thang điểm..."
-                className="w-full rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
               />
             </div>
           </div>

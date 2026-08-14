@@ -194,7 +194,7 @@ export function PaymentResultPage({ backTo }: PaymentResultPageProps) {
         <div className={`mx-auto flex size-14 items-center justify-center rounded-full ${display.iconClass}`}>
           <Icon aria-hidden="true" className={`size-7 ${outcome === 'checking' ? 'animate-spin' : ''}`} />
         </div>
-        <h1 className="mt-4 text-xl font-extrabold text-blue-950">{display.title}</h1>
+        <h1 className="mt-4 text-2xl font-black text-blue-950">{display.title}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">{display.message}</p>
         <button
           className="mt-6 inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-black text-white transition hover:bg-indigo-700"

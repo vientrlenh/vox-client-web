@@ -20,6 +20,7 @@ import type {
   GradingTaskDetail,
   GradingTaskItem,
   GradingTurn,
+  MyGradingExamOption,
   ResultStatusHistoryEntry,
 } from '../types'
 
@@ -154,12 +155,19 @@ const GRADING_STATS_QUERY = `
  */
 const MY_GRADING_TASKS_QUERY = `
   query MyGradingTasks(
+    $examId: ID
     $status: GradingAssignmentStatus
     $roundType: GradingRoundType
     $page: Int
     $size: Int
   ) {
-    myGradingTasks(status: $status, roundType: $roundType, page: $page, size: $size) {
+    myGradingTasks(
+      examId: $examId
+      status: $status
+      roundType: $roundType
+      page: $page
+      size: $size
+    ) {
       content {
         assignmentId
         candidateResultId
@@ -182,6 +190,25 @@ const MY_GRADING_TASKS_QUERY = `
       size
       totalElements
       totalPages
+    }
+  }
+`
+
+/**
+ * Kỳ thi để đổ vào bộ lọc của hàng đợi — CHỈ những kỳ thi giáo viên đang/đã có bài.
+ *
+ * Không dùng `exams` như bên nhà trường được: luật hiển thị ở đó đòi người gọi là admin
+ * hoặc thành viên kỳ thi, mà giáo viên chấm kỳ thi tập trung không phải thành viên, nên
+ * hỏi ở đó chỉ nhận về danh sách rỗng.
+ */
+const MY_GRADING_EXAMS_QUERY = `
+  query MyGradingExams {
+    myGradingExams {
+      id
+      code
+      name
+      taskCount
+      openTaskCount
     }
   }
 `
@@ -314,6 +341,8 @@ export type FetchGradingAssignmentsInput = {
 }
 
 export type FetchMyGradingTasksInput = {
+  /** Bỏ trống = mọi kỳ thi giáo viên đang có bài. Id lấy từ `useMyGradingExamsQuery`. */
+  examId?: string
   page: number
   roundType?: '' | GradingRoundType
   size: number
@@ -336,6 +365,7 @@ export const gradingKeys = {
     [...gradingKeys.all, 'finalize-preview', examId] as const,
   history: (candidateResultId: string | null) =>
     [...gradingKeys.all, 'result-history', candidateResultId] as const,
+  myExams: () => [...gradingKeys.all, 'my-exams'] as const,
   myTasks: (input: FetchMyGradingTasksInput) => [...gradingKeys.all, 'my-tasks', input] as const,
   preview: (assignmentId: string | null, payload: unknown) =>
     [...gradingKeys.all, 'preview', assignmentId, payload] as const,
@@ -381,6 +411,7 @@ export async function fetchMyGradingTasks(input: FetchMyGradingTasksInput) {
   const data = await graphQLRequest<{ myGradingTasks: GradingPage<GradingTask> }>(
     MY_GRADING_TASKS_QUERY,
     {
+      examId: input.examId || undefined,
       page: input.page,
       roundType: input.roundType || undefined,
       size: input.size,
@@ -388,6 +419,13 @@ export async function fetchMyGradingTasks(input: FetchMyGradingTasksInput) {
     },
   )
   return data.myGradingTasks
+}
+
+export async function fetchMyGradingExams() {
+  const data = await graphQLRequest<{ myGradingExams: MyGradingExamOption[] }>(
+    MY_GRADING_EXAMS_QUERY,
+  )
+  return data.myGradingExams
 }
 
 /**
@@ -475,6 +513,18 @@ export function useMyGradingTasksQuery(
     queryFn: () => fetchMyGradingTasks({ ...input, page: page - 1 }),
     queryKey: gradingKeys.myTasks(input),
     select: (data) => ({ ...data, page: data.page + 1 }),
+  })
+}
+
+/**
+ * Danh sách ổn định trong một phiên làm việc — giáo viên không được giao thêm bài giữa
+ * lúc đang chấm, nên không cần nạp lại mỗi lần quay lại tab.
+ */
+export function useMyGradingExamsQuery() {
+  return useQuery({
+    queryFn: fetchMyGradingExams,
+    queryKey: gradingKeys.myExams(),
+    refetchOnWindowFocus: false,
   })
 }
 
