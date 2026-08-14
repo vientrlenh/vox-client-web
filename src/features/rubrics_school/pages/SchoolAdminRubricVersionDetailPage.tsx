@@ -172,15 +172,10 @@ export function SchoolAdminRubricVersionDetailPage() {
 
   // Hàm xử lý Update Version
   const handleUpdateVersion = async (formData: UpdateRubricVersionPayload) => {
-    setErrorMessage(null);
-    try {
-      await updateVersion(formData);
-      setIsEditModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      console.error("Lỗi cập nhật Version:", err);
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateVersion(formData);
+    setIsEditModalOpen(false);
   };
 
   // Hàm xử lý Chuyển trạng thái Version (hiện chỉ hỗ trợ DRAFT -> PUBLISHED)
@@ -229,26 +224,18 @@ export function SchoolAdminRubricVersionDetailPage() {
 
   // Hàm xử lý Thêm Tiêu chí
   const handleAddCriterion = async (payload: AddRubricCriteriaPayload) => {
-    setErrorMessage(null);
-    try {
-      await addCriteria(payload);
-      setIsAddCriterionModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi thêm tiêu chí.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await addCriteria(payload);
+    setIsAddCriterionModalOpen(false);
   };
 
   // Hàm xử lý Sửa Tiêu chí
   const handleUpdateCriterion = async (payload: UpdateRubricCriterionPayload) => {
-    setErrorMessage(null);
-    try {
-      await updateCriterion(payload);
-      setEditingCriterion(null);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateCriterion(payload);
+    setEditingCriterion(null);
   };
 
   // Hàm xử lý Xóa Tiêu chí
@@ -272,26 +259,18 @@ export function SchoolAdminRubricVersionDetailPage() {
 
   // Hàm xử lý Thêm Thang điểm
   const handleAddResultBand = async (payload: AddRubricResultBandsPayload) => {
-    setErrorMessage(null);
-    try {
-      await addResultBands(payload);
-      setIsAddResultBandModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi thêm thang điểm.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await addResultBands(payload);
+    setIsAddResultBandModalOpen(false);
   };
 
   // Hàm xử lý Sửa Thang điểm
   const handleUpdateResultBand = async (payload: UpdateRubricResultBandPayload) => {
-    setErrorMessage(null);
-    try {
-      await updateResultBand(payload);
-      setEditingResultBand(null);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật thang điểm.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateResultBand(payload);
+    setEditingResultBand(null);
   };
 
   // Hàm xử lý Xóa Thang điểm

@@ -74,14 +74,10 @@ export function SchoolAdminRubricCriterionDetailPage() {
   const { mutateAsync: deleteCriterion, isPending: isDeletingCriterion } = useDeleteSchoolRubricCriterionMutation(schoolId, versionId);
 
   const handleUpdateCriterion = async (payload: UpdateRubricCriterionPayload) => {
-    setErrorMessage(null);
-    try {
-      await updateCriterion(payload);
-      setIsEditModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateCriterion(payload);
+    setIsEditModalOpen(false);
   };
 
   const handleDeleteCriterion = async () => {
