@@ -55,7 +55,7 @@ export function ScoringRuleTable({ rules, isLoading, isError, onRetry, onViewDet
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm text-slate-700">
-        <thead className="bg-slate-50/75 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+        <thead className="bg-slate-50/75 text-xs font-black text-blue-950 border-b border-slate-200">
           <tr>
             <th className="px-4 py-3 text-center">Ưu tiên</th>
             <th className="px-4 py-3">Mã Code</th>

@@ -493,7 +493,19 @@ export function SchoolAdminGradesPage() {
             type="button"
           >
             <Upload aria-hidden="true" className="size-4" />
-            Import
+            Import khối
+          </button>
+          {/*
+            Vào thẳng import năm học, không bắt mở một khối trước. File nạp được nhiều khối
+            cùng lúc nên bước chọn khối chỉ là thao tác thừa.
+          */}
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
+            onClick={() => navigate('/school-admin/grades/years/import')}
+            type="button"
+          >
+            <Upload aria-hidden="true" className="size-4" />
+            Import năm học
           </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700"

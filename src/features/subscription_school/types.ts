@@ -4,6 +4,7 @@ export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
 export type RequestType = 'REGISTRATION' | 'UPGRADE'
 export type InvoiceStatus = 'PAID' | 'PENDING' | 'FAILED' | 'CANCELLED'
+export type SchoolDebtEventType = 'LOCKED' | 'CAP_EXCEEDED' | 'CLEARED'
 
 export const QUOTA_TYPES: QuotaType[] = ['GRADING', 'CLASS_TEST', 'PRACTICE']
 
@@ -19,22 +20,11 @@ export const QUOTA_ICONS: Record<QuotaType, LucideIcon> = {
   PRACTICE: Headphones,
 }
 
-// includedQuantity / totalAllocated / usedQuantity đều tính bằng GIÂY audio xử lý —
-// quy đổi sang phút khi hiển thị cho dễ hiểu, chỉ gửi lại giây khi gọi API.
-export function secondsToMinutes(seconds?: number | null) {
-  return Math.round((Number(seconds) || 0) / 60)
-}
-
-export function minutesToSeconds(minutes?: number | null) {
-  return Math.round((Number(minutes) || 0) * 60)
-}
-
-export function formatQuotaMinutes(seconds?: number | null) {
-  return `${new Intl.NumberFormat('vi-VN').format(secondsToMinutes(seconds))} phút`
-}
-
-export function formatPricePerMinute(pricePerSecond?: number | null) {
-  return `${formatVnd((Number(pricePerSecond) || 0) * 60)} / phút`
+// includedQuantity / totalAllocated / usedQuantity đều tính bằng USD chi phí AI ước
+// tính (xem AI_USAGE_QUOTA_USD_MIGRATION.md) — hiển thị thẳng, không quy đổi đơn vị.
+export function formatUsd(value?: number | null) {
+  const amount = Number(value) || 0
+  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(amount)}`
 }
 
 export type PlanQuota = {
@@ -109,6 +99,28 @@ export type Invoice = {
 
 export type InvoicePage = {
   content: Invoice[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+// Sổ audit "nguyên nhân nợ hạn mức AI" của chính trường mình -- xem ViewSchoolDebtEventsUseCase.
+export type SchoolDebtEvent = {
+  id: string
+  subscriptionId: string
+  eventType: SchoolDebtEventType
+  quotaType: QuotaType
+  triggerExamSessionId: string | null
+  triggerAmountUsd: number | null
+  totalAllocatedUsd: number
+  usedQuantityUsd: number
+  overageUsd: number
+  occurredAt: string | null
+}
+
+export type SchoolDebtEventPage = {
+  content: SchoolDebtEvent[]
   page: number
   size: number
   totalElements: number
@@ -272,12 +284,28 @@ export function getInvoiceStatusDisplay(status: InvoiceStatus) {
   return { label: 'Thất bại', tone: 'danger' as const }
 }
 
-export function getUsageBarColor(pct: number) {
-  if (pct >= 90) {
-    return '#ef4444'
+export function getDebtEventDisplay(eventType: SchoolDebtEventType) {
+  if (eventType === 'LOCKED') {
+    return { label: 'Khóa do nợ', tone: 'danger' as const }
   }
-  if (pct >= 75) {
-    return '#f59e0b'
+
+  if (eventType === 'CAP_EXCEEDED') {
+    return { label: 'Vượt trần cảnh báo', tone: 'warning' as const }
   }
-  return '#4f46e5'
+
+  return { label: 'Đã hết nợ', tone: 'success' as const }
+}
+
+// overageUsd = usedQuantityUsd - totalAllocatedUsd (xem SchoolDebtNotificationService.logDebtEvent) --
+// dương nghĩa là đang vượt hạn mức, âm nghĩa là đã hết nợ và còn dư bấy nhiêu USD hạn mức.
+export function getOverageDisplay(overageUsd: number) {
+  if (overageUsd > 0) {
+    return { label: `Vượt ${formatUsd(overageUsd)}`, tone: 'danger' as const }
+  }
+
+  if (overageUsd < 0) {
+    return { label: `Còn dư ${formatUsd(Math.abs(overageUsd))}`, tone: 'success' as const }
+  }
+
+  return { label: formatUsd(0), tone: 'neutral' as const }
 }

@@ -73,9 +73,22 @@ export function MonitoringExamSchedulesPage() {
   return (
     <section aria-labelledby="monitoring-schedules-title" className="grid gap-6">
       <div className="flex flex-col gap-3">
+        {/*
+          relative="path" và HAI cấp, không phải `to=".."` trần.
+
+          Mặc định Link giải `..` theo ROUTE, mà route này khai phẳng
+          (`teacher/monitoring/exams/:examId`) nên route cha chính là layout -- bấm quay lại
+          văng thẳng ra trang chủ. Theo PATH thì mỗi `..` bỏ một đoạn URL:
+          `/teacher/monitoring/exams/:examId` -> bỏ 2 đoạn -> `/teacher/monitoring`, đúng danh
+          sách kỳ thi. Một cấp sẽ ra `/teacher/monitoring/exams` -- không có route nào ở đó.
+
+          Dùng đường tương đối chứ không viết cứng vì trang này phục vụ cả `teacher` lẫn
+          `school-admin` (xem AppRoutes: hai route khác tiền tố, chung một component).
+        */}
         <Link
           className="inline-flex w-fit items-center gap-2 text-sm font-bold text-cyan-700 transition hover:text-cyan-800"
-          to=".."
+          relative="path"
+          to="../.."
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           Quay lại danh sách kỳ thi

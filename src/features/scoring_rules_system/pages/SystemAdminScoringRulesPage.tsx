@@ -9,7 +9,7 @@ export function SystemAdminScoringRulesPage() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+    <section className="relative grid gap-6 overflow-hidden">
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}
@@ -29,7 +29,7 @@ export function SystemAdminScoringRulesPage() {
           >
             <ChevronLeft className="size-5" />
           </button>
-          <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
             <Gavel className="size-[26px] text-indigo-600" /> Quản lý quy tắc tính điểm
           </h1>
         </div>

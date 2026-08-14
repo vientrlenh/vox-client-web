@@ -43,6 +43,15 @@ async function updatePlan(id: string, payload: UpdatePlanPayload): Promise<strin
   return data.updateSubscriptionPlan.id
 }
 
+async function publishPlan(id: string): Promise<MutationResult<SubscriptionPlan>> {
+  const response = await apiClient.post<ApiResponse<SubscriptionPlan>>(`/v1/plans/${id}/publish`)
+  return response.data
+}
+
+async function deleteDraftPlan(id: string): Promise<void> {
+  await apiClient.delete(`/v1/plans/${id}/draft`)
+}
+
 export function useCreatePlanMutation() {
   const queryClient = useQueryClient()
 
@@ -70,6 +79,28 @@ export function useArchivePlanMutation() {
 
   return useMutation({
     mutationFn: archivePlan,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: subscriptionPlanQueryKeys.all })
+    },
+  })
+}
+
+export function usePublishPlanMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: publishPlan,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: subscriptionPlanQueryKeys.all })
+    },
+  })
+}
+
+export function useDeleteDraftPlanMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: deleteDraftPlan,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: subscriptionPlanQueryKeys.all })
     },

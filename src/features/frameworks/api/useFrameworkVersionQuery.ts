@@ -55,6 +55,7 @@ const FRAMEWORK_VERSION_FIELDS = `
   }
 `
 
+// System Admin xem được version ở mọi trạng thái (BE: @PreAuthorize hasRole('SYSTEM_ADMIN'))
 const FRAMEWORK_VERSION_QUERY = `
   query FrameworkVersion($id: ID!) {
     frameworkVersion(id: $id) {
@@ -63,6 +64,7 @@ const FRAMEWORK_VERSION_QUERY = `
   }
 `
 
+// School Admin chỉ xem được version đã PUBLISHED (BE: query riêng schoolFrameworkVersion, hasRole('SCHOOL_ADMIN'))
 const SCHOOL_FRAMEWORK_VERSION_QUERY = `
   query SchoolFrameworkVersion($id: ID!) {
     schoolFrameworkVersion(id: $id) {
@@ -103,6 +105,6 @@ export function useFrameworkVersionQuery(
 
       return fetchFrameworkVersion(id, scope)
     },
-    queryKey: frameworkQueryKeys.version(id),
+    queryKey: [...frameworkQueryKeys.version(id), scope] as const,
   })
 }

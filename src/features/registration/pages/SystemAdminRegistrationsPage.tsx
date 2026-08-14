@@ -164,7 +164,13 @@ export function SystemAdminRegistrationsPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_460px]">
+      {/*
+        Tách hai cột từ 2xl chứ không phải xl. Ở xl (1280px), trừ sidebar và panel chi tiết
+        400px thì cột bảng còn hẹp hơn min-width của chính bảng -- bảng phải cuộn ngang bên
+        trong và cột "Trạng thái" bị cắt ngang giữa chữ, trông như vỡ layout. Dưới 2xl thì panel
+        xuống dưới, bảng chiếm trọn bề ngang và hiện đủ cả 7 cột.
+      */}
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <RegistrationTable
           errorMessage={getErrorMessage(registerFormsQuery.error)}
           footer={
