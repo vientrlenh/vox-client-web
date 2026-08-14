@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, RefreshCw } from 'lucide-react';
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
 
 type Props = {
   status: string;
@@ -21,6 +22,7 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canChangeStatus = status === 'DRAFT' || status === 'PUBLISHED';
+  const { confirm, dialog } = useConfirmationDialog();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -37,21 +39,27 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
 
   const badgeClassName = STATUS_BADGE_CLASSNAMES[status] ?? 'bg-slate-100 text-slate-600 ring-slate-500/20';
 
-  function handlePublishClick() {
+  async function handlePublishClick() {
     setIsOpen(false);
-    const isConfirm = window.confirm(
-      'Bạn có chắc chắn muốn chuyển trạng thái Phiên bản này sang PUBLISHED? Sau khi Published, phiên bản sẽ được áp dụng chính thức.'
-    );
-    if (!isConfirm) return;
+    const isConfirmed = await confirm({
+      confirmLabel: 'Xuất bản',
+      message:
+        'Chuyển phiên bản này sang PUBLISHED? Sau khi xuất bản, phiên bản sẽ được áp dụng chính thức để chấm bài.',
+      title: 'Xuất bản phiên bản',
+    });
+    if (!isConfirmed) return;
     onPublish();
   }
 
-  function handleArchiveClick() {
+  async function handleArchiveClick() {
     setIsOpen(false);
-    const isConfirm = window.confirm(
-      'Bạn có chắc chắn muốn Lưu trữ (ARCHIVE) phiên bản này? Sau khi lưu trữ sẽ không thể chỉnh sửa hoặc sử dụng nữa.'
-    );
-    if (!isConfirm) return;
+    const isConfirmed = await confirm({
+      confirmLabel: 'Lưu trữ',
+      message:
+        'Lưu trữ (ARCHIVE) phiên bản này? Sau khi lưu trữ sẽ không thể chỉnh sửa hoặc sử dụng nữa.',
+      title: 'Lưu trữ phiên bản',
+    });
+    if (!isConfirmed) return;
     onArchive();
   }
 
@@ -65,6 +73,7 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
 
   return (
     <div className="relative inline-block" ref={containerRef}>
+      {dialog}
       <button
         className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 ${badgeClassName}`}
         disabled={isPending}
@@ -81,7 +90,7 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
           {status === 'DRAFT' ? (
             <button
               className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
-              onClick={handlePublishClick}
+              onClick={() => void handlePublishClick()}
               type="button"
             >
               Chuyển sang PUBLISHED
@@ -89,7 +98,7 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
           ) : (
             <button
               className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-slate-600 transition hover:bg-slate-100"
-              onClick={handleArchiveClick}
+              onClick={() => void handleArchiveClick()}
               type="button"
             >
               Lưu trữ (ARCHIVE)

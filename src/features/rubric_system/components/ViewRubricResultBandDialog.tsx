@@ -18,7 +18,7 @@ export function ViewRubricResultBandDialog({ isOpen, onClose, resultBandId }: Pr
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-md rounded-xl bg-white shadow-2xl">
+      <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h2 className="text-lg font-bold text-slate-900">Chi tiết Thang điểm</h2>
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
@@ -29,7 +29,7 @@ export function ViewRubricResultBandDialog({ isOpen, onClose, resultBandId }: Pr
         <div className="p-6">
           {isLoading || !band ? (
             <div className="flex h-32 items-center justify-center">
-              <RefreshCw className="size-6 animate-spin text-cyan-600" />
+              <RefreshCw className="size-6 animate-spin text-indigo-600" />
             </div>
           ) : (
             <div className="grid gap-4 text-sm">
