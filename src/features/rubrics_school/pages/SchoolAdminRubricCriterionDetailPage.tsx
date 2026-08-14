@@ -7,12 +7,14 @@ import { useAppSelector } from '@/app/store/hooks';
 
 import { useSchoolRubricCriterionQuery } from '../api/useSchoolRubricCriterionQuery';
 import { useSchoolRubricVersionQuery } from '../api/useSchoolRubricVersionQuery';
+import { useSearchSchoolRubricCriteriaQuery } from '../api/useSearchSchoolRubricCriteriaQuery';
 import { useUpdateSchoolRubricCriterionMutation, type UpdateRubricCriterionPayload } from '../api/useUpdateSchoolRubricCriterionMutation';
 import { useDeleteSchoolRubricCriterionMutation } from '../api/useDeleteSchoolRubricCriterionMutation';
 
 import { UpdateRubricCriterionDialog } from '../components/UpdateRubricCriterionDialog';
 import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
+import { weightToPercent } from '../types';
 
 type ExampleItem = { transcript: string; explanation: string; expectedScore: number };
 
@@ -61,6 +63,12 @@ export function SchoolAdminRubricCriterionDetailPage() {
   } = useSchoolRubricCriterionQuery(schoolId, criterionId);
 
   const { data: version } = useSchoolRubricVersionQuery(schoolId, versionId);
+
+  // Tổng phần trăm của các tiêu chí KHÁC, để modal sửa biết còn lại bao nhiêu chỗ.
+  const { data: allCriteriaData } = useSearchSchoolRubricCriteriaQuery(schoolId, versionId, {}, 1, 500);
+  const siblingAllocatedPercent = allCriteriaData?.content
+    .filter((sibling) => sibling.id !== criterionId)
+    .reduce((sum, sibling) => sum + weightToPercent(sibling.weight), 0) ?? 0;
 
   const { mutateAsync: updateCriterion, isPending: isUpdatingCriterion } = useUpdateSchoolRubricCriterionMutation(schoolId, criterionId);
   const { mutateAsync: deleteCriterion, isPending: isDeletingCriterion } = useDeleteSchoolRubricCriterionMutation(schoolId, versionId);
@@ -165,7 +173,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Điểm số</p>
             <div className="mt-2 space-y-1 text-sm text-slate-700">
               <p><span className="font-medium">Thang:</span> {criterion.minScore} - {criterion.maxScore}</p>
-              <p><span className="font-medium">Trọng số:</span> {criterion.weight}%</p>
+              <p><span className="font-medium">Trọng số:</span> {weightToPercent(criterion.weight)}%</p>
               <p><span className="font-medium">Thứ tự:</span> {criterion.order}</p>
             </div>
           </div>
@@ -231,6 +239,8 @@ export function SchoolAdminRubricCriterionDetailPage() {
           initialData={criterion}
           scoringScaleMin={version?.scoringScaleMin ?? 0}
           scoringScaleMax={version?.scoringScaleMax ?? 0}
+          totalScoreMethod={version?.totalScoreMethod ?? ''}
+          allocatedPercent={siblingAllocatedPercent}
         />
       )}
     </section>

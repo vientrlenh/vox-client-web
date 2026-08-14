@@ -29,7 +29,7 @@ const IMPORT_FIELDS: ImportField[] = [
   { isRequired: true, label: 'Mã Code', value: 'code' },
   { isRequired: true, label: 'Tên Tiêu chí', value: 'name' },
   { isRequired: false, label: 'Mô tả', value: 'description' },
-  { isRequired: true, label: 'Trọng số (Weight)', value: 'weight' },
+  { isRequired: true, label: 'Trọng số (%, ví dụ 20)', value: 'weight' },
   { isRequired: true, label: 'Điểm tối thiểu (Min)', value: 'minScore' },
   { isRequired: true, label: 'Điểm tối đa (Max)', value: 'maxScore' },
   { isRequired: true, label: 'Thứ tự (Order)', value: 'order' },

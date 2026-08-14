@@ -37,6 +37,13 @@ import { UpdateRubricResultBandDialog } from '../components/UpdateRubricResultBa
 import { ViewRubricResultBandDialog } from '../components/ViewRubricResultBandDialog';
 import { Pagination } from '@/shared/components/Pagination';
 import type { RubricCriterion, RubricResultBand } from '../types';
+import {
+  RUBRIC_ALLOCATION_TOTAL_PERCENT,
+  isAllocationMethod,
+  rubricTotalScoreMethodHint,
+  rubricTotalScoreMethodLabel,
+  weightToPercent,
+} from '../types';
 import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
 
@@ -113,6 +120,15 @@ export function SystemAdminRubricVersionDetailPage() {
   const siblingCriteriaOrders = allCriteriaData?.content
     .filter((criterion) => criterion.id !== editingCriterion?.id)
     .map((criterion) => criterion.order) ?? [];
+
+  // Tổng phần trăm đã phân bổ. Backend lưu trọng số dưới dạng phân số nên phải quy đổi trước khi
+  // cộng. Khi SỬA thì trừ chính tiêu chí đang sửa ra, nếu không nó tự tính mình là "đã dùng" và
+  // người dùng không bao giờ còn chỗ để giữ nguyên trọng số cũ.
+  const allocatedPercent = allCriteriaData?.content
+    .reduce((sum, criterion) => sum + weightToPercent(criterion.weight), 0) ?? 0;
+  const siblingAllocatedPercent = allCriteriaData?.content
+    .filter((criterion) => criterion.id !== editingCriterion?.id)
+    .reduce((sum, criterion) => sum + weightToPercent(criterion.weight), 0) ?? 0;
 
   const bandsFilter: SearchRubricResultBandFilter = {
     keyword: debouncedBandsKeyword.trim() ? debouncedBandsKeyword : null,
@@ -367,7 +383,16 @@ export function SystemAdminRubricVersionDetailPage() {
              </p>
              <div className="mt-2 space-y-1 text-sm text-slate-700">
                <p><span className="font-medium">Thang:</span> {version.scoringScaleMin} - {version.scoringScaleMax}</p>
-               <p><span className="font-medium">Cách tính:</span> {version.totalScoreMethod}</p>
+               <p><span className="font-medium">Cách tính:</span> {rubricTotalScoreMethodLabel(version.totalScoreMethod)}</p>
+               {isAllocationMethod(version.totalScoreMethod) && (
+                 <p>
+                   <span className="font-medium">Đã phân bổ:</span>{' '}
+                   <span className={allocatedPercent === RUBRIC_ALLOCATION_TOTAL_PERCENT ? 'font-bold text-emerald-700' : 'font-bold text-amber-700'}>
+                     {allocatedPercent}% / {RUBRIC_ALLOCATION_TOTAL_PERCENT}%
+                   </span>
+                 </p>
+               )}
+               <p className="text-xs leading-5 text-slate-500">{rubricTotalScoreMethodHint(version.totalScoreMethod)}</p>
              </div>
           </div>
 
@@ -587,6 +612,8 @@ export function SystemAdminRubricVersionDetailPage() {
           scoringScaleMax={version.scoringScaleMax}
           usedFrameworkCriterionIds={usedFrameworkCriterionIds}
           existingOrders={allCriteriaOrders}
+          totalScoreMethod={version.totalScoreMethod}
+          allocatedPercent={allocatedPercent}
         />
       )}
 
@@ -600,6 +627,8 @@ export function SystemAdminRubricVersionDetailPage() {
           scoringScaleMin={version.scoringScaleMin}
           scoringScaleMax={version.scoringScaleMax}
           existingOrders={siblingCriteriaOrders}
+          totalScoreMethod={version.totalScoreMethod}
+          allocatedPercent={siblingAllocatedPercent}
         />
       )}
 

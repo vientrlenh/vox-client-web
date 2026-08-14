@@ -2,7 +2,7 @@
 
 import { RefreshCw, LayoutList, Eye, Edit, Trash2 } from 'lucide-react';
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton';
-import type { RubricCriterion } from '../types';
+import { weightToPercent, type RubricCriterion } from '../types';
 
 type Props = {
   criteria: RubricCriterion[];
@@ -63,7 +63,7 @@ export function RubricCriterionTable({ criteria, isLoading, isError, onRetry, on
               <td className="px-4 py-3 font-medium text-slate-900">{c.name}</td>
               <td className="px-4 py-3 text-center">
                 <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                  {c.weight}%
+                  {weightToPercent(c.weight)}%
                 </span>
               </td>
               <td className="px-4 py-3 text-center font-medium">{c.minScore} - {c.maxScore}</td>
