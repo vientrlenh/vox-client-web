@@ -6,12 +6,14 @@ import { ChevronLeft, ListChecks, RefreshCw, AlertTriangle, Edit, Trash2 } from 
 
 import { useSystemRubricCriterionQuery } from '../api/useSystemRubricCriterionQuery';
 import { useSystemRubricVersionQuery } from '../api/useSystemRubricVersionQuery';
+import { useSearchSystemRubricCriteriaQuery } from '../api/useSearchSystemRubricCriteriaQuery';
 import { useUpdateSystemRubricCriterionMutation, type UpdateRubricCriterionPayload } from '../api/useUpdateSystemRubricCriterionMutation';
 import { useDeleteSystemRubricCriterionMutation } from '../api/useDeleteSystemRubricCriterionMutation';
 
 import { UpdateRubricCriterionDialog } from '../components/UpdateRubricCriterionDialog';
 import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
+import { weightToPercent } from '../types';
 
 type ExampleItem = { transcript: string; explanation: string; expectedScore: number };
 
@@ -58,18 +60,20 @@ export function SystemAdminRubricCriterionDetailPage() {
 
   const { data: version } = useSystemRubricVersionQuery(versionId);
 
+  // Tổng phần trăm của các tiêu chí KHÁC, để modal sửa biết còn lại bao nhiêu chỗ.
+  const { data: allCriteriaData } = useSearchSystemRubricCriteriaQuery(versionId, {}, 1, 500);
+  const siblingAllocatedPercent = allCriteriaData?.content
+    .filter((sibling) => sibling.id !== criterionId)
+    .reduce((sum, sibling) => sum + weightToPercent(sibling.weight), 0) ?? 0;
+
   const { mutateAsync: updateCriterion, isPending: isUpdatingCriterion } = useUpdateSystemRubricCriterionMutation(criterionId);
   const { mutateAsync: deleteCriterion, isPending: isDeletingCriterion } = useDeleteSystemRubricCriterionMutation(versionId);
 
   const handleUpdateCriterion = async (payload: UpdateRubricCriterionPayload) => {
-    setErrorMessage(null);
-    try {
-      await updateCriterion(payload);
-      setIsEditModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateCriterion(payload);
+    setIsEditModalOpen(false);
   };
 
   const handleDeleteCriterion = async () => {
@@ -161,7 +165,7 @@ export function SystemAdminRubricCriterionDetailPage() {
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Điểm số</p>
             <div className="mt-2 space-y-1 text-sm text-slate-700">
               <p><span className="font-medium">Thang:</span> {criterion.minScore} - {criterion.maxScore}</p>
-              <p><span className="font-medium">Trọng số:</span> {criterion.weight}%</p>
+              <p><span className="font-medium">Trọng số:</span> {weightToPercent(criterion.weight)}%</p>
               <p><span className="font-medium">Thứ tự:</span> {criterion.order}</p>
             </div>
           </div>
@@ -227,6 +231,8 @@ export function SystemAdminRubricCriterionDetailPage() {
           initialData={criterion}
           scoringScaleMin={version?.scoringScaleMin ?? 0}
           scoringScaleMax={version?.scoringScaleMax ?? 0}
+          totalScoreMethod={version?.totalScoreMethod ?? ''}
+          allocatedPercent={siblingAllocatedPercent}
         />
       )}
     </section>

@@ -100,14 +100,10 @@ export function SystemAdminRubricDetailPage() {
 
   // 4. Hàm xử lý submit Form Cập nhật Rubric
   const handleUpdateRubric = async (formData: { name: string; description: string; }) => {
-    setErrorMessage(null);
-    try {
-      await updateRubric(formData);
-      setIsEditModalOpen(false);
-    } catch (error: unknown) {
-      console.error("Chi tiết lỗi từ BE:", error);
-      setErrorMessage((error as { message?: string }).message || "Có lỗi xảy ra khi lưu thay đổi. Vui lòng thử lại.");
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateRubric(formData);
+    setIsEditModalOpen(false);
   };
 
   // Hàm xử lý Xóa toàn bộ Rubric (chỉ System Admin mới có quyền này)
@@ -133,14 +129,10 @@ export function SystemAdminRubricDetailPage() {
 
   // 5. Hàm xử lý submit Form Thêm Version mới
   const handleAddVersion = async (payload: AddRubricVersionsPayload) => {
-    setErrorMessage(null);
-    try {
-      await addVersions(payload);
-      setIsAddModalOpen(false); // Thành công thì đóng popup
-    } catch (error: unknown) {
-      console.error("Lỗi thêm Version:", error);
-      setErrorMessage((error as { message?: string }).message || "Có lỗi xảy ra khi thêm phiên bản mới.");
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await addVersions(payload);
+    setIsAddModalOpen(false); // Thành công thì đóng popup
   };
 
   if (isLoading) {

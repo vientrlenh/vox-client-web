@@ -37,6 +37,13 @@ import { UpdateRubricResultBandDialog } from '../components/UpdateRubricResultBa
 import { ViewRubricResultBandDialog } from '../components/ViewRubricResultBandDialog';
 import { Pagination } from '@/shared/components/Pagination';
 import type { RubricCriterion, RubricResultBand } from '../types';
+import {
+  RUBRIC_ALLOCATION_TOTAL_PERCENT,
+  isAllocationMethod,
+  rubricTotalScoreMethodHint,
+  rubricTotalScoreMethodLabel,
+  weightToPercent,
+} from '../types';
 import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
 
@@ -114,6 +121,15 @@ export function SystemAdminRubricVersionDetailPage() {
     .filter((criterion) => criterion.id !== editingCriterion?.id)
     .map((criterion) => criterion.order) ?? [];
 
+  // Tổng phần trăm đã phân bổ. Backend lưu trọng số dưới dạng phân số nên phải quy đổi trước khi
+  // cộng. Khi SỬA thì trừ chính tiêu chí đang sửa ra, nếu không nó tự tính mình là "đã dùng" và
+  // người dùng không bao giờ còn chỗ để giữ nguyên trọng số cũ.
+  const allocatedPercent = allCriteriaData?.content
+    .reduce((sum, criterion) => sum + weightToPercent(criterion.weight), 0) ?? 0;
+  const siblingAllocatedPercent = allCriteriaData?.content
+    .filter((criterion) => criterion.id !== editingCriterion?.id)
+    .reduce((sum, criterion) => sum + weightToPercent(criterion.weight), 0) ?? 0;
+
   const bandsFilter: SearchRubricResultBandFilter = {
     keyword: debouncedBandsKeyword.trim() ? debouncedBandsKeyword : null,
   };
@@ -152,15 +168,10 @@ export function SystemAdminRubricVersionDetailPage() {
 
   // Hàm xử lý Update Version
   const handleUpdateVersion = async (formData: UpdateRubricVersionPayload) => {
-    setErrorMessage(null);
-    try {
-      await updateVersion(formData);
-      setIsEditModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      console.error("Lỗi cập nhật Version:", err);
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateVersion(formData);
+    setIsEditModalOpen(false);
   };
 
   // Hàm xử lý Chuyển trạng thái Version (hiện chỉ hỗ trợ DRAFT -> PUBLISHED)
@@ -209,26 +220,18 @@ export function SystemAdminRubricVersionDetailPage() {
 
   // Hàm xử lý Thêm Tiêu chí
   const handleAddCriterion = async (payload: AddRubricCriteriaPayload) => {
-    setErrorMessage(null);
-    try {
-      await addCriteria(payload);
-      setIsAddCriterionModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi thêm tiêu chí.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await addCriteria(payload);
+    setIsAddCriterionModalOpen(false);
   };
 
   // Hàm xử lý Sửa Tiêu chí
   const handleUpdateCriterion = async (payload: UpdateRubricCriterionPayload) => {
-    setErrorMessage(null);
-    try {
-      await updateCriterion(payload);
-      setEditingCriterion(null);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật tiêu chí.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateCriterion(payload);
+    setEditingCriterion(null);
   };
 
   // Hàm xử lý Xóa Tiêu chí
@@ -252,26 +255,18 @@ export function SystemAdminRubricVersionDetailPage() {
 
   // Hàm xử lý Thêm Thang điểm
   const handleAddResultBand = async (payload: AddRubricResultBandsPayload) => {
-    setErrorMessage(null);
-    try {
-      await addResultBands(payload);
-      setIsAddResultBandModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi thêm thang điểm.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await addResultBands(payload);
+    setIsAddResultBandModalOpen(false);
   };
 
   // Hàm xử lý Sửa Thang điểm
   const handleUpdateResultBand = async (payload: UpdateRubricResultBandPayload) => {
-    setErrorMessage(null);
-    try {
-      await updateResultBand(payload);
-      setEditingResultBand(null);
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi cập nhật thang điểm.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateResultBand(payload);
+    setEditingResultBand(null);
   };
 
   // Hàm xử lý Xóa Thang điểm
@@ -367,7 +362,16 @@ export function SystemAdminRubricVersionDetailPage() {
              </p>
              <div className="mt-2 space-y-1 text-sm text-slate-700">
                <p><span className="font-medium">Thang:</span> {version.scoringScaleMin} - {version.scoringScaleMax}</p>
-               <p><span className="font-medium">Cách tính:</span> {version.totalScoreMethod}</p>
+               <p><span className="font-medium">Cách tính:</span> {rubricTotalScoreMethodLabel(version.totalScoreMethod)}</p>
+               {isAllocationMethod(version.totalScoreMethod) && (
+                 <p>
+                   <span className="font-medium">Đã phân bổ:</span>{' '}
+                   <span className={allocatedPercent === RUBRIC_ALLOCATION_TOTAL_PERCENT ? 'font-bold text-emerald-700' : 'font-bold text-amber-700'}>
+                     {allocatedPercent}% / {RUBRIC_ALLOCATION_TOTAL_PERCENT}%
+                   </span>
+                 </p>
+               )}
+               <p className="text-xs leading-5 text-slate-500">{rubricTotalScoreMethodHint(version.totalScoreMethod)}</p>
              </div>
           </div>
 
@@ -587,6 +591,8 @@ export function SystemAdminRubricVersionDetailPage() {
           scoringScaleMax={version.scoringScaleMax}
           usedFrameworkCriterionIds={usedFrameworkCriterionIds}
           existingOrders={allCriteriaOrders}
+          totalScoreMethod={version.totalScoreMethod}
+          allocatedPercent={allocatedPercent}
         />
       )}
 
@@ -600,6 +606,8 @@ export function SystemAdminRubricVersionDetailPage() {
           scoringScaleMin={version.scoringScaleMin}
           scoringScaleMax={version.scoringScaleMax}
           existingOrders={siblingCriteriaOrders}
+          totalScoreMethod={version.totalScoreMethod}
+          allocatedPercent={siblingAllocatedPercent}
         />
       )}
 

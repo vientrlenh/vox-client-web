@@ -87,7 +87,14 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
       ]
     };
 
-    await onSubmit(payload);
+    try {
+      await onSubmit(payload);
+    } catch (error) {
+      // Lỗi từ máy chủ phải hiện NGAY TRONG modal. Trang cha không nuốt lỗi nữa: modal vẫn
+      // mở khi submit hỏng, mà banner của trang thì nằm sau lớp backdrop-blur của overlay
+      // nên chỉ còn là một vệt đỏ mờ, không đọc được.
+      setErrorMessage((error as Error)?.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -143,8 +150,8 @@ export function AddRubricVersionDialog({ isOpen, onClose, onSubmit, isPending }:
                 required 
                 className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50"
               >
-                <option value="SUM">Cộng dồn (SUM)</option>
-                <option value="WEIGHTED_AVERAGE">Trung bình có trọng số (WEIGHTED_AVERAGE)</option>
+                <option value="WEIGHTED_AVERAGE">Trung bình — mọi tiêu chí cân bằng</option>
+                <option value="SUM">Phân bổ trọng số — chia phần trăm cho từng tiêu chí</option>
               </select>
             </div>
 

@@ -63,18 +63,13 @@ export function SystemAdminRubricsPage() {
   const { mutateAsync: deleteRubric } = useDeleteSystemRubricMutation();
 
   const handleCreateRubric = async (formData: CreateRubricPayload) => {
-    setErrorMessage(null);
-    try {
-      const newRubricId = await createRubric(formData);
-      setIsCreateModalOpen(false);
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    const newRubricId = await createRubric(formData);
+    setIsCreateModalOpen(false);
 
-      // UX xịn: Tạo thành công đá thẳng sang trang chi tiết để User add Versions!
-      navigate(`/system-admin/rubrics/${newRubricId}`);
-    } catch (error) {
-      const err = error as Error;
-      console.error("Lỗi tạo Rubric:", err);
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi tạo tiêu chí đánh giá.');
-    }
+    // UX xịn: Tạo thành công đá thẳng sang trang chi tiết để User add Versions!
+    navigate(`/system-admin/rubrics/${newRubricId}`);
   };
 
   const handleDeleteRubric = async (rubric: Rubric) => {
