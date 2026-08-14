@@ -1,7 +1,7 @@
 import { ClipboardList, Coins, FileCheck2, Headphones, ShoppingCart } from 'lucide-react'
 import { PaymentMethodField } from '@/shared/payment/PaymentMethodField'
 import {
-  formatPricePerMinute,
+  formatUsd,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -17,12 +17,12 @@ const QUOTA_ICONS: Record<QuotaType, typeof FileCheck2> = {
   PRACTICE: Headphones,
 }
 
-const MAX_MINUTES = 600
-const STEP_MINUTES = 5
+const MAX_USD = 500
+const STEP_USD = 5
 
 type TokenTopUpPanelProps = {
   isSubmitting: boolean
-  onChange: (quotaType: QuotaType, minutes: number) => void
+  onChange: (quotaType: QuotaType, amountUsd: number) => void
   onPaymentMethodChange: (method: PaymentMethod) => void
   onSubmit: () => void
   paymentMethod: PaymentMethod
@@ -39,11 +39,10 @@ export function TokenTopUpPanel({
   plan,
   state,
 }: TokenTopUpPanelProps) {
-  // plan.quotas[].tokenUnitPrice = giá VNĐ cho 1 GIÂY audio; slider ở đây thao tác theo PHÚT
-  // cho dễ hiểu, nên quy đổi *60 khi tính giá và khi gửi API (xem handleBuyTokens ở trang cha).
-  const pricePerSecondByType = new Map(plan.quotas.map((quota) => [quota.quotaType, quota.tokenUnitPrice]))
+  // plan.quotas[].tokenUnitPrice = giá VNĐ cho 1 USD quota — dùng thẳng, không quy đổi đơn vị.
+  const pricePerUnitByType = new Map(plan.quotas.map((quota) => [quota.quotaType, quota.tokenUnitPrice]))
   const total = QUOTA_TYPES.reduce(
-    (sum, quotaType) => sum + state[quotaType] * (pricePerSecondByType.get(quotaType) ?? 0) * 60,
+    (sum, quotaType) => sum + state[quotaType] * (pricePerUnitByType.get(quotaType) ?? 0),
     0,
   )
 
@@ -54,9 +53,9 @@ export function TokenTopUpPanel({
           <Coins aria-hidden="true" className="size-5" />
         </span>
         <div>
-          <h3 className="text-lg font-extrabold text-blue-950">Mua thêm thời gian xử lý cho gói đang dùng</h3>
+          <h3 className="text-lg font-black text-blue-950">Mua thêm hạn mức xử lý cho gói đang dùng</h3>
           <p className="mt-0.5 text-sm text-slate-500">
-            Gói <span className="font-bold text-indigo-700">{plan.name}</span> — giá theo phút tính riêng cho từng hạn mức
+            Gói <span className="font-bold text-indigo-700">{plan.name}</span> — giá theo $1 hạn mức tính riêng cho từng loại
           </p>
         </div>
       </div>
@@ -64,8 +63,8 @@ export function TokenTopUpPanel({
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.7fr_1fr]">
         <div className="grid gap-6">
           {QUOTA_TYPES.map((quotaType) => {
-            const pricePerSecond = pricePerSecondByType.get(quotaType) ?? 0
-            const qtyMinutes = state[quotaType]
+            const pricePerUnit = pricePerUnitByType.get(quotaType) ?? 0
+            const qtyUsd = state[quotaType]
             const Icon = QUOTA_ICONS[quotaType]
 
             return (
@@ -73,17 +72,17 @@ export function TokenTopUpPanel({
                 <div className="flex items-center gap-2.5">
                   <Icon aria-hidden="true" className="size-4.5 text-indigo-600" />
                   <span className="flex-1 text-sm font-bold text-slate-900">{QUOTA_LABELS[quotaType]}</span>
-                  <span className="text-xs text-slate-400">{formatPricePerMinute(pricePerSecond)}</span>
+                  <span className="text-xs text-slate-400">{formatVnd(pricePerUnit)} / $1</span>
                 </div>
                 <div className="mt-3 flex items-center gap-4">
                   <input
                     className="h-1.5 flex-1 accent-indigo-600"
-                    max={MAX_MINUTES}
+                    max={MAX_USD}
                     min={0}
                     onChange={(event) => onChange(quotaType, Math.max(0, Number(event.target.value) || 0))}
-                    step={STEP_MINUTES}
+                    step={STEP_USD}
                     type="range"
-                    value={qtyMinutes}
+                    value={qtyUsd}
                   />
                   <div className="flex items-baseline gap-2">
                     <input
@@ -91,10 +90,10 @@ export function TokenTopUpPanel({
                       min={0}
                       onChange={(event) => onChange(quotaType, Math.max(0, Number(event.target.value) || 0))}
                       type="number"
-                      value={qtyMinutes}
+                      value={qtyUsd}
                     />
-                    <span className="text-xs text-slate-400">phút</span>
-                    <span className="w-24 text-xs text-slate-400">= {formatVnd(qtyMinutes * pricePerSecond * 60)}</span>
+                    <span className="text-xs text-slate-400">USD</span>
+                    <span className="w-24 text-xs text-slate-400">= {formatVnd(qtyUsd * pricePerUnit)}</span>
                   </div>
                 </div>
               </div>
@@ -109,7 +108,7 @@ export function TokenTopUpPanel({
             {QUOTA_TYPES.map((quotaType) => (
               <div className="flex justify-between text-[12.5px] text-slate-600" key={quotaType}>
                 <span>{QUOTA_LABELS[quotaType]}</span>
-                <span className="font-bold">+{new Intl.NumberFormat('vi-VN').format(state[quotaType])} phút</span>
+                <span className="font-bold">+{formatUsd(state[quotaType])}</span>
               </div>
             ))}
           </div>

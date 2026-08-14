@@ -8,6 +8,7 @@ const routeLinks = {
   about: '/about',
   contact: '/contact',
   features: '/#features',
+  policy: '/privacy-policy',
   pricing: '/pricing',
   register: '/register',
 } as const
@@ -32,7 +33,7 @@ const footerColumns = [
   {
     links: [
       { href: routeLinks.about, label: 'Về chúng tôi' },
-      { href: routeLinks.about, label: 'Chính sách bảo mật' },
+      { href: routeLinks.policy, label: 'Chính sách bảo mật' },
       { href: routeLinks.about, label: 'Điều khoản sử dụng' },
     ],
     title: 'Công ty',

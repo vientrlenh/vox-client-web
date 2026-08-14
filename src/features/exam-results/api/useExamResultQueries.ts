@@ -87,6 +87,7 @@ const EXAM_SESSION_RESULT_QUERY = `
         paperItemId
         responseId
         sectionId
+        questionText
         itemScore
         weightedScore
       }

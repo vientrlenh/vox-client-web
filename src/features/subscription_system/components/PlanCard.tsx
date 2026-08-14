@@ -1,8 +1,8 @@
-import { ArrowRight, Archive, ClipboardList, Clock, FileCheck2, Headphones, Pencil, Star } from 'lucide-react'
+import { ArrowRight, Archive, ClipboardList, Clock, FileCheck2, Headphones, Pencil, Rocket, Star, Trash2 } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import {
   formatMinutes,
-  formatQuotaMinutes,
+  formatUsd,
   formatVnd,
   getPlanStatusDisplay,
   QUOTA_LABELS,
@@ -26,13 +26,16 @@ const QUOTA_ICON_STYLES: Record<QuotaType, string> = {
 type PlanCardProps = {
   getPlanName: (planId: string | null) => string
   onArchive: (plan: SubscriptionPlan) => void
+  onDeleteDraft: (plan: SubscriptionPlan) => void
   onEdit: (plan: SubscriptionPlan) => void
+  onPublish: (plan: SubscriptionPlan) => void
   plan: SubscriptionPlan
 }
 
-export function PlanCard({ getPlanName, onArchive, onEdit, plan }: PlanCardProps) {
+export function PlanCard({ getPlanName, onArchive, onDeleteDraft, onEdit, onPublish, plan }: PlanCardProps) {
   const statusDisplay = getPlanStatusDisplay(plan.status)
   const quotaByType = new Map(plan.quotas.map((quota) => [quota.quotaType, quota]))
+  const isDraft = plan.status === 'DRAFT'
   const isArchived = plan.status === 'ARCHIVED'
 
   return (
@@ -68,7 +71,7 @@ export function PlanCard({ getPlanName, onArchive, onEdit, plan }: PlanCardProps
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-extrabold text-blue-950">{plan.name}</h3>
+              <h3 className="text-lg font-black text-blue-950">{plan.name}</h3>
               <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
             </div>
             <p className="mt-1 max-w-52 text-[12.5px] text-slate-500">{plan.tagline ?? 'Chưa có mô tả'}</p>
@@ -81,7 +84,7 @@ export function PlanCard({ getPlanName, onArchive, onEdit, plan }: PlanCardProps
           </div>
 
           <div className="flex shrink-0 gap-1.5">
-            {!plan.hasActiveSubscribers ? (
+            {isDraft ? (
               <button
                 aria-label="Sửa gói"
                 className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-indigo-700 transition hover:bg-indigo-50"
@@ -89,6 +92,26 @@ export function PlanCard({ getPlanName, onArchive, onEdit, plan }: PlanCardProps
                 type="button"
               >
                 <Pencil aria-hidden="true" className="size-4" />
+              </button>
+            ) : null}
+            {isDraft ? (
+              <button
+                aria-label="Xuất bản gói"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-600 transition hover:bg-emerald-50"
+                onClick={() => onPublish(plan)}
+                type="button"
+              >
+                <Rocket aria-hidden="true" className="size-4" />
+              </button>
+            ) : null}
+            {isDraft ? (
+              <button
+                aria-label="Xóa gói nháp"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 transition hover:bg-red-50"
+                onClick={() => onDeleteDraft(plan)}
+                type="button"
+              >
+                <Trash2 aria-hidden="true" className="size-4" />
               </button>
             ) : null}
             {plan.status === 'ACTIVE' ? (
@@ -122,7 +145,7 @@ export function PlanCard({ getPlanName, onArchive, onEdit, plan }: PlanCardProps
                 </span>
                 <span className="flex-1 text-[13px] text-slate-600">{QUOTA_LABELS[quotaType]}</span>
                 <span className="text-sm font-extrabold text-slate-900">
-                  {formatQuotaMinutes(quotaByType.get(quotaType)?.includedQuantity)}
+                  {formatUsd(quotaByType.get(quotaType)?.includedQuantity)}
                 </span>
               </div>
             )

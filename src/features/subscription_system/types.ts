@@ -1,9 +1,10 @@
 export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
-export type PlanStatus = 'ACTIVE' | 'ARCHIVED'
+export type PlanStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
 export type RequestType = 'REGISTRATION' | 'UPGRADE'
 export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type InvoiceStatus = 'PAID' | 'PENDING' | 'FAILED' | 'CANCELLED'
+export type SchoolDebtEventType = 'LOCKED' | 'CAP_EXCEEDED' | 'CLEARED'
 
 export const QUOTA_TYPES: QuotaType[] = ['GRADING', 'CLASS_TEST', 'PRACTICE']
 
@@ -33,14 +34,15 @@ export type SubscriptionPlan = {
   pricePerYear: number
   validityDays: number
   maxTimePerAttemptMin: number | null
-  maxStudentCount: number | null
   popular: boolean
   status: PlanStatus
   version: number
   createdAt: string | null
   createdBy: string | null
   replacedByPlanId: string | null
-  hasActiveSubscribers: boolean
+  // Margin dịch vụ riêng của gói này (vd 0.20 = 20%) -- kết hợp với usdToVndRate (quotaPricing
+  // query) để tính giá gợi ý, không ảnh hưởng quota deduction/guard.
+  serviceFeeRatio: number
   quotas: PlanQuota[]
 }
 
@@ -130,15 +132,38 @@ export type InvoicePage = {
   totalPages: number
 }
 
+// Sổ audit "nguyên nhân nợ hạn mức AI" -- chỉ system admin xem được (xem ViewSchoolDebtEventsUseCase).
+export type SchoolDebtEvent = {
+  id: string
+  schoolId: string
+  subscriptionId: string
+  eventType: SchoolDebtEventType
+  quotaType: QuotaType
+  triggerExamSessionId: string | null
+  triggerAmountUsd: number | null
+  totalAllocatedUsd: number
+  usedQuantityUsd: number
+  overageUsd: number
+  occurredAt: string | null
+}
+
+export type SchoolDebtEventPage = {
+  content: SchoolDebtEvent[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
 export type CreatePlanPayload = {
   name: string
   tagline: string | null
   pricePerYear: number
   validityDays: number
   maxTimePerAttemptMin: number | null
-  maxStudentCount: number
-  popular: boolean
-  quotas: { quotaType: QuotaType; includedQuantity: number; tokenUnitPrice: number }[]
+  // Bỏ trống (undefined) -> BE tự mặc định 0.20 (20%).
+  serviceFeeRatio?: number
+  quotas: { quotaType: QuotaType; includedQuantity: number }[]
 }
 
 export type UpdatePlanPayload = Partial<CreatePlanPayload>
@@ -175,6 +200,26 @@ export function formatDate(value?: string | null) {
   }).format(date)
 }
 
+export function formatDateTime(value?: string | null) {
+  if (!value) {
+    return '-'
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
+}
+
 export function formatMinutes(minutes?: number | null) {
   if (!minutes) {
     return '-'
@@ -183,18 +228,11 @@ export function formatMinutes(minutes?: number | null) {
   return `${Math.round(minutes)} phút`
 }
 
-// includedQuantity / tokenUnitPrice của quota tính theo GIÂY audio xử lý — quy đổi
-// sang phút khi hiển thị/nhập liệu, chỉ gửi lại giây khi gọi API tạo/sửa gói.
-export function secondsToMinutes(seconds?: number | null) {
-  return Math.round((Number(seconds) || 0) / 60)
-}
-
-export function minutesToSeconds(minutes?: number | null) {
-  return Math.round((Number(minutes) || 0) * 60)
-}
-
-export function formatQuotaMinutes(seconds?: number | null) {
-  return formatMinutes(secondsToMinutes(seconds))
+// includedQuantity / tokenUnitPrice của quota tính theo USD chi phí AI ước tính (xem
+// AI_USAGE_QUOTA_USD_MIGRATION.md) — hiển thị/nhập liệu thẳng, không quy đổi đơn vị.
+export function formatUsd(value?: number | null) {
+  const amount = Number(value) || 0
+  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(amount)}`
 }
 
 export function formatNullableText(value?: string | null) {
@@ -256,6 +294,10 @@ export function getSubscriptionStatusDisplay(
 }
 
 export function getPlanStatusDisplay(status: PlanStatus) {
+  if (status === 'DRAFT') {
+    return { label: 'Nháp', tone: 'warning' as const }
+  }
+
   if (status === 'ACTIVE') {
     return { label: 'Đang áp dụng', tone: 'success' as const }
   }
@@ -291,14 +333,30 @@ export function getInvoiceStatusDisplay(status: InvoiceStatus) {
   return { label: 'Thất bại', tone: 'danger' as const }
 }
 
-export function getUsageBarColor(pct: number) {
-  if (pct >= 90) {
-    return '#ef4444'
+// overageUsd = usedQuantityUsd - totalAllocatedUsd (xem SchoolDebtNotificationService.logDebtEvent) --
+// dương nghĩa là đang vượt hạn mức, âm nghĩa là đã hết nợ và còn dư bấy nhiêu USD hạn mức.
+export function getOverageDisplay(overageUsd: number) {
+  if (overageUsd > 0) {
+    return { label: `Vượt ${formatUsd(overageUsd)}`, tone: 'danger' as const }
   }
-  if (pct >= 75) {
-    return '#f59e0b'
+
+  if (overageUsd < 0) {
+    return { label: `Còn dư ${formatUsd(Math.abs(overageUsd))}`, tone: 'success' as const }
   }
-  return '#4f46e5'
+
+  return { label: formatUsd(0), tone: 'neutral' as const }
+}
+
+export function getDebtEventDisplay(eventType: SchoolDebtEventType) {
+  if (eventType === 'LOCKED') {
+    return { label: 'Khóa do nợ', tone: 'danger' as const }
+  }
+
+  if (eventType === 'CAP_EXCEEDED') {
+    return { label: 'Vượt trần cảnh báo', tone: 'warning' as const }
+  }
+
+  return { label: 'Đã hết nợ', tone: 'success' as const }
 }
 
 export function getRequestTypeDisplay(type: RequestType) {

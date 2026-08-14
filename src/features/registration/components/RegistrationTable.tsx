@@ -75,7 +75,12 @@ export function RegistrationTable({
 
       {!isLoading && !isError && forms.length > 0 ? (
         <div className="min-h-80 flex-1 overflow-x-auto">
-          <table className="w-full min-w-210 border-collapse text-left">
+          {/*
+            min-w-176 (704px) thay vì 210 (840px): đây là bề ngang tối thiểu để 7 cột không bị
+            bóp nát, và vừa đúng phần còn lại sau sidebar + panel 420px ở 2xl. Để 840px thì ngay
+            cả màn 2xl vẫn phải cuộn ngang.
+          */}
+          <table className="w-full min-w-176 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
                 <th className="px-6 py-4">Người liên hệ</th>

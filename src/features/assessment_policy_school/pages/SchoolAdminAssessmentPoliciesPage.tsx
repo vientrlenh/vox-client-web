@@ -27,6 +27,7 @@ import { usePublishSchoolRubricVersionMutation } from '../api/usePublishSchoolRu
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
 
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { AssessmentPolicyTable } from '../components/AssessmentPolicyTable';
 import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPolicyDialog';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
@@ -148,15 +149,16 @@ export function SchoolAdminAssessmentPoliciesPage() {
   const { mutateAsync: publishPoliciesByVersion, isPending: isPublishingPolicies } = usePublishSchoolAssessmentPoliciesByRubricVersionMutation(schoolId);
   const { mutateAsync: publishRubricVersion, isPending: isPublishingVersion } = usePublishSchoolRubricVersionMutation(schoolId);
   const isQuickPublishing = isPublishingPolicies || isPublishingVersion;
+  const { showError, showSuccess, feedbackToast } = useFeedbackToast();
 
   const handleCreatePolicy = async (formDataList: CreateAssessmentPolicyPayload[]) => {
     try {
       const createdPolicyIds = await createPolicy(formDataList);
       setIsCreateModalOpen(false);
-      alert(`Đã tạo thành công ${createdPolicyIds.length} Chính Sách Đánh Giá.`);
+      showSuccess(`Đã tạo thành công ${createdPolicyIds.length} Chính Sách Đánh Giá.`);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi tạo Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi tạo Chính Sách Đánh Giá.');
     }
   };
 
@@ -168,7 +170,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
       setEditingPolicy(null);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
     }
   };
 
@@ -197,10 +199,10 @@ export function SchoolAdminAssessmentPoliciesPage() {
       if (willPublishVersion) {
         await publishRubricVersion(selectedRubricVersionId);
       }
-      alert('Đã xuất bản thành công.');
+      showSuccess('Đã xuất bản thành công.');
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xuất bản.');
+      showError(err.message || 'Có lỗi xảy ra khi xuất bản.');
     }
   };
 
@@ -214,12 +216,13 @@ export function SchoolAdminAssessmentPoliciesPage() {
       await deletePolicy(policy.id);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
     }
   };
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+    <section className="relative grid gap-6 overflow-hidden">
+      {feedbackToast}
       {/* vox background decoration — đồng bộ với gradient nút */}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
@@ -232,7 +235,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
 
       {/* HEADER */}
       <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
+        <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
           <ClipboardCheck className="size-[26px] text-indigo-600" /> Quản lý Chính Sách Đánh Giá
         </h1>
 
@@ -279,7 +282,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="size-4 text-indigo-600" />
-            <span className="text-sm font-bold text-slate-800">Bộ lọc</span>
+            <span className="text-sm font-bold text-blue-950">Bộ lọc</span>
           </div>
           {hasActiveFilters && (
             <button

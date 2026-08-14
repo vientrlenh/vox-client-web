@@ -2,7 +2,7 @@ import { ArrowRight, Sparkles } from 'lucide-react'
 import { PaymentMethodField } from '@/shared/payment/PaymentMethodField'
 import {
   formatMinutes,
-  formatQuotaMinutes,
+  formatUsd,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -46,7 +46,7 @@ export function PlanChangeConfirmDialog({
         <div className="flex size-13 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
           <Sparkles aria-hidden="true" className="size-6.5" />
         </div>
-        <h2 className="mt-4 text-xl font-extrabold text-blue-950" id="plan-change-confirm-title">
+        <h2 className="mt-4 text-xl font-black text-blue-950" id="plan-change-confirm-title">
           Gói dịch vụ đã được cập nhật
         </h2>
         <p className="mt-1.5 text-sm leading-6 text-slate-500">
@@ -77,7 +77,7 @@ export function PlanChangeConfirmDialog({
                       improved ? 'text-emerald-600' : 'text-slate-900',
                     ].join(' ')}
                   >
-                    {formatQuotaMinutes(before)} → {formatQuotaMinutes(after)}
+                    {formatUsd(before)} → {formatUsd(after)}
                   </span>
                 </div>
               )

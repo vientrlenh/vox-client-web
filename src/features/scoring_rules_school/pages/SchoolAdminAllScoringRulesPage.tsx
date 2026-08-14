@@ -72,7 +72,7 @@ export function SchoolAdminAllScoringRulesPage() {
   }
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+    <section className="relative grid gap-6 overflow-hidden">
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-120 rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}
@@ -85,7 +85,7 @@ export function SchoolAdminAllScoringRulesPage() {
       {/* HEADER */}
       <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
             <Gavel className="size-6.5 text-indigo-600" /> Quản lý quy tắc tính điểm
           </h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -162,7 +162,7 @@ export function SchoolAdminAllScoringRulesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-700">
-              <thead className="bg-slate-50/75 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+              <thead className="bg-slate-50/75 text-xs font-black text-blue-950 border-b border-slate-200">
                 <tr>
                   <th className="px-4 py-3 text-center">Ưu tiên</th>
                   <th className="px-4 py-3">Mã Code</th>

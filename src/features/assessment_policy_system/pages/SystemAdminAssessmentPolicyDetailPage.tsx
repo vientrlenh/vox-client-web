@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { useSystemAssessmentPolicyQuery } from '../api/useSystemAssessmentPolicyQuery';
 import { useUpdateSystemAssessmentPolicyMutation } from '../api/useUpdateSystemAssessmentPolicyMutation';
 import { useDeleteSystemAssessmentPolicyMutation } from '../api/useDeleteSystemAssessmentPolicyMutation';
@@ -67,6 +68,7 @@ export function SystemAdminAssessmentPolicyDetailPage() {
   const { mutateAsync: deletePolicy, isPending: isDeleting } = useDeleteSystemAssessmentPolicyMutation();
   const { mutateAsync: publishPolicy, isPending: isPublishing } = usePublishSystemAssessmentPolicyMutation();
   const { mutateAsync: archivePolicy, isPending: isArchiving } = useArchiveSystemAssessmentPolicyMutation();
+  const { showError, feedbackToast } = useFeedbackToast();
 
   const handlePublishPolicy = async () => {
     if (!policyId) return;
@@ -78,7 +80,7 @@ export function SystemAdminAssessmentPolicyDetailPage() {
       await publishPolicy(policyId);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xuất bản Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi xuất bản Chính Sách Đánh Giá.');
     }
   };
 
@@ -92,7 +94,7 @@ export function SystemAdminAssessmentPolicyDetailPage() {
       await archivePolicy(policyId);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi lưu trữ Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi lưu trữ Chính Sách Đánh Giá.');
     }
   };
 
@@ -104,7 +106,7 @@ export function SystemAdminAssessmentPolicyDetailPage() {
       setIsEditModalOpen(false);
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi cập nhật Chính Sách Đánh Giá.');
     }
   };
 
@@ -119,7 +121,7 @@ export function SystemAdminAssessmentPolicyDetailPage() {
       navigate('/system-admin/assessment-policies');
     } catch (error) {
       const err = error as Error;
-      alert(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
+      showError(err.message || 'Có lỗi xảy ra khi xóa Chính Sách Đánh Giá.');
     }
   };
 
@@ -153,7 +155,8 @@ export function SystemAdminAssessmentPolicyDetailPage() {
   ];
 
   return (
-    <section className="relative grid gap-6 overflow-hidden font-['Be_Vietnam_Pro',sans-serif]">
+    <section className="relative grid gap-6 overflow-hidden">
+      {feedbackToast}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}
@@ -172,7 +175,7 @@ export function SystemAdminAssessmentPolicyDetailPage() {
           >
             <ChevronLeft className="size-5" />
           </button>
-          <h1 className="flex items-center gap-2.5 text-[32px] font-bold tracking-tight text-slate-950">
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
             <ClipboardCheck className="size-[26px] text-indigo-600" /> Chi tiết Chính sách Đánh giá
           </h1>
         </div>

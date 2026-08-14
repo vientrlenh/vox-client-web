@@ -56,6 +56,10 @@ const APPEAL_STATUS = [
 
 const fmt = (n: number) => n.toLocaleString('vi-VN')
 
+function formatUsd(value: number) {
+  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(value)}`
+}
+
 function Kpi({
   accent,
   cta,
@@ -349,10 +353,6 @@ const QUOTA_ICONS: Record<QuotaType, typeof Coins> = {
   PRACTICE: Headphones,
 }
 
-function secondsToMinutes(seconds: number) {
-  return Math.round(seconds / 60)
-}
-
 function usageLevel(pct: number) {
   return pct >= 90 ? 'crit' : pct >= 75 ? 'warn' : 'ok'
 }
@@ -391,14 +391,14 @@ function TokenQuotaPanel({ quotaType, usage }: { quotaType: QuotaType; usage: To
         <span className="text-[13.5px] font-bold text-slate-900">{QUOTA_LABELS[quotaType]}</span>
       </div>
       <div className="flex items-baseline gap-1.5">
-        <span className="text-3xl font-extrabold tracking-tight text-slate-900 tabular-nums">{fmt(secondsToMinutes(used))}</span>
-        <span className="text-sm font-semibold text-slate-500">/ {fmt(secondsToMinutes(total))} phút</span>
+        <span className="text-3xl font-extrabold tracking-tight text-slate-900 tabular-nums">{formatUsd(used)}</span>
+        <span className="text-sm font-semibold text-slate-500">/ {formatUsd(total)}</span>
       </div>
       <div className="mt-3.5 h-2.5 overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${pct}%` }} />
       </div>
       <div className="mt-2.5 flex items-center justify-between">
-        <span className="text-[12.5px] text-slate-500">Còn lại {fmt(secondsToMinutes(Math.max(0, total - used)))} phút</span>
+        <span className="text-[12.5px] text-slate-500">Còn lại {formatUsd(Math.max(0, total - used))}</span>
         <span className={`text-[12.5px] font-extrabold ${level === 'crit' ? 'text-red-600' : level === 'warn' ? 'text-amber-600' : 'text-indigo-600'}`}>
           {pct}%
         </span>
@@ -509,8 +509,7 @@ function TokenUsageTimeseriesSection({
       <div className={isFetching ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
         <div className="text-[13px] font-semibold text-slate-500">Tổng token đã dùng ({days} ngày)</div>
         <div className="mt-1 text-4xl font-extrabold tracking-tight text-slate-900 tabular-nums">
-          {fmt(secondsToMinutes(data?.totalUsed ?? 0))}
-          <small className="ml-1.5 text-base font-bold text-slate-400">phút</small>
+          {formatUsd(data?.totalUsed ?? 0)}
         </div>
 
         <div className="mt-3.5 flex flex-wrap gap-4">

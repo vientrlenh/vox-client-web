@@ -74,6 +74,7 @@ import {
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useMySubscriptionUsageQuery } from '@/features/subscription_school/api/useMySubscriptionUsageQuery'
 import { useMyClassTestQuotaAllocationQuery } from '@/features/subscription_school/api/useMyClassTestQuotaAllocationQuery'
+import { useQuotaPricingQuery } from '@/features/subscription_school/api/useQuotaPricingQuery'
 import {
   formatDate,
   formatDateTime,
@@ -1103,6 +1104,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const subscriptionQuery = useMySubscriptionQuery()
   const subscriptionUsageQuery = useMySubscriptionUsageQuery()
   const myClassTestQuotaAllocationQuery = useMyClassTestQuotaAllocationQuery()
+  const quotaPricingQuery = useQuotaPricingQuery()
   const updateQuestionsMutation = useUpdateClassTestQuestionsMutation()
   const updateExamMutation = useUpdateClassTestMutation()
   const updateStatusMutation = useUpdateClassTestStatusMutation()
@@ -1495,7 +1497,34 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     if (
       action === 'START' &&
       !(await confirm({
-        message: 'Mở bài ngay sẽ chuyển bài sang trạng thái đang mở, khóa đề và học sinh có thể bắt đầu làm bài. Bạn có chắc muốn tiếp tục?',
+        confirmLabel: 'Mở bài',
+        message:
+          'Mở bài ngay sẽ chuyển bài sang trạng thái đang mở, khóa đề và học sinh có thể bắt đầu làm bài. Không quay lại trạng thái đã lên lịch được.',
+        title: 'Xác nhận mở bài kiểm tra',
+      }))
+    ) {
+      return
+    }
+    // Hai thao tác dưới đây đều KHÔNG lùi lại được, và đóng bài còn chấm 0 cho học sinh vắng
+    // -- hậu quả người dùng không tự đoán ra, xem UpdateExamStatusUseCase nhánh CLOSE.
+    if (
+      action === 'CLOSE' &&
+      !(await confirm({
+        confirmLabel: 'Đóng bài',
+        message:
+          'Đóng bài sẽ đóng mọi ca thi và CHẤM 0 cho học sinh chưa làm hoặc nộp bài trống. Không mở lại được, chỉ còn chốt kết quả hoặc huỷ.',
+        title: 'Xác nhận đóng bài kiểm tra',
+      }))
+    ) {
+      return
+    }
+    if (
+      action === 'CANCEL' &&
+      !(await confirm({
+        confirmLabel: 'Huỷ bài',
+        message:
+          'Huỷ bài sẽ huỷ toàn bộ ca thi đã xếp. Đây là trạng thái cuối — không mở lại, không lên lịch lại và không chấm được nữa.',
+        title: 'Xác nhận huỷ bài kiểm tra',
       }))
     ) {
       return
@@ -1552,6 +1581,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     gradingQuota,
     maxAttempt: exam.maxAttempt,
     personalAllocation: myClassTestQuotaAllocationQuery.data,
+    pricePerSecondUsd: quotaPricingQuery.data?.estimatedCostPerExamSecondUsd,
   })
   // Ước lượng "nếu lưu với giá trị đang sửa" trong modal — dùng editMaxAttempt thay vì exam.maxAttempt
   // vì đây là số người dùng đang gõ, chưa lưu.
@@ -1563,6 +1593,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     gradingQuota,
     maxAttempt: Number(editMaxAttempt) || 1,
     personalAllocation: myClassTestQuotaAllocationQuery.data,
+    pricePerSecondUsd: quotaPricingQuery.data?.estimatedCostPerExamSecondUsd,
   })
   const { completedCount, currentStep, steps } = workflow
   const scheduleReadiness = getClassTestScheduleReadiness(schedulesQuery.data, candidatesQuery.data)

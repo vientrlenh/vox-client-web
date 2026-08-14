@@ -22,7 +22,7 @@ export function FeedbackToast({ message, onClose, tone }: FeedbackToastProps) {
   }
 
   return (
-    <div className="pointer-events-none fixed right-4 top-4 z-50 sm:right-6 sm:top-6">
+    <div className="pointer-events-none fixed right-4 top-4 z-100 sm:right-6 sm:top-6">
       <div
         className={[
           'pointer-events-auto min-w-[280px] max-w-md rounded-2xl border px-4 py-3 shadow-lg backdrop-blur',

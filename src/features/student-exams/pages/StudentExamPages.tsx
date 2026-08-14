@@ -288,7 +288,6 @@ function ResultStatePanel({
 function StudentQuestionEvaluation({ item, index }: { item: ExamResultItemDto; index: number }) {
   const [open, setOpen] = useState(false)
   const evaluationQuery = useExamItemEvaluationQuery(open ? item.responseId : null)
-  const prompt = evaluationQuery.data?.turns.find((turn) => turn.promptText)?.promptText
   return (
     <QuestionEvaluationCard
       evaluation={evaluationQuery.data}
@@ -296,7 +295,15 @@ function StudentQuestionEvaluation({ item, index }: { item: ExamResultItemDto; i
       onToggle={() => setOpen((current) => !current)}
       open={open}
       questionCode={`Câu ${index + 1}`}
-      questionText={prompt ?? (open && evaluationQuery.isLoading ? 'Đang tải chi tiết câu hỏi...' : undefined)}
+      /*
+        Đề bài đi kèm ngay trong examSessionResult nên hiện được cả khi thẻ đang đóng.
+        Trước đây lấy từ `evaluationQuery.data?.turns.find(t => t.promptText)?.promptText`,
+        hỏng theo hai cách: thẻ đóng thì query không chạy (useExamItemEvaluationQuery nhận
+        null) nên rơi vào chữ "Không có nội dung câu hỏi." dù dữ liệu vẫn còn nguyên trong DB;
+        và kể cả mở ra thì turn đầu tiên là lời dẫn của AI ("You have 10 seconds to
+        prepare...") chứ không phải đề bài.
+      */
+      questionText={item.questionText}
       variant="student"
     />
   )
