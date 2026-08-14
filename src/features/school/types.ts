@@ -23,6 +23,43 @@ export interface SchoolPage {
   totalPages: number
 }
 
+/**
+ * Tạo trường trực tiếp, không qua đơn đăng ký (POST /v1/schools, chỉ SYSTEM_ADMIN).
+ *
+ * <p>Bốn trường `school*` và `schoolDirectoryId` loại trừ nhau: có `schoolDirectoryId` thì server
+ * LẤY TRỌN mã / tên / địa chỉ / domain từ danh mục và bỏ qua phần tự khai — nên đừng gửi kèm cả
+ * hai, người dùng sẽ tưởng giá trị mình gõ được lưu. Server yêu cầu có danh mục, HOẶC đủ cả mã +
+ * tên + địa chỉ.
+ */
+export type CreateSchoolRequest = {
+  adminAddress: string | null
+  adminAvatarUrl: string | null
+  /** Chuỗi ngày; server nhận yyyy-MM-dd nên giá trị thô của input[type=date] dùng thẳng được. */
+  adminDateOfBirth: string
+  adminEmail: string
+  adminFullName: string
+  adminPhone: string | null
+  schoolAddress: string | null
+  schoolCode: string | null
+  schoolDirectoryId: string | null
+  schoolDomain: string | null
+  schoolName: string | null
+  studentCount: number
+}
+
+/** Đúng theo @Size của CreateSchoolRequest ở backend — dùng chung cho maxLength lẫn validate. */
+export const CREATE_SCHOOL_FIELD_LIMITS = {
+  adminAddress: 255,
+  adminAvatarUrl: 4096,
+  adminEmail: 255,
+  adminFullName: 255,
+  adminPhone: 20,
+  schoolAddress: 512,
+  schoolCode: 100,
+  schoolDomain: 100,
+  schoolName: 255,
+} as const
+
 
 
 export interface User {

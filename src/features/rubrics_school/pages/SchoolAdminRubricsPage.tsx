@@ -7,20 +7,19 @@ import { ClipboardList, Plus, RefreshCw, Search, Filter } from "lucide-react";
 import { useSearchSchoolRubricsQuery, type SearchRubricFilter } from "../api/useSearchSchoolRubricsQuery";
 import { useFrameworkOptionsQuery, useLanguageOptionsQuery } from "../api/useFilterOptionsQuery";
 // IMPORT THÊM TYPE CreateRubricPayload TỪ FILE API
-import { useCreateSchoolRubricMutation, type CreateRubricPayload } from "../api/useCreateSchoolRubricMutation";
-import { useDeleteSchoolRubricMutation } from "../api/useDeleteSchoolRubricMutation";
+import { useCreateSchoolRubricMutation, type CreateRubricPayload } from "../api/useCreateSchoolRubricMutation"; 
 
 import { RubricTable } from "../components/RubricTable";
-import { CreateRubricDialog } from "../components/CreateRubricDialog";
+import { CreateRubricDialog } from "../components/CreateRubricDialog"; 
 import { Pagination } from "@/shared/components/Pagination";
-import { useFeedbackToast } from "@/shared/ui/useFeedbackToast";
 import { useAppSelector } from "@/app/store/hooks";
-import type { Rubric } from "../types";
+import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 10;
 
 export function SchoolAdminRubricsPage() {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
   const schoolId = user?.schoolId;
@@ -59,98 +58,82 @@ export function SchoolAdminRubricsPage() {
   const totalPages = data?.totalPages ?? 0;
   const totalElements = data?.totalElements ?? 0;
 
-  // KHỞI TẠO MUTATION THÊM MỚI / XÓA
+  // KHỞI TẠO MUTATION THÊM MỚI
   const { mutateAsync: createRubric, isPending: isCreating } = useCreateSchoolRubricMutation(schoolId);
-  const { mutateAsync: deleteRubric } = useDeleteSchoolRubricMutation(schoolId);
-  const { showError, feedbackToast } = useFeedbackToast();
 
   // HÀM XỬ LÝ SUBMIT VÀ BẮT LỖI TỪ BE (Đã thay 'any' bằng type cụ thể)
   const handleCreateRubric = async (formData: CreateRubricPayload) => {
+    setErrorMessage(null);
     try {
       const newRubricId = await createRubric(formData);
       setIsCreateModalOpen(false);
-
+      
       // UX xịn: Tạo thành công đá thẳng sang trang chi tiết để User add Versions!
       navigate(`/school-admin/rubrics/${newRubricId}`);
     } catch (error) {
       // Ép kiểu error về Error thuần để gọi được thuộc tính message
       const err = error as Error;
       console.error("Lỗi tạo Rubric:", err);
-      // Nơi này sẽ hứng cái lỗi "Trường của bạn đã thiết lập một bộ Rubric cho ngôn ngữ này rồi."
-      showError(err.message || 'Có lỗi xảy ra khi tạo Rubric.');
-    }
-  };
-
-  const handleDeleteRubric = async (rubric: Rubric) => {
-    const isConfirm = window.confirm(
-      `Bạn có chắc chắn muốn xóa bộ Rubric "${rubric.name}"? Chỉ xóa được khi chưa có phiên bản (version) nào bên trong.`
-    );
-    if (!isConfirm) return;
-
-    try {
-      await deleteRubric(rubric.id);
-    } catch (error) {
-      const err = error as Error;
-      showError(err.message || 'Có lỗi xảy ra khi xóa Rubric.');
+      // Nơi này sẽ hứng cái lỗi "Trường của bạn đã thiết lập một bộ tiêu chí đánh giá cho ngôn ngữ này rồi."
+      setErrorMessage(err.message || 'Có lỗi xảy ra khi tạo tiêu chí đánh giá.');
     }
   };
 
   return (
-    <section className="relative grid gap-6 overflow-hidden">
-      {feedbackToast}
-      {/* vox background decoration — đồng bộ với gradient nút */}
-      <div
-        className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
-        style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}
-      />
-      <div
-        className="pointer-events-none absolute -bottom-48 -left-36 size-[420px] rounded-full blur-[10px]"
-        style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.12), rgba(139,92,246,0.08) 55%, transparent 75%)' }}
-      />
+    <section className="grid gap-6">
+      <ErrorBanner message={errorMessage} />
 
       {/* HEADER */}
-      <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
-          <ClipboardList className="size-[26px] text-indigo-600" /> Quản lý Rubric
-        </h1>
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
+            <ClipboardList className="size-6 text-indigo-600" /> Quản lý tiêu chí đánh giá
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Bộ tiêu chí chấm điểm của trường, gắn với một khung năng lực và một ngôn ngữ. Mỗi bộ có
+            nhiều phiên bản, chỉ phiên bản đã xuất bản mới dùng để chấm bài.
+          </p>
+        </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-wrap gap-3">
           <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-wait disabled:opacity-70"
+            disabled={isFetching}
             onClick={() => refetch()}
-            aria-label="Tải lại"
-            className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-950 transition hover:bg-slate-50"
+            type="button"
           >
-            <RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} />
+            <RefreshCw aria-hidden="true" className={`size-4 ${isFetching ? "animate-spin" : ""}`} />
+            Làm mới
           </button>
 
           {/* NÚT MỞ MODAL THÊM MỚI */}
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 px-6 text-sm font-medium text-white transition hover:opacity-90"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700"
           >
-            <Plus className="size-4" /> Thêm Rubric
+            <Plus className="size-4" /> Thêm tiêu chí đánh giá
           </button>
         </div>
       </div>
 
       {/* FILTER BAR */}
-      <div className="relative rounded-[14px] border border-slate-200 bg-white p-4">
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5"><Search className="size-4 text-slate-400" /></div>
-            <input type="text" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Tìm theo mã hoặc tên Rubric..." className="w-full rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" />
+            <input type="text" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Tìm theo mã hoặc tên tiêu chí đánh giá..." className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" />
           </div>
           <div className="relative min-w-50">
              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5"><Filter className="size-4 text-slate-400" /></div>
-            <select value={selectedFrameworkId} onChange={(e) => {setSelectedFrameworkId(e.target.value); setPage(1);}} className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100">
+            <select value={selectedFrameworkId} onChange={(e) => {setSelectedFrameworkId(e.target.value); setPage(1);}} className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100">
               <option value="">Tất cả Khung năng lực</option>
               {frameworks?.map((fw) => <option key={fw.id} value={fw.id}>{fw.name}</option>)}
             </select>
           </div>
           <div className="relative min-w-50">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5"><Filter className="size-4 text-slate-400" /></div>
-            <select value={selectedLanguageId} onChange={(e) => {setSelectedLanguageId(e.target.value); setPage(1);}} className="w-full appearance-none rounded-[10px] border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100">
+            <select value={selectedLanguageId} onChange={(e) => {setSelectedLanguageId(e.target.value); setPage(1);}} className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100">
               <option value="">Tất cả Ngôn ngữ</option>
               {languages?.map((lang) => <option key={lang.id} value={lang.id}>{lang.name}</option>)}
             </select>
@@ -159,17 +142,10 @@ export function SchoolAdminRubricsPage() {
       </div>
 
       {/* TABLE */}
-      <div className="relative overflow-hidden rounded-[14px] border border-slate-200 bg-white">
-        <RubricTable
-          rubrics={rubrics}
-          isLoading={isLoading}
-          isError={isError}
-          onRetry={() => refetch()}
-          onViewDetails={(rubric) => navigate(`/school-admin/rubrics/${rubric.id}`)}
-          onDelete={handleDeleteRubric}
-        />
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <RubricTable rubrics={rubrics} isLoading={isLoading} isError={isError} onRetry={() => refetch()} onViewDetails={(rubric) => navigate(`/school-admin/rubrics/${rubric.id}`)} />
         {!isLoading && !isError && rubrics.length > 0 && (
-          <Pagination currentPage={page} totalPages={totalPages} totalElements={totalElements} itemName="rubric" onPageChange={setPage} />
+          <Pagination currentPage={page} totalPages={totalPages} totalElements={totalElements} itemName="tiêu chí đánh giá" onPageChange={setPage} />
         )}
       </div>
 

@@ -1,109 +1,133 @@
-// src/features/school/pages/SystemAdminSchoolsPage.tsx
+import { useState } from 'react'
+import { useLocation } from 'react-router'
+import { toApiError } from '@/shared/api'
+import { Pagination } from '@/shared/components/Pagination'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
+import { useSchoolsQuery } from '../api/useSchoolsQuery'
+import { useUpdateSchoolStatusMutation } from '../api/useUpdateSchoolStatusMutation'
+import { SchoolDetailDialog } from '../components/SchoolDetailDialog'
+import { SchoolPageHeader } from '../components/SchoolPageHeader'
+import { SchoolTable } from '../components/SchoolTable'
+import type { School } from '../types'
 
-import { useState } from "react";
-import { Building2, RefreshCw, AlertTriangle } from "lucide-react";
-import { useSchoolsQuery } from "../api/useSchoolsQuery";
-import { useUpdateSchoolStatusMutation } from "../api/useUpdateSchoolStatusMutation";
-import { SchoolTable } from "../components/SchoolTable";
-import { SchoolDetailDialog } from "../components/SchoolDetailDialog";
-import { Pagination } from "@/shared/components/Pagination";
-import { useFeedbackToast } from "@/shared/ui/useFeedbackToast";
-import type { School } from "../types";
+const DEFAULT_PAGE = 1
+const DEFAULT_PAGE_SIZE = 20
 
-const DEFAULT_PAGE = 1;
-const DEFAULT_PAGE_SIZE = 20;
+type PageMessage = {
+  text: string
+  tone: 'error' | 'success'
+}
 
 export function SystemAdminSchoolsPage() {
-  const [page, setPage] = useState(DEFAULT_PAGE);
-  const [pageSize] = useState(DEFAULT_PAGE_SIZE);
+  const location = useLocation()
+  const createdMessage = (location.state as { successMessage?: string } | null)
+    ?.successMessage
+  const [page, setPage] = useState(DEFAULT_PAGE)
+  const [viewingSchool, setViewingSchool] = useState<School | null>(null)
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(
+    createdMessage ? { text: createdMessage, tone: 'success' } : null,
+  )
+  const { confirm, dialog } = useConfirmationDialog()
 
-  const [viewingSchool, setViewingSchool] = useState<School | null>(null);
+  const schoolsQuery = useSchoolsQuery(page, DEFAULT_PAGE_SIZE)
+  const updateStatusMutation = useUpdateSchoolStatusMutation()
 
-  const { data, isLoading, isError, refetch, isFetching } = useSchoolsQuery(
-    page,
-    pageSize,
-  );
-  const { mutateAsync: updateStatus, isPending: isUpdatingStatus } =
-    useUpdateSchoolStatusMutation();
-  const { showError, feedbackToast } = useFeedbackToast();
-
-  const schools = data?.content ?? [];
-  const totalPages = data?.totalPages ?? 0;
-  const totalElements = data?.totalElements ?? 0;
+  const schools = schoolsQuery.data?.content ?? []
+  // Chỉ khoá đúng dòng đang gọi API, thay vì làm mờ cả bảng như trước.
+  const updatingId = updateStatusMutation.isPending
+    ? (updateStatusMutation.variables?.id ?? null)
+    : null
 
   async function handleChangeStatus(school: School) {
-    const actionText = school.isActive ? "khóa" : "kích hoạt";
-    const isConfirmed = window.confirm(
-      `Bạn có chắc chắn muốn ${actionText} trường "${school.name || school.code}" không?`,
-    );
-    if (!isConfirmed) return;
+    const schoolLabel = school.name || school.code
+    const isLocking = Boolean(school.isActive)
+    setPageMessage(null)
+
+    const isConfirmed = await confirm({
+      confirmLabel: isLocking ? 'Khóa trường' : 'Kích hoạt',
+      message: isLocking
+        ? `Khóa trường "${schoolLabel}"? Toàn bộ tài khoản thuộc trường sẽ không đăng nhập được cho tới khi kích hoạt lại.`
+        : `Kích hoạt lại trường "${schoolLabel}"? Các tài khoản thuộc trường sẽ đăng nhập được trở lại.`,
+      title: isLocking ? 'Khóa trường học' : 'Kích hoạt trường học',
+    })
+
+    if (!isConfirmed) {
+      return
+    }
+
     try {
-      await updateStatus({ id: school.id, isActive: !school.isActive });
-    } catch {
-      showError("Có lỗi xảy ra khi cập nhật trạng thái.");
+      const result = await updateStatusMutation.mutateAsync({
+        id: school.id,
+        isActive: !school.isActive,
+      })
+
+      setPageMessage({
+        text:
+          result.message ??
+          `Đã ${isLocking ? 'khóa' : 'kích hoạt'} trường "${schoolLabel}".`,
+        tone: 'success',
+      })
+    } catch (error) {
+      setPageMessage({ text: toApiError(error).message, tone: 'error' })
     }
   }
 
   return (
-    <section className="grid gap-6 p-4 sm:p-6 rounded-2xl bg-linear-to-br from-blue-500 via-white to-blue-100/80 min-h-[calc(100vh-6rem)]">
-      {feedbackToast}
-      {/* Bọc toàn trang bằng gradient Xanh biển - Trắng mềm mại */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-blue-950 flex items-center gap-2">
-          <Building2 className="size-6 text-blue-600" /> Quản lý trường học
-        </h1>
-        
-        {/* Nút làm mới tone-sur-tone màu xanh */}
-        <button
-          onClick={() => refetch()}
-          aria-label="Làm mới danh sách"
-          title="Làm mới"
-          className="inline-flex size-11 items-center justify-center rounded-lg border border-blue-500 bg-white text-blue-600 shadow-sm transition hover:bg-blue-50 hover:border-blue-300"
+    <section aria-labelledby="system-admin-schools-title" className="grid gap-6">
+      <SchoolPageHeader
+        isRefreshing={schoolsQuery.isFetching}
+        onRefresh={() => {
+          void schoolsQuery.refetch()
+        }}
+      />
+
+      {dialog}
+
+      {pageMessage ? (
+        <div
+          className={[
+            'rounded-lg border px-4 py-3 text-sm font-semibold',
+            pageMessage.tone === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700',
+          ].join(' ')}
+          role={pageMessage.tone === 'error' ? 'alert' : 'status'}
         >
-          <RefreshCw className={`size-5 ${isFetching ? "animate-spin" : ""}`} />
-        </button>
-      </div>
+          {pageMessage.text}
+        </div>
+      ) : null}
 
-      {/* Khung Table pha nền trắng và xanh biển nhạt, đổ bóng xanh */}
-      <div
-        className={`rounded-xl border border-blue-100 bg-linear-to-b from-white to-blue-50/40 shadow-lg shadow-blue-900/5 overflow-hidden transition duration-300 ${isUpdatingStatus ? "opacity-60 pointer-events-none" : ""}`}
-      >
-        {isError ? (
-          <div className="p-10 text-center text-red-600 flex flex-col items-center gap-2 bg-white">
-            <AlertTriangle className="size-10" />
-            <p>
-              Không thể tải danh sách trường. Vui lòng kiểm tra lại kết nối.
-            </p>
-          </div>
-        ) : (
-          <>
-            <SchoolTable
-              schools={schools}
-              isLoading={isLoading}
-              isError={isError}
-              onRetry={() => refetch()}
-              onChangeStatus={handleChangeStatus}
-              onView={(school) => setViewingSchool(school)}
-            />
-
-            {!isLoading && !isError && schools.length > 0 && (
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                itemName="trường"
-                onPageChange={setPage}
-              />
-            )}
-          </>
-        )}
-      </div>
+      <SchoolTable
+        errorMessage={
+          schoolsQuery.isError ? toApiError(schoolsQuery.error).message : undefined
+        }
+        footer={
+          <Pagination
+            currentPage={page}
+            itemName="trường"
+            onPageChange={setPage}
+            totalElements={schoolsQuery.data?.totalElements ?? 0}
+            totalPages={schoolsQuery.data?.totalPages ?? 0}
+          />
+        }
+        isError={schoolsQuery.isError}
+        isLoading={schoolsQuery.isLoading}
+        onChangeStatus={(school) => {
+          void handleChangeStatus(school)
+        }}
+        onRetry={() => {
+          void schoolsQuery.refetch()
+        }}
+        onView={(school) => setViewingSchool(school)}
+        schools={schools}
+        updatingId={updatingId}
+      />
 
       <SchoolDetailDialog
         isOpen={viewingSchool !== null}
-        school={viewingSchool}
         onClose={() => setViewingSchool(null)}
+        school={viewingSchool}
       />
     </section>
-  );
+  )
 }
