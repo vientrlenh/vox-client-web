@@ -59,7 +59,8 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
   const [formData, setFormData] = useState(() => ({
     name: initialData.name,
     description: initialData.description ?? '',
-    weight: initialData.weight,
+    // Lưu 0.2, hiện 20 -- xem ghi chú ở chỗ gửi lên.
+    weight: initialData.weight * 100,
     order: initialData.order,
     isRequired: initialData.isRequired,
   }));
@@ -97,7 +98,9 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
       name: formData.name,
       description: formData.description || undefined,
       examplesJson,
-      weight: Number(formData.weight),
+        // Người dùng nhập PHẦN TRĂM (20), hệ thống lưu PHÂN SỐ (0.2): cổng ban hành
+        // (ChangeSchoolRubricVersionStatusUseCase) đòi tổng trọng số đúng bằng 1.
+      weight: Number(formData.weight) / 100,
       minScore: scoringScaleMin,
       maxScore: scoringScaleMax,
       order: Number(formData.order),

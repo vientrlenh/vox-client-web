@@ -89,7 +89,9 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
           name: formData.name,
           description: formData.description || undefined,
           examples: cleanedExamples.length > 0 ? cleanedExamples : undefined,
-          weight: Number(formData.weight),
+            // Người dùng nhập PHẦN TRĂM (20), hệ thống lưu PHÂN SỐ (0.2): cổng ban hành
+        // (ChangeSchoolRubricVersionStatusUseCase) đòi tổng trọng số đúng bằng 1.
+      weight: Number(formData.weight) / 100,
           minScore: scoringScaleMin,
           maxScore: scoringScaleMax,
           order: Number(formData.order),

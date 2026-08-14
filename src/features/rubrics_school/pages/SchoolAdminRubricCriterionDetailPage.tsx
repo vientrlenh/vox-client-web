@@ -163,7 +163,7 @@ export function SchoolAdminRubricCriterionDetailPage() {
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Điểm số</p>
             <div className="mt-2 space-y-1 text-sm text-slate-700">
               <p><span className="font-medium">Thang:</span> {criterion.minScore} - {criterion.maxScore}</p>
-              <p><span className="font-medium">Trọng số:</span> {criterion.weight}%</p>
+              <p><span className="font-medium">Trọng số:</span> {criterion.weight * 100}%</p>
               <p><span className="font-medium">Thứ tự:</span> {criterion.order}</p>
             </div>
           </div>
