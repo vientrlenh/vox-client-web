@@ -34,7 +34,6 @@ export type SubscriptionPlan = {
   pricePerYear: number
   validityDays: number
   maxTimePerAttemptMin: number | null
-  maxStudentCount: number | null
   popular: boolean
   status: PlanStatus
   version: number
@@ -162,10 +161,9 @@ export type CreatePlanPayload = {
   pricePerYear: number
   validityDays: number
   maxTimePerAttemptMin: number | null
-  maxStudentCount: number
   // Bỏ trống (undefined) -> BE tự mặc định 0.20 (20%).
   serviceFeeRatio?: number
-  quotas: { quotaType: QuotaType; includedQuantity: number; tokenUnitPrice: number }[]
+  quotas: { quotaType: QuotaType; includedQuantity: number }[]
 }
 
 export type UpdatePlanPayload = Partial<CreatePlanPayload>

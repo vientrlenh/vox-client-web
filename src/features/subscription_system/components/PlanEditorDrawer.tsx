@@ -46,10 +46,9 @@ type PlanEditorDrawerProps = {
   plan: SubscriptionPlan | null
 }
 
-type QuotaFormState = Record<QuotaType, { includedQuantity: string; tokenUnitPrice: string }>
+type QuotaFormState = Record<QuotaType, { includedQuantity: string }>
 
 type FormState = {
-  maxStudentCount: string
   maxTimePerAttemptMin: string
   name: string
   pricePerYear: string
@@ -61,16 +60,15 @@ type FormState = {
 
 function emptyQuotas(): QuotaFormState {
   return {
-    CLASS_TEST: { includedQuantity: '', tokenUnitPrice: '' },
-    GRADING: { includedQuantity: '', tokenUnitPrice: '' },
-    PRACTICE: { includedQuantity: '', tokenUnitPrice: '' },
+    CLASS_TEST: { includedQuantity: '' },
+    GRADING: { includedQuantity: '' },
+    PRACTICE: { includedQuantity: '' },
   }
 }
 
 function createFormState(plan: SubscriptionPlan | null): FormState {
   if (!plan) {
     return {
-      maxStudentCount: '',
       maxTimePerAttemptMin: '',
       name: '',
       pricePerYear: '',
@@ -85,12 +83,10 @@ function createFormState(plan: SubscriptionPlan | null): FormState {
   for (const quota of plan.quotas) {
     quotas[quota.quotaType] = {
       includedQuantity: String(quota.includedQuantity),
-      tokenUnitPrice: String(quota.tokenUnitPrice),
     }
   }
 
   return {
-    maxStudentCount: plan.maxStudentCount != null ? String(plan.maxStudentCount) : '',
     maxTimePerAttemptMin: plan.maxTimePerAttemptMin != null ? String(plan.maxTimePerAttemptMin) : '',
     name: plan.name,
     pricePerYear: String(plan.pricePerYear),
@@ -114,10 +110,6 @@ function validate(form: FormState) {
     return 'Thời hạn gói (ngày) phải lớn hơn 0.'
   }
 
-  if (form.maxStudentCount === '' || Number(form.maxStudentCount) < 0) {
-    return 'Số học sinh tối đa không được để trống.'
-  }
-
   if (form.serviceFeeRatioPercent === '' || Number(form.serviceFeeRatioPercent) < 0) {
     return 'Phí dịch vụ (%) không được để trống.'
   }
@@ -132,9 +124,6 @@ function validate(form: FormState) {
     if (Number(quota.includedQuantity) >= 1_000_000_000_000) {
       return `Hạn mức "${QUOTA_LABELS[quotaType]}" vượt quá giới hạn cho phép (tối đa 999,999,999,999 USD).`
     }
-    if (quota.tokenUnitPrice === '' || Number(quota.tokenUnitPrice) < 0) {
-      return `Giá token "${QUOTA_LABELS[quotaType]}" không hợp lệ.`
-    }
   }
 
   return null
@@ -142,7 +131,6 @@ function validate(form: FormState) {
 
 function toPayload(form: FormState): CreatePlanPayload {
   return {
-    maxStudentCount: Number(form.maxStudentCount),
     maxTimePerAttemptMin: form.maxTimePerAttemptMin ? Number(form.maxTimePerAttemptMin) : null,
     name: form.name.trim(),
     pricePerYear: Number(form.pricePerYear),
@@ -151,9 +139,6 @@ function toPayload(form: FormState): CreatePlanPayload {
     quotas: QUOTA_TYPES.map((quotaType) => ({
       includedQuantity: Number(form.quotas[quotaType].includedQuantity),
       quotaType,
-      // token_unit_price ở DB là NUMERIC(15,0) — không có phần thập phân — nên làm tròn
-      // ngay tại FE thay vì để DB tự làm tròn khi lưu.
-      tokenUnitPrice: Math.round(Number(form.quotas[quotaType].tokenUnitPrice)),
     })),
     tagline: form.tagline.trim() || null,
     validityDays: Number(form.validityDays),
@@ -177,7 +162,8 @@ export function PlanEditorDrawer({
   const isEditMode = Boolean(plan)
   const { data: quotaPricing } = useQuotaPricingQuery()
   const serviceFeeRatioPercentNumber = Number(form.serviceFeeRatioPercent)
-  // Chỉ tham khảo cho admin lúc đặt giá -- KHÔNG gửi lên BE, KHÔNG bắt buộc theo con số này.
+  // BE tự tính đúng công thức này khi lưu gói (QuotaPricingService.tokenUnitPriceFor) -- ở đây chỉ
+  // hiện trước cho admin xem, không gửi lên BE.
   const suggestedTokenUnitPriceVnd =
     quotaPricing && !Number.isNaN(serviceFeeRatioPercentNumber)
       ? quotaPricing.usdToVndRate * (1 + serviceFeeRatioPercentNumber / 100)
@@ -192,7 +178,7 @@ export function PlanEditorDrawer({
     setValidationMessage(null)
   }
 
-  function updateQuota(quotaType: QuotaType, field: 'includedQuantity' | 'tokenUnitPrice', value: string) {
+  function updateQuota(quotaType: QuotaType, field: 'includedQuantity', value: string) {
     setForm((current) => ({
       ...current,
       quotas: {
@@ -305,7 +291,7 @@ export function PlanEditorDrawer({
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div>
               <label className="grid gap-2 text-sm font-bold text-blue-950">
                 Thời gian tối đa mỗi bài (phút)
                 <input
@@ -316,18 +302,6 @@ export function PlanEditorDrawer({
                   placeholder="60"
                   type="number"
                   value={form.maxTimePerAttemptMin}
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-bold text-blue-950">
-                Số học sinh tối đa <span className="text-red-500">*</span>
-                <input
-                  className={inputClassName}
-                  disabled={isSubmitting}
-                  inputMode="numeric"
-                  onChange={(event) => updateField('maxStudentCount', sanitizeNumericInput(event.target.value))}
-                  placeholder="1,000"
-                  type="text"
-                  value={formatThousands(form.maxStudentCount)}
                 />
               </label>
             </div>
@@ -348,8 +322,8 @@ export function PlanEditorDrawer({
               </label>
               {suggestedTokenUnitPriceVnd != null ? (
                 <p className="mt-1.5 text-xs font-medium text-slate-500">
-                  Giá gợi ý cho mỗi $1 hạn mức: <span className="font-bold text-indigo-600">{formatVnd(suggestedTokenUnitPriceVnd)}</span> (tỷ giá{' '}
-                  {formatVnd(quotaPricing?.usdToVndRate)}/$ × margin) — chỉ tham khảo, không bắt buộc.
+                  Giá áp dụng cho mỗi $1 hạn mức: <span className="font-bold text-indigo-600">{formatVnd(suggestedTokenUnitPriceVnd)}</span> (tỷ giá{' '}
+                  {formatVnd(quotaPricing?.usdToVndRate)}/$ × margin) — BE tự tính khi lưu gói, không nhập tay.
                 </p>
               ) : null}
             </div>
@@ -357,7 +331,8 @@ export function PlanEditorDrawer({
             <div className="border-t border-slate-200 pt-4">
               <p className="text-sm font-black text-blue-950">Hạn mức &amp; giá mua thêm</p>
               <p className="mt-1 text-xs text-slate-500">
-                Hạn mức tính theo USD chi phí AI ước tính được tặng miễn phí mỗi chu kỳ; giá áp dụng khi trường dùng vượt hạn mức.
+                Hạn mức tính theo USD chi phí AI ước tính được tặng miễn phí mỗi chu kỳ; giá áp dụng khi trường dùng vượt hạn mức
+                được BE tự tính theo tỷ giá + phí dịch vụ ở trên.
               </p>
               <div className="mt-4 grid gap-4">
                 {QUOTA_TYPES.map((quotaType) => {
@@ -368,7 +343,7 @@ export function PlanEditorDrawer({
                         <Icon aria-hidden="true" className="size-4 text-indigo-600" />
                         {QUOTA_LABELS[quotaType]}
                       </p>
-                      <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div className="mt-3">
                         <label className="grid gap-1.5 text-xs font-bold text-slate-600">
                           Hạn mức bao gồm (USD)
                           <input
@@ -381,20 +356,6 @@ export function PlanEditorDrawer({
                             placeholder="1,000"
                             type="text"
                             value={formatThousands(form.quotas[quotaType].includedQuantity)}
-                          />
-                        </label>
-                        <label className="grid gap-1.5 text-xs font-bold text-slate-600">
-                          Giá / $1 (VNĐ)
-                          <input
-                            className={inputClassName}
-                            disabled={isSubmitting}
-                            inputMode="decimal"
-                            onChange={(event) =>
-                              updateQuota(quotaType, 'tokenUnitPrice', sanitizeNumericInput(event.target.value))
-                            }
-                            placeholder="26,000"
-                            type="text"
-                            value={formatThousands(form.quotas[quotaType].tokenUnitPrice)}
                           />
                         </label>
                       </div>
