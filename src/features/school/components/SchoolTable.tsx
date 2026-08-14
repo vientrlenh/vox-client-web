@@ -1,123 +1,164 @@
-// src/features/school/components/SchoolTable.tsx
-
-import { Eye, Lock, RefreshCw, School as SchoolIcon, Unlock } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Eye, Lock, Unlock } from 'lucide-react'
 import type { School } from '../types'
 
 type SchoolTableProps = {
-  schools: School[]
-  isLoading: boolean
+  errorMessage?: string
+  footer?: ReactNode
   isError: boolean
+  isLoading: boolean
+  onChangeStatus?: (school: School) => void
   onRetry: () => void
-  onChangeStatus?: (school: School) => void 
   onView?: (school: School) => void
+  schools: School[]
+  updatingId: string | null
 }
 
-// ĐÃ XÓA SẠCH onViewUsers Ở ĐÂY
-export function SchoolTable({ schools, isLoading, isError, onRetry, onChangeStatus, onView }: SchoolTableProps) {
-  if (isLoading) {
-    return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-3">
-        <RefreshCw aria-hidden="true" className="size-8 animate-spin text-indigo-600" />
-        <p className="text-sm font-medium text-slate-500">Đang tải danh sách trường học...</p>
-      </div>
-    )
-  }
-
-  if (isError) {
-    return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-4 p-6">
-        <p className="text-sm font-semibold text-red-600">Đã có lỗi xảy ra khi tải dữ liệu từ server.</p>
-        <button 
-          type="button" 
-          onClick={onRetry} 
-          className="inline-flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-bold shadow-xs hover:bg-slate-50"
-        >
-          <RefreshCw aria-hidden="true" className="size-4" /> Thử lại
-        </button>
-      </div>
-    )
-  }
-
-  if (schools.length === 0) {
-    return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-6 text-slate-500">
-        <SchoolIcon aria-hidden="true" className="size-10 text-slate-300" />
-        <p className="text-sm font-medium">Không tìm thấy trường học nào.</p>
-      </div>
-    )
-  }
-
+export function SchoolTable({
+  errorMessage,
+  footer,
+  isError,
+  isLoading,
+  onChangeStatus,
+  onRetry,
+  onView,
+  schools,
+  updatingId,
+}: SchoolTableProps) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-left text-sm text-blue-950">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50/75 text-xs font-bold uppercase tracking-wider text-slate-500">
-            <th className="px-6 py-4">Mã trường</th>
-            <th className="px-6 py-4">Tên trường</th>
-            <th className="px-6 py-4">Liên hệ</th>
-            <th className="px-6 py-4">Học sinh</th>
-            <th className="px-6 py-4">Trạng thái</th>
-            <th className="px-6 py-4 text-right">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200">
-          {schools.map((school) => (
-            <tr key={school.id} className="transition hover:bg-slate-50/50">
-              <td className="px-6 py-4 font-mono text-xs font-bold text-slate-600">{school.code}</td>
-              <td className="px-6 py-4">
-                <div className="font-bold text-blue-950">{school.name || 'N/A'}</div>
-                <div className="mt-0.5 text-xs text-slate-500 max-w-xs truncate">{school.address || 'Chưa cập nhật địa chỉ'}</div>
-              </td>
-              <td className="px-6 py-4">
-                <div className="text-slate-700">{school.contactEmail || 'N/A'}</div>
-                <div className="mt-0.5 text-xs text-slate-500">{school.contactPhone || 'N/A'}</div>
-              </td>
-              <td className="px-6 py-4 font-medium">{school.studentCount || 0}</td>
-              
-              <td className="px-6 py-4">
-                <button
-                  type="button"
-                  title="Nhấn để đổi trạng thái"
-                  aria-label={`Thay đổi trạng thái trường ${school.name || school.code}`}
-                  onClick={() => onChangeStatus?.(school)}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold ring-1 ring-inset transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-                    school.isActive 
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 hover:bg-emerald-100 focus:ring-emerald-600/40' 
-                      : 'bg-red-50 text-red-700 ring-red-600/20 hover:bg-red-100 focus:ring-red-600/40'
-                  }`}
-                >
-                  {school.isActive ? (
-                    <>
-                      <Unlock aria-hidden="true" className="size-3.5" />
-                      Hoạt động
-                    </>
-                  ) : (
-                    <>
-                      <Lock aria-hidden="true" className="size-3.5" />
-                      Đã khóa
-                    </>
-                  )}
-                </button>
-              </td>
-              
-              <td className="px-6 py-4 text-right">
-                <div className="flex justify-end gap-2">                
-                  {/* Nút Xem chi tiết thông tin trường */}
-                  <button 
-                    type="button"
-                    aria-label={`Xem chi tiết trường ${school.name || school.code}`}
-                    title="Xem chi tiết"
-                    onClick={() => onView?.(school)} 
-                    className="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-50 hover:text-blue-950"
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-6 py-5">
+        <h2 className="text-lg font-black text-blue-950">Danh sách trường</h2>
+      </div>
+
+      {isLoading ? (
+        <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
+          Đang tải danh sách trường học...
+        </div>
+      ) : null}
+
+      {isError ? (
+        <div className="flex min-h-80 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
+          <p className="text-sm font-bold text-red-600">
+            {errorMessage ?? 'Không thể tải danh sách trường.'}
+          </p>
+          <button
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+            onClick={onRetry}
+            type="button"
+          >
+            Thử lại
+          </button>
+        </div>
+      ) : null}
+
+      {!isLoading && !isError && schools.length === 0 ? (
+        <div className="flex min-h-80 flex-1 items-center justify-center px-6 py-12 text-sm font-bold text-slate-500">
+          Không tìm thấy trường học nào.
+        </div>
+      ) : null}
+
+      {!isLoading && !isError && schools.length > 0 ? (
+        <div className="min-h-80 flex-1 overflow-x-auto">
+          <table className="w-full min-w-220 border-collapse text-left">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
+                <th className="px-6 py-4">Mã trường</th>
+                <th className="px-4 py-4">Tên trường</th>
+                <th className="px-4 py-4">Liên hệ</th>
+                <th className="px-4 py-4">Học sinh</th>
+                <th className="px-4 py-4">Trạng thái</th>
+                <th className="px-4 py-4 text-center">Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              {schools.map((school) => {
+                const schoolLabel = school.name || school.code
+                const isUpdating = updatingId === school.id
+
+                return (
+                  <tr
+                    className="border-b border-slate-100 bg-white align-top text-sm text-blue-950 last:border-b-0"
+                    key={school.id}
                   >
-                    <Eye aria-hidden="true" className="size-4" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                    <td className="px-6 py-5">
+                      <span className="font-mono text-sm font-black uppercase">
+                        {school.code}
+                      </span>
+                    </td>
+                    <td className="px-4 py-5">
+                      <p className="font-bold">{school.name || 'Chưa có tên'}</p>
+                      <p className="mt-0.5 max-w-xs truncate text-xs font-semibold text-slate-600">
+                        {school.address || 'Chưa cập nhật địa chỉ'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-5 text-sm font-semibold text-slate-600">
+                      <p>{school.contactEmail || 'Chưa cập nhật'}</p>
+                      <p className="mt-0.5 text-xs">
+                        {school.contactPhone || 'Chưa cập nhật'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-5 font-bold">
+                      {school.studentCount || 0}
+                    </td>
+                    <td className="px-4 py-5">
+                      <span
+                        className={[
+                          'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset',
+                          school.isActive
+                            ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                            : 'bg-red-50 text-red-700 ring-red-600/20',
+                        ].join(' ')}
+                      >
+                        {school.isActive ? (
+                          <Unlock aria-hidden="true" className="size-3.5" />
+                        ) : (
+                          <Lock aria-hidden="true" className="size-3.5" />
+                        )}
+                        {school.isActive ? 'Hoạt động' : 'Đã khóa'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          aria-label={`Xem chi tiết ${schoolLabel}`}
+                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50"
+                          onClick={() => onView?.(school)}
+                          type="button"
+                        >
+                          <Eye aria-hidden="true" className="size-4" />
+                          Xem
+                        </button>
+                        <button
+                          aria-label={`${school.isActive ? 'Khóa' : 'Kích hoạt'} trường ${schoolLabel}`}
+                          className={[
+                            'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border bg-white px-3 text-xs font-bold transition disabled:cursor-wait disabled:opacity-70',
+                            school.isActive
+                              ? 'border-red-200 text-red-700 hover:bg-red-50'
+                              : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50',
+                          ].join(' ')}
+                          disabled={isUpdating}
+                          onClick={() => onChangeStatus?.(school)}
+                          type="button"
+                        >
+                          {school.isActive ? (
+                            <Lock aria-hidden="true" className="size-4" />
+                          ) : (
+                            <Unlock aria-hidden="true" className="size-4" />
+                          )}
+                          {school.isActive ? 'Khóa' : 'Kích hoạt'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {footer}
+    </section>
   )
 }

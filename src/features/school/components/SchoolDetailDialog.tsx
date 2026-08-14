@@ -45,7 +45,7 @@ export function SchoolDetailDialog({ isOpen, onClose, school }: SchoolDetailDial
         type="button"
         aria-label="Đóng hộp thoại chi tiết"
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-slate-950/45"
       />
 
       <div
@@ -54,8 +54,6 @@ export function SchoolDetailDialog({ isOpen, onClose, school }: SchoolDetailDial
         aria-labelledby="school-detail-title"
         className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5"
       >
-        <div className="h-1.5 w-full bg-linear-to-r from-indigo-500 to-indigo-600" />
-
         <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
           <div className="flex items-center gap-4">
             <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-600/10">
@@ -87,7 +85,7 @@ export function SchoolDetailDialog({ isOpen, onClose, school }: SchoolDetailDial
             aria-label="Đóng"
             title="Đóng"
             onClick={onClose}
-            className="inline-flex size-9 items-center justify-center rounded-lg bg-white text-slate-400 ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:text-red-600 transition"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50"
           >
             <X aria-hidden="true" className="size-5" />
           </button>
@@ -97,7 +95,7 @@ export function SchoolDetailDialog({ isOpen, onClose, school }: SchoolDetailDial
           <div className="grid gap-6 md:grid-cols-2 items-stretch">
             
             {/* Card 1: Thông tin chung */}
-            <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5">
               <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3 text-sm font-bold text-blue-950">
                 <Building2 className="size-4 text-indigo-500" /> Thông tin chung
               </h3>
@@ -128,7 +126,7 @@ export function SchoolDetailDialog({ isOpen, onClose, school }: SchoolDetailDial
             </div>
 
             {/* Card 2: Liên hệ */}
-            <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5">
               <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3 text-sm font-bold text-blue-950">
                 <MapPin className="size-4 text-indigo-500" /> Liên hệ & Trụ sở
               </h3>
@@ -158,7 +156,7 @@ export function SchoolDetailDialog({ isOpen, onClose, school }: SchoolDetailDial
             </div>
 
             {/* Card 3: Thống kê */}
-            <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5">
               <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3 text-sm font-bold text-blue-950">
                 <Users className="size-4 text-indigo-500" /> Quy mô & Hệ thống
               </h3>
@@ -171,7 +169,7 @@ export function SchoolDetailDialog({ isOpen, onClose, school }: SchoolDetailDial
             </div>
 
             {/* Card 4: Thời gian */}
-            <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5">
               <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3 text-sm font-bold text-blue-950">
                 <Calendar className="size-4 text-indigo-500" /> Ghi nhận thời gian
               </h3>
@@ -200,9 +198,9 @@ export function SchoolDetailDialog({ isOpen, onClose, school }: SchoolDetailDial
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-50 px-6 text-sm font-bold text-indigo-700 ring-1 ring-inset ring-indigo-100 transition hover:bg-indigo-100 hover:text-indigo-800"
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
           >
-            Đóng cửa sổ
+            Đóng
           </button>
         </div>
       </div>
