@@ -70,6 +70,7 @@ import {
   useMyGradingTasksQuery,
 } from '../api/useGradingQueries'
 import { ExamRecordingPlayer } from '@/features/exam-recordings'
+import { ProctoringAlertsCard } from '@/features/proctoring-alerts'
 import { AiEvaluationSummary } from '../components/AiEvaluationSummary'
 import { AiQualityPanel } from '../components/AiQualityPanel'
 import { AssignTeacherDialog } from '../components/AssignTeacherDialog'
@@ -1878,6 +1879,11 @@ export function GradingTaskDetailView({
           người chấm cần xem đầu tiên để quyết định, chứ không phải cuộn xuống cuối mới thấy.
           Component tự nói ra lý do khi chưa có bản ghi / không đủ quyền, chỉ ẩn hẳn khi bài
           không gắn với ca thi nào. */}
+      {/* Ngay TRÊN trình phát, không phải dưới: nó trả lời câu "cần tua tới đâu, tìm cái gì" mà
+          người chấm đang cầm khi mở video. Đọc sau khi đã xem xong thì gần như vô dụng.
+          Component tự ẩn khi phiên thi không có cảnh báo nào, hoặc bài không gắn ca thi. */}
+      <ProctoringAlertsCard sessionId={detail.sessionId ?? null} />
+
       <ExamRecordingPlayer sessionId={detail.sessionId ?? null} />
 
       <div className="grid gap-4">

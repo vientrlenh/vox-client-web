@@ -9,12 +9,19 @@ import { useForceEndExamSessionMutation } from '@/features/examCore/api/mutation
 import { useMyProctorScheduleCandidatesQuery } from '@/features/examCore/api/queries'
 import type { ProctorCandidateSummaryDto } from '@/features/examCore/types'
 
-import { useScheduleMonitor } from '../api/useRoomMonitor'
+import { useScheduleProctoringAlertsQuery } from '@/features/proctoring-alerts'
+
+import { useScheduleMonitor, type AlertView } from '../api/useRoomMonitor'
 import { LiveRewindPanel } from '../components/LiveRewindPanel'
 import { ParticipantCard } from '../components/ParticipantCard'
 import { RoomAlertFeed } from '../components/RoomAlertFeed'
 import { RoomRosterPanel } from '../components/RoomRosterPanel'
-import { useMonitoringBoard, type ParticipantBoardEntry, type StreamFilter } from '../hooks/useMonitoringBoard'
+import {
+    alertDedupeKey,
+    useMonitoringBoard,
+    type ParticipantBoardEntry,
+    type StreamFilter,
+} from '../hooks/useMonitoringBoard'
 import { type MonitorConnectionState, type StreamType } from '../types'
 
 const EMPTY_CANDIDATES: ProctorCandidateSummaryDto[] = []
@@ -24,6 +31,14 @@ const EMPTY_CANDIDATES: ProctorCandidateSummaryDto[] = []
  * thấy được luồng ngừng phát, mà "nộp bài xong" với "rớt mạng" thì trông giống hệt nhau từ đó.
  */
 const ROSTER_POLL_MS = 15_000
+
+/**
+ * Số cảnh báo giữ lại sau khi gộp lịch sử với luồng trực tiếp.
+ *
+ * <p>Cùng mục đích với MAX_ALERTS của luồng trực tiếp: một ca thi dài không được biến dòng cảnh báo
+ * thành chỗ rò rỉ bộ nhớ. Lịch sử đầy đủ nằm ở server và tra được ở màn chấm bài.
+ */
+const MAX_MERGED_ALERTS = 200
 
 const CONNECTION_LABEL: Record<MonitorConnectionState, string> = {
     closed: 'Đã đóng',
@@ -67,8 +82,43 @@ export function MonitoringRoomPage() {
         return () => clearInterval(id)
     }, [])
 
+    // Lịch sử cảnh báo đã lưu. Kênh trực tiếp là pub/sub fire-and-forget nên nó chỉ kể được những gì
+    // xảy ra SAU khi giám thị kết nối: vào ca muộn, tải lại trang, hay mở thêm một người giám sát
+    // thứ hai đều từng dẫn tới việc mỗi người thấy một lịch sử khác nhau.
+    const alertHistoryQuery = useScheduleProctoringAlertsQuery(scheduleId ?? null)
+    const alertHistory = alertHistoryQuery.data
+
+    const mergedAlerts = useMemo(() => {
+        const seen = new Set(alerts.map(alertDedupeKey))
+        const merged: AlertView[] = [...alerts]
+
+        for (const row of alertHistory ?? []) {
+            const view: AlertView = {
+                alertType: row.alertType,
+                capturedAt: row.capturedAt,
+                confidence: row.confidence ?? 0,
+                eventId: row.eventId,
+                participantId: row.candidateId ?? '',
+                // receivedAt = thời điểm SỰ VIỆC, không phải lúc tải về. Trường này quyết định một
+                // cảnh báo còn "nóng" hay không (ALERT_ATTENTION_MS); lấy thời điểm tải sẽ khiến
+                // toàn bộ lịch sử của cả ca thi bùng lên đỏ rực mỗi lần refetch.
+                receivedAt: Date.parse(row.capturedAt) || 0,
+                sessionId: row.examSessionId,
+                streamId: row.streamId ?? '',
+            }
+            const key = alertDedupeKey(view)
+            if (seen.has(key)) {
+                continue
+            }
+            seen.add(key)
+            merged.push(view)
+        }
+
+        return merged.sort((left, right) => right.receivedAt - left.receivedAt).slice(0, MAX_MERGED_ALERTS)
+    }, [alertHistory, alerts])
+
     const { neverConnected, onScreen, resolveAlertCandidateId } = useMonitoringBoard({
-        alerts,
+        alerts: mergedAlerts,
         candidates,
         filter,
         now,
@@ -231,7 +281,7 @@ export function MonitoringRoomPage() {
                     ) : null}
                     <RoomRosterPanel neverConnected={neverConnected} onScreen={onScreen} />
                     <RoomAlertFeed
-                        alerts={alerts}
+                        alerts={mergedAlerts}
                         resolveName={(alert) =>
                             nameByCandidateId.get(resolveAlertCandidateId(alert)) ?? alert.participantId
                         }

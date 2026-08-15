@@ -39,6 +39,18 @@ export const ALERT_ATTENTION_MS = 60_000
 export type StreamFilter = 'all' | StreamType
 
 /**
+ * Khoá khử trùng khi gộp cảnh báo trực tiếp với lịch sử đọc từ DB.
+ *
+ * <p>`eventId` là khoá thật -- cùng một cảnh báo mang cùng id trên cả hai nhánh phát. Khoá tổ hợp
+ * chỉ là lưới đỡ cho một bản vox-streaming cũ chưa gửi trường đó; nó có thể gộp nhầm hai cảnh báo
+ * trùng loại nổ ra trong cùng một mili giây, và đó là đánh đổi tốt hơn so với hiện mỗi cảnh báo hai
+ * lần trên màn hình.
+ */
+export function alertDedupeKey(alert: Pick<AlertView, 'alertType' | 'capturedAt' | 'eventId' | 'streamId'>): string {
+    return alert.eventId ?? `${alert.streamId}|${alert.capturedAt}|${alert.alertType}`
+}
+
+/**
  * Mức đáng chú ý của một học viên, xếp từ cần nhìn ngay tới bình thường. Thứ tự khai báo chính là
  * thứ tự ưu tiên hiển thị.
  */
