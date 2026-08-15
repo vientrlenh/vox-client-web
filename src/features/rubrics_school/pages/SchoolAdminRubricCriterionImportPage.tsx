@@ -147,7 +147,7 @@ function SampleRowsTable({ preview }: SampleRowsTableProps) {
       </div>
       <div className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="min-w-full divide-y divide-slate-200 text-left">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
+          <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
             <tr>
               {preview.originalHeaders.map((header) => (
                 <th className="px-4 py-3" key={header}>

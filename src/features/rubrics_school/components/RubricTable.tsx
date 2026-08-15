@@ -42,7 +42,7 @@ export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetail
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm text-slate-700">
-        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
+        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
           <tr>
             <th className="px-4 py-3">Mã tiêu chí đánh giá</th>
             <th className="px-4 py-3">Tên tiêu chí đánh giá</th>

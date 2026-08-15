@@ -74,7 +74,7 @@ export function UpdateRubricResultBandDialog({ isOpen, onClose, onSubmit, isPend
 
       <div className="relative w-full max-w-xl rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-black text-blue-950">
             Chỉnh sửa Thang điểm <span className="font-mono text-slate-500">{initialData.code}</span>
           </h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
