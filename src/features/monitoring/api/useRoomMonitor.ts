@@ -15,6 +15,14 @@ export type StreamView = StreamSnapshot & {
      * mất đi giữa lưới mà không ai kịp nhận ra.
      */
     endedAt?: number
+    /**
+     * Thời điểm server báo transport rớt, undefined nghĩa là đang nối bình thường.
+     *
+     * <p>Khác `endedAt` ở chỗ luồng CHƯA đóng: peer còn trong cửa sổ reconnect và có thể sống lại.
+     * Đây là câu trả lời chắc chắn cho "học viên này còn kết nối không", thay cho việc suy đoán từ
+     * việc bao lâu rồi không có khung hình mới.
+     */
+    disconnectedAt?: number
 }
 
 type StreamsAction =
@@ -45,6 +53,11 @@ function streamsReducer(
                     latestFrameUrl: prev?.latestFrameUrl,
                     lastSeq: prev?.lastSeq,
                     lastFrameAt: prev?.lastFrameAt,
+                    // Còn trong snapshot chỉ có nghĩa là peer chưa đóng - mà suốt cửa sổ reconnect
+                    // thì đúng là chưa đóng. Nên snapshot không phải bằng chứng đã nối lại, và
+                    // không được xoá dấu mất kết nối; chỉ 'reconnected' hoặc một khung hình mới mới
+                    // xoá được.
+                    disconnectedAt: prev?.disconnectedAt,
                 })
             }
             // Snapshot là nguồn sự thật về việc AI đang sống, nên stream cũ không còn trong đó là đã
@@ -79,7 +92,9 @@ function streamsReducer(
                 lastSeq: frame.sequenceNo,
                 lastFrameAt: Date.now(),
                 // Frame mới về nghĩa là stream sống lại: gỡ dấu đã-ngừng để một lần rớt ngắn không
-                // để lại ô xám vĩnh viễn.
+                // để lại ô xám vĩnh viễn. Khung hình đang chảy là bằng chứng mạnh hơn mọi sự kiện
+                // nói ngược lại, nên nó xoá luôn cả dấu mất kết nối.
+                disconnectedAt: undefined,
                 endedAt: undefined,
             })
             return next
@@ -88,22 +103,52 @@ function streamsReducer(
         case 'participant': {
             const event = action.event
             const next = new Map(state)
+            const prev = next.get(event.streamId)
+
             if (event.type === 'joined') {
-                const prev = next.get(event.streamId)
                 next.set(event.streamId, {
+                    ...prev,
                     streamId: event.streamId,
                     streamType: event.streamType,
-                    participantId: event.participantId,
-                    startedAt: event.at,
-                    ...prev,
+                    // Sự kiện 'joined' là nguồn ĐÚNG NHẤT về chủ nhân của luồng, nên nó phải ghi đè
+                    // lên prev chứ không ngược lại. Frame notification của vox-streaming không mang
+                    // participantId, nên một frame về trước 'joined' (Kafka chậm hơn Redis pub/sub)
+                    // tạo ra ô tạm với participantId rỗng - và với thứ tự spread cũ, cái rỗng đó
+                    // thắng vĩnh viễn: luồng mồ côi, không bao giờ ghép được roster, không hiện tên
+                    // và không bấm "Hủy bài thi" được.
+                    participantId: event.participantId || prev?.participantId || '',
+                    startedAt: prev?.startedAt || event.at,
+                    disconnectedAt: undefined,
                     endedAt: undefined,
                 })
-            } else {
-                const prev = next.get(event.streamId)
-                if (prev) {
-                    next.set(event.streamId, { ...prev, endedAt: Date.parse(event.at) || Date.now() })
-                }
+                return next
             }
+
+            // Không dựng ô mới từ một tin "đã rời"/"mất kết nối": ô đó sẽ chẳng có gì để hiện. Nếu
+            // luồng thật sự còn sống thì snapshot định kỳ sẽ dựng lại nó trong vòng một nhịp.
+            if (!prev) {
+                return next
+            }
+
+            const at = Date.parse(event.at) || Date.now()
+            if (event.type === 'left') {
+                next.set(event.streamId, {
+                    ...prev,
+                    // Ai báo trước thì thắng: cùng một luồng phát 'left' hai lần - trực tiếp từ peer
+                    // ngay lúc đóng, rồi lại qua Kafka sau khi chốt xong bản ghi. Lần thứ hai tới
+                    // sau đó hàng chục giây, nên ghi đè sẽ đẩy mốc "mất lúc" trôi khỏi thời điểm
+                    // thật và giám thị đọc sai thời điểm học viên biến mất.
+                    endedAt: prev.endedAt ?? at,
+                })
+                return next
+            }
+
+            if (event.type === 'disconnected') {
+                next.set(event.streamId, { ...prev, disconnectedAt: prev.disconnectedAt ?? at })
+                return next
+            }
+
+            next.set(event.streamId, { ...prev, disconnectedAt: undefined })
             return next
         }
             

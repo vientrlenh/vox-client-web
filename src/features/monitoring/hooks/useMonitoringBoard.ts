@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import type { ProctorCandidateSummaryDto } from '@/features/examCore/types'
 
@@ -7,6 +7,25 @@ import type { StreamType } from '../types'
 
 /** Quá thời gian này mà không có frame mới thì coi như đứng hình (server sinh frame mỗi 5 giây). */
 export const STALE_MS = 12_000
+
+/**
+ * Đứng hình quá lâu thì thôi gọi là đứng hình.
+ *
+ * <p>Tín hiệu "đã rời phòng" của vox-streaming đi một đường rất dài trước khi tới được đây: hết
+ * grace period của peer, rồi cả khâu chốt/upload bản ghi, rồi mới qua Kafka và Redis pub/sub. Nó
+ * có thể chậm hàng chục giây - và có thể KHÔNG BAO GIỜ tới, vì pub/sub là fire-and-forget còn
+ * snapshot thì chỉ gửi đúng một lần lúc monitor kết nối.
+ *
+ * <p>Không có nấc này thì một học viên rớt mạng thật nằm ở "Đứng hình" tới hết ca thi, tức là màn
+ * hình giám sát đang nói dối theo hướng trấn an - hướng nguy hiểm nhất mà nó có thể nói dối.
+ */
+export const STALE_LOST_MS = 45_000
+
+/**
+ * Phiên thi còn đang chạy. Ngoài hai giá trị này (SUBMITTED/GRADING/GRADED/EXPIRED/...) là phiên
+ * đã đóng, và mọi thứ ngừng phát sau đó đều là chuyện bình thường chứ không phải sự cố.
+ */
+export const LIVE_SESSION_STATUSES = new Set(['IN_PROGRESS', 'INTERRUPTED'])
 
 /**
  * Cảnh báo còn "nóng" trong bao lâu, tính theo mục đích sắp xếp.
@@ -20,10 +39,22 @@ export const ALERT_ATTENTION_MS = 60_000
 export type StreamFilter = 'all' | StreamType
 
 /**
+ * Khoá khử trùng khi gộp cảnh báo trực tiếp với lịch sử đọc từ DB.
+ *
+ * <p>`eventId` là khoá thật -- cùng một cảnh báo mang cùng id trên cả hai nhánh phát. Khoá tổ hợp
+ * chỉ là lưới đỡ cho một bản vox-streaming cũ chưa gửi trường đó; nó có thể gộp nhầm hai cảnh báo
+ * trùng loại nổ ra trong cùng một mili giây, và đó là đánh đổi tốt hơn so với hiện mỗi cảnh báo hai
+ * lần trên màn hình.
+ */
+export function alertDedupeKey(alert: Pick<AlertView, 'alertType' | 'capturedAt' | 'eventId' | 'streamId'>): string {
+    return alert.eventId ?? `${alert.streamId}|${alert.capturedAt}|${alert.alertType}`
+}
+
+/**
  * Mức đáng chú ý của một học viên, xếp từ cần nhìn ngay tới bình thường. Thứ tự khai báo chính là
  * thứ tự ưu tiên hiển thị.
  */
-export const PARTICIPANT_STATUS_ORDER = ['alerted', 'dropped', 'stale', 'live'] as const
+export const PARTICIPANT_STATUS_ORDER = ['alerted', 'dropped', 'lost', 'stale', 'live', 'finished'] as const
 
 export type ParticipantStatus = (typeof PARTICIPANT_STATUS_ORDER)[number]
 
@@ -46,20 +77,43 @@ export type ParticipantBoardEntry = {
     studentName: string
 }
 
-function resolveStatus(streams: StreamView[], latestAlert: AlertView | undefined, now: number): ParticipantStatus {
+function resolveStatus(
+    streams: StreamView[],
+    latestAlert: AlertView | undefined,
+    sessionStatus: null | string | undefined,
+    now: number,
+): ParticipantStatus {
     if (latestAlert && now - latestAlert.receivedAt <= ALERT_ATTENTION_MS) {
         return 'alerted'
+    }
+    // Xét TRƯỚC cả 'dropped': với một phiên thi đã đóng thì luồng tắt là chuyện đúng, không phải sự
+    // cố. Trước đây hàm này chỉ đọc luồng, nên học viên nộp bài xong vẫn tụt qua "Đứng hình" rồi
+    // "Mất kết nối" và nằm đỏ tới hết ca - báo động cho đúng cái kết thúc bình thường nhất.
+    if (sessionStatus && !LIVE_SESSION_STATUSES.has(sessionStatus)) {
+        return 'finished'
     }
     const liveStreams = streams.filter((stream) => stream.endedAt === undefined)
     if (liveStreams.length === 0) {
         return 'dropped'
     }
-    // Một luồng đứng hình là đủ để cả học viên đáng nhìn lại: hỏng camera trong khi màn hình vẫn
-    // chạy vẫn là mất một nửa bằng chứng.
-    const hasStale = liveStreams.some(
-        (stream) => stream.lastFrameAt !== undefined && now - stream.lastFrameAt > STALE_MS,
-    )
-    return hasStale ? 'stale' : 'live'
+    // Server đã XÁC NHẬN transport rớt và peer đang trong cửa sổ reconnect. Biết chắc thì không cần
+    // đợi đủ ngưỡng im lặng bên dưới - đó chỉ là cách suy đoán cho trường hợp không có tin tức gì.
+    if (liveStreams.some((stream) => stream.disconnectedAt !== undefined)) {
+        return 'lost'
+    }
+    // Lấy luồng im lặng LÂU NHẤT, không phải "có luồng nào im không": một luồng đứng hình là đủ để
+    // cả học viên đáng nhìn lại (hỏng camera trong khi màn hình vẫn chạy vẫn là mất một nửa bằng
+    // chứng), và chính con số lâu nhất đó mới quyết định được đã tới nấc nghi mất kết nối chưa.
+    const silentForMs = liveStreams.reduce((longest, stream) => {
+        if (stream.lastFrameAt === undefined) {
+            return longest
+        }
+        return Math.max(longest, now - stream.lastFrameAt)
+    }, 0)
+    if (silentForMs > STALE_LOST_MS) {
+        return 'lost'
+    }
+    return silentForMs > STALE_MS ? 'stale' : 'live'
 }
 
 type UseMonitoringBoardParams = {
@@ -81,16 +135,60 @@ type UseMonitoringBoardParams = {
  * <p>Khoá ghép là `participantId` của stream = `candidateId` của thí sinh.
  */
 export function useMonitoringBoard({ alerts, candidates, filter, now, streams }: UseMonitoringBoardParams) {
+    const candidateById = useMemo(
+        () => new Map(candidates.map((candidate) => [candidate.candidateId, candidate])),
+        [candidates],
+    )
+
+    const candidateIdBySessionId = useMemo(() => {
+        const map = new Map<string, string>()
+        for (const candidate of candidates) {
+            if (candidate.sessionId) {
+                map.set(candidate.sessionId, candidate.candidateId)
+            }
+        }
+        // Luồng đang sống biết cặp (phiên thi, thí sinh) sớm hơn roster, vốn chỉ tải lại theo nhịp.
+        for (const stream of streams) {
+            if (stream.sessionId && stream.participantId) {
+                map.set(stream.sessionId, stream.participantId)
+            }
+        }
+        return map
+    }, [candidates, streams])
+
+    /**
+     * Chủ nhân thật của một cảnh báo.
+     *
+     * <p>`alert.participantId` lẽ ra là candidateId, nhưng AI service đang gán CẢ BA định danh
+     * (sessionId, participantId, streamId) bằng cùng một giá trị, nên với cảnh báo do AI sinh thì
+     * trường này thực chất là id PHIÊN THI. Hệ quả không chỉ là dòng cảnh báo in ra một chuỗi UUID
+     * thay vì tên: khoá sai còn khiến cảnh báo không bao giờ dính vào ô nào, nên trạng thái "Có
+     * cảnh báo", viền đỏ và cả thứ tự ưu tiên của lưới đều chết theo.
+     *
+     * <p>Ngả về sessionId vá được ngay hôm nay mà không phải chờ sửa phía AI; khi AI gửi đúng
+     * participantId thì nhánh đầu vẫn thắng, nên không có gì phải gỡ lại sau này.
+     */
+    const resolveAlertCandidateId = useCallback(
+        (alert: AlertView) => {
+            if (candidateById.has(alert.participantId)) {
+                return alert.participantId
+            }
+            return candidateIdBySessionId.get(alert.sessionId) ?? alert.participantId
+        },
+        [candidateById, candidateIdBySessionId],
+    )
+
     const alertByCandidate = useMemo(() => {
         // alerts đã được xếp mới nhất trước, nên lần set đầu tiên cho mỗi người là cái mới nhất.
         const map = new Map<string, AlertView>()
         for (const alert of alerts) {
-            if (!map.has(alert.participantId)) {
-                map.set(alert.participantId, alert)
+            const candidateId = resolveAlertCandidateId(alert)
+            if (!map.has(candidateId)) {
+                map.set(candidateId, alert)
             }
         }
         return map
-    }, [alerts])
+    }, [alerts, resolveAlertCandidateId])
 
     const streamsByCandidate = useMemo(() => {
         const map = new Map<string, StreamView[]>()
@@ -101,11 +199,6 @@ export function useMonitoringBoard({ alerts, candidates, filter, now, streams }:
         }
         return map
     }, [streams])
-
-    const candidateById = useMemo(
-        () => new Map(candidates.map((candidate) => [candidate.candidateId, candidate])),
-        [candidates],
-    )
 
     /** Học viên có luồng (đang sống hoặc vừa ngừng) - đây là những ô hiện trên lưới. */
     const onScreen = useMemo(() => {
@@ -123,7 +216,7 @@ export function useMonitoringBoard({ alerts, candidates, filter, now, streams }:
                 // Ưu tiên sessionId từ luồng: roster có thể chưa kịp thấy phiên thi vừa mở.
                 sessionId: candidateStreams.find((stream) => stream.sessionId)?.sessionId ?? candidate?.sessionId,
                 sessionStatus: candidate?.sessionStatus,
-                status: resolveStatus(candidateStreams, latestAlert, now),
+                status: resolveStatus(candidateStreams, latestAlert, candidate?.sessionStatus, now),
                 streams:
                     filter === 'all'
                         ? candidateStreams
@@ -154,5 +247,5 @@ export function useMonitoringBoard({ alerts, candidates, filter, now, streams }:
         [candidates, streamsByCandidate],
     )
 
-    return { neverConnected, onScreen }
+    return { neverConnected, onScreen, resolveAlertCandidateId }
 }
