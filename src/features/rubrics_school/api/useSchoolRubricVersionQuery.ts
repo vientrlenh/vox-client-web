@@ -18,6 +18,7 @@ export type RubricVersion = {
   scoringScaleMax: number;
   totalScoreMethod: string;
   createdAt?: string | null;
+  sourceRubricVersionId?: string | null;
 };
 
 // Câu lệnh Query gọi thẳng vào viewSchoolRubricVersion
@@ -37,6 +38,7 @@ const GET_SCHOOL_RUBRIC_VERSION = `
       scoringScaleMax
       totalScoreMethod
       createdAt
+      sourceRubricVersionId
     }
   }
 `;
