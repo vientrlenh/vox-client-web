@@ -769,11 +769,20 @@ const PaymentResultPage = lazy(() =>
   })),
 );
 
+const PrivacyPolicyPage = lazy(() =>
+  import("@/features/legal").then((module) => ({
+    default: module.PrivacyPolicyPage,
+  })),
+);
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route index element={<HomePage />} />
+        {/* Trang cong khai, KHONG dat sau guard dang nhap: Google Play doi URL chinh
+            sach bao mat mo duoc ma khong can tai khoan. */}
+        <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="oauth2-callback" element={<OAuth2CallbackPage/>}/>
         <Route path="register" element={<RegisterPage />} />
@@ -980,6 +989,16 @@ export function AppRoutes() {
             <Route
               path="school-admin/grades/import"
               element={<SchoolAdminGradeLevelImportPage />}
+            />
+            {/*
+              Import năm học KHÔNG cần chọn khối trước: một file nạp được nhiều khối khác nhau,
+              và trang import cũng không gửi gradeLevelId lên server -- nó chỉ dùng id đó cho
+              nút quay lại. Giữ cả hai đường: vào thẳng từ danh sách khối, hoặc vào từ trong một
+              khối (khi đó vẫn quay lại đúng khối đó).
+            */}
+            <Route
+              path="school-admin/grades/years/import"
+              element={<SchoolAdminGradeImportPage />}
             />
             <Route
               path="school-admin/grades/:gradeLevelId/grades/import"

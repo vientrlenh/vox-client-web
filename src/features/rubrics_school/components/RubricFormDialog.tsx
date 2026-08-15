@@ -2,28 +2,29 @@
 
 import { useState } from 'react'; // Đã xóa import useEffect
 import { X, Loader2 } from 'lucide-react';
-import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
+import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 
 type RubricFormDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   initialData?: { name: string; description?: string | null };
-  onSubmit: (data: { name: string; description?: string }) => Promise<void>;
+  onSubmit: (data: { name: string; description: string }) => Promise<void>;
   isPending: boolean;
 };
 
 export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPending }: RubricFormDialogProps) {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
   // Kỹ thuật React 19: Lưu lại prop isOpen của lần render trước để so sánh
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  const { showError, feedbackToast } = useFeedbackToast();
 
   // Cập nhật state trực tiếp trong lúc render thay vì dùng useEffect
   // Giúp tránh render 2 lần (Cascading Renders) và fix triệt để lỗi ESLint
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen);
+    setErrorMessage(null);
     if (isOpen && initialData) {
       setName(initialData.name || '');
       setDescription(initialData.description || '');
@@ -37,28 +38,33 @@ export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPen
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
     if (!name.trim()) {
-      showError('Vui lòng nhập tên Rubric!');
+      setErrorMessage('Vui lòng nhập tên tiêu chí đánh giá!');
       return;
     }
-    // Để trống thì gửi undefined (không đổi), không gửi chuỗi rỗng -- BE COALESCE chỉ giữ nguyên
-    // giá trị cũ khi field là null/không có, chuỗi rỗng "" bị coi là giá trị thật.
-    await onSubmit({ name, description: description.trim() || undefined });
+    try {
+      await onSubmit({ name, description });
+    } catch (error) {
+      // Lỗi từ máy chủ phải hiện NGAY TRONG modal. Trang cha không nuốt lỗi nữa: modal vẫn
+      // mở khi submit hỏng, mà banner của trang thì nằm sau lớp backdrop-blur của overlay
+      // nên chỉ còn là một vệt đỏ mờ, không đọc được.
+      setErrorMessage((error as Error)?.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       {/* Lớp nền đen mờ (Click ra ngoài để đóng nếu không đang load) */}
-      <div
-        className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition-opacity"
+      <div 
+        className="absolute inset-0 bg-slate-950/45" 
         onClick={!isPending ? onClose : undefined}
       />
-      {feedbackToast}
-
+      
       {/* Box Dialog */}
-      <div className="relative w-full max-w-lg rounded-xl bg-white shadow-2xl">
+      <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-black text-blue-950">Chỉnh sửa thông tin Rubric</h2>
+          <h2 className="text-lg font-black text-blue-950">Chỉnh sửa thông tin tiêu chí đánh giá</h2>
           <button 
             type="button" 
             onClick={onClose} 
@@ -70,10 +76,11 @@ export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPen
         </div>
         
         <form onSubmit={handleSubmit} className="p-6">
+          <ErrorBanner className="mb-5" message={errorMessage} />
           <div className="grid gap-5">
             <div>
               <label htmlFor="name" className="mb-1 block text-sm font-bold text-slate-700">
-                Tên Rubric <span className="text-red-500">*</span>
+                Tên tiêu chí đánh giá <span className="text-red-500">*</span>
               </label>
               <input
                 id="name"
@@ -81,7 +88,7 @@ export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPen
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={isPending}
-                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 disabled:bg-slate-50"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
                 placeholder="Ví dụ: Khung chấm điểm Đồ án..."
               />
             </div>
@@ -96,7 +103,7 @@ export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPen
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isPending}
-                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 disabled:bg-slate-50"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
                 placeholder="Nhập mô tả chi tiết (không bắt buộc)..."
               />
             </div>
@@ -114,7 +121,7 @@ export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPen
             <button 
               type="submit" 
               disabled={isPending} 
-              className="inline-flex min-w-30 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-700 disabled:opacity-50"
+              className="inline-flex min-w-30 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
             >
               {isPending ? <Loader2 className="size-4 animate-spin" /> : 'Lưu thay đổi'}
             </button>

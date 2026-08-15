@@ -90,6 +90,36 @@ const PAPER_ACTION_LABEL: Record<ExamPaperAction, string> = {
   SUBMIT: 'Nộp duyệt',
 }
 
+/**
+ * Lời xác nhận cho các thao tác đổi trạng thái kỳ thi. Chỉ liệt kê thao tác KHÔNG lùi lại
+ * được -- SCHEDULE thì không có ở đây vì còn huỷ hoặc mở lại được.
+ *
+ * Nội dung bám đúng việc backend thật sự làm (UpdateExamStatusUseCase), nhất là chi tiết
+ * người dùng không tự đoán ra: đóng kỳ thi sẽ CHẤM 0 cho thí sinh chưa làm hoặc nộp bài trống.
+ */
+const STATUS_ACTION_PROMPTS: Partial<
+  Record<'CANCEL' | 'CLOSE' | 'PUBLISH_RESULTS' | 'SCHEDULE' | 'START', { confirmLabel: string; message: string; title: string }>
+> = {
+  CANCEL: {
+    confirmLabel: 'Huỷ kỳ thi',
+    message:
+      'Huỷ kỳ thi sẽ huỷ toàn bộ ca thi đã xếp. Đây là trạng thái cuối — không mở lại, không lên lịch lại và không chấm được nữa.',
+    title: 'Xác nhận huỷ kỳ thi',
+  },
+  CLOSE: {
+    confirmLabel: 'Đóng kỳ thi',
+    message:
+      'Đóng kỳ thi sẽ đóng mọi ca thi và CHẤM 0 cho những thí sinh chưa làm hoặc nộp bài trống. Không mở lại được, chỉ còn chốt kết quả hoặc huỷ.',
+    title: 'Xác nhận đóng kỳ thi',
+  },
+  START: {
+    confirmLabel: 'Mở kỳ thi',
+    message:
+      'Mở kỳ thi sẽ chuyển sang trạng thái đang diễn ra và khoá đề lại — thí sinh bắt đầu làm bài được. Không quay lại trạng thái đã lên lịch.',
+    title: 'Xác nhận mở kỳ thi',
+  },
+}
+
 const ACTIVE_LANGUAGE_FILTERS = { isActive: 'active' as const, search: '' }
 
 const STATUS_FILTERS: Array<{ label: string; value: '' | ExamStatus }> = [
@@ -692,6 +722,10 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
     forExamId: string,
     action: 'CANCEL' | 'CLOSE' | 'PUBLISH_RESULTS' | 'SCHEDULE' | 'START',
   ) {
+    const prompt = STATUS_ACTION_PROMPTS[action]
+    if (prompt && !(await confirm(prompt))) {
+      return
+    }
     try {
       await updateStatusMutation.mutateAsync({ examId: forExamId, payload: { action } })
       await invalidate()

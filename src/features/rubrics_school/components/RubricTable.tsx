@@ -1,7 +1,6 @@
 // src/features/rubrics/components/RubricTable.tsx
 
-import { RefreshCw, LayoutList, Eye, Trash2 } from 'lucide-react';
-import { ActionMenuButton } from '@/shared/ui/ActionMenuButton';
+import { RefreshCw, LayoutList, ChevronRight } from 'lucide-react';
 import type { Rubric } from '../types';
 
 type RubricTableProps = {
@@ -10,15 +9,14 @@ type RubricTableProps = {
   isError: boolean;
   onRetry: () => void;
   onViewDetails: (rubric: Rubric) => void;
-  onDelete: (rubric: Rubric) => void;
 };
 
-export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetails, onDelete }: RubricTableProps) {
+export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetails }: RubricTableProps) {
   if (isLoading) {
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3">
-        <RefreshCw className="size-6 animate-spin text-cyan-600" />
-        <p className="text-sm text-slate-500">Đang tải danh sách Rubric...</p>
+        <RefreshCw className="size-6 animate-spin text-indigo-600" />
+        <p className="text-sm text-slate-500">Đang tải danh sách tiêu chí đánh giá...</p>
       </div>
     );
   }
@@ -27,7 +25,7 @@ export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetail
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3 text-center">
         <p className="text-sm font-semibold text-red-600">Đã có lỗi xảy ra khi tải dữ liệu.</p>
-        <button onClick={onRetry} className="text-sm font-bold text-cyan-600 underline">Thử lại</button>
+        <button onClick={onRetry} className="text-sm font-bold text-indigo-600 underline">Thử lại</button>
       </div>
     );
   }
@@ -36,7 +34,7 @@ export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetail
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-3 text-slate-500">
         <LayoutList className="size-8 text-slate-300" />
-        <p className="text-sm">Không tìm thấy Rubric nào.</p>
+        <p className="text-sm">Không tìm thấy tiêu chí đánh giá nào.</p>
       </div>
     );
   }
@@ -44,24 +42,24 @@ export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetail
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm text-slate-700">
-        <thead className="bg-slate-50/75 text-xs font-black text-blue-950 border-b border-slate-200">
+        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
           <tr>
-            <th className="px-4 py-3">Mã Rubric</th>
-            <th className="px-4 py-3">Tên Rubric</th>
+            <th className="px-4 py-3">Mã tiêu chí đánh giá</th>
+            <th className="px-4 py-3">Tên tiêu chí đánh giá</th>
             <th className="px-4 py-3">Khung năng lực</th>
             <th className="px-4 py-3">Ngôn ngữ</th>
-            <th className="px-4 py-3 text-right">Hành động</th>
+            <th className="px-4 py-3 text-right">Chi tiết</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200">
+        <tbody className="divide-y divide-slate-100">
           {rubrics.map((r) => (
             <tr
               key={r.id}
               onClick={() => onViewDetails(r)}
               // Thêm các class để click được cả dòng và highlight khi hover
-              className="group cursor-pointer transition hover:bg-cyan-50"
+              className="group cursor-pointer transition hover:bg-indigo-50"
             >
-              <td className="px-4 py-3 font-mono font-bold text-slate-900 group-hover:text-cyan-700">{r.code}</td>
+              <td className="px-4 py-3 font-mono font-bold text-slate-900 group-hover:text-indigo-700">{r.code}</td>
               <td className="px-4 py-3 font-medium text-slate-900">{r.name}</td>
               <td className="px-4 py-3">
                 <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
@@ -73,15 +71,10 @@ export function RubricTable({ rubrics, isLoading, isError, onRetry, onViewDetail
                   {r.language?.name || '—'}
                 </span>
               </td>
-              <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-end">
-                  <ActionMenuButton
-                    ariaLabel={`Hành động cho rubric ${r.code}`}
-                    items={[
-                      { id: 'view', label: 'Xem chi tiết', icon: Eye, onSelect: () => onViewDetails(r) },
-                      { id: 'delete', label: 'Xóa', icon: Trash2, tone: 'danger', onSelect: () => onDelete(r) },
-                    ]}
-                  />
+              <td className="px-4 py-3 text-right">
+                {/* Thay icon con mắt bằng icon Mũi tên trượt để chỉ hướng di chuyển */}
+                <div className="inline-flex size-8 items-center justify-center rounded-full text-slate-400 group-hover:bg-white group-hover:text-indigo-600 group-hover:shadow-sm transition">
+                  <ChevronRight className="size-5" />
                 </div>
               </td>
             </tr>

@@ -73,7 +73,7 @@ type SummaryCardProps = {
 
 function SummaryCard({ label, value }: SummaryCardProps) {
   return (
-    <div className="rounded-[14px] border border-slate-200 bg-white p-5">
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-bold text-slate-950">{value}</p>
     </div>
@@ -88,9 +88,9 @@ type MappingPanelProps = {
 
 function MappingPanel({ mapping, onChange, preview }: MappingPanelProps) {
   return (
-    <section className="grid gap-5 rounded-[14px] border border-slate-200 bg-white p-6">
+    <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-6">
       <div>
-        <h2 className="text-lg font-black text-blue-950">Ghép cột dữ liệu</h2>
+        <h2 className="text-lg font-medium text-slate-950">Ghép cột dữ liệu</h2>
         <p className="mt-1 text-sm text-slate-500">
           Chọn trường hệ thống tương ứng với từng cột trong file.
         </p>
@@ -99,12 +99,12 @@ function MappingPanel({ mapping, onChange, preview }: MappingPanelProps) {
       <div className="grid gap-3">
         {preview.originalHeaders.map((header) => (
           <label
-            className="grid gap-3 rounded-[10px] border border-slate-200 p-3 text-sm font-bold text-slate-700 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-center"
+            className="grid gap-3 rounded-lg border border-slate-200 p-3 text-sm font-bold text-slate-700 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-center"
             key={header}
           >
             <span className="truncate">{header}</span>
             <select
-              className="h-10 rounded-[10px] border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
               onChange={(event) => onChange(header, event.target.value)}
               value={mapping[header] ?? ''}
             >
@@ -130,23 +130,23 @@ type SampleRowsTableProps = {
 function SampleRowsTable({ preview }: SampleRowsTableProps) {
   if (!preview.sampleRows.length || !preview.originalHeaders.length) {
     return (
-      <div className="rounded-[14px] border border-dashed border-slate-300 bg-white p-6 text-center text-sm font-semibold text-slate-500">
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm font-semibold text-slate-500">
         Không có dữ liệu mẫu để hiển thị.
       </div>
     );
   }
 
   return (
-    <section className="grid gap-5 rounded-[14px] border border-slate-200 bg-white p-6">
+    <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-6">
       <div>
-        <h2 className="text-lg font-black text-blue-950">Dữ liệu mẫu</h2>
+        <h2 className="text-lg font-medium text-slate-950">Dữ liệu mẫu</h2>
         <p className="mt-1 text-sm text-slate-500">
           Kiểm tra nhanh một số dòng đầu tiên trước khi import.
         </p>
       </div>
-      <div className="overflow-x-auto rounded-[10px] border border-slate-200">
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="min-w-full divide-y divide-slate-200 text-left">
-          <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
+          <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
             <tr>
               {preview.originalHeaders.map((header) => (
                 <th className="px-4 py-3" key={header}>
@@ -270,20 +270,20 @@ export function SchoolAdminRubricVersionImportPage() {
         <div>
           <nav aria-label="Đường dẫn" className="flex items-center gap-2 text-sm font-bold text-slate-500">
             <Link className="transition hover:text-indigo-600" to={backToRubricUrl}>
-              Chi tiết Rubric
+              Chi tiết tiêu chí đánh giá
             </Link>
             <span aria-hidden="true" className="text-slate-300">/</span>
             <span className="text-slate-950">Import Phiên bản hàng loạt</span>
           </nav>
-          <h1 className="mt-4 text-2xl font-black text-blue-950 sm:text-3xl" id="school-rubric-version-import-title">
+          <h1 className="mt-3 text-2xl font-black text-blue-950 sm:text-3xl" id="school-rubric-version-import-title">
             Import Phiên bản hàng loạt
           </h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-500">
-            Tải lên file CSV hoặc Excel, kiểm tra mapping cột và xác nhận import các phiên bản Rubric mới.
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Tải lên file CSV hoặc Excel, kiểm tra mapping cột và xác nhận import các phiên bản tiêu chí đánh giá mới.
           </p>
         </div>
         <Link
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-medium text-slate-950 transition hover:bg-slate-50"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
           to={backToRubricUrl}
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
@@ -293,7 +293,7 @@ export function SchoolAdminRubricVersionImportPage() {
 
       {message ? (
         <div
-          className={`flex items-center gap-2.5 rounded-[10px] border px-4 py-3.5 text-sm font-semibold ${messageClassName}`}
+          className={`flex items-center gap-2.5 rounded-lg border px-4 py-3.5 text-sm font-semibold ${messageClassName}`}
           role={message.tone === 'error' ? 'alert' : 'status'}
         >
           {message.tone === 'success' ? (
@@ -305,18 +305,18 @@ export function SchoolAdminRubricVersionImportPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-5 rounded-[14px] border border-slate-200 bg-white p-6">
+      <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-6">
         <div className="flex items-start gap-3">
-          <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-cyan-50 text-cyan-700">
+          <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
             <FileSpreadsheet aria-hidden="true" className="size-5" />
           </span>
           <div>
-            <h2 className="text-lg font-black text-blue-950">Chọn file import</h2>
+            <h2 className="text-lg font-medium text-slate-950">Chọn file import</h2>
             <p className="mt-1 text-sm text-slate-500">Hỗ trợ file .csv, .xlsx và .xls.</p>
           </div>
         </div>
 
-        <label className="grid cursor-pointer place-items-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center transition hover:border-indigo-400 hover:bg-indigo-50/40">
+        <label className="grid cursor-pointer place-items-center gap-3 rounded-lg border-[1.5px] border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center transition hover:border-indigo-400 hover:bg-indigo-50/40">
           <span className="flex size-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
             <Upload aria-hidden="true" className="size-[26px]" />
           </span>
@@ -356,12 +356,12 @@ export function SchoolAdminRubricVersionImportPage() {
           <MappingPanel mapping={mapping} onChange={handleMappingChange} preview={preview} />
 
           {missingFields.length ? (
-            <div className="flex items-center gap-2.5 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm font-semibold text-amber-700" role="alert">
+            <div className="flex items-center gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm font-semibold text-amber-700" role="alert">
               <AlertTriangle aria-hidden="true" className="size-[18px] shrink-0" />
               Cần ghép đủ trường bắt buộc: {missingFields.map((field) => field.label).join(', ')}.
             </div>
           ) : (
-            <div className="flex items-center gap-2.5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3.5 text-sm font-semibold text-emerald-700">
+            <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3.5 text-sm font-semibold text-emerald-700">
               <CheckCircle2 aria-hidden="true" className="size-[18px] shrink-0" />
               Mapping đã đủ các trường bắt buộc.
             </div>
@@ -371,7 +371,7 @@ export function SchoolAdminRubricVersionImportPage() {
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
-              className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-medium text-slate-950 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
               disabled={isBusy}
               onClick={() => {
                 setPreview(null);
@@ -383,7 +383,7 @@ export function SchoolAdminRubricVersionImportPage() {
               Chọn file khác
             </button>
             <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 px-6 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!canAccept || isBusy}
               onClick={() => {
                 void handleAccept();

@@ -16,7 +16,7 @@ export function RubricResultBandTable({ bands, isLoading, isError, onRetry, onVi
   if (isLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
-        <RefreshCw className="size-6 animate-spin text-cyan-600" />
+        <RefreshCw className="size-6 animate-spin text-indigo-600" />
       </div>
     );
   }
@@ -25,7 +25,7 @@ export function RubricResultBandTable({ bands, isLoading, isError, onRetry, onVi
     return (
       <div className="flex h-32 flex-col items-center justify-center">
         <p className="text-red-500">Lỗi tải dữ liệu.</p>
-        <button onClick={onRetry} className="text-cyan-600 underline hover:text-cyan-700">Thử lại</button>
+        <button onClick={onRetry} className="text-indigo-600 underline hover:text-indigo-700">Thử lại</button>
       </div>
     );
   }
@@ -42,7 +42,7 @@ export function RubricResultBandTable({ bands, isLoading, isError, onRetry, onVi
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm text-slate-700">
-        <thead className="bg-slate-50/75 text-xs font-black text-blue-950 border-b border-slate-200">
+        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
           <tr>
             <th className="px-4 py-3">STT</th>
             <th className="px-4 py-3">Mã Band</th>
@@ -51,9 +51,9 @@ export function RubricResultBandTable({ bands, isLoading, isError, onRetry, onVi
             <th className="px-4 py-3 text-right">Hành động</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200">
+        <tbody className="divide-y divide-slate-100">
           {bands.map((b) => (
-            <tr key={b.id} className="transition hover:bg-cyan-50">
+            <tr key={b.id} className="transition hover:bg-indigo-50">
               <td className="px-4 py-3 font-medium text-slate-500">{b.order}</td>
               <td className="px-4 py-3 font-mono font-bold text-slate-900">{b.code}</td>
               <td className="px-4 py-3 font-medium text-slate-900">{b.name}</td>

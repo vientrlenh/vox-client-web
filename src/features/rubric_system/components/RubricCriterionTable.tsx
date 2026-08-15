@@ -2,7 +2,7 @@
 
 import { RefreshCw, LayoutList, Eye, Edit, Trash2 } from 'lucide-react';
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton';
-import type { RubricCriterion } from '../types';
+import { weightToPercent, type RubricCriterion } from '../types';
 
 type Props = {
   criteria: RubricCriterion[];
@@ -18,7 +18,7 @@ export function RubricCriterionTable({ criteria, isLoading, isError, onRetry, on
   if (isLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
-        <RefreshCw className="size-6 animate-spin text-cyan-600" />
+        <RefreshCw className="size-6 animate-spin text-indigo-600" />
       </div>
     );
   }
@@ -27,7 +27,7 @@ export function RubricCriterionTable({ criteria, isLoading, isError, onRetry, on
     return (
       <div className="flex h-32 flex-col items-center justify-center">
         <p className="text-red-500">Lỗi tải dữ liệu.</p>
-        <button onClick={onRetry} className="text-cyan-600 underline hover:text-cyan-700">Thử lại</button>
+        <button onClick={onRetry} className="text-indigo-600 underline hover:text-indigo-700">Thử lại</button>
       </div>
     );
   }
@@ -44,7 +44,7 @@ export function RubricCriterionTable({ criteria, isLoading, isError, onRetry, on
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm text-slate-700">
-        <thead className="bg-slate-50/75 text-xs font-black text-blue-950 border-b border-slate-200">
+        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
           <tr>
             <th className="px-4 py-3">STT</th>
             <th className="px-4 py-3">Mã Code</th>
@@ -55,15 +55,15 @@ export function RubricCriterionTable({ criteria, isLoading, isError, onRetry, on
             <th className="px-4 py-3 text-right">Hành động</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200">
+        <tbody className="divide-y divide-slate-100">
           {criteria.map((c) => (
-            <tr key={c.id} onClick={() => onViewDetails(c)} className="group cursor-pointer transition hover:bg-cyan-50">
+            <tr key={c.id} onClick={() => onViewDetails(c)} className="group cursor-pointer transition hover:bg-indigo-50">
               <td className="px-4 py-3 font-medium text-slate-500">{c.order}</td>
-              <td className="px-4 py-3 font-mono font-bold text-slate-900 group-hover:text-cyan-700">{c.code}</td>
+              <td className="px-4 py-3 font-mono font-bold text-slate-900 group-hover:text-indigo-700">{c.code}</td>
               <td className="px-4 py-3 font-medium text-slate-900">{c.name}</td>
               <td className="px-4 py-3 text-center">
                 <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                  {c.weight}%
+                  {weightToPercent(c.weight)}%
                 </span>
               </td>
               <td className="px-4 py-3 text-center font-medium">{c.minScore} - {c.maxScore}</td>
