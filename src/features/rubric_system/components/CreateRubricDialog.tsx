@@ -45,7 +45,14 @@ export function CreateRubricDialog({ isOpen, onClose, onSubmit, isPending, frame
       setErrorMessage('Vui lòng nhập đầy đủ các trường bắt buộc!');
       return;
     }
-    await onSubmit({ code, name, description, frameworkId, languageId });
+    try {
+      await onSubmit({ code, name, description, frameworkId, languageId });
+    } catch (error) {
+      // Lỗi từ máy chủ phải hiện NGAY TRONG modal. Trang cha không nuốt lỗi nữa: modal vẫn
+      // mở khi submit hỏng, mà banner của trang thì nằm sau lớp backdrop-blur của overlay
+      // nên chỉ còn là một vệt đỏ mờ, không đọc được.
+      setErrorMessage((error as Error)?.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -54,7 +61,7 @@ export function CreateRubricDialog({ isOpen, onClose, onSubmit, isPending, frame
       
       <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">Thêm mới tiêu chí đánh giá</h2>
+          <h2 className="text-lg font-black text-blue-950">Thêm mới tiêu chí đánh giá</h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
             <X className="size-5" />
           </button>

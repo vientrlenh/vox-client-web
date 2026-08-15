@@ -13,13 +13,11 @@ import { RubricTable } from "../components/RubricTable";
 import { CreateRubricDialog } from "../components/CreateRubricDialog"; 
 import { Pagination } from "@/shared/components/Pagination";
 import { useAppSelector } from "@/app/store/hooks";
-import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 10;
 
 export function SchoolAdminRubricsPage() {
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
   const schoolId = user?.schoolId;
@@ -63,25 +61,17 @@ export function SchoolAdminRubricsPage() {
 
   // HÀM XỬ LÝ SUBMIT VÀ BẮT LỖI TỪ BE (Đã thay 'any' bằng type cụ thể)
   const handleCreateRubric = async (formData: CreateRubricPayload) => {
-    setErrorMessage(null);
-    try {
-      const newRubricId = await createRubric(formData);
-      setIsCreateModalOpen(false);
-      
-      // UX xịn: Tạo thành công đá thẳng sang trang chi tiết để User add Versions!
-      navigate(`/school-admin/rubrics/${newRubricId}`);
-    } catch (error) {
-      // Ép kiểu error về Error thuần để gọi được thuộc tính message
-      const err = error as Error;
-      console.error("Lỗi tạo Rubric:", err);
-      // Nơi này sẽ hứng cái lỗi "Trường của bạn đã thiết lập một bộ tiêu chí đánh giá cho ngôn ngữ này rồi."
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi tạo tiêu chí đánh giá.');
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    const newRubricId = await createRubric(formData);
+    setIsCreateModalOpen(false);
+    
+    // UX xịn: Tạo thành công đá thẳng sang trang chi tiết để User add Versions!
+    navigate(`/school-admin/rubrics/${newRubricId}`);
   };
 
   return (
     <section className="grid gap-6">
-      <ErrorBanner message={errorMessage} />
 
       {/* HEADER */}
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">

@@ -3,6 +3,13 @@
 import { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ErrorBanner } from '@/shared/ui/ErrorBanner';
+import {
+  RUBRIC_ALLOCATION_TOTAL_PERCENT,
+  RUBRIC_AVERAGE_WEIGHT,
+  isAllocationMethod,
+  percentToWeight,
+  weightToPercent,
+} from '../types';
 import type { UpdateRubricCriterionPayload } from '../api/useUpdateSystemRubricCriterionMutation';
 import type { RubricCriterion } from '../types';
 
@@ -15,6 +22,10 @@ type Props = {
   scoringScaleMin: number;
   scoringScaleMax: number;
   existingOrders?: number[];
+  /** Cách khai trọng số của phiên bản — quyết định ô trọng số hiện ra hay tự điền. */
+  totalScoreMethod: string;
+  /** Tổng phần trăm của các tiêu chí KHÁC (không tính tiêu chí đang sửa). */
+  allocatedPercent?: number;
 };
 
 // Cấu trúc thật của examplesJson trả về từ Backend: { "values": [{ transcript, explanation, expectedScore }] }
@@ -55,12 +66,16 @@ function parseExamples(examplesJson?: string | null): ExampleItem[] {
   return [EMPTY_EXAMPLE];
 }
 
-export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, initialData, scoringScaleMin, scoringScaleMax, existingOrders = [] }: Props) {
+export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending, initialData, scoringScaleMin, scoringScaleMax, existingOrders = [], totalScoreMethod, allocatedPercent = 0 }: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Chế độ trung bình gán cứng 100% cho mọi tiêu chí nên không hỏi người dùng; chỉ chế độ phân bổ
+  // mới cần khai phần trăm. allocatedPercent đã trừ sẵn tiêu chí đang sửa ra.
+  const isAllocation = isAllocationMethod(totalScoreMethod);
+  const remainingPercent = Math.max(RUBRIC_ALLOCATION_TOTAL_PERCENT - allocatedPercent, 0);
   const [formData, setFormData] = useState(() => ({
     name: initialData.name,
     description: initialData.description ?? '',
-    weight: initialData.weight,
+    weightPercent: weightToPercent(initialData.weight),
     order: initialData.order,
     isRequired: initialData.isRequired,
   }));
@@ -92,6 +107,18 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
       return;
     }
 
+    if (isAllocation) {
+      const percent = Number(formData.weightPercent);
+      if (percent <= 0) {
+        setErrorMessage('Vui lòng nhập trọng số lớn hơn 0%.');
+        return;
+      }
+      if (percent > remainingPercent) {
+        setErrorMessage(`Chỉ còn ${remainingPercent}% chưa được phân bổ, không thể gán ${percent}% cho tiêu chí này.`);
+        return;
+      }
+    }
+
     const cleanedExamples = examples
       .filter((item) => item.transcript.trim() || item.explanation.trim())
       .map((item) => ({
@@ -105,14 +132,21 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
       name: formData.name,
       description: formData.description || undefined,
       examplesJson,
-      weight: Number(formData.weight),
+      weight: isAllocation ? percentToWeight(Number(formData.weightPercent)) : RUBRIC_AVERAGE_WEIGHT,
       minScore: scoringScaleMin,
       maxScore: scoringScaleMax,
       order: Number(formData.order),
       isRequired: formData.isRequired,
     };
 
-    await onSubmit(payload);
+    try {
+      await onSubmit(payload);
+    } catch (error) {
+      // Lỗi từ máy chủ phải hiện NGAY TRONG modal. Trang cha không nuốt lỗi nữa: modal vẫn
+      // mở khi submit hỏng, mà banner của trang thì nằm sau lớp backdrop-blur của overlay
+      // nên chỉ còn là một vệt đỏ mờ, không đọc được.
+      setErrorMessage((error as Error)?.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -121,7 +155,7 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
 
       <div className="relative w-full max-w-xl rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-black text-blue-950">
             Chỉnh sửa Tiêu chí <span className="font-mono text-slate-500">{initialData.code}</span>
           </h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
@@ -206,9 +240,33 @@ export function UpdateRubricCriterionDialog({ isOpen, onClose, onSubmit, isPendi
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-bold text-slate-700">Trọng số (Weight)</label>
-              <input type="number" step="0.01" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value === '' ? 0 : Number(e.target.value) })} disabled={isPending} required className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50" />
-              <p className="mt-1 text-xs text-slate-400">Trọng số tương đối khi tính điểm trung bình có trọng số giữa các tiêu chí</p>
+              <label className="mb-1 block text-sm font-bold text-slate-700">Trọng số</label>
+              {isAllocation ? (
+                <>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max={remainingPercent}
+                      step="1"
+                      value={formData.weightPercent}
+                      onChange={(e) => setFormData({ ...formData, weightPercent: e.target.value === '' ? 0 : Number(e.target.value) })}
+                      disabled={isPending}
+                      required
+                      className="w-full rounded-lg border border-slate-300 py-2 pl-4 pr-9 text-sm outline-none transition focus:border-indigo-500 disabled:bg-slate-50"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-slate-400">%</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Đã phân bổ {allocatedPercent}% / {RUBRIC_ALLOCATION_TOTAL_PERCENT}% — còn lại {remainingPercent}%
+                  </p>
+                </>
+              ) : (
+                <>
+                  <input type="text" value="100%" disabled readOnly className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-500 outline-none" />
+                  <p className="mt-1 text-xs text-slate-400">Phiên bản đang tính trung bình nên mọi tiêu chí cân bằng nhau, không cần khai riêng</p>
+                </>
+              )}
             </div>
 
             <div>

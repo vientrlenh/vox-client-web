@@ -80,7 +80,14 @@ export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending
       })),
     };
 
-    await onSubmit(payload);
+    try {
+      await onSubmit(payload);
+    } catch (error) {
+      // Lỗi từ máy chủ phải hiện NGAY TRONG modal. Trang cha không nuốt lỗi nữa: modal vẫn
+      // mở khi submit hỏng, mà banner của trang thì nằm sau lớp backdrop-blur của overlay
+      // nên chỉ còn là một vệt đỏ mờ, không đọc được.
+      setErrorMessage((error as Error)?.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -89,7 +96,7 @@ export function AddRubricResultBandDialog({ isOpen, onClose, onSubmit, isPending
 
       <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">Thêm Thang điểm Mới</h2>
+          <h2 className="text-lg font-black text-blue-950">Thêm Thang điểm Mới</h2>
           <button type="button" onClick={onClose} disabled={isPending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
             <X className="size-5" />
           </button>

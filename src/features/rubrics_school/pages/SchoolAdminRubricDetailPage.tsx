@@ -34,10 +34,8 @@ import { RubricVersionTable } from "../components/RubricVersionTable";
 import { RubricFormDialog } from "../components/RubricFormDialog";
 import { AddRubricVersionDialog } from "../components/AddRubricVersionDialog"; // IMPORT MODAL
 import { Pagination } from "@/shared/components/Pagination";
-import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 
 export function SchoolAdminRubricDetailPage() {
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { rubricId } = useParams<{ rubricId: string }>();
   const navigate = useNavigate();
 
@@ -100,26 +98,18 @@ export function SchoolAdminRubricDetailPage() {
 
   // 4. Hàm xử lý submit Form Cập nhật Rubric
   const handleUpdateRubric = async (formData: { name: string; description: string; }) => {
-    setErrorMessage(null);
-    try {
-      await updateRubric(formData);
-      setIsEditModalOpen(false);
-    } catch (error: unknown) {
-      console.error("Chi tiết lỗi từ BE:", error);
-      setErrorMessage((error as { message?: string }).message || "Có lỗi xảy ra khi lưu thay đổi. Vui lòng thử lại.");
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await updateRubric(formData);
+    setIsEditModalOpen(false);
   };
 
   // 5. Hàm xử lý submit Form Thêm Version mới
   const handleAddVersion = async (payload: AddRubricVersionsPayload) => {
-    setErrorMessage(null);
-    try {
-      await addVersions(payload);
-      setIsAddModalOpen(false); // Thành công thì đóng popup
-    } catch (error: unknown) {
-      console.error("Lỗi thêm Version:", error);
-      setErrorMessage((error as { message?: string }).message || "Có lỗi xảy ra khi thêm phiên bản mới.");
-    }
+    // Không bắt lỗi ở đây: dialog đang mở sẽ tự bắt và hiện lỗi ngay trong form.
+    // Banner của trang nằm sau lớp backdrop-blur của overlay nên không đọc được.
+    await addVersions(payload);
+    setIsAddModalOpen(false); // Thành công thì đóng popup
   };
 
   if (isLoading) {
@@ -150,7 +140,6 @@ export function SchoolAdminRubricDetailPage() {
 
   return (
     <section className="grid gap-6">
-      <ErrorBanner message={errorMessage} />
 
       {/* HEADER BAR */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

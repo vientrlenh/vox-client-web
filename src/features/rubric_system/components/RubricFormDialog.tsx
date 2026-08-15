@@ -43,7 +43,14 @@ export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPen
       setErrorMessage('Vui lòng nhập tên tiêu chí đánh giá!');
       return;
     }
-    await onSubmit({ name, description });
+    try {
+      await onSubmit({ name, description });
+    } catch (error) {
+      // Lỗi từ máy chủ phải hiện NGAY TRONG modal. Trang cha không nuốt lỗi nữa: modal vẫn
+      // mở khi submit hỏng, mà banner của trang thì nằm sau lớp backdrop-blur của overlay
+      // nên chỉ còn là một vệt đỏ mờ, không đọc được.
+      setErrorMessage((error as Error)?.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -57,7 +64,7 @@ export function RubricFormDialog({ isOpen, onClose, initialData, onSubmit, isPen
       {/* Box Dialog */}
       <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">Chỉnh sửa thông tin tiêu chí đánh giá</h2>
+          <h2 className="text-lg font-black text-blue-950">Chỉnh sửa thông tin tiêu chí đánh giá</h2>
           <button 
             type="button" 
             onClick={onClose} 
