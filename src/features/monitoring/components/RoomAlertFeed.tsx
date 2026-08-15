@@ -3,8 +3,14 @@ import { getAlertTypeDisplay } from '../types'
 
 type RoomAlertFeedProps = {
     alerts: AlertView[]
-    /** Đổi id thí sinh thành tên hiển thị; trả về chính id nếu chưa ghép được roster. */
-    resolveName: (participantId: string) => string
+    /**
+     * Đổi một cảnh báo thành tên học viên; trả về id thô nếu chưa ghép được roster.
+     *
+     * <p>Nhận cả cảnh báo chứ không chỉ `participantId` vì với cảnh báo do AI sinh thì trường đó
+     * không phải candidateId, và phải ngả sang `sessionId` mới tra ra người - xem
+     * `resolveAlertCandidateId`.
+     */
+    resolveName: (alert: AlertView) => string
 }
 
 function formatClock(value: string, fallbackAt: number): string {
@@ -41,7 +47,7 @@ export function RoomAlertFeed({ alerts, resolveName }: RoomAlertFeedProps) {
                                     </span>
                                 </div>
                                 <p className="mt-0.5 truncate text-[11px] font-medium opacity-80">
-                                    {resolveName(alert.participantId)}
+                                    {resolveName(alert)}
                                 </p>
                             </li>
                         )

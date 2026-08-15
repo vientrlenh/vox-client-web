@@ -2,16 +2,23 @@ import { Ban, Flag } from 'lucide-react'
 
 import { StatusBadge, type StatusTone } from '@/shared/ui/StatusBadge'
 
-import type { ParticipantBoardEntry, ParticipantStatus } from '../hooks/useMonitoringBoard'
+import {
+    LIVE_SESSION_STATUSES,
+    type ParticipantBoardEntry,
+    type ParticipantStatus,
+} from '../hooks/useMonitoringBoard'
 import { getAlertTypeDisplay, getStreamTypeLabel } from '../types'
 import { StreamThumbnail } from './StreamThumbnail'
-
-const LIVE_SESSION_STATUSES = new Set(['IN_PROGRESS', 'INTERRUPTED'])
 
 const STATUS_DISPLAY: Record<ParticipantStatus, { label: string; tone: StatusTone }> = {
     alerted: { label: 'Có cảnh báo', tone: 'danger' },
     dropped: { label: 'Mất kết nối', tone: 'danger' },
+    finished: { label: 'Đã kết thúc', tone: 'info' },
     live: { label: 'Đang lên sóng', tone: 'success' },
+    // Tách khỏi "Mất kết nối" chứ không gộp: cái kia là luồng đã đóng hẳn, cái này là học viên đang
+    // không tới được ta NGAY LÚC NÀY và vẫn có thể quay lại. Đến từ hai đường - server báo transport
+    // rớt, hoặc quá lâu không có khung hình nào - nhưng với giám thị thì cùng một việc phải làm.
+    lost: { label: 'Đang mất kết nối', tone: 'danger' },
     stale: { label: 'Đứng hình', tone: 'warning' },
 }
 
@@ -22,7 +29,9 @@ const STATUS_DISPLAY: Record<ParticipantStatus, { label: string; tone: StatusTon
 const STATUS_RING: Record<ParticipantStatus, string> = {
     alerted: 'border-red-300 ring-2 ring-red-200',
     dropped: 'border-red-200',
+    finished: 'border-slate-200',
     live: 'border-slate-200',
+    lost: 'border-red-200',
     stale: 'border-amber-200',
 }
 
