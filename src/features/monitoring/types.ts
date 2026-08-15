@@ -15,7 +15,14 @@ export type AlertType =
   | 'SUSPICIOUS_GAZE'
   | 'TRACK_ENDED'
 
-export type ParticipantEventType = 'joined' | 'left'
+/**
+ * `disconnected`/`reconnected` báo TRANSPORT rớt và nối lại trong khi luồng vẫn còn mở.
+ *
+ * <p>Chúng tồn tại vì `left` tới quá muộn để làm tín hiệu duy nhất: nó được phát khi peer đóng hẳn,
+ * tức sau 30 giây grace kể từ lúc ICE nhận ra vấn đề. Cả quãng đó giám thị chỉ thấy một ô đứng hình
+ * không kèm lời giải thích nào.
+ */
+export type ParticipantEventType = 'disconnected' | 'joined' | 'left' | 'reconnected'
 
 /** An active stream returned by a monitor snapshot or `/schedules/active`. */
 export type StreamSnapshot = {

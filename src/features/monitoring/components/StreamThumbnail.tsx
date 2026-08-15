@@ -1,5 +1,5 @@
 import type { StreamView } from '../api/useRoomMonitor'
-import { STALE_MS } from '../hooks/useMonitoringBoard'
+import { STALE_LOST_MS, STALE_MS } from '../hooks/useMonitoringBoard'
 import { getStreamTypeLabel } from '../types'
 
 type StreamThumbnailProps = {
@@ -15,8 +15,12 @@ function formatClock(at: number): string {
 
 export function StreamThumbnail({ isWatching, now, onSelect, stream }: StreamThumbnailProps) {
     const hasEnded = stream.endedAt !== undefined
-    const isStale =
-        !hasEnded && stream.lastFrameAt !== undefined && now - stream.lastFrameAt > STALE_MS
+    const silentForMs = !hasEnded && stream.lastFrameAt !== undefined ? now - stream.lastFrameAt : 0
+    // Cùng điều kiện với trạng thái của cả ô, để nhãn trên khung hình không mâu thuẫn với huy hiệu:
+    // "Đứng hình" ở đây trong khi ô ngoài đã báo "Đang mất kết nối" là hai câu trả lời khác nhau cho
+    // cùng một câu hỏi.
+    const isLost = !hasEnded && (stream.disconnectedAt !== undefined || silentForMs > STALE_LOST_MS)
+    const isStale = isLost || silentForMs > STALE_MS
 
     return (
         <button
@@ -32,7 +36,11 @@ export function StreamThumbnail({ isWatching, now, onSelect, stream }: StreamThu
                 {hasEnded ? (
                     <span className="text-red-300">Mất lúc {formatClock(stream.endedAt as number)}</span>
                 ) : null}
-                {isStale ? <span className="text-amber-300">Đứng hình</span> : null}
+                {isStale ? (
+                    <span className={isLost ? 'text-red-300' : 'text-amber-300'}>
+                        {isLost ? 'Đang mất kết nối' : 'Đứng hình'}
+                    </span>
+                ) : null}
             </div>
             <div className="relative aspect-video">
                 {stream.latestFrameUrl ? (

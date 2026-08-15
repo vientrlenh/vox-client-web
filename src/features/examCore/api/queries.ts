@@ -777,11 +777,21 @@ async function fetchMyProctorScheduleCandidates(scheduleId: string) {
   return data.myProctorScheduleCandidates
 }
 
-export function useMyProctorScheduleCandidatesQuery(scheduleId: string | null) {
+/**
+ * @param options.refetchInterval Nhịp tự tải lại, tính bằng ms. Mặc định không bật: trang điểm danh
+ *   là một màn hình thao tác, người dùng tự biết khi nào dữ liệu đổi. Chỉ màn hình giám sát trực
+ *   tiếp mới cần, vì ở đó `sessionStatus` và `blockedAt` đổi do học viên chứ không do người đang
+ *   nhìn - không có nhịp này thì một phiên đã nộp bài vẫn hiện IN_PROGRESS tới hết ca.
+ */
+export function useMyProctorScheduleCandidatesQuery(
+  scheduleId: string | null,
+  options?: { refetchInterval?: number },
+) {
   return useQuery({
     enabled: Boolean(scheduleId),
     queryFn: () => fetchMyProctorScheduleCandidates(scheduleId as string),
     queryKey: examQueryKeys.proctorCandidates(scheduleId),
+    refetchInterval: options?.refetchInterval,
   })
 }
 

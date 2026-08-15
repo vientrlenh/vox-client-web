@@ -19,6 +19,12 @@ import { type MonitorConnectionState, type StreamType } from '../types'
 
 const EMPTY_CANDIDATES: ProctorCandidateSummaryDto[] = []
 
+/**
+ * Nhịp tải lại roster. Đây là nguồn DUY NHẤT cho biết phiên thi đã đóng hay chưa - lưới video chỉ
+ * thấy được luồng ngừng phát, mà "nộp bài xong" với "rớt mạng" thì trông giống hệt nhau từ đó.
+ */
+const ROSTER_POLL_MS = 15_000
+
 const CONNECTION_LABEL: Record<MonitorConnectionState, string> = {
     closed: 'Đã đóng',
     connected: 'Đang kết nối trực tiếp',
@@ -40,7 +46,9 @@ export function MonitoringRoomPage() {
         examId,
         scheduleId,
     })
-    const candidatesQuery = useMyProctorScheduleCandidatesQuery(scheduleId ?? null)
+    const candidatesQuery = useMyProctorScheduleCandidatesQuery(scheduleId ?? null, {
+        refetchInterval: ROSTER_POLL_MS,
+    })
     const candidates = candidatesQuery.data ?? EMPTY_CANDIDATES
 
     const forceEndExamSessionMutation = useForceEndExamSessionMutation()
@@ -59,7 +67,7 @@ export function MonitoringRoomPage() {
         return () => clearInterval(id)
     }, [])
 
-    const { neverConnected, onScreen } = useMonitoringBoard({
+    const { neverConnected, onScreen, resolveAlertCandidateId } = useMonitoringBoard({
         alerts,
         candidates,
         filter,
@@ -224,7 +232,9 @@ export function MonitoringRoomPage() {
                     <RoomRosterPanel neverConnected={neverConnected} onScreen={onScreen} />
                     <RoomAlertFeed
                         alerts={alerts}
-                        resolveName={(participantId) => nameByCandidateId.get(participantId) ?? participantId}
+                        resolveName={(alert) =>
+                            nameByCandidateId.get(resolveAlertCandidateId(alert)) ?? alert.participantId
+                        }
                     />
                 </div>
             </div>
