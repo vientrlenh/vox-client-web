@@ -12,6 +12,7 @@ export type StreamTokenRequest = {
 import type { AlertType } from '@/features/proctoring-alerts/types'
 
 export {
+  getAlertSeverity,
   getAlertTypeDisplay,
   type AlertSeverity,
   type AlertType,
@@ -72,6 +73,14 @@ export type AlertEvent = {
    * nó thì phải rơi về khoá tổ hợp, kém chắc chắn hơn nhưng không được phép làm hỏng màn hình.
    */
   eventId?: string
+  /**
+   * Mức độ do vox-streaming đóng dấu lúc phát (`DefaultAlertLevel`), cùng một giá trị với bản ghi
+   * lưu vào DB -- nhờ vậy màn trực tiếp và màn chấm bài không thể nói khác nhau về cùng một cảnh
+   * báo. Dùng qua `getAlertSeverity`, đừng suy lại từ `alertType`.
+   *
+   * <p>Optional vì bản vox-streaming cũ hơn không gửi trường này; thiếu thì rơi về bảng theo loại.
+   */
+  level?: string
   participantId: string
   sessionId: string
   streamId: string

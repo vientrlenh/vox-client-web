@@ -4,6 +4,7 @@ import { StatusBadge, type StatusTone } from '@/shared/ui/StatusBadge'
 
 import { useExamSessionProctoringAlertsQuery } from '../api/useProctoringAlertsQuery'
 import {
+  getAlertSeverity,
   getAlertSourceLabel,
   getAlertTypeDisplay,
   getProctoringStreamTypeLabel,
@@ -44,6 +45,14 @@ type AlertGroup = {
   details: string[]
   firstAt: string
   lastAt: string
+  /**
+   * Mức của cả nhóm, lấy từ bản ghi ĐẦU TIÊN gặp.
+   *
+   * <p>Cùng một loại thì cùng một mức, vì mức được suy ra từ loại ở nơi phát. Trường hợp duy nhất
+   * lệch là bản ghi cũ hơn lần đổi thang mức gần nhất -- và mức cũ đã được migration nâng lại, nên
+   * không có nhóm nào trộn hai mức trong thực tế.
+   */
+  level: string | null
   sources: string[]
   streamTypes: string[]
 }
@@ -59,6 +68,7 @@ function groupAlerts(alerts: ProctoringAlertDto[]): AlertGroup[] {
         details: alert.detail ? [alert.detail] : [],
         firstAt: alert.capturedAt,
         lastAt: alert.capturedAt,
+        level: alert.level,
         sources: alert.source ? [alert.source] : [],
         streamTypes: alert.streamType ? [alert.streamType] : [],
       })
@@ -77,12 +87,12 @@ function groupAlerts(alerts: ProctoringAlertDto[]): AlertGroup[] {
     }
   }
   // Nặng trước, rồi nhiều lần trước: người chấm đọc từ trên xuống và thường dừng sớm.
-  const severityRank = (alertType: string) => {
-    const severity = getAlertTypeDisplay(alertType).severity
+  const severityRank = (group: AlertGroup) => {
+    const severity = getAlertSeverity(group.alertType, group.level)
     return severity === 'critical' ? 0 : severity === 'warning' ? 1 : 2
   }
   return [...groups.values()].sort((left, right) => {
-    const bySeverity = severityRank(left.alertType) - severityRank(right.alertType)
+    const bySeverity = severityRank(left) - severityRank(right)
     return bySeverity !== 0 ? bySeverity : right.count - left.count
   })
 }
@@ -126,11 +136,12 @@ export function ProctoringAlertsCard({ sessionId }: { sessionId: string | null }
       <div className="mt-3 grid gap-2">
         {groups.map((group) => {
           const display = getAlertTypeDisplay(group.alertType)
+          const severity = getAlertSeverity(group.alertType, group.level)
           return (
             <div className="rounded-xl border border-amber-200 bg-white px-3.5 py-2.5" key={group.alertType}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[12.5px] font-bold text-slate-900">{display.label}</span>
-                <StatusBadge label={SEVERITY_LABEL[display.severity]} tone={SEVERITY_TONE[display.severity]} />
+                <StatusBadge label={SEVERITY_LABEL[severity]} tone={SEVERITY_TONE[severity]} />
                 {group.count > 1 ? <StatusBadge label={`${group.count} lượt`} tone="warning" /> : null}
               </div>
 

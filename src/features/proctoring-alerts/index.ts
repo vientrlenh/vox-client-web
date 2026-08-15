@@ -5,6 +5,7 @@ export {
 } from './api/useProctoringAlertsQuery'
 export { ProctoringAlertsCard } from './components/ProctoringAlertsCard'
 export {
+  getAlertSeverity,
   getAlertSourceLabel,
   getAlertTypeDisplay,
   getProctoringStreamTypeLabel,
