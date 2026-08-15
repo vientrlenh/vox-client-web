@@ -11,6 +11,7 @@ import {
   PAYMENT_METHOD_OPTIONS,
   type PaymentMethod,
 } from '@/shared/payment/types'
+import { useQuotaPricingQuery } from '@/features/subscription_system/api/useQuotaPricingQuery'
 import { useMySubscriptionQuery } from '../api/useMySubscriptionQuery'
 import { useMySubscriptionUsageQuery } from '../api/useMySubscriptionUsageQuery'
 import { useSubscriptionPlansQuery } from '../api/useSubscriptionPlansQuery'
@@ -84,6 +85,7 @@ export function SchoolAdminSubscriptionPage() {
 
   const mySubscriptionQuery = useMySubscriptionQuery()
   const usageQuery = useMySubscriptionUsageQuery()
+  const quotaPricingQuery = useQuotaPricingQuery()
   const plansQuery = useSubscriptionPlansQuery(DEFAULT_PAGE, 50)
   const invoicesQuery = useInvoicesQuery(invoicesPage, 10)
   const debtEventsQuery = useMyDebtEventsQuery(debtEventsPage, 10)
@@ -325,6 +327,7 @@ export function SchoolAdminSubscriptionPage() {
               paymentMethod={paymentMethod}
               plan={subscription.plan}
               state={tokenState}
+              usdToVndRate={quotaPricingQuery.data?.usdToVndRate}
             />
           ) : null}
         </div>
