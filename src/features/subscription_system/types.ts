@@ -64,7 +64,7 @@ export type SchoolSubscription = {
   pricePaidSnapshot: number
   cancelledAt: string | null
   createdAt: string | null
-  plan: Pick<SubscriptionPlan, 'id' | 'name' | 'pricePerYear' | 'maxTimePerAttemptMin' | 'quotas'> | null
+  plan: Pick<SubscriptionPlan, 'id' | 'name' | 'pricePerYear' | 'maxTimePerAttemptMin' | 'quotas' | 'serviceFeeRatio'> | null
 }
 
 export type SchoolSubscriptionPage = {
