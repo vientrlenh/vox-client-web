@@ -926,7 +926,7 @@ export function SchoolAdminDashboardPage() {
         />
         <Kpi
           icon={<Coins aria-hidden="true" className="size-5.5" />}
-          label="Token đã dùng"
+          label="Tổng số hạn mức đã sử dụng"
           sub={<span className="font-semibold text-slate-600">{formatUsd(data.tokenUsed)} / {formatUsd(data.tokenAllocated)}</span>}
           tint={{ bg: 'bg-orange-50', fg: 'text-orange-700' }}
           unit="%"

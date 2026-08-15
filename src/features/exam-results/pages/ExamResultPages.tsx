@@ -26,6 +26,7 @@ import { Pagination } from '@/shared/components/Pagination'
 import {
   buildValidityRulesForDisplay,
   criterionScorePercentage,
+  formatConfidencePercent,
   formatScaleMax,
   getResultScoreTone,
 } from '@/shared/lib/aiEvaluation'
@@ -643,6 +644,17 @@ export function QuestionEvaluationCard({
                       thành một hàng chữ mà người chấm không hành động được gì -- và nhãn nào
                       thật sự cần hành động thì đã có "Cần giáo viên duyệt lại" nói rồi. */}
                   {display.markedInvalid ? <StatusBadge label="Đánh dấu không hợp lệ" tone="danger" /> : null}
+                  {/* Chỉ hiện con số, không kèm lý do duyệt lại -- khác AiEvaluationSummary bên
+                      chấm bài một chút theo yêu cầu ở đây. */}
+                  {typeof display.overallConfidence === 'number' ? (
+                    <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-500">
+                      <Gauge aria-hidden="true" className="size-3.5 text-slate-400" />
+                      Độ tin cậy AI
+                      <b className="font-extrabold tabular-nums text-slate-900">
+                        {formatConfidencePercent(display.overallConfidence)}
+                      </b>
+                    </span>
+                  ) : null}
                   <span className="text-xs text-slate-500">Chấm lúc {formatDateTime(evaluation.evaluatedAt)}</span>
                   {/* Hai mốc thời gian khác nhau: phán quyết của giáo viên và lần AI phân
                       tích. Gộp làm một là khẳng định sai về thời điểm. */}
@@ -650,14 +662,17 @@ export function QuestionEvaluationCard({
                     <span className="text-xs text-slate-500">· phân tích AI {formatDateTime(display.aiEvaluatedAt)}</span>
                   ) : null}
                 </div>
-                {/* GỠ: ô "Overall confidence", ô "Audio quality", dải "Chưa đủ bằng chứng" và
-                    dải cảnh báo alignment.
+                {/* GỠ: ô "Audio quality", dải "Chưa đủ bằng chứng" và dải cảnh báo alignment.
                     Chúng là số đo NỘI BỘ của bộ chấm, không phải thứ người chấm quyết định
-                    được: thấy "0% confidence" hay "độ phủ alignment thấp" thì việc phải làm vẫn
-                    y hệt -- nghe lại rồi tự cho điểm. Nhồi bốn khối đó lên đầu mỗi câu chỉ đẩy
-                    NHẬN XÉT và điểm từng tiêu chí -- thứ thật sự dùng để chấm -- xuống dưới.
-                    Dữ liệu vẫn còn nguyên trong `display.signals`, cần thì dựng lại một trang
-                    chẩn đoán riêng cho người vận hành, đừng trộn vào màn chấm. */}
+                    được: thấy "độ phủ alignment thấp" thì việc phải làm vẫn y hệt -- nghe lại
+                    rồi tự cho điểm. Nhồi cả khối đó lên đầu mỗi câu chỉ đẩy NHẬN XÉT và điểm
+                    từng tiêu chí -- thứ thật sự dùng để chấm -- xuống dưới. Dữ liệu vẫn còn
+                    nguyên trong `display.signals`, cần thì dựng lại một trang chẩn đoán riêng
+                    cho người vận hành, đừng trộn vào màn chấm.
+                    "Overall confidence" thì quay lại ở dạng MỘT DÒNG cạnh nhãn trạng thái (như
+                    AiEvaluationSummary bên chấm bài) sau khi người chấm yêu cầu có lại -- nó trả
+                    lời được câu "vì sao câu này bị đẩy sang cho tôi" khi đi kèm reviewReasonCode,
+                    dù bản thân con số không đổi được thao tác. */}
                 {evaluation.feedbackSummary ? (
                   <p className="mt-3 text-sm leading-6 text-slate-700">{evaluation.feedbackSummary}</p>
                 ) : null}

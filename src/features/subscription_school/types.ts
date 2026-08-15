@@ -44,6 +44,10 @@ export type SubscriptionPlan = {
   popular: boolean
   status: 'ACTIVE' | 'ARCHIVED'
   replacedByPlanId: string | null
+  // Margin dịch vụ của gói (vd 0.20 = 20%) -- kết hợp với quotaPricing.usdToVndRate (số SỐNG) để
+  // tính giá quota hiện tại, KHÔNG dùng quotas[].tokenUnitPrice (đóng băng lúc tạo gói) cho màn
+  // "mua thêm" -- xem TokenTopUpPanel.
+  serviceFeeRatio: number
   quotas: PlanQuota[]
 }
 

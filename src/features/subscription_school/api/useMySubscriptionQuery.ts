@@ -26,6 +26,7 @@ const MY_SUBSCRIPTION_QUERY = `
         maxTimePerAttemptMin
         popular
         status
+        serviceFeeRatio
         quotas {
           id
           quotaType

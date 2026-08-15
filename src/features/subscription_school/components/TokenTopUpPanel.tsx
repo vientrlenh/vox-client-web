@@ -28,6 +28,11 @@ type TokenTopUpPanelProps = {
   paymentMethod: PaymentMethod
   plan: SubscriptionPlan
   state: TokenTopUpState
+  // Tỷ giá USD->VND SỐNG (quotaPricing.usdToVndRate) -- dùng để tính lại giá bán ngay lúc hiển thị,
+  // khớp đúng công thức BuyTokensUseCase/CreatePaymentLinkForTokenPurchaseUseCase tính lúc mua thật
+  // (QuotaPricingService.tokenUnitPriceFor). plan.quotas[].tokenUnitPrice bị đóng băng lúc tạo gói
+  // nên KHÔNG dùng để hiển thị ở đây -- chỉ dùng làm fallback khi tỷ giá sống chưa tải xong.
+  usdToVndRate?: number
 }
 
 export function TokenTopUpPanel({
@@ -38,9 +43,14 @@ export function TokenTopUpPanel({
   paymentMethod,
   plan,
   state,
+  usdToVndRate,
 }: TokenTopUpPanelProps) {
-  // plan.quotas[].tokenUnitPrice = giá VNĐ cho 1 USD quota — dùng thẳng, không quy đổi đơn vị.
-  const pricePerUnitByType = new Map(plan.quotas.map((quota) => [quota.quotaType, quota.tokenUnitPrice]))
+  const frozenPriceByType = new Map(plan.quotas.map((quota) => [quota.quotaType, quota.tokenUnitPrice]))
+  const livePrice =
+    usdToVndRate != null ? Math.round(usdToVndRate * (1 + plan.serviceFeeRatio)) : undefined
+  const pricePerUnitByType = new Map(
+    QUOTA_TYPES.map((quotaType) => [quotaType, livePrice ?? frozenPriceByType.get(quotaType) ?? 0]),
+  )
   const total = QUOTA_TYPES.reduce(
     (sum, quotaType) => sum + state[quotaType] * (pricePerUnitByType.get(quotaType) ?? 0),
     0,
