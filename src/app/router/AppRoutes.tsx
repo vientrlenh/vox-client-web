@@ -593,6 +593,12 @@ const SchoolAdminRubricsPage = lazy(() =>
   })),
 );
 
+const SchoolAdminRubricTemplatesPage = lazy(() =>
+  import("@/features/rubrics_school").then((module) => ({
+    default: module.SchoolAdminRubricTemplatesPage,
+  })),
+);
+
 const SchoolAdminRubricDetailPage = lazy(() =>
   import("@/features/rubrics_school").then((module) => ({
     default: module.SchoolAdminRubricDetailPage,
@@ -1091,6 +1097,11 @@ export function AppRoutes() {
             <Route
               path="school-admin/rubrics"
               element={<SchoolAdminRubricsPage />}
+            />
+            {/* Đặt trước ":rubricId" cho dễ đọc; React Router vốn đã ưu tiên đoạn tĩnh hơn tham số. */}
+            <Route
+              path="school-admin/rubrics/templates"
+              element={<SchoolAdminRubricTemplatesPage />}
             />
             <Route
               path="school-admin/rubrics/:rubricId"

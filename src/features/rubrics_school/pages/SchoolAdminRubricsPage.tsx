@@ -2,7 +2,7 @@
 
 import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
-import { ClipboardList, Plus, RefreshCw, Search, Filter } from "lucide-react";
+import { ClipboardList, LibraryBig, Plus, RefreshCw, Search, Filter } from "lucide-react";
 
 import { useSearchSchoolRubricsQuery, type SearchRubricFilter } from "../api/useSearchSchoolRubricsQuery";
 import { useFrameworkOptionsQuery, useLanguageOptionsQuery } from "../api/useFilterOptionsQuery";
@@ -94,6 +94,16 @@ export function SchoolAdminRubricsPage() {
           >
             <RefreshCw aria-hidden="true" className={`size-4 ${isFetching ? "animate-spin" : ""}`} />
             Làm mới
+          </button>
+
+          {/* Lối vào thư viện bản mẫu: nằm cạnh nút tạo mới vì đây là chỗ người dùng tìm đến khi
+              cần một bộ tiêu chí mới — soạn từ đầu hay sao từ mẫu là hai cách của cùng một việc. */}
+          <button
+            type="button"
+            onClick={() => navigate('/school-admin/rubrics/templates')}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+          >
+            <LibraryBig className="size-4" /> Sao từ mẫu hệ thống
           </button>
 
           {/* NÚT MỞ MODAL THÊM MỚI */}

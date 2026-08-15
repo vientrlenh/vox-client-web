@@ -1,5 +1,6 @@
 // src/features/rubrics/index.ts
 export { SchoolAdminRubricsPage } from './pages/SchoolAdminRubricsPage';
+export { SchoolAdminRubricTemplatesPage } from './pages/SchoolAdminRubricTemplatesPage';
 export { SchoolAdminRubricDetailPage } from './pages/SchoolAdminRubricDetailPage';
 export { SchoolAdminRubricVersionDetailPage } from './pages/SchoolAdminRubricVersionDetailPage'; // <--- THÊM DÒNG NÀY
 export { SchoolAdminRubricCriterionDetailPage } from './pages/SchoolAdminRubricCriterionDetailPage';

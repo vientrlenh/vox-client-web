@@ -41,6 +41,13 @@ export type RubricVersion = {
   scoringScaleMax: number;
   totalScoreMethod: string;
   createdAt?: string | null;
+  /**
+   * Phiên bản mẫu mà bản này được sao ra; null/thiếu nghĩa là do chính trường soạn.
+   *
+   * Chỉ dùng để đánh dấu xuất xứ. Không tra ngược ra tên bản mẫu được: các cổng đọc rubric của hệ
+   * thống chỉ mở cho SYSTEM_ADMIN, nên phía trường chỉ biết "đây là bản sao", không biết sao từ đâu.
+   */
+  sourceRubricVersionId?: string | null;
 };
 
 export type RubricVersionPage = {

@@ -2,7 +2,7 @@
 
 import { useParams, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, Edit, Plus, ListChecks, Layers, Calculator, Trash2, Archive, Search, Filter, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, Copy, Edit, Plus, ListChecks, Layers, Calculator, Trash2, Archive, Search, Filter, FileSpreadsheet } from 'lucide-react';
 import { useAppSelector } from '@/app/store/hooks';
 
 import { useSchoolRubricQuery } from '../api/useSchoolRubricQuery';
@@ -351,6 +351,16 @@ export function SchoolAdminRubricVersionDetailPage() {
               <span className="inline-flex items-center font-mono rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-500/20">
                 Mã Phiên bản: {version.code}
               </span>
+              {/* Xuất xứ: chỉ nói được "đây là bản sao", không nói được sao từ bản mẫu nào — các cổng
+                  đọc rubric hệ thống chỉ mở cho SYSTEM_ADMIN nên phía trường tra ngược không ra. */}
+              {version.sourceRubricVersionId && (
+                <span
+                  title="Nội dung ban đầu được sao từ thư viện bản mẫu của hệ thống, sau đó trường tự chỉnh sửa."
+                  className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-xs font-bold text-sky-700 ring-1 ring-inset ring-sky-600/20"
+                >
+                  <Copy className="size-3.5" /> Sao từ mẫu hệ thống
+                </span>
+              )}
               <RubricVersionStatusMenu
                 isPending={isChangingStatus || isArchiving}
                 onPublish={handlePublishVersion}
