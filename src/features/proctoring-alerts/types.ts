@@ -12,6 +12,7 @@ export type AlertType =
   | 'PROHIBITED_OBJECT'
   | 'RECONNECT_LOOP'
   | 'RECORDING_INCOMPLETE'
+  | 'RECORDING_TRUNCATED'
   | 'STREAM_DROPPED'
   | 'TRACK_ENDED'
   | 'UNCOOPERATIVE_CANDIDATE'
@@ -144,6 +145,14 @@ export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay
         className: 'border-slate-300 bg-slate-100 text-slate-700',
         label: 'Bản ghi không trọn vẹn',
         severity: 'warning',
+      }
+    // Khác RECORDING_INCOMPLETE ở chỗ bản ghi VẪN xem được: chỉ vài giây cuối là đáng ngờ. Nhãn
+    // phải nói rõ điều đó, nếu không người chấm sẽ tưởng cả bản ghi hỏng và bỏ qua bằng chứng.
+    case 'RECORDING_TRUNCATED':
+      return {
+        className: 'border-slate-300 bg-slate-100 text-slate-700',
+        label: 'Bản ghi cụt đoạn cuối',
+        severity: 'info',
       }
 
     // Tên cũ, chỉ còn trong dữ liệu lịch sử -- không nguồn nào phát chúng nữa. Giữ lại vì sổ bằng
