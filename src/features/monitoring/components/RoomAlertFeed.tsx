@@ -4,6 +4,14 @@ import { getAlertTypeDisplay } from '../types'
 type RoomAlertFeedProps = {
     alerts: AlertView[]
     /**
+     * Mở luồng của học viên này và tua tới đúng lúc cảnh báo xảy ra.
+     *
+     * <p>Bỏ trống thì mỗi dòng chỉ là chữ. Có nó thì sổ cảnh báo thôi làm danh sách để đọc và trở
+     * thành cách điều hướng: mọi cảnh báo đều mang `capturedAt` tuyệt đối, còn trình phát đã có sẵn
+     * ánh xạ giờ thực sang thời gian media, nên "xem lại đúng lúc đó" gần như không tốn gì thêm.
+     */
+    onSelect?: (alert: AlertView) => void
+    /**
      * Đổi một cảnh báo thành tên học viên; trả về id thô nếu chưa ghép được roster.
      *
      * <p>Nhận cả cảnh báo chứ không chỉ `participantId` vì với cảnh báo do AI sinh thì trường đó
@@ -22,7 +30,7 @@ function formatClock(value: string, fallbackAt: number): string {
     })
 }
 
-export function RoomAlertFeed({ alerts, resolveName }: RoomAlertFeedProps) {
+export function RoomAlertFeed({ alerts, onSelect, resolveName }: RoomAlertFeedProps) {
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="text-sm font-black text-slate-950">Cảnh báo</h2>
@@ -35,11 +43,8 @@ export function RoomAlertFeed({ alerts, resolveName }: RoomAlertFeedProps) {
                 <ul className="mt-3 grid max-h-96 gap-2 overflow-y-auto">
                     {alerts.map((alert) => {
                         const display = getAlertTypeDisplay(alert.alertType)
-                        return (
-                            <li
-                                className={`rounded-lg border px-3 py-2 ${display.className}`}
-                                key={`${alert.streamId}-${alert.capturedAt}-${alert.alertType}`}
-                            >
+                        const body = (
+                            <>
                                 <div className="flex items-baseline justify-between gap-2">
                                     <span className="truncate text-xs font-bold">{display.label}</span>
                                     <span className="shrink-0 text-[11px] font-semibold opacity-70">
@@ -49,6 +54,22 @@ export function RoomAlertFeed({ alerts, resolveName }: RoomAlertFeedProps) {
                                 <p className="mt-0.5 truncate text-[11px] font-medium opacity-80">
                                     {resolveName(alert)}
                                 </p>
+                            </>
+                        )
+                        return (
+                            <li key={`${alert.streamId}-${alert.capturedAt}-${alert.alertType}`}>
+                                {onSelect ? (
+                                    <button
+                                        className={`w-full rounded-lg border px-3 py-2 text-left transition hover:brightness-95 ${display.className}`}
+                                        onClick={() => onSelect(alert)}
+                                        title="Xem lại đúng lúc xảy ra"
+                                        type="button"
+                                    >
+                                        {body}
+                                    </button>
+                                ) : (
+                                    <div className={`rounded-lg border px-3 py-2 ${display.className}`}>{body}</div>
+                                )}
                             </li>
                         )
                     })}
