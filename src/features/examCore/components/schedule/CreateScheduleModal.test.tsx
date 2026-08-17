@@ -2,6 +2,16 @@ import { screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { CreateScheduleModal } from './CreateScheduleModal'
 
+/** Gói phủ trọn 2026 — bao ngoài mọi mốc dùng trong file này trừ các case cố ý ra ngoài hạn. */
+let mockSubscription: unknown = {
+  endDate: '2026-12-31',
+  startDate: '2026-01-01',
+  status: 'ACTIVE',
+}
+jest.mock('@/features/subscription_school/api/useMySubscriptionQuery', () => ({
+  useMySubscriptionQuery: () => ({ data: mockSubscription }),
+}))
+
 // Giờ Việt Nam; ca 08:00–09:00 ngày 01/09/2026 dài đúng 1 tiếng.
 const START = '2026-09-01T08:00:00+07:00'
 const END_ONE_HOUR = '2026-09-01T09:00:00+07:00'
@@ -21,6 +31,10 @@ function renderModal(props: Partial<Parameters<typeof CreateScheduleModal>[0]> =
 }
 
 describe('CreateScheduleModal — ràng buộc khung giờ', () => {
+  beforeEach(() => {
+    mockSubscription = { endDate: '2026-12-31', startDate: '2026-01-01', status: 'ACTIVE' }
+  })
+
   it('cho tạo khi ca thi thoả mọi ràng buộc', () => {
     expect(
       renderModal({
@@ -63,6 +77,35 @@ describe('CreateScheduleModal — ràng buộc khung giờ', () => {
       isClassTest: true,
     })
     expect(submit).toBeEnabled()
+  })
+
+  /**
+   * Bài trên lớp không có khung kỳ thi bao ngoài, nhưng ca thi của nó ĐƯỢC GHI NGƯỢC thành
+   * openAt/closeAt của bài — nên hạn gói dịch vụ thay thế đúng vai trò ràng buộc ngoài đó.
+   */
+  it('chặn ca thi của bài trên lớp nằm ngoài hạn gói dịch vụ', () => {
+    mockSubscription = { endDate: '2026-08-31', startDate: '2026-01-01', status: 'ACTIVE' }
+
+    const submit = renderModal({ isClassTest: true })
+
+    expect(submit).toBeDisabled()
+    expect(screen.getByText(/nằm trong hạn gói dịch vụ/)).toBeInTheDocument()
+  })
+
+  it('kẹp picker của bài trên lớp theo hạn gói dịch vụ', () => {
+    renderModal({ isClassTest: true })
+
+    expect(screen.getByLabelText('Bắt đầu')).toHaveAttribute('min', '2026-01-01T00:00')
+    expect(screen.getByLabelText('Kết thúc')).toHaveAttribute('max', '2026-12-31T23:59')
+  })
+
+  it('chặn ca thi của bài trên lớp khi trường chưa có gói đang hoạt động', () => {
+    mockSubscription = null
+
+    const submit = renderModal({ isClassTest: true })
+
+    expect(submit).toBeDisabled()
+    expect(screen.getByText(/chưa có gói dịch vụ đang hoạt động/)).toBeInTheDocument()
   })
 
   it('vẫn chặn khi giờ kết thúc không sau giờ bắt đầu', () => {

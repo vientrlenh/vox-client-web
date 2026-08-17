@@ -6,6 +6,19 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import type { ExamDto } from '@/features/examCore/types'
 import { EditExamModal } from './EditExamModal'
 
+/**
+ * Khung mở/đóng phải nằm trong hạn gói dịch vụ của trường, nên mọi test lưu được đều cần một gói
+ * đang hoạt động. Gói mặc định phủ trọn 2026 — bao ngoài mốc thời gian của `exam()` bên dưới.
+ */
+let mockSubscription: unknown = {
+  endDate: '2026-12-31',
+  startDate: '2026-01-01',
+  status: 'ACTIVE',
+}
+jest.mock('@/features/subscription_school/api/useMySubscriptionQuery', () => ({
+  useMySubscriptionQuery: () => ({ data: mockSubscription }),
+}))
+
 const mockedPut = jest.spyOn(apiClient, 'put')
 const mockedGraphQL = jest.spyOn(graphqlApiClient, 'post')
 
@@ -38,6 +51,7 @@ function payloadOfLastPut() {
 
 describe('EditExamModal', () => {
   beforeEach(() => {
+    mockSubscription = { endDate: '2026-12-31', startDate: '2026-01-01', status: 'ACTIVE' }
     mockedPut.mockReset()
     mockedPut.mockResolvedValue({ data: { data: exam() } })
     mockedGraphQL.mockReset()
@@ -138,6 +152,52 @@ describe('EditExamModal', () => {
     await user.click(screen.getByRole('button', { name: 'Lưu' }))
 
     expect(await screen.findByText('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')).toBeInTheDocument()
+    expect(mockedPut).not.toHaveBeenCalled()
+  })
+
+  it('kẹp picker theo hạn gói dịch vụ của trường', () => {
+    renderWithProviders(<EditExamModal exam={exam()} onClose={jest.fn()} onSaved={jest.fn()} />)
+
+    expect(screen.getByLabelText(/Mở lúc/)).toHaveAttribute('min', '2026-01-01T00:00')
+    expect(screen.getByLabelText(/Đóng lúc/)).toHaveAttribute('max', '2026-12-31T23:59')
+  })
+
+  /** Native min/max chỉ chặn thao tác trên picker, gõ tay vẫn lọt — nên phải chặn lại lúc lưu. */
+  it('chặn lưu khi thời gian đóng bài vượt ra ngoài hạn gói dịch vụ', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<EditExamModal exam={exam()} onClose={jest.fn()} onSaved={jest.fn()} />)
+
+    await user.clear(screen.getByLabelText(/Đóng lúc/))
+    await user.type(screen.getByLabelText(/Đóng lúc/), '2027-01-05T10:00')
+    await user.click(screen.getByRole('button', { name: 'Lưu' }))
+
+    expect(await screen.findByText(/Thời gian đóng bài phải nằm trong hạn gói dịch vụ/)).toBeInTheDocument()
+    expect(mockedPut).not.toHaveBeenCalled()
+  })
+
+  it('chặn lưu khi trường chưa có gói dịch vụ đang hoạt động', async () => {
+    mockSubscription = null
+    const user = userEvent.setup()
+    renderWithProviders(<EditExamModal exam={exam()} onClose={jest.fn()} onSaved={jest.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Lưu' }))
+
+    expect(await screen.findByText(/chưa có gói dịch vụ đang hoạt động/)).toBeInTheDocument()
+    expect(mockedPut).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Trước đây modal này chỉ so hai mốc khi CẢ HAI còn giá trị, nên xoá trắng là gửi null lên —
+   * mà BE giờ bắt buộc phải có đủ khung mở/đóng.
+   */
+  it('chặn lưu khi xoá trắng thời gian mở bài', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<EditExamModal exam={exam()} onClose={jest.fn()} onSaved={jest.fn()} />)
+
+    await user.clear(screen.getByLabelText(/Mở lúc/))
+    await user.click(screen.getByRole('button', { name: 'Lưu' }))
+
+    expect(await screen.findByText('Vui lòng nhập đầy đủ thời gian mở bài và đóng bài.')).toBeInTheDocument()
     expect(mockedPut).not.toHaveBeenCalled()
   })
 

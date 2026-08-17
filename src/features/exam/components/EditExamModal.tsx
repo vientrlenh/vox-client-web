@@ -6,6 +6,11 @@ import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { ExamStreamSetupField } from '@/features/examCore/components/ExamStreamSetupField'
 import { RubricPolicyPicker, type RubricPolicySelection } from '@/features/examCore/components/RubricPolicyPicker'
 import {
+  buildSubscriptionWindowError,
+  getSubscriptionWindowBounds,
+} from '@/features/examCore/utils/subscriptionWindow'
+import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
+import {
   toDateTimeLocalValue,
   toExamStreamSetup,
   toIsoDateTime,
@@ -38,6 +43,8 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
   const [confidenceThreshold, setConfidenceThreshold] = useState<number | null>(
     exam.aiConfidenceThresholdPercent ?? null,
   )
+  const subscription = useMySubscriptionQuery().data
+  const subscriptionBounds = getSubscriptionWindowBounds(subscription)
 
   async function handleSubmit() {
     setErrorMessage(null)
@@ -47,8 +54,19 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
     }
     const openIso = toIsoDateTime(openAt)
     const closeIso = toIsoDateTime(closeAt)
-    if (openIso && closeIso && new Date(openIso).getTime() >= new Date(closeIso).getTime()) {
+    // Khung mở/đóng giờ là bắt buộc ở BE: xoá trắng rồi gửi null chắc chắn ăn 400, và nếu lọt thì
+    // mọi ca thi của kỳ thi này mất luôn cận trên/dưới.
+    if (!openIso || !closeIso) {
+      setErrorMessage('Vui lòng nhập đầy đủ thời gian mở bài và đóng bài.')
+      return
+    }
+    if (new Date(openIso).getTime() >= new Date(closeIso).getTime()) {
       setErrorMessage('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
+      return
+    }
+    const subscriptionWindowError = buildSubscriptionWindowError(openIso, closeIso, subscription)
+    if (subscriptionWindowError) {
+      setErrorMessage(subscriptionWindowError)
       return
     }
     try {
@@ -116,7 +134,10 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
               Mở lúc
               <input
                 className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                max={subscriptionBounds?.max}
+                min={subscriptionBounds?.min}
                 onChange={(event) => setOpenAt(event.target.value)}
+                required
                 type="datetime-local"
                 value={openAt}
               />
@@ -125,7 +146,10 @@ export function EditExamModal({ exam, onClose, onSaved }: EditExamModalProps) {
               Đóng lúc
               <input
                 className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                max={subscriptionBounds?.max}
+                min={subscriptionBounds?.min}
                 onChange={(event) => setCloseAt(event.target.value)}
+                required
                 type="datetime-local"
                 value={closeAt}
               />
