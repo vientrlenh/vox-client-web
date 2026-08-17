@@ -1645,21 +1645,25 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
             : null
 
   // Nhà trường chỉ theo dõi: CTA của họ chỉ được điều hướng tab, không bao giờ gọi mutation.
-  const nextAction = currentStep
-    ? {
-        ctaLabel: currentStep.cta,
-        description: currentStep.todo,
-        onClick: () => selectTab(currentStep.tab),
-        title: currentStep.label,
-      }
-    : canManage && exam.status === 'DRAFT' && scheduleReadiness.ready
+  // Bài đã bắt đầu thì mọi bước còn dở đều đã hết đường làm (`isExamLockedForEditing` khóa hết
+  // tab bên dưới) — mời bấm tiếp chỉ dẫn vào một tab chỉ còn banner báo đã khóa.
+  const nextAction = isExamLockedForEditing(exam.status)
+    ? null
+    : currentStep
       ? {
-          ctaLabel: 'Lên lịch',
-          description: 'Phòng thi, giám khảo và danh sách học sinh đã đủ — bấm lên lịch để chốt ca thi.',
-          onClick: () => void handlePrimaryStatusAction('SCHEDULE'),
-          title: 'Sẵn sàng lên lịch',
+          ctaLabel: currentStep.cta,
+          description: currentStep.todo,
+          onClick: () => selectTab(currentStep.tab),
+          title: currentStep.label,
         }
-      : null
+      : canManage && exam.status === 'DRAFT' && scheduleReadiness.ready
+        ? {
+            ctaLabel: 'Lên lịch',
+            description: 'Phòng thi, giám khảo và danh sách học sinh đã đủ — bấm lên lịch để chốt ca thi.',
+            onClick: () => void handlePrimaryStatusAction('SCHEDULE'),
+            title: 'Sẵn sàng lên lịch',
+          }
+        : null
 
   return (
     <section className="mx-auto max-w-260">

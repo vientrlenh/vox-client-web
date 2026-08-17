@@ -818,21 +818,25 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
             : null
 
   const currentStep = workflow.currentStep
-  const nextAction = currentStep
-    ? {
-        ctaLabel: currentStep.cta,
-        description: currentStep.todo,
-        onClick: () => selectTab(currentStep.tab),
-        title: currentStep.label,
-      }
-    : exam.status === 'DRAFT' && scheduleReadiness.ready
+  // Kỳ thi đã khóa thì mọi bước còn dở đều đã hết đường làm — tab tương ứng chỉ còn banner
+  // "kỳ thi đã bắt đầu". Vẫn giữ nguyên thanh 5 bước để nhìn lại, chỉ bỏ lời mời bấm.
+  const nextAction = examLocked
+    ? null
+    : currentStep
       ? {
-          ctaLabel: 'Lên lịch',
-          description: 'Ca thi, thí sinh và mã đề đã đủ — bấm lên lịch để chốt kỳ thi.',
-          onClick: () => void handleStatusAction(exam.id, 'SCHEDULE'),
-          title: 'Sẵn sàng lên lịch',
+          ctaLabel: currentStep.cta,
+          description: currentStep.todo,
+          onClick: () => selectTab(currentStep.tab),
+          title: currentStep.label,
         }
-      : null
+      : exam.status === 'DRAFT' && scheduleReadiness.ready
+        ? {
+            ctaLabel: 'Lên lịch',
+            description: 'Ca thi, thí sinh và mã đề đã đủ — bấm lên lịch để chốt kỳ thi.',
+            onClick: () => void handleStatusAction(exam.id, 'SCHEDULE'),
+            title: 'Sẵn sàng lên lịch',
+          }
+        : null
 
   return (
     <section className="mx-auto max-w-260">
