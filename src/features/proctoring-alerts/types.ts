@@ -6,15 +6,15 @@
  */
 
 export type AlertType =
+  | 'CAMERA_SIGNAL_LOST'
+  | 'CAMERA_SIGNAL_RESTORED'
   | 'MULTIPLE_PERSONS'
   | 'PERSON_MISSING'
   | 'PHONE_DETECTED'
   | 'PROHIBITED_OBJECT'
-  | 'RECONNECT_LOOP'
   | 'RECORDING_INCOMPLETE'
   | 'RECORDING_TRUNCATED'
   | 'STREAM_DROPPED'
-  | 'TRACK_ENDED'
   | 'UNCOOPERATIVE_CANDIDATE'
   | 'WINDOW_FOCUS_LOST'
 
@@ -122,22 +122,27 @@ export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay
         label: 'Rời khỏi cửa sổ bài thi',
         severity: 'warning',
       }
-    case 'RECONNECT_LOOP':
+    // Máy trạm báo lên: camera ngừng gửi khung hình. Xám (sự cố kỹ thuật) chứ không đỏ (nghi vấn
+    // gian lận) -- trong những giây đầu, rút cáp cố ý và cáp lỏng là không phân biệt được, nên màu
+    // không được kết luận hộ người chấm.
+    case 'CAMERA_SIGNAL_LOST':
       return {
-        className: 'border-amber-200 bg-amber-50 text-amber-700',
-        label: 'Reconnect liên tục',
+        className: 'border-slate-300 bg-slate-100 text-slate-700',
+        label: 'Mất tín hiệu camera',
         severity: 'warning',
+      }
+    // Đóng khoảng của cảnh báo trên. `detail` mang theo thời lượng mất -- đó mới là thứ quyết định
+    // sự việc là sợi cáp lỏng hai mươi giây hay một khoảng trống che hết phần trả lời.
+    case 'CAMERA_SIGNAL_RESTORED':
+      return {
+        className: 'border-slate-300 bg-slate-100 text-slate-700',
+        label: 'Camera có hình trở lại',
+        severity: 'info',
       }
     case 'STREAM_DROPPED':
       return {
         className: 'border-slate-300 bg-slate-100 text-slate-700',
         label: 'Mất kết nối stream',
-        severity: 'warning',
-      }
-    case 'TRACK_ENDED':
-      return {
-        className: 'border-slate-300 bg-slate-100 text-slate-700',
-        label: 'Luồng media kết thúc',
         severity: 'warning',
       }
     case 'RECORDING_INCOMPLETE':
@@ -163,6 +168,21 @@ export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay
       return {
         className: 'border-amber-200 bg-amber-50 text-amber-700',
         label: 'Không hợp tác khi trả lời',
+        severity: 'warning',
+      }
+    // Hai loại này chưa từng có nguồn nào phát -- chúng được khai báo trong từ vựng vox-streaming
+    // nhưng không đoạn code nào bắn, và nay đã bị bỏ khỏi đó. Giữ nhãn phòng khi có bản ghi cũ từ
+    // một phiên bản nào đó từng phát chúng: sổ bằng chứng thì không viết lại lịch sử.
+    case 'TRACK_ENDED':
+      return {
+        className: 'border-slate-300 bg-slate-100 text-slate-700',
+        label: 'Luồng media kết thúc',
+        severity: 'warning',
+      }
+    case 'RECONNECT_LOOP':
+      return {
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
+        label: 'Reconnect liên tục',
         severity: 'warning',
       }
     case 'OBJECT_DETECTED':
