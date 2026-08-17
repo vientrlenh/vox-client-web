@@ -64,6 +64,12 @@ import {
 } from '@/features/examCore/api/mutations'
 import { useMatchingTeacherAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
 import { formatScheduleProgressLabel } from '@/features/examCore/utils/scheduleProgress'
+import {
+  buildSubscriptionWindowError,
+  getSubscriptionWindowBounds,
+  hasActiveSubscriptionPeriod,
+  NO_ACTIVE_SUBSCRIPTION_MESSAGE,
+} from '@/features/examCore/utils/subscriptionWindow'
 import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '@/features/examCore/utils/timeQuota'
 import { buildClassTestQuotaWarning } from '@/features/classTest/utils/classTestTokenQuota'
 import {
@@ -451,6 +457,12 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   const { confirm, dialog } = useConfirmationDialog()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  // Với bài trên lớp, khung mở/đóng CHÍNH LÀ ca thi, nên nó phải nằm trong hạn gói dịch vụ --
+  // BE chặn ở SubscriptionPeriodGuardService, đây là lớp chặn trước.
+  const subscription = useMySubscriptionQuery().data
+  const subscriptionBounds = getSubscriptionWindowBounds(subscription)
+  const hasSubscriptionPeriod = hasActiveSubscriptionPeriod(subscription)
+
   const [selectedRubricVersion, setSelectedRubricVersion] = useState<SelectedRubricVersion | null>(
     locationState?.selectedRubricVersion ?? null,
   )
@@ -532,6 +544,12 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
       setErrorMessage('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
       return
     }
+    // Kẹp min/max ở picker chỉ chặn thao tác chọn, không chặn giá trị gõ/dán tay -- phải kiểm lại.
+    const subscriptionWindowError = buildSubscriptionWindowError(openAtIso, closeAtIso, subscription)
+    if (subscriptionWindowError) {
+      setErrorMessage(subscriptionWindowError)
+      return
+    }
     if (createLockedRef.current || createMutation.isPending) {
       return
     }
@@ -611,6 +629,8 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
             Mở lúc
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              max={subscriptionBounds?.max}
+              min={subscriptionBounds?.min}
               onChange={(event) => setOpenAt(event.target.value)}
               required
               type="datetime-local"
@@ -621,12 +641,22 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
             Đóng lúc
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              max={subscriptionBounds?.max}
+              min={subscriptionBounds?.min}
               onChange={(event) => setCloseAt(event.target.value)}
               required
               type="datetime-local"
               value={closeAt}
             />
           </label>
+          {hasSubscriptionPeriod ? (
+            <p className="text-xs font-medium text-slate-500">
+              Bài kiểm tra phải nằm trong hạn gói dịch vụ của trường: {formatDate(subscription?.startDate)} –{' '}
+              {formatDate(subscription?.endDate)}.
+            </p>
+          ) : (
+            <WarningBanner message={NO_ACTIVE_SUBSCRIPTION_MESSAGE} />
+          )}
           <label className="grid gap-1.5 text-sm font-bold text-slate-700">
             Số lượt thi tối đa
             <input
@@ -1102,6 +1132,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const schedulesQuery = useExamSchedulesQuery(examId ?? null)
   const candidatesQuery = useExamCandidatesQuery(examId ?? null)
   const subscriptionQuery = useMySubscriptionQuery()
+  // Sửa khung mở/đóng ở đây cũng ghi thẳng xuống ca thi, nên vẫn phải nằm trong hạn gói dịch vụ.
+  const subscription = subscriptionQuery.data
+  const detailSubscriptionBounds = getSubscriptionWindowBounds(subscription)
   const subscriptionUsageQuery = useMySubscriptionUsageQuery()
   const myClassTestQuotaAllocationQuery = useMyClassTestQuotaAllocationQuery()
   const quotaPricingQuery = useQuotaPricingQuery()
@@ -1258,6 +1291,11 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     }
     if (new Date(openAtIso).getTime() >= new Date(closeAtIso).getTime()) {
       setErrorMessage('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
+      return
+    }
+    const subscriptionWindowError = buildSubscriptionWindowError(openAtIso, closeAtIso, subscription)
+    if (subscriptionWindowError) {
+      setErrorMessage(subscriptionWindowError)
       return
     }
     try {
@@ -1645,21 +1683,25 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
             : null
 
   // Nhà trường chỉ theo dõi: CTA của họ chỉ được điều hướng tab, không bao giờ gọi mutation.
-  const nextAction = currentStep
-    ? {
-        ctaLabel: currentStep.cta,
-        description: currentStep.todo,
-        onClick: () => selectTab(currentStep.tab),
-        title: currentStep.label,
-      }
-    : canManage && exam.status === 'DRAFT' && scheduleReadiness.ready
+  // Bài đã bắt đầu thì mọi bước còn dở đều đã hết đường làm (`isExamLockedForEditing` khóa hết
+  // tab bên dưới) — mời bấm tiếp chỉ dẫn vào một tab chỉ còn banner báo đã khóa.
+  const nextAction = isExamLockedForEditing(exam.status)
+    ? null
+    : currentStep
       ? {
-          ctaLabel: 'Lên lịch',
-          description: 'Phòng thi, giám khảo và danh sách học sinh đã đủ — bấm lên lịch để chốt ca thi.',
-          onClick: () => void handlePrimaryStatusAction('SCHEDULE'),
-          title: 'Sẵn sàng lên lịch',
+          ctaLabel: currentStep.cta,
+          description: currentStep.todo,
+          onClick: () => selectTab(currentStep.tab),
+          title: currentStep.label,
         }
-      : null
+      : canManage && exam.status === 'DRAFT' && scheduleReadiness.ready
+        ? {
+            ctaLabel: 'Lên lịch',
+            description: 'Phòng thi, giám khảo và danh sách học sinh đã đủ — bấm lên lịch để chốt ca thi.',
+            onClick: () => void handlePrimaryStatusAction('SCHEDULE'),
+            title: 'Sẵn sàng lên lịch',
+          }
+        : null
 
   return (
     <section className="mx-auto max-w-260">
@@ -1816,6 +1858,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               Mở lúc
               <input
                 className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                max={detailSubscriptionBounds?.max}
+                min={detailSubscriptionBounds?.min}
                 onChange={(event) => setEditOpenAt(event.target.value)}
                 required
                 type="datetime-local"
@@ -1826,6 +1870,8 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
               Đóng lúc
               <input
                 className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+                max={detailSubscriptionBounds?.max}
+                min={detailSubscriptionBounds?.min}
                 onChange={(event) => setEditCloseAt(event.target.value)}
                 required
                 type="datetime-local"

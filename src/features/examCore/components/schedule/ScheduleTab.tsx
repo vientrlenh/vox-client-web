@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, FileText, Lock, ShieldCheck, UserPlus } from 'lucide-react'
 import { toApiError } from '@/shared/api'
@@ -19,7 +19,12 @@ import {
   useUpdateScheduleMutation,
   useUpdateScheduleStatusMutation,
 } from '../../api/mutations'
-import { examQueryKeys, useExamCandidatesQuery, useExamSchedulesQuery } from '../../api/queries'
+import {
+  examQueryKeys,
+  useExamCandidatesQuery,
+  useExamSchedulesQuery,
+  useStudentBusySlotsQuery,
+} from '../../api/queries'
 import { getScheduleLabel, type ExamCandidateDto, type ExamPaperDto, type ExamScheduleDto } from '../../types'
 import { AddStudentToRoomModal } from './AddStudentToRoomModal'
 import { CreateScheduleModal } from './CreateScheduleModal'
@@ -90,7 +95,7 @@ export function ScheduleTab({
   const applyPaperAssignmentsMutation = useApplyPaperAssignmentsMutation()
 
   const schedules = schedulesQuery.data ?? []
-  const candidates = candidatesQuery.data ?? []
+  const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
   // Quyền sửa lịch = quyền quản lý + kỳ thi chưa bắt đầu.
   const canEdit = canManage && !locked
 
@@ -107,6 +112,34 @@ export function ScheduleTab({
   const scheduleCandidates = selectedSchedule
     ? candidates.filter((candidate) => candidate.scheduleId === selectedSchedule.id)
     : []
+
+  // Chỉ hỏi backend khi modal thêm học sinh đang mở, và chỉ về những người có thể được thêm vào ca
+  // này (người đã ở trong ca thì không phải hỏi).
+  const activeScheduleId = selectedSchedule?.id
+  const addableCandidates = useMemo(
+    () =>
+      showAddStudentModal && activeScheduleId
+        ? candidates.filter((candidate) => candidate.scheduleId !== activeScheduleId)
+        : [],
+    [candidates, activeScheduleId, showAddStudentModal],
+  )
+  const busySlotsQuery = useStudentBusySlotsQuery(
+    selectedSchedule && showAddStudentModal ? [selectedSchedule.id] : [],
+    addableCandidates.map((candidate) => candidate.studentId),
+  )
+
+  // Làm mờ chứ không lọc bỏ: người dùng cần biết học sinh có tồn tại nhưng đang kẹt, và vì sao.
+  // Đây chỉ là lớp tiện dụng — backend vẫn chặn khi submit.
+  const conflictReasonByCandidateId = useMemo(() => {
+    const busyStudentIds = new Set((busySlotsQuery.data ?? []).map((slot) => slot.studentId))
+    const reasons = new Map<string, string>()
+    for (const candidate of addableCandidates) {
+      if (busyStudentIds.has(candidate.studentId)) {
+        reasons.set(candidate.id, 'Đã có ca thi khác trùng giờ với ca này')
+      }
+    }
+    return reasons
+  }, [addableCandidates, busySlotsQuery.data])
 
   const lockedPapers = papers.filter((paper) => paper.status === 'LOCKED')
   const lockedPaperIds = lockedPapers.map((paper) => paper.id)
@@ -570,6 +603,7 @@ export function ScheduleTab({
       {showAddStudentModal && selectedSchedule ? (
         <AddStudentToRoomModal
           candidates={candidates}
+          conflictReasonByCandidateId={conflictReasonByCandidateId}
           onAssign={(candidateIds) => void handleAssignCandidates(candidateIds)}
           onClose={() => setShowAddStudentModal(false)}
           schedule={selectedSchedule}

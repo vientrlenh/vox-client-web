@@ -521,6 +521,32 @@ export function suggestedRoundFor(
 }
 
 /**
+ * Lý do KHÔNG mở được vòng chấm mới cho một bài, suy từ trạng thái bài. null = gán được.
+ *
+ * <p>Là giao của `suggestedRoundFor` (bài này hợp với vòng nào) và `ADMIN_ASSIGNABLE_ROUNDS`
+ * (admin tự giao được vòng nào) — hai luật đã có sẵn nhưng trước đây chỗ vẽ nút không đọc,
+ * nên bài đã chốt sổ vẫn hiện nút "Phân công" rồi bấm vào ăn 400. BE vẫn là chỗ chốt; đây
+ * chỉ để đừng mời người dùng bấm một nút chắc chắn hỏng.
+ */
+export function assignBlockedReason(
+  status: ExamCandidateResultStatus | null | undefined,
+): string | null {
+  // Không biết trạng thái thì để BE quyết — khóa nút bằng một luật FE dựng trên dữ liệu
+  // thiếu là chặn nhầm cả bài đang giao được.
+  if (status == null) {
+    return null
+  }
+  const suggested = suggestedRoundFor(status)
+  if (suggested === null) {
+    return 'Bài đã chốt sổ — không mở thêm vòng chấm nào nữa.'
+  }
+  if (!ADMIN_ASSIGNABLE_ROUNDS.includes(suggested)) {
+    return 'Bài đang trong luồng phúc khảo — giao giám khảo ở màn đơn phúc khảo.'
+  }
+  return null
+}
+
+/**
  * Nhãn của MỘT câu: "Part 1 · Câu 2". Chỉ ghép số câu khi phần đó có nhiều hơn một
  * câu — bài mỗi phần một câu thì thêm "· Câu 1" chỉ làm nhãn dài ra vô ích.
  *
