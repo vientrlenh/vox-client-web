@@ -15,6 +15,7 @@ import type {
   ProctorCandidateSummaryDto,
   ProctorScheduleSummaryDto,
   SchoolRoomLite,
+  StudentBusySlotDto,
 } from '../types'
 
 const EXAM_MEMBER_FIELDS = `
@@ -327,6 +328,18 @@ const PROCTOR_BUSY_SLOTS_QUERY = `
   }
 `
 
+const STUDENT_BUSY_SLOTS_QUERY = `
+  query StudentBusySlots($scheduleIds: [ID!]!, $studentIds: [ID!]!) {
+    studentBusySlots(scheduleIds: $scheduleIds, studentIds: $studentIds) {
+      studentId
+      targetScheduleId
+      busyScheduleId
+      startDate
+      endDate
+    }
+  }
+`
+
 const MY_PROCTOR_SCHEDULES_QUERY = `
   query MyProctorSchedules {
     myProctorSchedules {
@@ -570,6 +583,8 @@ export const examQueryKeys = {
   exams: (filters: Record<string, unknown>) => [...examQueryKeys.all, 'exams', filters] as const,
   proctorBusySlots: (scheduleId: string | null, teacherIds: string[]) =>
     [...examQueryKeys.all, 'proctor-busy-slots', scheduleId, teacherIds] as const,
+  studentBusySlots: (scheduleIds: string[], studentIds: string[]) =>
+    [...examQueryKeys.all, 'student-busy-slots', scheduleIds, studentIds] as const,
   proctorCandidates: (scheduleId: string | null) => [...examQueryKeys.all, 'proctor-candidates', scheduleId] as const,
   proctorSchedules: () => [...examQueryKeys.all, 'proctor-schedules'] as const,
   schedules: (examId: string | null) => [...examQueryKeys.all, 'schedules', examId] as const,
@@ -737,6 +752,26 @@ export function useProctorBusySlotsQuery(scheduleId: string | null, teacherIds: 
     enabled: Boolean(scheduleId) && teacherIds.length > 0,
     queryFn: () => fetchProctorBusySlots(scheduleId as string, teacherIds),
     queryKey: examQueryKeys.proctorBusySlots(scheduleId, teacherIds),
+  })
+}
+
+/**
+ * Trong nhóm học sinh đang xét, ai bận vào đúng khung giờ của từng ca thi đang cân nhắc. Chỉ để làm
+ * mờ sẵn kèm lý do — backend mới là chỗ chặn thật (ExamScheduleCandidateConflictValidator).
+ */
+async function fetchStudentBusySlots(scheduleIds: string[], studentIds: string[]) {
+  const data = await graphQLRequest<{ studentBusySlots: StudentBusySlotDto[] }>(STUDENT_BUSY_SLOTS_QUERY, {
+    scheduleIds,
+    studentIds,
+  })
+  return data.studentBusySlots
+}
+
+export function useStudentBusySlotsQuery(scheduleIds: string[], studentIds: string[]) {
+  return useQuery({
+    enabled: scheduleIds.length > 0 && studentIds.length > 0,
+    queryFn: () => fetchStudentBusySlots(scheduleIds, studentIds),
+    queryKey: examQueryKeys.studentBusySlots(scheduleIds, studentIds),
   })
 }
 

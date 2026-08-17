@@ -4,6 +4,12 @@ import { getCandidateName, getScheduleLabel, type ExamCandidateDto, type ExamSch
 
 type AddStudentToRoomModalProps = {
   candidates: ExamCandidateDto[]
+  /**
+   * Học sinh nào đã có ca thi khác trùng giờ với ca này, kèm lý do hiển thị. Làm mờ chứ không lọc
+   * bỏ: người dùng cần biết học sinh có tồn tại nhưng đang kẹt, và vì sao. Đây chỉ là lớp tiện
+   * dụng — backend vẫn chặn khi submit.
+   */
+  conflictReasonByCandidateId?: Map<string, string>
   onAssign: (candidateIds: string[]) => void
   onClose: () => void
   /** Mọi ca của kỳ thi — để chọn nguồn khi muốn chuyển học sinh từ ca khác sang. */
@@ -17,6 +23,7 @@ type SourceScheduleId = string | null
 
 export function AddStudentToRoomModal({
   candidates,
+  conflictReasonByCandidateId,
   onAssign,
   onClose,
   schedule,
@@ -53,8 +60,12 @@ export function AddStudentToRoomModal({
     )
   }, [keyword, pool])
 
-  const visibleIds = visible.map((candidate) => candidate.id)
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+  // Người trùng giờ bị loại khỏi "chọn tất cả": bấm một phát rồi gửi lên cả người backend sẽ chặn
+  // sẽ làm hỏng nguyên lượt (xếp hàng loạt là all-or-nothing).
+  const selectableIds = visible
+    .filter((candidate) => !conflictReasonByCandidateId?.has(candidate.id))
+    .map((candidate) => candidate.id)
+  const allVisibleSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id))
 
   function toggle(candidateId: string) {
     setSelectedIds((current) => {
@@ -73,9 +84,9 @@ export function AddStudentToRoomModal({
     setSelectedIds((current) => {
       const next = new Set(current)
       if (allVisibleSelected) {
-        visibleIds.forEach((id) => next.delete(id))
+        selectableIds.forEach((id) => next.delete(id))
       } else {
-        visibleIds.forEach((id) => next.add(id))
+        selectableIds.forEach((id) => next.add(id))
       }
       return next
     })
@@ -142,7 +153,7 @@ export function AddStudentToRoomModal({
             />
           </div>
 
-          {visible.length > 0 ? (
+          {selectableIds.length > 0 ? (
             <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
               <input
                 checked={allVisibleSelected}
@@ -150,7 +161,7 @@ export function AddStudentToRoomModal({
                 onChange={toggleAllVisible}
                 type="checkbox"
               />
-              Chọn tất cả {visible.length} kết quả đang hiện
+              Chọn tất cả {selectableIds.length} kết quả đang hiện
             </label>
           ) : null}
         </div>
@@ -162,28 +173,47 @@ export function AddStudentToRoomModal({
             </p>
           ) : (
             <div className="grid gap-2 py-2">
-              {visible.map((candidate) => (
-                <label
-                  className={[
-                    'flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition',
-                    selectedIds.has(candidate.id)
-                      ? 'border-indigo-300 bg-indigo-50'
-                      : 'border-slate-200 hover:bg-slate-50',
-                  ].join(' ')}
-                  key={candidate.id}
-                >
-                  <input
-                    checked={selectedIds.has(candidate.id)}
-                    className="size-4 shrink-0 accent-indigo-600"
-                    onChange={() => toggle(candidate.id)}
-                    type="checkbox"
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-bold text-slate-900">{getCandidateName(candidate)}</div>
-                    <div className="truncate text-xs text-slate-500">{candidate.student?.email ?? '-'}</div>
-                  </div>
-                </label>
-              ))}
+              {visible.map((candidate) => {
+                const conflictReason = conflictReasonByCandidateId?.get(candidate.id)
+
+                return (
+                  <label
+                    className={[
+                      'flex items-center gap-3 rounded-xl border p-3 transition',
+                      conflictReason ? 'cursor-not-allowed border-slate-200 bg-slate-50' : 'cursor-pointer',
+                      !conflictReason && selectedIds.has(candidate.id)
+                        ? 'border-indigo-300 bg-indigo-50'
+                        : conflictReason
+                          ? ''
+                          : 'border-slate-200 hover:bg-slate-50',
+                    ].join(' ')}
+                    key={candidate.id}
+                    title={conflictReason}
+                  >
+                    <input
+                      checked={selectedIds.has(candidate.id)}
+                      className="size-4 shrink-0 accent-indigo-600"
+                      disabled={Boolean(conflictReason)}
+                      onChange={() => toggle(candidate.id)}
+                      type="checkbox"
+                    />
+                    <div className="min-w-0">
+                      <div
+                        className={[
+                          'truncate text-sm font-bold',
+                          conflictReason ? 'text-slate-400' : 'text-slate-900',
+                        ].join(' ')}
+                      >
+                        {getCandidateName(candidate)}
+                      </div>
+                      <div className="truncate text-xs text-slate-500">{candidate.student?.email ?? '-'}</div>
+                      {conflictReason ? (
+                        <div className="truncate text-xs font-semibold text-amber-600">{conflictReason}</div>
+                      ) : null}
+                    </div>
+                  </label>
+                )
+              })}
             </div>
           )}
         </div>
