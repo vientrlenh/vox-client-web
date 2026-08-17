@@ -12,10 +12,11 @@ export function TeacherMonitoringRoomsPage() {
           className="mt-2 text-3xl font-black tracking-0 text-slate-950"
           id="teacher-monitoring-title"
         >
-          Kỳ thi được phân công
+          Được phân công
         </h1>
         <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-          Các kỳ thi bạn chủ trì đang diễn ra. Nhấn vào một kỳ thi để chọn phòng giám sát
+          Kỳ thi bạn chủ trì và bài kiểm tra trên lớp của bạn đang diễn ra. Nhấn vào một mục để chọn
+          phòng giám sát
         </p>
       </div>
 
