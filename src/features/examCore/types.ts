@@ -142,10 +142,11 @@ export const EXAM_STREAM_SETUPS: ExamStreamSetupOption[] = [
     value: 'SCREEN_ONLY',
   },
   {
-    // Ứng dụng thi trên máy học viên hiện luôn bật cả hai (ExamSessionBootstrapService không gửi
-    // loại ưu tiên), nên lựa chọn này tạm thời cho ra kết quả giống "bắt buộc cả hai". Nói thẳng
-    // trong UI thay vì để nó hứa một điều hệ thống chưa làm được.
-    hint: 'Học viên tự chọn camera hoặc màn hình. Chưa có hiệu lực: ứng dụng thi hiện vẫn bật cả hai.',
+    // Học viên chọn ở màn kiểm tra thiết bị, và lựa chọn bị CHỐT xuống phiên thi ngay lần phát
+    // stream token đầu tiên -- không đổi được giữa chừng. Nói rõ điều đó ở đây vì nó là thứ giáo
+    // viên cần cân nhắc: mức giám sát của một bài thi cụ thể do học viên quyết, một lần, và mặc
+    // định của họ là cả hai.
+    hint: 'Học viên chọn camera, màn hình hoặc cả hai khi vào thi. Chốt một lần, không đổi được giữa chừng.',
     label: 'Cho học viên tự chọn',
     value: 'BOTH_STUDENT_CHOICE',
   },

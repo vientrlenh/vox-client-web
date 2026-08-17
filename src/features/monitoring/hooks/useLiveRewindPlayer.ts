@@ -114,6 +114,29 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
     const [status, setStatus] = useState<PlayerStatus>({ kind: 'idle', message: '' })
     const [seek, setSeek] = useState<null | SeekReadout>(null)
     const [isFollowingLive, setIsFollowingLive] = useState(true)
+    /**
+     * Vị trí con trượt trong lúc NGƯỜI DÙNG đang kéo, tách khỏi `seek.playheadOffset`.
+     *
+     * <p>Không có nó thì nhịp vẽ lại 500ms ghi đè vị trí thumb giữa hai bước kéo, và con trượt giật
+     * ngược về playhead ngay dưới ngón tay.
+     */
+    const [dragOffset, setDragOffset] = useState<null | number>(null)
+    /**
+     * Mốc giám thị rời khỏi mép live, null khi đang bám live.
+     *
+     * <p>Tồn tại để phía trên SUY RA được "có cảnh báo nào xảy ra sau khi tôi ngừng xem hiện tại
+     * không" -- một phép so sánh thuần, thay cho việc theo dõi cảnh báo bằng effect + state.
+     * Cập nhật theo hàm (`prev ?? now`) chứ không ghi đè: mỗi lần kéo thanh tua tiếp mà đặt lại mốc
+     * sẽ xoá mất đúng cảnh báo vừa bỏ lỡ.
+     */
+    const [leftLiveAtMs, setLeftLiveAtMs] = useState<null | number>(null)
+    const [isMuted, setIsMuted] = useState(false)
+    const [volume, setVolumeState] = useState(1)
+    /**
+     * Trình duyệt chặn autoplay. Phải lộ ra ngoài vì panel không còn `controls` mặc định để người
+     * xem tự bấm phát -- không có đường thoát này thì màn hình đứng im mà không nói tại sao.
+     */
+    const [autoplayBlocked, setAutoplayBlocked] = useState(false)
 
     useEffect(() => {
         tokenRef.current = token
@@ -198,8 +221,21 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         seekDomainRef.current = null
         followingLiveRef.current = true
         setIsFollowingLive(true)
+        setLeftLiveAtMs(null)
         setSeek(null)
+        setDragOffset(null)
+        setAutoplayBlocked(false)
         setStatus({ kind: 'loading', message: 'Đang tải luồng…' })
+
+        // Phát tường minh thay vì chỉ dựa vào thuộc tính `autoplay`: thuộc tính đó không trả về
+        // promise nên một lần bị chặn sẽ im lặng tuyệt đối. Panel đã bỏ `controls` mặc định, nên
+        // nếu không bắt được ở đây thì người xem ngồi trước khung hình đứng mà không có nút nào bấm.
+        const tryPlay = () => {
+            video.play().then(
+                () => setAutoplayBlocked(false),
+                () => setAutoplayBlocked(true),
+            )
+        }
 
         // Chỉ là token khởi tạo. Mọi request sau đó - kể cả manifest hls.js tự poll lại - đều được
         // xhrSetup ghi đè bằng `tokenRef.current`, nên URL này cũ đi không sao.
@@ -215,7 +251,10 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 usingNativeHlsRef.current = true
                 video.src = url
-                video.onloadedmetadata = () => setStatus({ kind: 'playing', message: '' })
+                video.onloadedmetadata = () => {
+                    setStatus({ kind: 'playing', message: '' })
+                    tryPlay()
+                }
                 video.onerror = () =>
                     setStatus({
                         kind: 'error',
@@ -249,6 +288,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 mediaErrorRecoveries = 0
                 setStatus({ kind: 'playing', message: '' })
+                tryPlay()
             })
 
             // Bắn ở MỌI lần nạp lại playlist, không chỉ lần đầu - đây là nơi duy nhất phản ánh vùng
@@ -379,12 +419,27 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         draggingRef.current = true
         followingLiveRef.current = false
         setIsFollowingLive(false)
+        setLeftLiveAtMs((previous) => previous ?? Date.now())
+    }, [])
+
+    /**
+     * Người dùng đang kéo: CHỈ dời con trượt, không tua.
+     *
+     * <p>Tách khỏi `onScrubCommit` vì React bắn `onChange` của `input[type=range]` ở MỖI bước di
+     * chuyển chứ không phải lúc thả tay. Tua ngay tại đây nghĩa là kéo qua một ca thi 40 phút sẽ
+     * phát ra hàng trăm lệnh seek, mỗi lệnh khiến hls.js xả buffer và tải lại fragment -- thanh tua
+     * trở nên gần như không dùng được đúng lúc cần nó nhất.
+     */
+    const onScrubMove = useCallback((offsetSecs: number) => {
+        draggingRef.current = true
+        setDragOffset(offsetSecs)
     }, [])
 
     /** Tua tới `offsetSecs` giây kể từ lúc stream bắt đầu - chính là đơn vị của thanh trượt. */
     const onScrubCommit = useCallback(
         (offsetSecs: number) => {
             draggingRef.current = false
+            setDragOffset(null)
             const video = videoRef.current
             const dvr = dvrRangeRef.current
             const domain = seekDomainRef.current
@@ -402,9 +457,44 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         [dateToMedia],
     )
 
+    /**
+     * Tua tới một MỐC GIỜ THỰC. Đây là thứ biến một cảnh báo thành điều hướng: cảnh báo mang
+     * `capturedAt` tuyệt đối, còn `wallAnchorRef` đã có sẵn ánh xạ giờ thực sang thời gian media.
+     *
+     * @returns
+     * `unavailable` khi chưa dựng được ánh xạ (playlist chưa có PROGRAM-DATE-TIME, hoặc trình phát
+     * còn đang tải) -- phía gọi nên thử lại chứ đừng báo lỗi. `out-of-range` khi mốc đó đã trôi ra
+     * ngoài cửa sổ tua: KHÔNG kẹp thầm về mép, vì nhảy tới một chỗ khác chỗ được bấm mà không nói gì
+     * là đúng kiểu làm người xem mất lòng tin vào thanh tua.
+     */
+    const seekToDate = useCallback((dateMs: number): 'ok' | 'out-of-range' | 'unavailable' => {
+        const video = videoRef.current
+        const dvr = dvrRangeRef.current
+        if (!video || !dvr || !wallAnchorRef.current || !Number.isFinite(dateMs)) {
+            return 'unavailable'
+        }
+
+        const anchor = wallAnchorRef.current
+        const target = anchor.mediaTime + (dateMs - anchor.dateMs) / 1000
+        const safeEnd = Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS)
+        if (target < dvr.start || target > dvr.end) {
+            return 'out-of-range'
+        }
+
+        draggingRef.current = false
+        setDragOffset(null)
+        followingLiveRef.current = false
+        setIsFollowingLive(false)
+        setLeftLiveAtMs((previous) => previous ?? Date.now())
+        video.currentTime = Math.min(safeEnd, Math.max(dvr.start + 0.05, target))
+        return 'ok'
+    }, [])
+
     const goLive = useCallback(() => {
         followingLiveRef.current = true
         setIsFollowingLive(true)
+        setLeftLiveAtMs(null)
+        setDragOffset(null)
         const video = videoRef.current
         const dvr = dvrRangeRef.current
         if (video && dvr) {
@@ -412,5 +502,60 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         }
     }, [])
 
-    return { goLive, isFollowingLive, onScrubCommit, onScrubStart, seek, status, videoRef }
+    const toggleMute = useCallback(() => {
+        const video = videoRef.current
+        if (!video) {
+            return
+        }
+        video.muted = !video.muted
+        setIsMuted(video.muted)
+    }, [])
+
+    const setVolume = useCallback((next: number) => {
+        const video = videoRef.current
+        const clamped = Math.min(1, Math.max(0, next))
+        setVolumeState(clamped)
+        if (!video) {
+            return
+        }
+        video.volume = clamped
+        // Kéo âm lượng lên thì bỏ tắt tiếng luôn: để nguyên `muted` sẽ khiến thanh nhích mà vẫn
+        // không nghe được gì, và người xem kết luận là luồng không có tiếng.
+        if (clamped > 0 && video.muted) {
+            video.muted = false
+            setIsMuted(false)
+        }
+    }, [])
+
+    /** Phát lại sau khi trình duyệt chặn autoplay -- chỉ dùng cho đúng tình huống đó. */
+    const resume = useCallback(() => {
+        const video = videoRef.current
+        if (!video) {
+            return
+        }
+        video.play().then(
+            () => setAutoplayBlocked(false),
+            () => setAutoplayBlocked(true),
+        )
+    }, [])
+
+    return {
+        autoplayBlocked,
+        dragOffset,
+        goLive,
+        isFollowingLive,
+        isMuted,
+        leftLiveAtMs,
+        onScrubCommit,
+        onScrubMove,
+        onScrubStart,
+        resume,
+        seek,
+        seekToDate,
+        setVolume,
+        status,
+        toggleMute,
+        videoRef,
+        volume,
+    }
 }
