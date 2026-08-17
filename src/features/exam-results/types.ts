@@ -45,7 +45,8 @@ export type ExamResultSectionDto = {
 }
 
 export type ExamResultItemDto = {
-  itemScore: number
+  /** Null khi câu chưa được chấm — bài vẫn trả về câu để hiện bản ghi bài nói. */
+  itemScore: number | null
   paperItemId: string
   /**
    * Đề bài, do BE trả thẳng từ bảng questions. Đừng quay lại cách cũ là suy ra từ
@@ -55,7 +56,8 @@ export type ExamResultItemDto = {
   questionText?: string | null
   responseId: string
   sectionId: string
-  weightedScore: number
+  /** Null khi câu chưa được chấm. */
+  weightedScore: number | null
 }
 
 export type ExamCandidateResultDto = {
@@ -160,13 +162,17 @@ export type ExamItemEvaluationDto = {
   evaluatedAt?: string | null
   feedbackSummary?: string | null
   gradedByModel?: string | null
-  id: string
-  itemScore: number
+  /**
+   * Null khi câu CHƯA có bản chấm nào. Đây là tín hiệu "chưa chấm" — đừng suy từ việc thiếu
+   * điểm, vì điểm 0 hợp lệ cũng thiếu điểm theo nghĩa đó. Lúc này chỉ `turns` có dữ liệu.
+   */
+  id: string | null
+  itemScore: number | null
   markedInvalid: boolean
   overallConfidence?: number | null
   paperItemId: string
   promptVersion?: string | null
-  rawItemScore: number
+  rawItemScore: number | null
   requiresHumanReview: boolean
   requiresRetake: boolean
   reviewReasonCode?: string | null

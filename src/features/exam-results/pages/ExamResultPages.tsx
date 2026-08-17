@@ -566,6 +566,45 @@ function SectionOverview({ result }: { result: ExamCandidateResultDto }) {
   )
 }
 
+/**
+ * Bản ghi bài nói của một câu: audio + transcript từng lượt.
+ *
+ * Tách riêng vì nó phải hiện ở CẢ hai nhánh — câu đã chấm và câu chưa chấm. Trước đây khối
+ * này nằm lọt trong nhánh "đã có evaluation", nên bài bị buộc kết thúc rồi gỡ vi phạm không
+ * thấy audio lẫn transcript, dù màn chấm vẫn hiện đủ.
+ */
+function TurnList({ turns }: { turns: ExamItemEvaluationDto['turns'] }) {
+  return (
+    <div className="grid gap-4">
+      {turns.map((turn) => (
+        <div className="rounded-xl border border-slate-200 p-4" key={turn.id}>
+          <div>
+            <div>
+              <p className="text-sm font-extrabold text-slate-900">
+                {turn.turnType === 'FOLLOWUP' ? `Follow-up ${turn.turnOrder}` : `Turn ${turn.turnOrder}`}
+              </p>
+              {turn.promptText ? <p className="mt-1 text-sm leading-6 text-slate-600">{turn.promptText}</p> : null}
+            </div>
+          </div>
+
+          {turn.audioUrl ? (
+            <audio className="mt-3 w-full" controls preload="none" src={turn.audioUrl}>
+              Trình duyệt của bạn không hỗ trợ phát âm thanh.
+            </audio>
+          ) : null}
+
+          <div className="mt-4">
+            <WordFeedbackText
+              fallbackTranscript={turn.transcript}
+              words={Array.isArray(turn.wordFeedback) ? turn.wordFeedback : []}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function QuestionEvaluationCard({
   evaluation,
   itemResult,
@@ -621,7 +660,9 @@ export function QuestionEvaluationCard({
           <p className="mt-1 text-sm leading-6 text-slate-600">{questionText ?? 'Không có nội dung câu hỏi.'}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {itemResult ? (
+          {/* Câu chưa chấm thì KHÔNG hiện huy hiệu điểm: `formatScore(null)` sẽ in ra một con
+              số trông như điểm thật. Thay bằng nhãn nói đúng tình trạng. */}
+          {itemResult && itemResult.itemScore != null ? (
             <StatusBadge
               label={`Điểm câu ${formatScore(itemResult.itemScore)}${scaleSuffixOf(scoringScaleMax)}`}
               tone={getResultScoreTone(
@@ -629,8 +670,11 @@ export function QuestionEvaluationCard({
               )}
             />
           ) : null}
-          {itemResult ? (
+          {itemResult && itemResult.weightedScore != null ? (
             <StatusBadge label={`Quy đổi ${formatScore(itemResult.weightedScore)}`} tone="violet" />
+          ) : null}
+          {itemResult && itemResult.itemScore == null ? (
+            <StatusBadge label="Chưa chấm" tone="warning" />
           ) : null}
           <ChevronDown
             aria-hidden="true"
@@ -641,8 +685,18 @@ export function QuestionEvaluationCard({
 
       {open ? (
         <div className="border-t border-slate-100 px-4 py-4">
-          {!evaluation || !display ? (
-            <p className="text-sm text-slate-400">Chưa có evaluation cho câu trả lời này.</p>
+          {/* `evaluation.id == null` là tín hiệu "chưa ai chấm câu này" do BE gửi. Không suy từ
+              việc thiếu điểm — điểm 0 hợp lệ cũng thiếu điểm theo nghĩa đó. Chưa chấm thì vẫn
+              hiện bản ghi bài nói: nó là bằng chứng, không phải điểm. */}
+          {!evaluation || evaluation.id == null || !display ? (
+            <div className="grid gap-4">
+              <p className="text-sm text-slate-400">
+                {evaluation && evaluation.turns.length > 0
+                  ? 'Câu này chưa được chấm. Dưới đây là bản ghi bài nói của thí sinh.'
+                  : 'Chưa có dữ liệu chấm cho câu trả lời này.'}
+              </p>
+              {evaluation && evaluation.turns.length > 0 ? <TurnList turns={evaluation.turns} /> : null}
+            </div>
           ) : (
             <div className="grid gap-5">
               {isStudentView ? (
@@ -707,33 +761,7 @@ export function QuestionEvaluationCard({
               </div>
               )}
 
-              <div className="grid gap-4">
-                {evaluation.turns.map((turn) => (
-                  <div className="rounded-xl border border-slate-200 p-4" key={turn.id}>
-                    <div>
-                      <div>
-                        <p className="text-sm font-extrabold text-slate-900">
-                          {turn.turnType === 'FOLLOWUP' ? `Follow-up ${turn.turnOrder}` : `Turn ${turn.turnOrder}`}
-                        </p>
-                        {turn.promptText ? <p className="mt-1 text-sm leading-6 text-slate-600">{turn.promptText}</p> : null}
-                      </div>
-                    </div>
-
-                    {turn.audioUrl ? (
-                      <audio className="mt-3 w-full" controls preload="none" src={turn.audioUrl}>
-                        Trình duyệt của bạn không hỗ trợ phát âm thanh.
-                      </audio>
-                    ) : null}
-
-                    <div className="mt-4">
-                      <WordFeedbackText
-                        fallbackTranscript={turn.transcript}
-                        words={Array.isArray(turn.wordFeedback) ? turn.wordFeedback : []}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <TurnList turns={evaluation.turns} />
 
               <div className="grid gap-3 md:grid-cols-2">
                 {evaluation.criteria.map((criterion) => (
