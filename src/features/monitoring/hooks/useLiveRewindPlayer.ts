@@ -20,6 +20,28 @@ const SEEK_TICK_MS = 500
 const MAX_MEDIA_ERROR_RECOVERIES = 3
 
 /**
+ * Số target duration mà hls.js cố tình đậu playhead lùi lại khỏi mép playlist.
+ *
+ * <p>Khai báo thành hằng thay vì viết thẳng vào config vì dung sai "coi như live" bên dưới phải suy
+ * ra TỪ nó: hai con số rời nhau sẽ lệch, và lúc lệch thì trạng thái live không bao giờ đúng.
+ */
+const LIVE_SYNC_DURATION_COUNT = 3
+
+/**
+ * Trong khoảng này thì coi như đang ở hiện tại.
+ *
+ * <p>Phải LỚN hơn `LIVE_SYNC_DURATION_COUNT`, không phải bằng: ngay cả khi bám live hoàn hảo,
+ * playhead vẫn nằm sau mép playlist đúng `LIVE_SYNC_DURATION_COUNT` nhịp. Lấy dung sai bằng đúng số
+ * đó nghĩa là "đang ở live" không bao giờ true. Cộng thêm một nhịp để bù việc cửa sổ trượt: mép
+ * playlist nhảy lên một segment mỗi lần server đóng file, nên khoảng cách dao động trong một nhịp mà
+ * không phải do người xem làm gì.
+ */
+const LIVE_EDGE_TOLERANCE_COUNT = LIVE_SYNC_DURATION_COUNT + 1
+
+/** Khớp FFMPEG_INGEST_HLS_SEGMENT_SECONDS mặc định phía vox-streaming. Chỉ dùng khi chưa đọc được playlist. */
+const DEFAULT_TARGET_DURATION_SECS = 4
+
+/**
  * `getStartDate()` là API riêng của Safari (bản đọc #EXT-X-PROGRAM-DATE-TIME của nền tảng) nên
  * không có trong `lib.dom`. Khai báo optional để chỗ dùng buộc phải kiểm tra trước khi gọi.
  */
@@ -33,6 +55,16 @@ export type PlayerStatus = {
 export type SeekReadout = {
     /** Mốc thời gian tuyệt đối có dựng được không (cần PROGRAM-DATE-TIME và giờ bắt đầu stream). */
     absolute: boolean
+    /**
+     * Có đang ở hiện tại hay không -- ĐO ĐƯỢC, không phải ý định của người xem.
+     *
+     * <p>Đây là thứ thay cho cờ "đang bám live" trước đây. Cờ đó chỉ đổi khi giám thị tự kéo thanh
+     * tua, nên một luồng bị stall rồi trôi lại phía sau vẫn tự nhận là đang trực tiếp - đúng cái
+     * trường hợp nguy hiểm nhất thì lại không có cảnh báo nào.
+     */
+    atLiveEdge: boolean
+    /** Khoảng cách từ playhead tới mép vùng tua, giây. Không âm. */
+    behindSecs: number
     domainEndOffset: number
     dvrEndOffset: number
     dvrStartOffset: number
@@ -99,7 +131,13 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
     /** Miền thời gian tuyệt đối thanh trượt đang vẽ. Đóng băng suốt thao tác kéo. */
     const seekDomainRef = useRef<null | { absolute: boolean; endMs: number; startMs: number }>(null)
     const draggingRef = useRef(false)
-    const followingLiveRef = useRef(true)
+    /**
+     * `#EXT-X-TARGETDURATION` của playlist đang phát. Đọc từ server thay vì viết cứng vì độ dài
+     * segment là cấu hình được (`FFMPEG_INGEST_HLS_SEGMENT_SECONDS`), và mọi ngưỡng live ở đây đều là
+     * bội số của nó -- viết cứng 4 giây thì một cụm đổi sang segment 6 giây sẽ báo "đang xem lại"
+     * suốt buổi thi.
+     */
+    const targetDurationRef = useRef(DEFAULT_TARGET_DURATION_SECS)
     const tokenRef = useRef<string | undefined>(token)
     /**
      * Đọc qua ref vì cùng một lý do với `token`: `stream` là object mới sau MỖI sự kiện frame (xem
@@ -113,7 +151,6 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
 
     const [status, setStatus] = useState<PlayerStatus>({ kind: 'idle', message: '' })
     const [seek, setSeek] = useState<null | SeekReadout>(null)
-    const [isFollowingLive, setIsFollowingLive] = useState(true)
     /**
      * Vị trí con trượt trong lúc NGƯỜI DÙNG đang kéo, tách khỏi `seek.playheadOffset`.
      *
@@ -122,12 +159,16 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
      */
     const [dragOffset, setDragOffset] = useState<null | number>(null)
     /**
-     * Mốc giám thị rời khỏi mép live, null khi đang bám live.
+     * Mốc giám thị rời khỏi mép live, null khi đang ở hiện tại.
      *
      * <p>Tồn tại để phía trên SUY RA được "có cảnh báo nào xảy ra sau khi tôi ngừng xem hiện tại
      * không" -- một phép so sánh thuần, thay cho việc theo dõi cảnh báo bằng effect + state.
      * Cập nhật theo hàm (`prev ?? now`) chứ không ghi đè: mỗi lần kéo thanh tua tiếp mà đặt lại mốc
      * sẽ xoá mất đúng cảnh báo vừa bỏ lỡ.
+     *
+     * <p>Đặt từ nhịp đo trong `tick`, không từ hành động kéo: rời khỏi hiện tại vì stall cũng là rời
+     * khỏi hiện tại, và đó mới là trường hợp giám thị không tự biết. Dùng `Date.now()` ở đây là đúng
+     * chỗ -- nó chỉ đem so với `receivedAt` của cảnh báo, cũng là mốc đóng bởi máy này.
      */
     const [leftLiveAtMs, setLeftLiveAtMs] = useState<null | number>(null)
     const [isMuted, setIsMuted] = useState(false)
@@ -219,8 +260,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         dvrRangeRef.current = null
         wallAnchorRef.current = null
         seekDomainRef.current = null
-        followingLiveRef.current = true
-        setIsFollowingLive(true)
+        targetDurationRef.current = DEFAULT_TARGET_DURATION_SECS
         setLeftLiveAtMs(null)
         setSeek(null)
         setDragOffset(null)
@@ -270,7 +310,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         } else {
             usingNativeHlsRef.current = false
             const hls = new Hls({
-                liveSyncDurationCount: 3,
+                liveSyncDurationCount: LIVE_SYNC_DURATION_COUNT,
                 // Mọi request tới route /live/ - cả manifest hls.js tự poll lại lẫn các URL init/
                 // fragment mà manifest trỏ tới - đều được gắn token mới nhất. Nhờ vậy việc refetch
                 // token nền là đủ để xem quá TTL 5 phút mà không cần nạp lại nguồn.
@@ -301,6 +341,10 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
                 const first = frags[0]
                 const last = frags[frags.length - 1]
                 dvrRangeRef.current = { end: last.start + last.duration, start: first.start }
+                const target = data.details?.targetduration
+                if (typeof target === 'number' && Number.isFinite(target) && target > 0) {
+                    targetDurationRef.current = target
+                }
                 // Đọc lại mỗi lần thay vì cache từ lần đầu: sau một discontinuity server neo lại, và
                 // fragment đầu cửa sổ đổi khi cửa sổ trượt.
                 if (typeof first.programDateTime === 'number') {
@@ -360,34 +404,61 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             }
             dvrRangeRef.current = dvr
 
-            // Thanh trượt trải trên TOÀN BỘ thời gian stream đã chạy - [lúc gửi yêu cầu .. bây giờ] -
-            // chứ không chỉ phần tua được. Đó là thứ giữ cho độ dài thanh bằng đúng thời lượng stream
-            // dù trình phát gắn vào lúc nào hay đã bị dựng lại bao nhiêu lần.
+            // Mép phải của thanh là MÉP VÙNG TUA, không phải `Date.now()`.
+            //
+            // Trước đây nó là `Date.now()`, và đó là một phép so sánh giữa hai đồng hồ khác nhau: mép
+            // phải lấy từ đồng hồ của máy giám thị, còn playhead lấy từ PROGRAM-DATE-TIME của server.
+            // Máy giám thị nhanh hai phút là thanh mọc thêm hai phút vùng không thể tới, chậm hai
+            // phút thì thumb dính mép và GIẤU luôn độ tụt thật. Neo cả hai đầu vào đồng hồ server thì
+            // độ lệch đó biến mất khỏi hình học thanh, và phần còn lại đúng bằng độ trễ thật.
+            //
+            // Vẫn đóng băng suốt thao tác kéo: mép vùng tua nhảy lên một segment mỗi lần server đóng
+            // file, và thang đo đổi giữa lúc kéo sẽ làm thumb giật dưới ngón tay.
             const absolute = wallAnchorRef.current !== null && !Number.isNaN(streamStartMs)
             if (!draggingRef.current || !seekDomainRef.current) {
                 seekDomainRef.current = absolute
-                    ? { absolute: true, endMs: Date.now(), startMs: streamStartMs }
+                    ? { absolute: true, endMs: mediaToDate(dvr.end), startMs: streamStartMs }
                     : { absolute: false, endMs: 0, startMs: 0 }
             }
             const domain = seekDomainRef.current
+            const tolerance = LIVE_EDGE_TOLERANCE_COUNT * targetDurationRef.current
 
+            let behindSecs: number
             if (domain.absolute) {
                 const toOffset = (ms: number) => (ms - domain.startMs) / 1000
+                const dvrEndOffset = toOffset(mediaToDate(dvr.end))
+                const playheadOffset = toOffset(mediaToDate(video.currentTime))
+                behindSecs = Math.max(0, dvrEndOffset - playheadOffset)
                 setSeek({
                     absolute: true,
+                    atLiveEdge: behindSecs <= tolerance,
+                    behindSecs,
                     domainEndOffset: toOffset(domain.endMs),
-                    dvrEndOffset: toOffset(mediaToDate(dvr.end)),
+                    dvrEndOffset,
                     dvrStartOffset: toOffset(mediaToDate(dvr.start)),
-                    playheadOffset: toOffset(mediaToDate(video.currentTime)),
+                    playheadOffset,
                 })
             } else {
+                behindSecs = Math.max(0, dvr.end - video.currentTime)
                 setSeek({
                     absolute: false,
+                    atLiveEdge: behindSecs <= tolerance,
+                    behindSecs,
                     domainEndOffset: dvr.end,
                     dvrEndOffset: dvr.end,
                     dvrStartOffset: dvr.start,
                     playheadOffset: video.currentTime,
                 })
+            }
+
+            // Mốc "từ lúc nào tôi không còn thấy hiện tại" được đo ở đây, không đặt lúc kéo thanh:
+            // trôi lại phía sau vì stall cũng là không thấy hiện tại, và đó là trường hợp giám thị
+            // không tự biết. `prev ?? now` để việc tụt kéo dài không đẩy mốc chạy theo và xoá mất
+            // cảnh báo vừa bỏ lỡ; cả hai nhánh đều idempotent nên gọi mỗi nhịp không gây render thêm.
+            if (behindSecs <= tolerance) {
+                setLeftLiveAtMs(null)
+            } else {
+                setLeftLiveAtMs((previous) => previous ?? Date.now())
             }
         }
 
@@ -415,11 +486,10 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         // nên chỉ những thứ thực sự bắt buộc phải dựng lại mới được đứng đây.
     }, [scheduleId, streamId, dateToMedia, mediaToDate, readDvrWindow, requestFreshToken])
 
+    // Không đặt cờ "đã rời live" ở đây nữa: nhịp đo trong `tick` tự thấy điều đó ngay sau lệnh tua, và
+    // một cờ ý định song song với phép đo là đúng cách để hai nguồn sự thật lệch nhau.
     const onScrubStart = useCallback(() => {
         draggingRef.current = true
-        followingLiveRef.current = false
-        setIsFollowingLive(false)
-        setLeftLiveAtMs((previous) => previous ?? Date.now())
     }, [])
 
     /**
@@ -483,23 +553,36 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
 
         draggingRef.current = false
         setDragOffset(null)
-        followingLiveRef.current = false
-        setIsFollowingLive(false)
-        setLeftLiveAtMs((previous) => previous ?? Date.now())
         video.currentTime = Math.min(safeEnd, Math.max(dvr.start + 0.05, target))
         return 'ok'
     }, [])
 
     const goLive = useCallback(() => {
-        followingLiveRef.current = true
-        setIsFollowingLive(true)
         setLeftLiveAtMs(null)
         setDragOffset(null)
         const video = videoRef.current
         const dvr = dvrRangeRef.current
-        if (video && dvr) {
-            video.currentTime = Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS)
+        if (!video || !dvr) {
+            return
         }
+        // Về ĐIỂM ĐỒNG BỘ LIVE, không về mép playlist.
+        //
+        // Mép playlist là điểm ngay sau segment cuối, và hls.js chưa buffer tới đó -- nhảy vào đấy là
+        // tự đặt playhead vào chỗ không có gì phía trước, phát hết segment cuối rồi đứng chờ segment
+        // kế. Nút "Về hiện tại" giờ nằm trong dải cảnh báo nên được bấm thường xuyên hơn, và một cú
+        // giật mỗi lần bấm sẽ dạy người ta đừng bấm nó.
+        //
+        // `liveSyncPosition` là con số hls.js tự nhắm tới; chỉ tính tay khi không có nó (nhánh native
+        // HLS của Safari, nơi engine tự quản việc bám live).
+        const syncPosition = hlsRef.current?.liveSyncPosition
+        const target =
+            typeof syncPosition === 'number' && Number.isFinite(syncPosition)
+                ? syncPosition
+                : dvr.end - LIVE_SYNC_DURATION_COUNT * targetDurationRef.current
+        video.currentTime = Math.min(
+            Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS),
+            Math.max(dvr.start, target),
+        )
     }, [])
 
     const toggleMute = useCallback(() => {
@@ -543,7 +626,6 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         autoplayBlocked,
         dragOffset,
         goLive,
-        isFollowingLive,
         isMuted,
         leftLiveAtMs,
         onScrubCommit,
