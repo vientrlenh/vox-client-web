@@ -30,6 +30,7 @@ import { StatCard } from '@/shared/ui/StatCard'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import { DetailHeaderCard } from '@/shared/ui/DetailHeaderCard'
 import { FilterChips } from '@/shared/ui/FilterChips'
+import { WarningBanner } from '@/shared/ui/WarningBanner'
 import { CandidatesTab } from '@/features/examCore/components/CandidatesTab'
 import { ExamListRow } from '@/features/examCore/components/ExamListRow'
 import { AiConfidenceThresholdField } from '@/features/examCore/components/AiConfidenceThresholdField'
@@ -45,6 +46,12 @@ import {
 } from '@/features/examCore/api/queries'
 import { useMatchingSchoolAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
 import { formatScheduleProgressLabel } from '@/features/examCore/utils/scheduleProgress'
+import {
+  buildSubscriptionWindowError,
+  getSubscriptionWindowBounds,
+  hasActiveSubscriptionPeriod,
+  NO_ACTIVE_SUBSCRIPTION_MESSAGE,
+} from '@/features/examCore/utils/subscriptionWindow'
 import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import {
@@ -333,6 +340,12 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { confirm, dialog } = useConfirmationDialog()
 
+  // Khung mở/đóng của kỳ thi là ràng buộc ngoài của mọi ca thi, nên nó phải nằm trong hạn gói --
+  // BE chặn ở SubscriptionPeriodGuardService, đây là lớp chặn trước.
+  const subscription = useMySubscriptionQuery().data
+  const subscriptionBounds = getSubscriptionWindowBounds(subscription)
+  const hasSubscriptionPeriod = hasActiveSubscriptionPeriod(subscription)
+
   const matchingPoliciesQuery = useMatchingSchoolAssessmentPoliciesQuery({
     languageId,
     rubricVersionId: selectedRubricVersion?.id,
@@ -343,7 +356,10 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   const isResolvingPolicy = Boolean(selectedRubricVersion) && matchingPoliciesQuery.isLoading
   const hasNoMatchingPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length === 0
   const hasAmbiguousPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length > 1 && !manualPolicyId
-  const canSubmit = Boolean(selectedRubricVersion) && !isResolvingPolicy && !hasAmbiguousPolicy
+  // Không có gói đang hoạt động thì BE từ chối thẳng (422) -- chặn ngay ở nút thay vì để người dùng
+  // điền hết form rồi mới biết.
+  const canSubmit =
+    Boolean(selectedRubricVersion) && !isResolvingPolicy && !hasAmbiguousPolicy && hasSubscriptionPeriod
 
   function goToSelectRubricVersion() {
     navigate('/school-admin/rubric-versions/select', {
@@ -390,6 +406,12 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
     }
     if (new Date(openAtIso).getTime() >= new Date(closeAtIso).getTime()) {
       setErrorMessage('Thời gian mở bài phải nhỏ hơn thời gian đóng bài.')
+      return
+    }
+    // Kẹp min/max ở picker chỉ chặn thao tác chọn, không chặn giá trị gõ/dán tay -- phải kiểm lại.
+    const subscriptionWindowError = buildSubscriptionWindowError(openAtIso, closeAtIso, subscription)
+    if (subscriptionWindowError) {
+      setErrorMessage(subscriptionWindowError)
       return
     }
     if (!selectedRubricVersion) {
@@ -482,6 +504,8 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             Mở lúc
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              max={subscriptionBounds?.max}
+              min={subscriptionBounds?.min}
               onChange={(event) => setOpenAt(event.target.value)}
               required
               type="datetime-local"
@@ -492,6 +516,8 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             Đóng lúc
             <input
               className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-900"
+              max={subscriptionBounds?.max}
+              min={subscriptionBounds?.min}
               onChange={(event) => setCloseAt(event.target.value)}
               required
               type="datetime-local"
@@ -499,6 +525,14 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             />
           </label>
         </div>
+        {hasSubscriptionPeriod ? (
+          <p className="-mt-2 text-xs font-medium text-slate-500">
+            Kỳ thi phải nằm trong hạn gói dịch vụ của trường: {formatDate(subscription?.startDate)} –{' '}
+            {formatDate(subscription?.endDate)}.
+          </p>
+        ) : (
+          <WarningBanner message={NO_ACTIVE_SUBSCRIPTION_MESSAGE} />
+        )}
 
         <AiConfidenceThresholdField onChange={setConfidenceThreshold} value={confidenceThreshold} />
 
@@ -818,21 +852,25 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
             : null
 
   const currentStep = workflow.currentStep
-  const nextAction = currentStep
-    ? {
-        ctaLabel: currentStep.cta,
-        description: currentStep.todo,
-        onClick: () => selectTab(currentStep.tab),
-        title: currentStep.label,
-      }
-    : exam.status === 'DRAFT' && scheduleReadiness.ready
+  // Kỳ thi đã khóa thì mọi bước còn dở đều đã hết đường làm — tab tương ứng chỉ còn banner
+  // "kỳ thi đã bắt đầu". Vẫn giữ nguyên thanh 5 bước để nhìn lại, chỉ bỏ lời mời bấm.
+  const nextAction = examLocked
+    ? null
+    : currentStep
       ? {
-          ctaLabel: 'Lên lịch',
-          description: 'Ca thi, thí sinh và mã đề đã đủ — bấm lên lịch để chốt kỳ thi.',
-          onClick: () => void handleStatusAction(exam.id, 'SCHEDULE'),
-          title: 'Sẵn sàng lên lịch',
+          ctaLabel: currentStep.cta,
+          description: currentStep.todo,
+          onClick: () => selectTab(currentStep.tab),
+          title: currentStep.label,
         }
-      : null
+      : exam.status === 'DRAFT' && scheduleReadiness.ready
+        ? {
+            ctaLabel: 'Lên lịch',
+            description: 'Ca thi, thí sinh và mã đề đã đủ — bấm lên lịch để chốt kỳ thi.',
+            onClick: () => void handleStatusAction(exam.id, 'SCHEDULE'),
+            title: 'Sẵn sàng lên lịch',
+          }
+        : null
 
   return (
     <section className="mx-auto max-w-260">

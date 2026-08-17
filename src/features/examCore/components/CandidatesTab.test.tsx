@@ -47,12 +47,19 @@ const schedule = {
   status: 'PUBLISHED',
 }
 
-function mockGraphQL(candidates: unknown[] = [candidate], schedules: unknown[] = []) {
+function mockGraphQL(
+  candidates: unknown[] = [candidate],
+  schedules: unknown[] = [],
+  studentBusySlots: unknown[] = [],
+) {
   mockedPost.mockImplementation((_url, body) => {
     const { query } = body as GraphQLBody
-    const payload = query.includes('examSchedules')
-      ? { examSchedules: schedules }
-      : { examCandidates: candidates }
+    let payload: Record<string, unknown> = { examCandidates: candidates }
+    if (query.includes('examSchedules')) {
+      payload = { examSchedules: schedules }
+    } else if (query.includes('studentBusySlots')) {
+      payload = { studentBusySlots }
+    }
     return Promise.resolve({ data: { data: payload } })
   })
 }
@@ -125,6 +132,27 @@ describe('CandidatesTab', () => {
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /P\.101/ })).toBeInTheDocument()
+  })
+
+  // Backend vẫn là chỗ chặn thật; đây chỉ là lớp tiện dụng để không phải bấm rồi ăn lỗi.
+  it('thí sinh đã có ca thi khác trùng giờ: ca bị làm mờ kèm lý do', async () => {
+    const user = userEvent.setup()
+    mockGraphQL([freshCandidate], [schedule], [
+      {
+        busyScheduleId: 'schedule-9',
+        endDate: '2026-08-05T03:00:00Z',
+        startDate: '2026-08-05T01:00:00Z',
+        studentId: 'student-2',
+        targetScheduleId: 'schedule-1',
+      },
+    ])
+    renderTab()
+
+    await user.click(await screen.findByRole('button', { name: 'Thao tác cho Trần Văn Bình' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Xếp ca thi' }))
+
+    expect(await screen.findByText('Học sinh đã có ca thi khác trùng giờ')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /P\.101/ })).toBeDisabled()
   })
 
   it('bài đã bắt đầu: không cho sửa danh sách từ menu của thí sinh', async () => {
