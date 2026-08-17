@@ -1912,6 +1912,16 @@ export function GradingTaskDetailView({
                     {item.turns.length} lượt
                   </span>
                 </div>
+                {/*
+                  Đề bài, đặt ngay dưới tiêu đề câu và TRƯỚC mọi thứ khác.
+                  Không lấy từ turn.promptText: cái đó là lời AI đọc lúc vào lượt
+                  ("You have 5 seconds to get ready…"), không phải câu hỏi.
+                */}
+                {item.questionText ? (
+                  <p className="mt-2.5 text-[13px] leading-relaxed text-slate-700">
+                    {item.questionText}
+                  </p>
+                ) : null}
                 <AiEvaluationSummary item={item} />
                 <div className="mt-3.5">
                   <GradingTurnList turns={item.turns} />

@@ -238,6 +238,7 @@ const GRADING_TASK_DETAIL_QUERY = `
         partLabel
         sectionId
         orderInSection
+        questionText
         currentItemScore
         currentFeedbackSummary
         currentScores { ${CRITERION_SCORE_FIELDS} }

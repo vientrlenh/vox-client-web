@@ -102,6 +102,14 @@ export type GradingTaskItem = {
   partLabel?: string | null
   sectionId?: string | null
   orderInSection: number
+  /**
+   * Đề bài của câu — cùng nguồn với trang Xem kết quả (`questions.question_text`).
+   *
+   * KHÁC `GradingTurn.promptText`: cái đó là lời AI đọc lúc vào lượt ("You have 5 seconds to
+   * get ready…"), không phải đề. Trước khi có trường này, giáo viên chấm mà không biết câu hỏi
+   * là gì — chỉ thấy "Phần 1 · Câu 2".
+   */
+  questionText?: string | null
   // Điểm của bản chấm đang có hiệu lực (lần đầu là bản AI) — mốc để đối chiếu.
   currentItemScore?: number | null
   currentFeedbackSummary?: string | null

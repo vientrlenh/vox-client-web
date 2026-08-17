@@ -181,6 +181,23 @@ function ResultBand({
   )
 }
 
+/**
+ * Trạng thái phiên cho phép xoá: chấm lỗi, bị gián đoạn, hoặc đã chấm xong.
+ *
+ * Loại trừ IN_PROGRESS / SUBMITTED / GRADING / EXPIRED — đó là phiên đang thi, đang chờ chấm
+ * hoặc đang chấm dở. Xoá lúc đó là cắt ngang một luồng còn đang ghi dữ liệu, mà
+ * DeleteExamSessionUseCase xoá VĨNH VIỄN cả câu trả lời, lượt nói, điểm, phúc khảo và bản ghi
+ * hình — không hoàn tác được.
+ *
+ * Đây là chốt GIAO DIỆN. Backend chưa có ràng buộc tương ứng, nên gọi thẳng API vẫn xoá được
+ * phiên ở trạng thái khác; muốn chặn thật thì phải thêm ở DeleteExamSessionUseCase.
+ */
+const DELETABLE_ATTEMPT_STATUSES = new Set(['GRADING_FAILED', 'INTERRUPTED', 'GRADED'])
+
+function canDeleteAttempt(status?: string | null): boolean {
+  return status != null && DELETABLE_ATTEMPT_STATUSES.has(status)
+}
+
 function AttemptRows({
   attempts,
   canDelete,
@@ -268,14 +285,16 @@ function AttemptRows({
             </span>
             {canDelete ? (
               <span>
-                <button
-                  aria-label="Xóa phiên thi này"
-                  className="inline-flex size-8.5 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:bg-rose-50"
-                  onClick={() => onDeleteSession(attempt.sessionId)}
-                  type="button"
-                >
-                  <Trash2 aria-hidden="true" className="size-3.5" />
-                </button>
+                {canDeleteAttempt(attempt.status) ? (
+                  <button
+                    aria-label="Xóa phiên thi này"
+                    className="inline-flex size-8.5 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:bg-rose-50"
+                    onClick={() => onDeleteSession(attempt.sessionId)}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" className="size-3.5" />
+                  </button>
+                ) : null}
               </span>
             ) : null}
           </div>
