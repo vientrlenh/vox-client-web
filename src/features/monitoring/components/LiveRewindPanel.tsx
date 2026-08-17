@@ -65,7 +65,6 @@ export function LiveRewindPanel({
         autoplayBlocked,
         dragOffset,
         goLive,
-        isFollowingLive,
         isMuted,
         leftLiveAtMs,
         onScrubCommit,
@@ -134,18 +133,30 @@ export function LiveRewindPanel({
         }
     }, [onSeekUnavailable, seek, seekRequest, seekToDate])
 
-    // Thanh trượt trải hết thời gian stream đã chạy, kể cả phần không tua được, nên độ dài của nó
-    // luôn bằng thời lượng thật của stream.
-    const sliderMax = seek ? Math.max(seek.domainEndOffset, seek.dvrEndOffset) : 0
-    const sliderValue = dragOffset ?? seek?.playheadOffset ?? 0
+    // Mép phải của thanh là mép VÙNG TUA -- xa nhất mà con trượt có thể tới thật.
+    //
+    // Trước đây mép này là `Date.now()`, nên thanh luôn có một dải cuối không thể chạm vào: playhead
+    // của HLS nằm sau mép playlist một khoảng cố định, cộng thời gian ghi xong segment, cộng độ lệch
+    // đồng hồ giữa máy giám thị và server. Nhìn ra ngoài thì đó đúng là "thanh cuộn luôn chạy sau
+    // kích thước thật của thanh". Phần `[0, dvrStartOffset]` vẫn được vẽ xám nên "cả ca thi dài bao
+    // nhiêu" không mất đi -- chỉ bỏ đúng cái vùng vô nghĩa.
+    const sliderMax = seek?.domainEndOffset ?? 0
+    // Ghim vào mép khi đang ở hiện tại. Khoảng lùi mà hls.js cố tình giữ là hiện vật của giao thức,
+    // không phải thông tin giám thị làm gì được; để thumb thiếu mép mãi mãi thì đọc như một cái lỗi.
+    const sliderValue = dragOffset ?? (seek?.atLiveEdge ? sliderMax : (seek?.playheadOffset ?? 0))
     // Phần tua được, tính theo phần trăm chiều dài thanh. Vẽ ra thay vì chỉ mô tả bằng chữ: khi con
     // trượt bị kẹp ngược về đầu cửa sổ, dòng "tua được: X–Y" không cứu được gì vì lúc đó không ai
     // đang đọc chữ -- họ đang nhìn cái thumb vừa nhảy.
     const dvrLeftPct = sliderMax > 0 && seek ? Math.max(0, Math.min(100, (seek.dvrStartOffset / sliderMax) * 100)) : 0
     const dvrRightPct = sliderMax > 0 && seek ? Math.max(0, Math.min(100, (seek.dvrEndOffset / sliderMax) * 100)) : 100
 
-    const behindSecs = seek ? Math.max(0, seek.dvrEndOffset - seek.playheadOffset) : 0
-    const isBehind = !isFollowingLive && seek !== null
+    // Tụt lại hay không là một PHÉP ĐO, không phải cờ ý định.
+    //
+    // Bản trước dùng `!isFollowingLive`, cờ chỉ đổi khi giám thị tự kéo thanh tua. Nghĩa là một luồng
+    // bị stall rồi trôi lại ba phút phía sau vẫn tự nhận là đang trực tiếp, và dải cảnh báo không hiện
+    // -- đúng cái trường hợp giám thị KHÔNG tự biết thì lại là trường hợp duy nhất không được báo.
+    const behindSecs = seek?.behindSecs ?? 0
+    const isBehind = seek !== null && !seek.atLiveEdge
     const isFarBehind = isBehind && behindSecs >= BEHIND_LIVE_WARNING_SECS
 
     // Cảnh báo xảy ra SAU khi giám thị rời khỏi mép live -- tức thứ họ đang không nhìn thấy. Suy ra
@@ -327,7 +338,10 @@ export function LiveRewindPanel({
                             <>
                                 {seek.absolute ? (
                                     <>
-                                        đã live: {formatDuration(seek.domainEndOffset)} · tua được:{' '}
+                                        {/* `dvrEndOffset` chứ không `domainEndOffset`: cái sau bị đóng
+                                            băng trong lúc kéo để thang đo không đổi dưới ngón tay, nên
+                                            dùng nó ở đây sẽ khiến con số đứng im khi đang kéo. */}
+                                        đã live: {formatDuration(seek.dvrEndOffset)} · tua được:{' '}
                                         {formatDuration(seek.dvrStartOffset)}–{formatDuration(seek.dvrEndOffset)}
                                     </>
                                 ) : (
@@ -386,15 +400,19 @@ export function LiveRewindPanel({
                           tại đã có dải cảnh báo phía trên video lo -- ở đó nó là hành động, có màu
                           và có chỗ để giải thích tụt bao lâu. Một phần tử gánh cả hai vai là lý do
                           cái cũ nhấn mạnh ngược.
+
+                          Đèn sáng theo `atLiveEdge` -- điều ĐO ĐƯỢC -- chứ không theo ý định của
+                          giám thị. Một cái đèn "Live" sáng trong lúc luồng đã trôi lại phía sau còn
+                          tệ hơn không có đèn nào.
                         */}
                         <button
                             className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                                isFollowingLive
+                                seek?.atLiveEdge
                                     ? 'border-red-200 bg-red-50 text-red-700'
                                     : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700'
                             }`}
                             onClick={goLive}
-                            title={isFollowingLive ? 'Đang xem trực tiếp' : 'Về hiện tại'}
+                            title={seek?.atLiveEdge ? 'Đang xem trực tiếp' : 'Về hiện tại'}
                             type="button"
                         >
                             <Radio aria-hidden="true" className="size-3.5" />
