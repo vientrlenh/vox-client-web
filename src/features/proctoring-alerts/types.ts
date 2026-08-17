@@ -6,15 +6,16 @@
  */
 
 export type AlertType =
-  | 'FACE_NOT_VISIBLE'
+  | 'CAMERA_SIGNAL_LOST'
+  | 'CAMERA_SIGNAL_RESTORED'
   | 'MULTIPLE_PERSONS'
+  | 'PERSON_MISSING'
   | 'PHONE_DETECTED'
   | 'PROHIBITED_OBJECT'
-  | 'RECONNECT_LOOP'
   | 'RECORDING_INCOMPLETE'
+  | 'RECORDING_TRUNCATED'
   | 'STREAM_DROPPED'
-  | 'SUSPICIOUS_GAZE'
-  | 'TRACK_ENDED'
+  | 'UNCOOPERATIVE_CANDIDATE'
   | 'WINDOW_FOCUS_LOST'
 
 export type AlertSeverity = 'critical' | 'info' | 'warning'
@@ -48,6 +49,41 @@ export type ProctoringAlertDto = {
   raisedAt: string
 }
 
+/**
+ * Mức độ của một cảnh báo, LẤY TỪ `level` đã lưu chứ không suy lại từ loại.
+ *
+ * <p>vox-streaming đóng dấu mức này lúc phát (`DefaultAlertLevel`) và gửi kèm trên cả nhánh trực
+ * tiếp lẫn nhánh lưu vào DB. Trước đây màn hình bỏ qua nó và tự suy severity từ `alertType`, tức là
+ * có hai bảng mức song song trong hệ -- và chúng đã lệch nhau: mọi cảnh báo backend chưa biết tên
+ * rơi về INFO trong DB nhưng vẫn hiện màu theo bảng phía này.
+ *
+ * <p>Rơi về bảng theo loại chỉ khi `level` trống (bản ghi cũ, hoặc bản vox-streaming cũ hơn không
+ * gửi trường này) -- vẫn tốt hơn là hiện mọi thứ thành INFO.
+ */
+export function getAlertSeverity(
+  alertType?: string | null,
+  level?: string | null,
+): AlertSeverity {
+  switch (level?.trim().toUpperCase()) {
+    case 'CRITICAL':
+      return 'critical'
+    case 'WARNING':
+      return 'warning'
+    case 'INFO':
+      return 'info'
+    default:
+      return getAlertTypeDisplay(alertType).severity
+  }
+}
+
+/**
+ * Nhãn + màu theo LOẠI cảnh báo. `severity` trả về ở đây chỉ là mức mặc định của loại đó, dùng khi
+ * bản ghi không mang `level`; nơi nào có bản ghi thật thì gọi `getAlertSeverity` để lấy mức đã lưu.
+ *
+ * <p>Màu (`className`) cố ý KHÔNG đi theo mức mà đi theo BẢN CHẤT sự việc, vì đó là hai trục khác
+ * nhau: đỏ cho nghi vấn gian lận, hổ phách cho hành vi thi, xám cho sự cố kỹ thuật. Một luồng rớt
+ * và một chiếc điện thoại đều đáng chú ý, nhưng chúng đòi hai loại phản ứng khác hẳn nhau.
+ */
 export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay {
   switch (alertType) {
     case 'PHONE_DETECTED':
@@ -68,16 +104,16 @@ export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay
         label: 'Phát hiện vật thể cấm',
         severity: 'critical',
       }
-    case 'FACE_NOT_VISIBLE':
+    case 'PERSON_MISSING':
       return {
         className: 'border-amber-200 bg-amber-50 text-amber-700',
-        label: 'Không thấy mặt học sinh',
+        label: 'Không thấy người trong camera',
         severity: 'warning',
       }
-    case 'SUSPICIOUS_GAZE':
+    case 'UNCOOPERATIVE_CANDIDATE':
       return {
         className: 'border-amber-200 bg-amber-50 text-amber-700',
-        label: 'Hướng nhìn đáng ngờ',
+        label: 'Không hợp tác khi trả lời',
         severity: 'warning',
       }
     case 'WINDOW_FOCUS_LOST':
@@ -86,22 +122,27 @@ export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay
         label: 'Rời khỏi cửa sổ bài thi',
         severity: 'warning',
       }
-    case 'RECONNECT_LOOP':
+    // Máy trạm báo lên: camera ngừng gửi khung hình. Xám (sự cố kỹ thuật) chứ không đỏ (nghi vấn
+    // gian lận) -- trong những giây đầu, rút cáp cố ý và cáp lỏng là không phân biệt được, nên màu
+    // không được kết luận hộ người chấm.
+    case 'CAMERA_SIGNAL_LOST':
       return {
-        className: 'border-amber-200 bg-amber-50 text-amber-700',
-        label: 'Reconnect liên tục',
+        className: 'border-slate-300 bg-slate-100 text-slate-700',
+        label: 'Mất tín hiệu camera',
         severity: 'warning',
+      }
+    // Đóng khoảng của cảnh báo trên. `detail` mang theo thời lượng mất -- đó mới là thứ quyết định
+    // sự việc là sợi cáp lỏng hai mươi giây hay một khoảng trống che hết phần trả lời.
+    case 'CAMERA_SIGNAL_RESTORED':
+      return {
+        className: 'border-slate-300 bg-slate-100 text-slate-700',
+        label: 'Camera có hình trở lại',
+        severity: 'info',
       }
     case 'STREAM_DROPPED':
       return {
         className: 'border-slate-300 bg-slate-100 text-slate-700',
         label: 'Mất kết nối stream',
-        severity: 'warning',
-      }
-    case 'TRACK_ENDED':
-      return {
-        className: 'border-slate-300 bg-slate-100 text-slate-700',
-        label: 'Luồng media kết thúc',
         severity: 'warning',
       }
     case 'RECORDING_INCOMPLETE':
@@ -110,6 +151,47 @@ export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay
         label: 'Bản ghi không trọn vẹn',
         severity: 'warning',
       }
+    // Khác RECORDING_INCOMPLETE ở chỗ bản ghi VẪN xem được: chỉ vài giây cuối là đáng ngờ. Nhãn
+    // phải nói rõ điều đó, nếu không người chấm sẽ tưởng cả bản ghi hỏng và bỏ qua bằng chứng.
+    case 'RECORDING_TRUNCATED':
+      return {
+        className: 'border-slate-300 bg-slate-100 text-slate-700',
+        label: 'Bản ghi cụt đoạn cuối',
+        severity: 'info',
+      }
+
+    // Tên cũ, chỉ còn trong dữ liệu lịch sử -- không nguồn nào phát chúng nữa. Giữ lại vì sổ bằng
+    // chứng thì KHÔNG đổi tên bản ghi đã lưu: tên là thứ hệ thống thật sự đã ghi lúc đó, và sửa nó
+    // là viết lại lịch sử. Chỉ mức độ được nâng lại bằng migration, vì INFO ở đó là lỗi ghi chép
+    // (nhánh "không nhận ra loại này") chứ không phải một đánh giá có chủ ý.
+    case 'CRITICAL_VIOLATION':
+      return {
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
+        label: 'Không hợp tác khi trả lời',
+        severity: 'warning',
+      }
+    // Hai loại này chưa từng có nguồn nào phát -- chúng được khai báo trong từ vựng vox-streaming
+    // nhưng không đoạn code nào bắn, và nay đã bị bỏ khỏi đó. Giữ nhãn phòng khi có bản ghi cũ từ
+    // một phiên bản nào đó từng phát chúng: sổ bằng chứng thì không viết lại lịch sử.
+    case 'TRACK_ENDED':
+      return {
+        className: 'border-slate-300 bg-slate-100 text-slate-700',
+        label: 'Luồng media kết thúc',
+        severity: 'warning',
+      }
+    case 'RECONNECT_LOOP':
+      return {
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
+        label: 'Reconnect liên tục',
+        severity: 'warning',
+      }
+    case 'OBJECT_DETECTED':
+      return {
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
+        label: 'Phát hiện vật thể trong khung',
+        severity: 'warning',
+      }
+
     default:
       return {
         className: 'border-slate-200 bg-slate-50 text-slate-600',
