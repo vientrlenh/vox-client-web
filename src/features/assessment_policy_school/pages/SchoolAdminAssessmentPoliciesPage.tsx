@@ -1,7 +1,7 @@
 // src/features/assessment_policy_school/pages/SchoolAdminAssessmentPoliciesPage.tsx
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import {
   BookOpen,
   Calendar,
@@ -84,6 +84,10 @@ function FilterSelect({ id, icon: Icon, label, value, disabled, placeholder, opt
 
 export function SchoolAdminAssessmentPoliciesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Policy vừa tạo từ trang chi tiết Rubric Version (điều hướng qua đây kèm state) — tô nổi bật
+  // đúng dòng đó để người dùng không phải tự mò trong danh sách.
+  const highlightPolicyId = (location.state as { highlightPolicyId?: string } | null)?.highlightPolicyId ?? null;
   const user = useAppSelector((state) => state.auth.user);
   const schoolId = user?.schoolId;
 
@@ -399,6 +403,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
           onViewDetails={(policy) => navigate(`/school-admin/assessment-policies/${policy.id}`)}
           onEdit={(policy) => setEditingPolicy(policy)}
           onDelete={handleDeletePolicy}
+          highlightId={highlightPolicyId}
         />
         {!isLoading && !isError && policies.length > 0 && (
           <Pagination currentPage={page} totalPages={totalPages} totalElements={totalElements} itemName="assessment policy" onPageChange={setPage} />

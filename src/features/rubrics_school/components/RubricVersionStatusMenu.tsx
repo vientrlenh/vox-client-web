@@ -39,15 +39,11 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
 
   const badgeClassName = STATUS_BADGE_CLASSNAMES[status] ?? 'bg-slate-100 text-slate-600 ring-slate-500/20';
 
-  async function handlePublishClick() {
+  // Không tự confirm bằng dialog text chung ở đây: bên gọi (trang chi tiết Version) mở hẳn dialog
+  // liệt kê Version + các Chính Sách Đánh Giá liên quan để xác nhận -- dialog đó đã là bước xác
+  // nhận, hỏi lại lần nữa ở đây chỉ dư thừa.
+  function handlePublishClick() {
     setIsOpen(false);
-    const isConfirmed = await confirm({
-      confirmLabel: 'Xuất bản',
-      message:
-        'Chuyển phiên bản này sang PUBLISHED? Sau khi xuất bản, phiên bản sẽ được áp dụng chính thức để chấm bài.',
-      title: 'Xuất bản phiên bản',
-    });
-    if (!isConfirmed) return;
     onPublish();
   }
 
@@ -90,7 +86,7 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
           {status === 'DRAFT' ? (
             <button
               className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
-              onClick={() => void handlePublishClick()}
+              onClick={handlePublishClick}
               type="button"
             >
               Chuyển sang PUBLISHED

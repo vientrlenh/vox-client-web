@@ -154,7 +154,7 @@ export type RubricVersionOption = {
 // ==========================================
 export type CreateAssessmentPolicyPayload = {
   frameworkVersionId: string;
-  rubricVersionIds: string[];
+  rubricVersionId: string;
   languageId: string;
   targetFrameworkBandId: string;
   passingScore?: number;

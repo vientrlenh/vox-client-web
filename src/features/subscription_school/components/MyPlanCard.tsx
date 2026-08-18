@@ -63,6 +63,12 @@ export function MyPlanCard({
           Bạn đã hủy — vẫn dùng bình thường tới hết {formatDate(subscription.endDate)}, sau đó sẽ không tự gia hạn.
         </p>
       ) : null}
+      {subscription.status === 'SUSPENDED' ? (
+        <p className="mt-1.5 text-sm text-red-200">
+          Gói đã bị đình chỉ{subscription.suspendedReason ? `: "${subscription.suspendedReason}"` : ''}. Liên hệ hệ
+          thống để biết thêm chi tiết.
+        </p>
+      ) : null}
       <p className="mt-2 flex items-center gap-1.5 text-sm text-white/85">
         <Clock aria-hidden="true" className="size-4" />
         Thời gian tối đa mỗi bài: {formatMinutes(subscription.plan.maxTimePerAttemptMin)}

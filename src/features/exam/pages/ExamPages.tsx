@@ -23,7 +23,7 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
 import { Pagination } from '@/shared/components/Pagination'
-import { toApiError } from '@/shared/api'
+import { isPlanLimitExceededApiError, toApiError } from '@/shared/api'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
@@ -331,6 +331,8 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   // và việc hạ nó xuống phải là hành động có ý thức.
   const [streamSetup, setStreamSetup] = useState<ExamStreamSetup>('BOTH_REQUIRED')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // Retry vô nghĩa với lỗi này (gói đã hết hạn) — cần CTA điều hướng đi gia hạn thay vì toast chung.
+  const [isPlanLimitError, setIsPlanLimitError] = useState(false)
   const { confirm, dialog } = useConfirmationDialog()
 
   const matchingPoliciesQuery = useMatchingSchoolAssessmentPoliciesQuery({
@@ -374,6 +376,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
 
   async function handleSubmit() {
     setErrorMessage(null)
+    setIsPlanLimitError(false)
     if (!name.trim() || !code.trim() || !languageId) {
       setErrorMessage('Vui lòng nhập tên, mã kỳ thi và ngôn ngữ.')
       return
@@ -424,6 +427,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
       navigate('/school-admin/exams')
     } catch (error) {
       setErrorMessage(toApiError(error).message)
+      setIsPlanLimitError(isPlanLimitExceededApiError(error))
     }
   }
 
@@ -432,6 +436,18 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
       <h1 className="text-[26px] font-extrabold text-slate-900">Tạo kỳ thi</h1>
       <p className="mt-1.5 text-sm text-slate-500">Nhập thông tin cơ bản, sau đó gắn khung đề và thêm hội đồng đề.</p>
       <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+      {isPlanLimitError ? (
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800">Trường chưa có gói subscription đang hoạt động.</p>
+          <button
+            type="button"
+            onClick={() => navigate('/school-admin/subscription')}
+            className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-amber-700"
+          >
+            Gia hạn ngay
+          </button>
+        </div>
+      ) : null}
       {dialog}
 
       <div className="mt-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-6">

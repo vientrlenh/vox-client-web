@@ -17,6 +17,8 @@ const MY_SUBSCRIPTION_QUERY = `
       status
       pricePaidSnapshot
       cancelledAt
+      suspendedAt
+      suspendedReason
       plan {
         id
         name

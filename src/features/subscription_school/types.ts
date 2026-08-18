@@ -1,7 +1,7 @@
 import { ClipboardList, FileCheck2, Headphones, type LucideIcon } from 'lucide-react'
 
 export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
-export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
+export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUSPENDED'
 export type RequestType = 'REGISTRATION' | 'UPGRADE'
 export type InvoiceStatus = 'PAID' | 'PENDING' | 'FAILED' | 'CANCELLED'
 export type SchoolDebtEventType = 'LOCKED' | 'CAP_EXCEEDED' | 'CLEARED'
@@ -74,6 +74,10 @@ export type MySubscription = {
   status: SubscriptionStatus
   pricePaidSnapshot: number
   cancelledAt: string | null
+  // System Admin cưỡng chế đình chỉ (mất quyền dùng NGAY, khác cancelledAt chỉ tắt gia hạn) — cả 2 null
+  // khi không bị đình chỉ.
+  suspendedAt: string | null
+  suspendedReason: string | null
   plan: SubscriptionPlan | null
 }
 
@@ -249,6 +253,10 @@ export function getSubscriptionStatusDisplay(
   endDate?: string | null,
   cancelledAt?: string | null,
 ) {
+  if (status === 'SUSPENDED') {
+    return { label: 'Đã đình chỉ', tone: 'danger' as const }
+  }
+
   if (status === 'ACTIVE') {
     // Đã bấm Hủy nhưng gói không cắt ngay — dùng bình thường tới hết endDate (kiểu Claude), chỉ là
     // sẽ không tự gia hạn nữa.

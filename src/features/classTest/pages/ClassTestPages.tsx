@@ -30,7 +30,7 @@ import { useMySchoolClassesQuery } from '@/features/classes/api/useMySchoolClass
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery'
 import type { SchoolClass } from '@/features/classes/types'
 import type { QuestionDto } from '@/features/question/types'
-import { toApiError } from '@/shared/api'
+import { isPlanLimitExceededApiError, toApiError } from '@/shared/api'
 import { autoDistributeWeights } from '@/shared/weightDistribution'
 import { Pagination } from '@/shared/components/Pagination'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
@@ -450,6 +450,9 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
   )
   const { confirm, dialog } = useConfirmationDialog()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // Retry vô nghĩa với lỗi này (gói của trường đã hết hạn) — giáo viên không tự gia hạn được, chỉ
+  // hiển thị hướng dẫn liên hệ Quản trị viên trường thay vì toast chung chung.
+  const [isPlanLimitError, setIsPlanLimitError] = useState(false)
 
   const [selectedRubricVersion, setSelectedRubricVersion] = useState<SelectedRubricVersion | null>(
     locationState?.selectedRubricVersion ?? null,
@@ -498,6 +501,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
 
   async function handleSubmit() {
     setErrorMessage(null)
+    setIsPlanLimitError(false)
     if (!name.trim() || !schoolClassId) {
       setErrorMessage('Vui lòng nhập tên bài và chọn lớp học.')
       return
@@ -574,6 +578,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
       })
     } catch (error) {
       setErrorMessage(toApiError(error).message)
+      setIsPlanLimitError(isPlanLimitExceededApiError(error))
     } finally {
       createLockedRef.current = false
     }
@@ -588,6 +593,13 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
       {dialog}
 
       <FeedbackToast message={errorMessage} onClose={() => setErrorMessage(null)} tone="error" />
+      {isPlanLimitError ? (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800">
+            Trường chưa có gói subscription đang hoạt động. Vui lòng liên hệ Quản trị viên trường để gia hạn.
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-6">
         <div className="grid gap-4 sm:grid-cols-2">
