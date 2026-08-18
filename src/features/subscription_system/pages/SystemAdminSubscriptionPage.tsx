@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BarChart3, Building2, ClipboardList, Package, Plus } from 'lucide-react'
+import { BarChart3, Building2, ClipboardList, Copy, Package, Plus } from 'lucide-react'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
@@ -25,6 +25,7 @@ import { useSubscriptionRequestsQuery } from '../api/useSubscriptionRequestsQuer
 import { useCreatePaymentLinkForRequestMutation, useRejectRequestMutation } from '../api/useSubscriptionRequestMutations'
 import { useSchoolLookup } from '../api/useSchoolLookup'
 import { SubscriptionOverviewPanel } from '../components/SubscriptionOverviewPanel'
+import { ArchivePlanDialog } from '../components/ArchivePlanDialog'
 import { PlanCard } from '../components/PlanCard'
 import { PlanEditorDrawer } from '../components/PlanEditorDrawer'
 import { SchoolSubscriptionsFiltersBar } from '../components/SchoolSubscriptionsFiltersBar'
@@ -61,6 +62,11 @@ export function SystemAdminSubscriptionPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  // Gói gốc đang được thay thế (nếu mở form tạo từ luồng "Tạo gói thay thế") -- có giá trị thì
+  // handleCreatePlan sẽ tự publish gói mới + archive gói này sau khi tạo xong.
+  const [replacingSourcePlan, setReplacingSourcePlan] = useState<SubscriptionPlan | null>(null)
+
+  const [archivingPlan, setArchivingPlan] = useState<SubscriptionPlan | null>(null)
 
   const [detailOpen, setDetailOpen] = useState(false)
   const [viewingSubscription, setViewingSubscription] = useState<SchoolSubscription | null>(null)
@@ -83,6 +89,13 @@ export function SystemAdminSubscriptionPage() {
     DEFAULT_PAGE,
     200,
   )
+
+  // Tái dùng danh sách subscription ACTIVE đã fetch cho tab Tổng quan để đếm theo planId -- không
+  // gọi thêm API nào chỉ để biết "gói này còn trường nào đang dùng không" lúc archive.
+  const activeCountByPlanId = new Map<string, number>()
+  for (const sub of overviewSubscriptionsQuery.data?.content ?? []) {
+    activeCountByPlanId.set(sub.planId, (activeCountByPlanId.get(sub.planId) ?? 0) + 1)
+  }
 
   const schoolsQuery = useSchoolSubscriptionsQuery(schoolFilters, schoolsPage, PAGE_SIZE)
   const requestsQuery = useSubscriptionRequestsQuery(requestsStatus, requestsPage, PAGE_SIZE)
@@ -117,15 +130,17 @@ export function SystemAdminSubscriptionPage() {
     setSchoolsPage(DEFAULT_PAGE)
   }
 
-  function openCreatePlan() {
+  function openCreatePlan(sourcePlan?: SubscriptionPlan) {
     setEditingPlan(null)
     setFormError(null)
+    setReplacingSourcePlan(sourcePlan ?? null)
     setEditorOpen(true)
   }
 
   function openEditPlan(plan: SubscriptionPlan) {
     setEditingPlan(plan)
     setFormError(null)
+    setReplacingSourcePlan(null)
     setEditorOpen(true)
   }
 
@@ -151,10 +166,33 @@ export function SystemAdminSubscriptionPage() {
   async function handleCreatePlan(payload: CreatePlanPayload) {
     try {
       setFormError(null)
-      await createPlanMutation.mutateAsync(payload)
-      setToast({ text: 'Đã tạo gói mới', tone: 'success' })
+      const created = await createPlanMutation.mutateAsync(payload)
+
+      if (replacingSourcePlan) {
+        // Gói đã tạo thành công tại đây -- lỗi ở publish/archive KHÔNG rollback việc tạo, chỉ báo
+        // cho admin biết còn thiếu bước nào để tự hoàn tất thủ công (giống thao tác tay bình thường).
+        try {
+          await publishPlanMutation.mutateAsync(created.data.id)
+          await archivePlanMutation.mutateAsync({ id: replacingSourcePlan.id, replacedByPlanId: created.data.id })
+          setToast({
+            text: `Đã tạo, xuất bản "${created.data.name}" và lưu trữ gói "${replacingSourcePlan.name}"`,
+            tone: 'success',
+          })
+        } catch (chainError) {
+          setToast({
+            text:
+              getErrorMessage(chainError) ??
+              'Đã tạo gói mới nhưng xuất bản/lưu trữ gói cũ chưa xong — vào danh sách gói để hoàn tất thủ công.',
+            tone: 'error',
+          })
+        }
+      } else {
+        setToast({ text: 'Đã tạo gói mới', tone: 'success' })
+      }
+
       setEditorOpen(false)
       setEditingPlan(null)
+      setReplacingSourcePlan(null)
     } catch (error) {
       setFormError(getErrorMessage(error) ?? 'Không thể tạo gói. Vui lòng thử lại.')
     }
@@ -172,30 +210,61 @@ export function SystemAdminSubscriptionPage() {
     }
   }
 
-  async function handleArchivePlan(plan: SubscriptionPlan) {
-    const replacementOptions = activePlans
-      .filter((candidate) => candidate.id !== plan.id)
-      .map((candidate) => ({ label: `${candidate.name} — ${formatVnd(candidate.pricePerYear)}`, value: candidate.id }))
+  function handleArchivePlan(plan: SubscriptionPlan) {
+    setArchivingPlan(plan)
+  }
 
-    const result = await confirmWithSelection({
-      confirmLabel: 'Lưu trữ',
-      message: `Gói "${plan.name}" sẽ được lưu trữ và không còn hiển thị cho trường đăng ký mới. Các trường đang dùng gói này không bị ảnh hưởng ngay, nhưng nếu không chọn gói thay thế, các trường sẽ không gia hạn được cho tới khi có gói thay thế.`,
-      selectLabel: 'Gói thay thế khi trường gia hạn (không bắt buộc)',
-      selectOptions: replacementOptions,
-      selectPlaceholder: 'Không chọn — chặn gia hạn cho tới khi có gói thay thế',
-      title: 'Lưu trữ gói dịch vụ',
-    })
-
-    if (!result.confirmed) {
+  async function handleConfirmArchive(replacedByPlanId: string | null) {
+    if (!archivingPlan) {
       return
     }
 
     try {
-      await archivePlanMutation.mutateAsync({ id: plan.id, replacedByPlanId: result.selection || null })
+      await archivePlanMutation.mutateAsync({ id: archivingPlan.id, replacedByPlanId })
       setToast({ text: 'Đã lưu trữ gói', tone: 'success' })
+      setArchivingPlan(null)
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể lưu trữ gói.', tone: 'error' })
     }
+  }
+
+  async function handleCreateReplacement() {
+    // Chỉ liệt kê gói đang thật sự có trường dùng (activeCountByPlanId đã tính sẵn cho banner cảnh
+    // báo ở ArchivePlanDialog) -- gói không còn trường nào thì không cần "chuẩn bị thay thế" trước.
+    const options = plans
+      .filter((candidate) => (activeCountByPlanId.get(candidate.id) ?? 0) > 0)
+      .map((candidate) => ({
+        label: `${candidate.name} — ${formatVnd(candidate.pricePerYear)} (${activeCountByPlanId.get(candidate.id)} trường đang dùng)`,
+        value: candidate.id,
+      }))
+
+    if (options.length === 0) {
+      setToast({ text: 'Chưa có gói nào đang có trường sử dụng.', tone: 'error' })
+      return
+    }
+
+    const { confirmed, selection } = await confirmWithSelection({
+      confirmLabel: 'Tiếp tục',
+      message: 'Chọn gói đang có trường sử dụng cần thay thế để tự điền sẵn giá và thời hạn cho gói mới.',
+      selectLabel: 'Gói cần thay thế',
+      selectOptions: options,
+      selectPlaceholder: 'Chọn gói...',
+      title: 'Tạo gói thay thế',
+    })
+
+    if (!confirmed) {
+      return
+    }
+    if (!selection) {
+      setToast({ text: 'Vui lòng chọn 1 gói.', tone: 'error' })
+      return
+    }
+
+    const sourcePlan = plans.find((candidate) => candidate.id === selection)
+    if (!sourcePlan) {
+      return
+    }
+    openCreatePlan(sourcePlan)
   }
 
   async function handlePublishPlan(plan: SubscriptionPlan) {
@@ -390,14 +459,24 @@ export function SystemAdminSubscriptionPage() {
           </p>
         </div>
         {tab === 'packages' ? (
-          <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-indigo-600 px-4.5 text-sm font-black text-white transition hover:bg-indigo-700"
-            onClick={openCreatePlan}
-            type="button"
-          >
-            <Plus aria-hidden="true" className="size-4.5" />
-            Tạo gói mới
-          </button>
+          <div className="flex flex-wrap gap-2.5">
+            <button
+              className="inline-flex h-11 items-center gap-2 rounded-lg border border-indigo-200 bg-white px-4.5 text-sm font-black text-indigo-700 transition hover:bg-indigo-50"
+              onClick={() => void handleCreateReplacement()}
+              type="button"
+            >
+              <Copy aria-hidden="true" className="size-4.5" />
+              Tạo gói thay thế
+            </button>
+            <button
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-indigo-600 px-4.5 text-sm font-black text-white transition hover:bg-indigo-700"
+              onClick={() => openCreatePlan()}
+              type="button"
+            >
+              <Plus aria-hidden="true" className="size-4.5" />
+              Tạo gói mới
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -418,7 +497,10 @@ export function SystemAdminSubscriptionPage() {
           getSchoolName={(schoolId) => getSchool(schoolId)?.name ?? schoolId}
           isLoading={overviewSubscriptionsQuery.isLoading || plansQuery.isLoading || isSchoolLookupLoading}
           pendingRequestsCount={overviewRequestsQuery.data?.totalElements ?? 0}
-          plans={activePlans}
+          // Truyền TẤT CẢ gói (không chỉ activePlans) -- trường có thể vẫn ACTIVE trên 1 gói đã bị
+          // archive (chưa gia hạn/chưa đổi gói thay thế), lọc theo activePlans sẽ làm "Doanh thu theo
+          // gói" thiếu hẳn phần doanh thu/trường đó dù vẫn được tính trong tổng số ở StatCard.
+          plans={plans}
           recentRequests={overviewRequestsQuery.data?.content ?? []}
         />
       ) : null}
@@ -506,12 +588,14 @@ export function SystemAdminSubscriptionPage() {
       <PlanEditorDrawer
         errorMessage={formError ?? undefined}
         isOpen={editorOpen}
-        key={editorOpen ? (editingPlan?.id ?? 'create') : 'closed'}
+        key={editorOpen ? (editingPlan?.id ?? `create-${replacingSourcePlan?.id ?? ''}`) : 'closed'}
         isSubmitting={isSavingPlan}
         onClose={closeEditor}
         onCreate={(payload) => void handleCreatePlan(payload)}
         onUpdate={(id, payload) => void handleUpdatePlan(id, payload)}
         plan={editingPlan}
+        prefillPricePerYear={replacingSourcePlan?.pricePerYear ?? null}
+        prefillValidityDays={replacingSourcePlan?.validityDays ?? null}
       />
 
       <SchoolSubscriptionDetailDrawer
@@ -519,6 +603,24 @@ export function SystemAdminSubscriptionPage() {
         onClose={closeDetail}
         school={viewingSubscription ? getSchool(viewingSubscription.schoolId) : null}
         subscription={viewingSubscription}
+      />
+
+      <ArchivePlanDialog
+        activeSchoolCount={archivingPlan ? activeCountByPlanId.get(archivingPlan.id) ?? 0 : 0}
+        isOpen={Boolean(archivingPlan)}
+        isSubmitting={archivePlanMutation.isPending}
+        onClose={() => setArchivingPlan(null)}
+        onConfirm={(replacedByPlanId) => void handleConfirmArchive(replacedByPlanId)}
+        plan={archivingPlan}
+        replacementOptions={
+          archivingPlan
+            ? activePlans
+                .filter(
+                  (candidate) => candidate.id !== archivingPlan.id && candidate.pricePerYear === archivingPlan.pricePerYear,
+                )
+                .map((candidate) => ({ label: `${candidate.name} — ${formatVnd(candidate.pricePerYear)}`, value: candidate.id }))
+            : []
+        }
       />
 
       {confirmDialog}

@@ -884,14 +884,12 @@ export function SchoolAdminDashboardPage() {
   const renewal = data.subscriptionRenewal
   const renewalDaysLeft = renewal ? daysUntil(renewal.endDate) : null
   const renewalExpired = renewalDaysLeft !== null && renewalDaysLeft < 0
-  const renewalUrgent = renewalDaysLeft !== null && renewalDaysLeft >= 0 && renewalDaysLeft <= 30
+  const renewalUrgent = renewalDaysLeft !== null && renewalDaysLeft >= 0 && renewalDaysLeft <= 7
   const renewalTint = !renewal
     ? { bg: 'bg-slate-100', fg: 'text-slate-500' }
-    : renewalExpired || (renewalDaysLeft !== null && renewalDaysLeft <= 7)
+    : renewalExpired || renewalUrgent
       ? { bg: 'bg-red-50', fg: 'text-red-700' }
-      : renewalUrgent
-        ? { bg: 'bg-amber-50', fg: 'text-amber-700' }
-        : { bg: 'bg-indigo-50', fg: 'text-indigo-700' }
+      : { bg: 'bg-indigo-50', fg: 'text-indigo-700' }
 
   return (
     <section className="grid gap-5">

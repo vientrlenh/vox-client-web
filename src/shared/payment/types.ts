@@ -5,8 +5,11 @@ export type PaymentMethod = 'PAYOS' | 'SEPAY'
 /**
  * Cách mở trang thanh toán, do BE quyết định thay vì FE suy ra từ tên cổng. Nhờ vậy thêm một cổng
  * mới không phải sửa FE — trước đây FE buộc phải biết "nếu là SePay thì submit form".
+ *
+ * 'NONE': hóa đơn đã chốt PAID ngay (amountDue = 0 sau khi bù trừ ngày chưa dùng lúc đổi gói), không
+ * có gì để điều hướng sang cổng — xem CreatePaymentLinkForRenewalUseCase ở BE.
  */
-export type CheckoutAction = 'FORM_POST' | 'REDIRECT'
+export type CheckoutAction = 'FORM_POST' | 'NONE' | 'REDIRECT'
 
 export type PaymentLink = {
   action: CheckoutAction
