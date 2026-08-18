@@ -217,6 +217,19 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
      */
     const [dragOffset, setDragOffset] = useState<null | number>(null)
     /**
+     * Vị trí đang chờ chốt của lần kéo hiện tại; null nghĩa là không còn gì để chốt.
+     *
+     * <p>Tồn tại vì thả tay sinh ra HAI sự kiện chứ không phải một: `input[type=range]` tự bắt con
+     * trỏ lúc nhấn xuống, nên lúc nhả trình duyệt bắn `pointerup` rồi `lostpointercapture`. Cả hai
+     * đều phải là đường chốt hợp lệ -- thả tay ra ngoài phạm vi thanh thì chỉ có cái sau. Nhưng React
+     * kịp render lại giữa hai lần đó và ghi giá trị cũ trở lại DOM, nên lần chốt thứ hai đọc
+     * `event.currentTarget.value` là đọc phải chính con số vừa bị bỏ đi, rồi tua ngược về đấy.
+     *
+     * <p>Nguồn sự thật vì thế phải là ref này, không phải DOM: nó do `onScrubMove` ghi, và lần chốt
+     * đầu tiên xoá nó đi khiến mọi lần sau thành vô hại.
+     */
+    const pendingOffsetRef = useRef<null | number>(null)
+    /**
      * Mốc giám thị rời khỏi mép live, null khi đang ở hiện tại.
      *
      * <p>Tồn tại để phía trên SUY RA được "có cảnh báo nào xảy ra sau khi tôi ngừng xem hiện tại
@@ -558,11 +571,23 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             }
         }
 
+        // Thả con trượt khỏi vị trí vừa kéo ĐÚNG lúc playhead đáp xuống, không sớm hơn.
+        //
+        // Đây là mảnh còn lại của việc giữ `dragOffset` qua lúc chốt: giữ mà không có đường thả thì
+        // thumb đứng chết ở chỗ vừa thả trong khi hình chạy tiếp. Nghe 'seeked' thay vì hẹn giờ vì nó
+        // bắn ở đúng nơi playhead THẬT SỰ đáp xuống, kể cả khi đích bị kẹp về mép vùng tua.
+        const releaseScrub = () => {
+            setDragOffset(null)
+            tick()
+        }
+        video.addEventListener('seeked', releaseScrub)
+
         tick()
         const timer = setInterval(tick, SEEK_TICK_MS)
 
         return () => {
             clearInterval(timer)
+            video.removeEventListener('seeked', releaseScrub)
             if (hlsRef.current) {
                 hlsRef.current.destroy()
                 hlsRef.current = null
@@ -598,29 +623,50 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
      */
     const onScrubMove = useCallback((offsetSecs: number) => {
         draggingRef.current = true
+        pendingOffsetRef.current = offsetSecs
         setDragOffset(offsetSecs)
     }, [])
 
-    /** Tua tới `offsetSecs` giây kể từ lúc stream bắt đầu - chính là đơn vị của thanh trượt. */
-    const onScrubCommit = useCallback(
-        (offsetSecs: number) => {
-            draggingRef.current = false
+    /**
+     * Chốt lần kéo hiện tại: tua tới vị trí người dùng vừa thả tay.
+     *
+     * <p>KHÔNG nhận vị trí từ người gọi. Đích lấy từ `pendingOffsetRef`, và lần chốt đầu tiên xoá nó
+     * đi -- xem doc của ref đó: trình duyệt gọi đường này hai lần cho một lần thả tay, và lần thứ hai
+     * chỉ còn đọc được giá trị DOM đã cũ.
+     *
+     * <p>Cũng không xoá `dragOffset` ngay. Con trượt phải ở nguyên chỗ vừa thả cho tới khi playhead
+     * thật sự tới nơi; trả nó về `seek.playheadOffset` lúc này là hiện một vị trí còn cũ hơn cả lệnh
+     * vừa phát ra, và người xem đọc cú giật đó đúng như tua hỏng.
+     */
+    const onScrubCommit = useCallback(() => {
+        const offsetSecs = pendingOffsetRef.current
+        if (offsetSecs === null) {
+            return
+        }
+        pendingOffsetRef.current = null
+        draggingRef.current = false
+
+        const video = videoRef.current
+        const dvr = dvrRangeRef.current
+        const domain = seekDomainRef.current
+        if (!video || !dvr || !domain) {
+            // Không tua được thì cũng không có 'seeked' nào tới thả con trượt ra.
             setDragOffset(null)
-            const video = videoRef.current
-            const dvr = dvrRangeRef.current
-            const domain = seekDomainRef.current
-            if (!video || !dvr || !domain) {
-                return
-            }
-            // Đi qua giờ tuyệt đối chứ không coi offset là vị trí media: hai thứ chỉ trùng nhau khi
-            // trình phát gắn vào đúng lúc stream bắt đầu.
-            const target = domain.absolute ? dateToMedia(domain.startMs + offsetSecs * 1000) : offsetSecs
-            // Kẹp trong vùng tua được thay vì tin giá trị thô: thanh trượt trải cả thời gian đã chạy
-            // mà chỉ dvrRange là thực sự lấy được.
-            applySeek(video, dvr, target)
-        },
-        [dateToMedia],
-    )
+            return
+        }
+        // Đi qua giờ tuyệt đối chứ không coi offset là vị trí media: hai thứ chỉ trùng nhau khi
+        // trình phát gắn vào đúng lúc stream bắt đầu.
+        const target = domain.absolute ? dateToMedia(domain.startMs + offsetSecs * 1000) : offsetSecs
+        // Kẹp trong vùng tua được thay vì tin giá trị thô: thanh trượt trải cả thời gian đã chạy
+        // mà chỉ dvrRange là thực sự lấy được.
+        const previous = video.currentTime
+        const clamped = applySeek(video, dvr, target)
+        // Tua vào đúng chỗ đang đứng thì trình duyệt không bắn 'seeked', nên phải tự thả ở đây --
+        // nếu không con trượt đứng yên trong khi hình vẫn chạy tiếp.
+        if (Math.abs(clamped - previous) < 0.05) {
+            setDragOffset(null)
+        }
+    }, [dateToMedia])
 
     /**
      * Tua tới một MỐC GIỜ THỰC. Đây là thứ biến một cảnh báo thành điều hướng: cảnh báo mang
@@ -645,6 +691,9 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             return 'out-of-range'
         }
 
+        // Xoá cả lần kéo đang chờ chốt: tua theo cảnh báo mà để lại một đích cũ trong hàng đợi thì
+        // sự kiện `lostpointercapture` tới sau sẽ kéo ngược người xem ra khỏi chỗ vừa nhảy tới.
+        pendingOffsetRef.current = null
         draggingRef.current = false
         setDragOffset(null)
         applySeek(video, dvr, target)
@@ -653,6 +702,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
 
     const goLive = useCallback(() => {
         setLeftLiveAtMs(null)
+        pendingOffsetRef.current = null
         setDragOffset(null)
         const video = videoRef.current
         const dvr = dvrRangeRef.current

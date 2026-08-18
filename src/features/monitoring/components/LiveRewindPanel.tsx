@@ -354,12 +354,18 @@ export function LiveRewindPanel({
                         // onChange chỉ DỜI con trượt. Tua thật xảy ra lúc thả tay (pointerup) hoặc
                         // nhả phím -- xem doc của onScrubMove.
                         onChange={(event) => onScrubMove(Number(event.target.value))}
-                        onKeyUp={(event) => onScrubCommit(Number(event.currentTarget.value))}
+                        onKeyUp={onScrubCommit}
                         onPointerDown={onScrubStart}
                         // Bắt cả lostpointercapture: thả tay ngoài phạm vi thanh vẫn phải chốt, nếu
                         // không con trượt kẹt ở trạng thái đang kéo và không bao giờ tua.
-                        onLostPointerCapture={(event) => onScrubCommit(Number(event.currentTarget.value))}
-                        onPointerUp={(event) => onScrubCommit(Number(event.currentTarget.value))}
+                        //
+                        // Cả ba đường đều gọi onScrubCommit KHÔNG kèm vị trí, và đó là điều bắt buộc:
+                        // một lần thả tay bắn cả pointerup lẫn lostpointercapture, React render lại
+                        // giữa hai lần và ghi giá trị cũ trở lại DOM, nên đọc `currentTarget.value` ở
+                        // lần thứ hai là tua ngược về đúng chỗ vừa rời đi. Vị trí lấy từ ref bên trong
+                        // hook, và lần chốt đầu tiên vô hiệu hoá mọi lần sau.
+                        onLostPointerCapture={onScrubCommit}
+                        onPointerUp={onScrubCommit}
                         step={0.1}
                         type="range"
                         value={sliderValue}

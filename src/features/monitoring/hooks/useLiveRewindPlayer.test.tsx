@@ -201,6 +201,51 @@ describe('thanh tua live rewind', () => {
         expect(currentTime).toBeCloseTo(300, 1)
     })
 
+    /**
+     * Thả tay sinh ra HAI sự kiện, không phải một.
+     *
+     * <p>`input[type=range]` tự bắt con trỏ lúc nhấn xuống, nên lúc nhả trình duyệt bắn `pointerup`
+     * rồi `lostpointercapture`. Cả hai đều là đường chốt hợp lệ -- thả tay ra ngoài phạm vi thanh chỉ
+     * có cái sau. Nhưng React kịp render lại giữa hai lần đó, và bản render ấy ghi giá trị cũ trở lại
+     * DOM, nên lần chốt thứ hai đọc phải chính con số vừa bị bỏ đi và tua ngược về chỗ cũ.
+     *
+     * <p>Nhìn từ ngoài: kéo xong thả tay là hình nhảy về đoạn vừa đi qua.
+     */
+    it('thả tay chỉ chốt MỘT lần, dù trình duyệt bắn cả pointerup lẫn lostpointercapture', () => {
+        const { slider } = mount()
+
+        act(() => {
+            fireEvent.pointerDown(slider)
+            fireEvent.change(slider, { target: { value: '100' } })
+        })
+        // Ba act tách rời, cố ý: trong trình duyệt đây là ba sự kiện rời nhau, và React flush state
+        // giữa chúng. Gộp vào một act là bỏ mất đúng cái khe mà lỗi chui qua.
+        act(() => {
+            fireEvent.pointerUp(slider)
+        })
+        act(() => {
+            fireEvent.lostPointerCapture(slider)
+        })
+
+        expect(currentTime).toBeCloseTo(100, 1)
+    })
+
+    it('con trượt ở nguyên chỗ vừa thả trong lúc chờ playhead tới nơi', () => {
+        const { slider } = mount()
+
+        act(() => {
+            fireEvent.pointerDown(slider)
+            fireEvent.change(slider, { target: { value: '100' } })
+        })
+        act(() => {
+            fireEvent.pointerUp(slider)
+        })
+
+        // Chưa có nhịp đo nào chạy kể từ lúc chốt: nếu thumb đã trả về `seek.playheadOffset` ở đây thì
+        // nó đang hiện một vị trí cũ hơn cả lệnh tua vừa phát ra.
+        expect(Number(slider.value)).toBeCloseTo(100, 1)
+    })
+
     it('sau khi tua về quá khứ, thanh không tự nhảy lại về mép', () => {
         const { slider } = mount()
 
