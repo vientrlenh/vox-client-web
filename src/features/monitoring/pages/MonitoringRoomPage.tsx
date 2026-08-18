@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 
@@ -12,7 +12,7 @@ import type { ProctorCandidateSummaryDto } from '@/features/examCore/types'
 import { useScheduleProctoringAlertsQuery } from '@/features/proctoring-alerts'
 
 import { useScheduleMonitor, type AlertView } from '../api/useRoomMonitor'
-import { LiveRewindPanel } from '../components/LiveRewindPanel'
+import { LiveRewindPanel, type LatestAlertNotice, type SeekRequest } from '../components/LiveRewindPanel'
 import { ParticipantCard } from '../components/ParticipantCard'
 import { RoomAlertFeed } from '../components/RoomAlertFeed'
 import { RoomRosterPanel } from '../components/RoomRosterPanel'
@@ -22,7 +22,7 @@ import {
     type ParticipantBoardEntry,
     type StreamFilter,
 } from '../hooks/useMonitoringBoard'
-import { type MonitorConnectionState, type StreamType } from '../types'
+import { getAlertTypeDisplay, type MonitorConnectionState, type StreamType } from '../types'
 
 const EMPTY_CANDIDATES: ProctorCandidateSummaryDto[] = []
 
@@ -128,6 +128,39 @@ export function MonitoringRoomPage() {
     // Lưu theo cặp (học viên, loại luồng) chứ không theo streamId: một lần reconnect sinh streamId
     // mới, và giám thị đang xem sẽ bị đá ra ngoài dù học viên vẫn là người đó và vẫn đang stream.
     const [watching, setWatching] = useState<null | { candidateId: string; streamType: StreamType }>(null)
+    const [seekRequest, setSeekRequest] = useState<null | SeekRequest>(null)
+
+    /**
+     * Bấm một cảnh báo: mở luồng của học viên đó rồi tua tới đúng thời điểm.
+     *
+     * <p>`requestId` tăng dần chứ không dùng chính mốc thời gian làm khoá: bấm lại cùng một cảnh báo
+     * sau khi đã tua đi chỗ khác phải quay về được, mà nếu khoá theo mốc thì lần bấm thứ hai trông
+     * y hệt lần đầu và effect bên panel bỏ qua.
+     */
+    const handleSelectAlert = useCallback(
+        (alert: AlertView) => {
+            const candidateId = resolveAlertCandidateId(alert)
+            const entry = onScreen.find((item) => item.candidateId === candidateId)
+            if (!entry || entry.allStreams.length === 0) {
+                setErrorMessage('Học viên của cảnh báo này hiện không có luồng nào đang xem được.')
+                return
+            }
+
+            const atMs = Date.parse(alert.capturedAt) || alert.receivedAt
+            if (!atMs) {
+                setErrorMessage('Cảnh báo này không có mốc thời gian để tua tới.')
+                return
+            }
+
+            // Ưu tiên giữ nguyên loại luồng đang xem nếu học viên đó có; nếu không thì lấy luồng đầu.
+            const keepType = watching?.candidateId === candidateId ? watching.streamType : undefined
+            const target =
+                (keepType && entry.allStreams.find((item) => item.streamType === keepType)) ?? entry.allStreams[0]
+            setWatching({ candidateId, streamType: target.streamType })
+            setSeekRequest((previous) => ({ atMs, requestId: (previous?.requestId ?? 0) + 1 }))
+        },
+        [onScreen, resolveAlertCandidateId, watching],
+    )
 
     const watchingEntry = useMemo(
         () => onScreen.find((entry) => entry.candidateId === watching?.candidateId),
@@ -154,6 +187,33 @@ export function MonitoringRoomPage() {
         }
         return map
     }, [candidates])
+
+    /**
+     * Cảnh báo mới nhất của phòng, thu về primitive cho panel.
+     *
+     * <p>`mergedAlerts` đã sắp giảm dần theo `receivedAt`, nên phần tử đầu là mới nhất. Dùng
+     * `receivedAt` chứ không `capturedAt`: nó đã được chuẩn hoá về số ở bước gộp, và với cảnh báo
+     * đọc từ lịch sử thì chính nó mang mốc SỰ VIỆC.
+     */
+    const latestAlertNotice = useMemo<LatestAlertNotice | null>(() => {
+        const newest = mergedAlerts[0]
+        if (!newest) {
+            return null
+        }
+        return {
+            atMs: newest.receivedAt,
+            label: getAlertTypeDisplay(newest.alertType).label,
+            participantName:
+                nameByCandidateId.get(resolveAlertCandidateId(newest)) ?? (newest.participantId || 'Không rõ'),
+        }
+    }, [mergedAlerts, nameByCandidateId, resolveAlertCandidateId])
+
+    // useCallback vì panel đăng ký nó vào listener keydown (Esc): một identity mới mỗi lần render sẽ
+    // tháo và gắn lại listener liên tục.
+    const handleCloseWatch = useCallback(() => {
+        setWatching(null)
+        setSeekRequest(null)
+    }, [])
 
     async function handleForceEnd(entry: ParticipantBoardEntry) {
         if (!entry.sessionId) {
@@ -234,12 +294,52 @@ export function MonitoringRoomPage() {
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="grid content-start gap-5">
+                    {/*
+                      Panel xem nằm ở CỘT CHÍNH, không phải sidebar 320px. Ở sidebar, video rộng
+                      ~288px sau padding -- tức bằng hoặc NHỎ HƠN chính những ô thumbnail vừa được
+                      bấm vào (cột chính chia 2 thẻ × 2 luồng = 4 ô ngang). Bấm để "xem kỹ" mà nhận
+                      khung nhỏ hơn là tai nạn của việc đặt panel vào sidebar.
+
+                      Đổi chỗ cũng gỡ luôn việc panel và dòng cảnh báo tranh nhau một cột: mở xem
+                      thì cảnh báo bị đẩy xuống, đúng lúc cần cả hai nhất.
+                    */}
+                    {watchingEntry && watchingStream ? (
+                        <LiveRewindPanel
+                            availableStreams={watchingEntry.allStreams}
+                            latestAlert={latestAlertNotice}
+                            onAuthError={() => void refreshStreamToken()}
+                            onClose={handleCloseWatch}
+                            onSeekUnavailable={() =>
+                                setErrorMessage(
+                                    'Thời điểm của cảnh báo này đã trôi khỏi cửa sổ tua lại. Bản ghi đầy đủ xem được ở màn chấm bài.',
+                                )
+                            }
+                            onSelectStreamType={(streamType) =>
+                                setWatching({ candidateId: watchingEntry.candidateId, streamType })
+                            }
+                            participantName={watchingEntry.studentName}
+                            scheduleId={scheduleId}
+                            seekRequest={seekRequest}
+                            stream={watchingStream}
+                            token={streamToken}
+                        />
+                    ) : null}
+
                     {onScreen.length === 0 ? (
                         <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm font-medium text-slate-500">
                             Chưa có học sinh nào đang stream trong phòng.
                         </p>
                     ) : (
-                        <div className="grid gap-5 lg:grid-cols-2">
+                        // Đang xem một người thì lưới dày lên chứ KHÔNG bớt người: lúc đó việc của
+                        // lưới là TRẠNG THÁI, không phải video. Giám thị không cần đọc nội dung màn
+                        // hình của 19 người kia, họ cần liếc thấy ai vừa chuyển đỏ -- đúng thứ
+                        // STATUS_RING được thiết kế cho thị giác ngoại vi. Thu nhỏ thì được, ẩn
+                        // bớt người thì không.
+                        <div
+                            className={`grid gap-5 ${
+                                watchingEntry ? 'md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'lg:grid-cols-2'
+                            }`}
+                        >
                             {onScreen.map((entry) => (
                                 <ParticipantCard
                                     entry={entry}
@@ -263,25 +363,10 @@ export function MonitoringRoomPage() {
                 </div>
 
                 <div className="grid content-start gap-4">
-                    {/* Panel nằm cạnh lưới chứ không thay thế lưới: soi kỹ một học viên mà mù với
-                        những người còn lại thì mất đúng lý do tồn tại của màn hình giám sát. */}
-                    {watchingEntry && watchingStream ? (
-                        <LiveRewindPanel
-                            availableStreams={watchingEntry.allStreams}
-                            onAuthError={() => void refreshStreamToken()}
-                            onClose={() => setWatching(null)}
-                            onSelectStreamType={(streamType) =>
-                                setWatching({ candidateId: watchingEntry.candidateId, streamType })
-                            }
-                            participantName={watchingEntry.studentName}
-                            scheduleId={scheduleId}
-                            stream={watchingStream}
-                            token={streamToken}
-                        />
-                    ) : null}
                     <RoomRosterPanel neverConnected={neverConnected} onScreen={onScreen} />
                     <RoomAlertFeed
                         alerts={mergedAlerts}
+                        onSelect={handleSelectAlert}
                         resolveName={(alert) =>
                             nameByCandidateId.get(resolveAlertCandidateId(alert)) ?? alert.participantId
                         }

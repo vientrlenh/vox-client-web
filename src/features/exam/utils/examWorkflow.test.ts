@@ -40,7 +40,19 @@ describe('getExamWorkflowSteps — 5 bước theo đúng thứ tự tab', () => 
     expect(result.currentStep).toBeNull()
   })
 
-  it('thiếu người ra đề thì kẹt ở bước phân công giáo viên', () => {
+  it('chưa phân công ai thì kẹt ở bước phân công giáo viên', () => {
+    const result = getExamWorkflowSteps(exam({ members: [] }), [lockedPaper], [schedule('s1', 'PUBLISHED')], candidates)
+
+    expect(result.done.people).toBe(false)
+    expect(result.currentStep?.tab).toBe('people')
+    expect(result.steps[0].sublabel).toBe('Chưa phân công')
+  })
+
+  /**
+   * Quản trị trường / chủ tịch hội đồng làm được mọi việc mà không cần AUTHOR, nên đòi đủ cả hai vai
+   * là luật FE-only: kỳ thi giao cho đúng một người vẫn là đã phân công.
+   */
+  it('có người được giao là bước phân công xong, kể cả khi chưa đủ cả chủ tịch lẫn người ra đề', () => {
     const result = getExamWorkflowSteps(
       exam({ members: [{ id: 'm1', role: 'CHAIR' }] as ExamDto['members'] }),
       [lockedPaper],
@@ -48,8 +60,9 @@ describe('getExamWorkflowSteps — 5 bước theo đúng thứ tự tab', () => 
       candidates,
     )
 
-    expect(result.done.people).toBe(false)
-    expect(result.currentStep?.tab).toBe('people')
+    expect(result.done.people).toBe(true)
+    expect(result.completedCount).toBe(5)
+    expect(result.steps[0].sublabel).toBe('1 thành viên')
   })
 
   it('còn ca thi bản nháp thì bước xếp lịch chưa xong', () => {

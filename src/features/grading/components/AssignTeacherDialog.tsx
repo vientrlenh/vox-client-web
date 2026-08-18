@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Info, Search, UserCheck, X } from 'lucide-react'
+import { Info, Search, ShieldAlert, UserCheck, X } from 'lucide-react'
 import { useAssignableTeachersQuery } from '../api/useGradingQueries'
 import {
+  assignBlockedReason,
   getRoundTypeDisplay,
   localDateTimeToIso,
   suggestedRoundFor,
@@ -55,6 +56,9 @@ export function AssignTeacherDialog({
   const teachersQuery = useAssignableTeachersQuery(search)
   const teachers = teachersQuery.data ?? []
   const roundMismatch = !isReassign && suggested != null && suggested !== roundType
+  // Chốt chặn cuối: `roundMismatch` im lặng đúng lúc nguy hiểm nhất (bài đã chốt sổ thì
+  // `suggested` là null nên không có vòng nào để so lệch). Đổi giáo viên không đi qua đây.
+  const blockedReason = isReassign ? null : assignBlockedReason(resultStatus)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-5">
@@ -94,6 +98,14 @@ export function AssignTeacherDialog({
             </div>
           ) : (
             <>
+              {blockedReason ? (
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <ShieldAlert className="mt-0.5 size-4.5 shrink-0 text-red-600" />
+                  <span className="text-[12.5px] font-medium leading-relaxed text-red-700">
+                    {blockedReason} Hệ thống sẽ từ chối mọi phân công cho bài này.
+                  </span>
+                </div>
+              ) : null}
               <div className="text-[12.5px] font-bold text-slate-600">Vòng chấm</div>
               <div className="mt-2">
                 <RoundTypePicker onChange={setRoundType} value={roundType} />
@@ -158,7 +170,7 @@ export function AssignTeacherDialog({
           </button>
           <button
             className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-cyan-600 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={picked == null || picked === currentTeacherId || isPending}
+            disabled={picked == null || picked === currentTeacherId || isPending || blockedReason !== null}
             onClick={() =>
               picked &&
               onConfirm({

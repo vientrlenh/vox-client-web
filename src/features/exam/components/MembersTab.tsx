@@ -8,7 +8,18 @@ import { TeacherPickerModal } from './TeacherPickerModal'
 import { getMemberRoleDisplay, type ExamMemberRole } from '../types'
 
 const ROLE_ORDER: ExamMemberRole[] = ['CHAIR', 'AUTHOR', 'REVIEWER']
-const REQUIRED_ROLES: ExamMemberRole[] = ['CHAIR', 'AUTHOR']
+
+/**
+ * Không vai nào bắt buộc: quản trị trường và chủ tịch hội đồng tự chạy được trọn quy trình
+ * (`resolveExamAuthority`), và backend cũng không đòi thành viên khi lên lịch kỳ thi. Vì thế thẻ vai
+ * trò chỉ tô xanh khi đã có người, còn lại để xám — trước đây CHAIR/AUTHOR để trống bị tô amber như
+ * một lỗi cần sửa, trong khi bỏ trống là lựa chọn hợp lệ.
+ */
+const ROLE_HINT: Record<ExamMemberRole, string> = {
+  AUTHOR: 'Soạn nội dung mã đề',
+  CHAIR: 'Chốt phiên bản khung đề, khóa mã đề, mở khóa ngân hàng câu hỏi sau kỳ thi',
+  REVIEWER: 'Duyệt mã đề do người khác soạn',
+}
 
 const ROLE_AVATAR_COLOR: Record<ExamMemberRole, string> = {
   AUTHOR: 'bg-cyan-600',
@@ -93,37 +104,27 @@ export function MembersTab({ canManage, canManageChair, examId, locked = false, 
         {ROLE_ORDER.map((role) => {
           const count = members.filter((member) => member.role === role).length
           const isSatisfied = count > 0
-          const isRequired = REQUIRED_ROLES.includes(role)
-          const toneClass = isSatisfied ? 'emerald' : isRequired ? 'amber' : 'slate'
           return (
             <div
               className={[
                 'flex items-center gap-3 rounded-2xl border bg-white p-4',
-                toneClass === 'emerald' ? 'border-emerald-200' : toneClass === 'amber' ? 'border-amber-200' : 'border-slate-200',
+                isSatisfied ? 'border-emerald-200' : 'border-slate-200',
               ].join(' ')}
               key={role}
+              title={ROLE_HINT[role]}
             >
               <span
                 className={[
-                  'flex size-9 items-center justify-center rounded-full',
-                  toneClass === 'emerald'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : toneClass === 'amber'
-                      ? 'bg-amber-50 text-amber-700'
-                      : 'bg-slate-100 text-slate-500',
+                  'flex size-9 shrink-0 items-center justify-center rounded-full',
+                  isSatisfied ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400',
                 ].join(' ')}
               >
                 <Check aria-hidden="true" className="size-4.5" />
               </span>
               <div>
                 <div className="text-[13px] font-bold text-slate-900">{getMemberRoleDisplay(role)}</div>
-                <div
-                  className={[
-                    'text-xs font-semibold',
-                    toneClass === 'emerald' ? 'text-emerald-600' : toneClass === 'amber' ? 'text-amber-700' : 'text-slate-500',
-                  ].join(' ')}
-                >
-                  {isSatisfied ? `Đủ · ${count} người` : isRequired ? 'Chưa có' : 'Không bắt buộc'}
+                <div className={['text-xs font-semibold', isSatisfied ? 'text-emerald-600' : 'text-slate-400'].join(' ')}>
+                  {isSatisfied ? `${count} người` : 'Chưa phân công'}
                 </div>
               </div>
             </div>
@@ -148,7 +149,7 @@ export function MembersTab({ canManage, canManageChair, examId, locked = false, 
 
         {members.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
-            Chưa có thành viên hội đồng.
+            Chưa phân công ai — quản trị trường đang tự chạy kỳ thi này.
           </div>
         ) : (
           <div className="grid gap-2.5">

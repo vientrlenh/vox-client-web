@@ -12,10 +12,11 @@ export function SchoolAdminMonitoringRoomsPage() {
           className="mt-2 text-3xl font-black tracking-0 text-slate-950"
           id="school-admin-monitoring-title"
         >
-          Kỳ thi đang diễn ra
+          Đang diễn ra
         </h1>
         <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-          Các kỳ thi tập trung đang diễn ra trong trường. Nhấn vào một kỳ thi để chọn phòng giám sát
+          Kỳ thi tập trung và bài kiểm tra trên lớp đang diễn ra trong trường. Nhấn vào một mục để
+          chọn phòng giám sát
         </p>
       </div>
 

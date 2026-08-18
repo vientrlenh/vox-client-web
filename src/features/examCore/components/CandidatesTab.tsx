@@ -22,7 +22,12 @@ import {
   useRemoveExamCandidateMutation,
   useUnblockExamCandidateMutation,
 } from '../api/mutations'
-import { examQueryKeys, useExamCandidatesQuery, useExamSchedulesQuery } from '../api/queries'
+import {
+  examQueryKeys,
+  useExamCandidatesQuery,
+  useExamSchedulesQuery,
+  useStudentBusySlotsQuery,
+} from '../api/queries'
 import {
   getCandidateName,
   getCandidateStatusDisplay,
@@ -34,6 +39,7 @@ import {
 } from '../types'
 import { AssignScheduleModal } from './AssignScheduleModal'
 import { ImportCandidatesModal } from './ImportCandidatesModal'
+import { ASSIGNABLE_SCHEDULE_STATUSES } from '../utils/scheduleAssignment'
 import { StudentPickerModal } from './StudentPickerModal'
 
 const PAGE_SIZE = 10
@@ -133,6 +139,46 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
 
   const visibleIds = visibleCandidates.map((candidate) => candidate.id)
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+
+  // Chỉ hỏi backend khi một modal xếp ca đang mở, và chỉ về đúng những người đang xét.
+  const assignableScheduleIds = useMemo(
+    () =>
+      (schedulesQuery.data ?? [])
+        .filter((schedule) => ASSIGNABLE_SCHEDULE_STATUSES.has(schedule.status))
+        .map((schedule) => schedule.id),
+    [schedulesQuery.data],
+  )
+  const studentIdsBeingAssigned = useMemo(() => {
+    if (assigningCandidate) {
+      return [assigningCandidate.studentId]
+    }
+    if (showBulkAssignModal) {
+      return candidates.filter((candidate) => selectedIds.has(candidate.id)).map((candidate) => candidate.studentId)
+    }
+    return []
+  }, [assigningCandidate, candidates, selectedIds, showBulkAssignModal])
+  const busySlotsQuery = useStudentBusySlotsQuery(assignableScheduleIds, studentIdsBeingAssigned)
+
+  // Làm mờ chứ không lọc bỏ: người dùng cần biết ca có tồn tại nhưng đang kẹt, và vì sao.
+  // Đây chỉ là lớp tiện dụng — backend vẫn chặn khi submit.
+  const conflictReasonByScheduleId = useMemo(() => {
+    const busyStudentsBySchedule = new Map<string, Set<string>>()
+    for (const slot of busySlotsQuery.data ?? []) {
+      const students = busyStudentsBySchedule.get(slot.targetScheduleId) ?? new Set<string>()
+      students.add(slot.studentId)
+      busyStudentsBySchedule.set(slot.targetScheduleId, students)
+    }
+    const reasons = new Map<string, string>()
+    for (const [scheduleId, students] of busyStudentsBySchedule) {
+      reasons.set(
+        scheduleId,
+        studentIdsBeingAssigned.length > 1
+          ? `${students.size}/${studentIdsBeingAssigned.length} học sinh đã chọn bị trùng giờ`
+          : 'Học sinh đã có ca thi khác trùng giờ',
+      )
+    }
+    return reasons
+  }, [busySlotsQuery.data, studentIdsBeingAssigned])
 
   function handleSearchChange(value: string) {
     setSearch(value)
@@ -604,6 +650,7 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
       {assigningCandidate ? (
         <AssignScheduleModal
           candidateName={getCandidateName(assigningCandidate)}
+          conflictReasonByScheduleId={conflictReasonByScheduleId}
           currentScheduleId={assigningCandidate.scheduleId}
           onClose={() => setAssigningCandidate(null)}
           onSelect={(scheduleId) => void handleAssignSchedule(scheduleId)}
@@ -614,6 +661,7 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
       {showBulkAssignModal ? (
         <AssignScheduleModal
           candidateName={`${selectedIds.size} thí sinh đã chọn`}
+          conflictReasonByScheduleId={conflictReasonByScheduleId}
           onClose={() => setShowBulkAssignModal(false)}
           onSelect={(scheduleId) => void handleBulkAssignSchedule(scheduleId)}
           schedules={schedulesQuery.data ?? []}

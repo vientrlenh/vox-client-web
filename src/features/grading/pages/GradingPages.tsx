@@ -88,6 +88,7 @@ import { SetDeadlineDialog } from '../components/SetDeadlineDialog'
 import { SubmitGradingDialog } from '../components/SubmitGradingDialog'
 import { ValidityRulesCard } from '../components/ValidityRulesCard'
 import {
+  assignBlockedReason,
   avatarClasses,
   countSections,
   describeReclaimResult,
@@ -331,8 +332,14 @@ export function SchoolAdminGradingPage({
   const selectedAssignmentIds = selectedRows
     .map((row) => row.assignmentId)
     .filter((id): id is string => !!id)
+  // Chưa có phân công là điều kiện CẦN, chưa đủ: bài đã chốt sổ (FINAL/PASSED/FAILED…) cũng
+  // không có phân công nào nhưng không nhận vòng chấm mới — gán cả lô là cả lô ăn 400.
+  const bulkAssignBlockedReason =
+    selectableUnassigned.map((row) => assignBlockedReason(row.resultStatus)).find(Boolean) ?? null
   const canBulkAssign =
-    selectedRows.length > 0 && selectableUnassigned.length === selectedRows.length
+    selectedRows.length > 0 &&
+    selectableUnassigned.length === selectedRows.length &&
+    bulkAssignBlockedReason === null
   const canSetDeadline = selectedAssignmentIds.length === selectedRows.length && selectedRows.length > 0
 
   function resetToFirstPage<T>(setter: (value: T) => void) {
@@ -829,7 +836,11 @@ export function SchoolAdminGradingPage({
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                 disabled={!canBulkAssign}
                 onClick={() => setBulkAssignOpen(true)}
-                title={canBulkAssign ? undefined : 'Chỉ gán được các bài chưa có phân công đang mở'}
+                title={
+                  canBulkAssign
+                    ? undefined
+                    : (bulkAssignBlockedReason ?? 'Chỉ gán được các bài chưa có phân công đang mở')
+                }
                 type="button"
               >
                 <UserPlus className="size-4" />
@@ -946,6 +957,11 @@ export function SchoolAdminGradingPage({
                       const result = getResultStatusDisplay(row.resultStatus)
                       const outcome = getOutcomeDisplay(row.outcome)
                       const completed = row.assignmentStatus === 'COMPLETED'
+                      // Chỉ chặn ĐƯỜNG GÁN MỚI: đổi giáo viên cho một phân công đang mở thì
+                      // trạng thái bài không cản (vòng chấm giữ nguyên, chỉ thay người).
+                      const blockedReason = row.assignmentId
+                        ? null
+                        : assignBlockedReason(row.resultStatus)
                       // Lịch sử điểm + gỡ phân công chuyển vào menu ⋯ để mỗi dòng chỉ còn
                       // MỘT nút nổi bật — trước đây ba nút cạnh nhau trên mọi dòng.
                       const rowMenu: ActionMenuItem[] = [
@@ -1090,8 +1106,10 @@ export function SchoolAdminGradingPage({
                                   Việc chấm nằm ở phía giáo viên đang cầm phân công. */}
                               {completed || readOnly ? null : (
                                 <button
-                                  className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700"
+                                  className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 text-xs font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                  disabled={blockedReason !== null}
                                   onClick={() => setAssignTarget(row)}
+                                  title={blockedReason ?? undefined}
                                   type="button"
                                 >
                                   {row.assignmentId ? (
