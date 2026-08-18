@@ -17,6 +17,42 @@ const SEEK_END_MARGIN_SECS = 0.25
 /** Nhịp vẽ lại thanh tua. Chạy theo timer chứ không theo `timeupdate` để số liệu vẫn nhích khi phát bị kẹt. */
 const SEEK_TICK_MS = 500
 
+/**
+ * Lệch quá ngần này giữa chỗ ta yêu cầu và chỗ playhead thật sự đáp xuống thì coi là lệnh tua đã bị
+ * từ chối. Rộng hơn một nhịp segment để việc trình phát nhích về keyframe gần nhất không bị báo nhầm.
+ */
+const SEEK_LANDING_TOLERANCE_SECS = 5
+
+/**
+ * Đặt playhead vào `target`, kẹp trong vùng tua được, và NÓI RA khi lệnh không đáp xuống nơi đã hẹn.
+ *
+ * <p>Gán `currentTime` là lệnh có thể bị từ chối trong im lặng: đích nằm ngoài `video.seekable` thì
+ * trình duyệt lặng lẽ kẹp về mép gần nhất -- không lỗi, không sự kiện, không dấu vết. Nhìn từ ngoài
+ * nó giống hệt "kéo thanh tua mà hình không nhúc nhích", và không có gì phân biệt được nó với việc
+ * chính phép tính đích ở đây sai. Đó là lý do chỗ này phải tự tố cáo: ba nguyên nhân rất khác nhau
+ * cùng cho ra một triệu chứng, nên đoán bằng mắt là không xong.
+ *
+ * @returns vị trí đã kẹp mà ta yêu cầu (không phải nơi trình duyệt thực sự đáp xuống).
+ */
+function applySeek(video: HTMLVideoElement, dvr: { end: number; start: number }, target: number): number {
+    const safeEnd = Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS)
+    const clamped = Math.min(safeEnd, Math.max(dvr.start + 0.05, target))
+    video.currentTime = clamped
+
+    const landed = video.currentTime
+    if (Math.abs(landed - clamped) > SEEK_LANDING_TOLERANCE_SECS) {
+        const seekable: [number, number][] = []
+        for (let index = 0; index < video.seekable.length; index += 1) {
+            seekable.push([video.seekable.start(index), video.seekable.end(index)])
+        }
+        console.warn(
+            'live rewind: lệnh tua không đáp xuống nơi đã hẹn -- trình duyệt đã kẹp nó lại',
+            { clamped, dvr, landed, requested: target, seekable },
+        )
+    }
+    return clamped
+}
+
 const MAX_MEDIA_ERROR_RECOVERIES = 3
 
 /**
@@ -159,6 +195,14 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
      * bên dưới khoá vào `streamId` - một primitive - thay vì vào identity của object.
      */
     const startedAtRef = useRef<string | undefined>(stream?.startedAt)
+    /**
+     * Luồng này đã đóng chưa. Cùng lý do đọc qua ref với `startedAt`.
+     *
+     * <p>Quyết định một điều mà phần còn lại của hook không tự suy được: có tồn tại "mép live" hay
+     * không. Playlist đã đóng bằng #EXT-X-ENDLIST thì không, và mọi phép tính lùi khỏi mép live đều
+     * trở thành vô nghĩa trên nó.
+     */
+    const endedAtRef = useRef<number | undefined>(stream?.endedAt)
     /** Cùng lý do với hai ref trên: giữ callback ngoài deps để không dựng lại trình phát. */
     const onAuthErrorRef = useRef(onAuthError)
     const lastAuthRefreshRef = useRef(0)
@@ -200,6 +244,10 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
     useEffect(() => {
         startedAtRef.current = stream?.startedAt
     }, [stream?.startedAt])
+
+    useEffect(() => {
+        endedAtRef.current = stream?.endedAt
+    }, [stream?.endedAt])
 
     useEffect(() => {
         onAuthErrorRef.current = onAuthError
@@ -411,6 +459,16 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
          * HLS của Safari, nơi engine tự quản việc bám live và không lộ ra giá trị này.
          */
         const liveSyncMediaTime = (dvr: { end: number; start: number }) => {
+            // Bản ghi đã đóng thì KHÔNG có mép live để lùi khỏi, nên cả đoạn đều tới được.
+            //
+            // Lùi lại vài nhịp ở đây là sai theo cách khó thấy: hls.js vẫn trả `liveSyncPosition`
+            // cho playlist VOD (nó tính từ `edge` cộng tuổi playlist rồi kẹp lại), nên nhánh dưới
+            // vẫn ra một con số trông hợp lý - chỉ là nó cắt mất chừng 12 giây cuối của bản ghi và
+            // con trượt không bao giờ tới được đoạn kết. Mà với xem lại bằng chứng thì đoạn kết
+            // thường đúng là đoạn cần xem.
+            if (endedAtRef.current !== undefined) {
+                return dvr.end
+            }
             const syncPosition = hlsRef.current?.liveSyncPosition
             if (typeof syncPosition === 'number' && Number.isFinite(syncPosition)) {
                 return Math.max(dvr.start, Math.min(dvr.end, syncPosition))
@@ -455,6 +513,10 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             }
             const domain = seekDomainRef.current
             const tolerance = LIVE_EDGE_TOLERANCE_COUNT * targetDurationRef.current
+            // Trên một bản ghi đã đóng thì "đang ở hiện tại" không có nghĩa, và trả về true ở đoạn
+            // cuối kéo theo một hậu quả cụ thể: panel ghim con trượt vào mép phải, nên xem tới gần
+            // hết bản ghi là thanh tua khoá cứng ở cuối và không kéo đi đâu được nữa.
+            const isAtLiveEdge = (behind: number) => endedAtRef.current === undefined && behind <= tolerance
 
             let behindSecs: number
             if (domain.absolute) {
@@ -464,7 +526,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
                 behindSecs = Math.max(0, dvrEndOffset - playheadOffset)
                 setSeek({
                     absolute: true,
-                    atLiveEdge: behindSecs <= tolerance,
+                    atLiveEdge: isAtLiveEdge(behindSecs),
                     behindSecs,
                     domainEndOffset: toOffset(domain.endMs),
                     dvrEndOffset,
@@ -475,7 +537,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
                 behindSecs = Math.max(0, dvr.end - video.currentTime)
                 setSeek({
                     absolute: false,
-                    atLiveEdge: behindSecs <= tolerance,
+                    atLiveEdge: isAtLiveEdge(behindSecs),
                     behindSecs,
                     domainEndOffset: domain.endMs,
                     dvrEndOffset: dvr.end,
@@ -488,7 +550,8 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             // trôi lại phía sau vì stall cũng là không thấy hiện tại, và đó là trường hợp giám thị
             // không tự biết. `prev ?? now` để việc tụt kéo dài không đẩy mốc chạy theo và xoá mất
             // cảnh báo vừa bỏ lỡ; cả hai nhánh đều idempotent nên gọi mỗi nhịp không gây render thêm.
-            if (behindSecs <= tolerance) {
+            // Bản ghi thì không có hiện tại để mà rời khỏi.
+            if (endedAtRef.current !== undefined || behindSecs <= tolerance) {
                 setLeftLiveAtMs(null)
             } else {
                 setLeftLiveAtMs((previous) => previous ?? Date.now())
@@ -554,8 +617,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             const target = domain.absolute ? dateToMedia(domain.startMs + offsetSecs * 1000) : offsetSecs
             // Kẹp trong vùng tua được thay vì tin giá trị thô: thanh trượt trải cả thời gian đã chạy
             // mà chỉ dvrRange là thực sự lấy được.
-            const safeEnd = Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS)
-            video.currentTime = Math.min(safeEnd, Math.max(dvr.start + 0.05, target))
+            applySeek(video, dvr, target)
         },
         [dateToMedia],
     )
@@ -579,14 +641,13 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
 
         const anchor = wallAnchorRef.current
         const target = anchor.mediaTime + (dateMs - anchor.dateMs) / 1000
-        const safeEnd = Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS)
         if (target < dvr.start || target > dvr.end) {
             return 'out-of-range'
         }
 
         draggingRef.current = false
         setDragOffset(null)
-        video.currentTime = Math.min(safeEnd, Math.max(dvr.start + 0.05, target))
+        applySeek(video, dvr, target)
         return 'ok'
     }, [])
 
@@ -612,10 +673,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             typeof syncPosition === 'number' && Number.isFinite(syncPosition)
                 ? syncPosition
                 : dvr.end - LIVE_SYNC_DURATION_COUNT * targetDurationRef.current
-        video.currentTime = Math.min(
-            Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS),
-            Math.max(dvr.start, target),
-        )
+        applySeek(video, dvr, target)
     }, [])
 
     const toggleMute = useCallback(() => {
