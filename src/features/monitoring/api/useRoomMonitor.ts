@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import type { AlertEvent, MonitorConnectionState, FrameNotification, MonitorMessage, ParticipantEvent, StreamSnapshot } from "../types";
+import type { AlertEvent, MonitorConnectionState, FrameNotification, MonitorMessage, ParticipantEvent, ScheduleStreamRecord, StreamSnapshot } from "../types";
 import { useMonitorToken } from "./useMonitorToken";
-import { buildMonitorSocketUrl } from "./streamClient";
+import { buildMonitorSocketUrl, fetchScheduleStreams } from "./streamClient";
 
 export type StreamView = StreamSnapshot & {
     latestFrameUrl?: string | null
@@ -30,14 +30,37 @@ type StreamsAction =
     | { type: 'frame'; frame: FrameNotification }
     | { type: 'participant'; event: ParticipantEvent }
     | { type: 'reset' }
+    | { type: 'seed'; streams: ScheduleStreamRecord[] }
 
 function streamsReducer(
     state: Map<string, StreamView>, 
     action: StreamsAction
 ): Map<string, StreamView> {
     switch (action.type) {
-        case 'reset': 
+        case 'reset':
             return new Map()
+        case 'seed': {
+            // Nạp lịch sử luồng của ca thi từ server, chạy MỘT lần lúc mở phòng.
+            //
+            // Chỉ THÊM chứ không thay: seed có thể về sau snapshot, và khi đó thứ nó mang là bản
+            // chụp cũ hơn -- ghi đè sẽ hạ một luồng đang sống xuống thành đã kết thúc. Vì vậy entry
+            // đã có luôn thắng, bất kể ai tới trước.
+            const next = new Map(state)
+            for (const record of action.streams) {
+                if (next.has(record.streamId)) {
+                    continue
+                }
+                next.set(record.streamId, {
+                    endedAt: record.endedAt ? Date.parse(record.endedAt) || Date.now() : undefined,
+                    participantId: record.participantId,
+                    sessionId: record.sessionId,
+                    startedAt: record.startedAt,
+                    streamId: record.streamId,
+                    streamType: record.streamType,
+                })
+            }
+            return next
+        }
         case 'snapshot': {
             // Fire khi reconnect, giữ lại frame cũ nếu có.
             // ?? [] chứ không tin thẳng vào payload: đây là dữ liệu từ dây, và một trường thiếu
@@ -199,6 +222,38 @@ export function useScheduleMonitor({ examId, scheduleId }: UseScheduleMonitorPar
     useEffect(() => {
         tokenRef.current = token ?? null
     }, [token])
+
+    /**
+     * Nạp lịch sử luồng của ca thi, một lần cho mỗi lần mở phòng.
+     *
+     * <p>Đây là thứ khiến phòng giám sát sống sót qua F5. Bản đồ luồng vốn chỉ được dựng từ snapshot
+     * WebSocket, mà snapshot chỉ trả luồng ĐANG sống -- nên nạp lại trang giữa ca là mọi học viên đã
+     * rớt biến mất, kèm theo đường vào đoạn ghi của họ, dù đoạn ghi vẫn còn nguyên phía server.
+     *
+     * <p>Lỗi thì bỏ qua trong im lặng: seed chỉ là lớp phủ thêm lên luồng trực tiếp, và một phòng
+     * thiếu vài ô đã kết thúc vẫn tốt hơn nhiều so với một phòng không mở được.
+     */
+    useEffect(() => {
+        const activeToken = tokenRef.current
+        if (!scheduleId || !activeToken) {
+            return
+        }
+        let cancelled = false
+        fetchScheduleStreams(scheduleId, activeToken)
+            .then((streams) => {
+                if (!cancelled && streams.length > 0) {
+                    dispatch({ streams, type: 'seed' })
+                }
+            })
+            .catch(() => {})
+        return () => {
+            cancelled = true
+        }
+        // `hasToken` chứ không phải `token`: cái sau được làm mới mỗi 4 phút và sẽ gọi lại API mỗi
+        // lần gia hạn cho dữ liệu gần như không đổi, còn cái này lật false->true đúng một lần. Phải
+        // có nó trong deps -- lần render đầu token thường chưa về, và chỉ khoá theo scheduleId thì
+        // seed sẽ không bao giờ chạy.
+    }, [hasToken, scheduleId])
 
     useEffect(() => {
         if (!scheduleId || !hasToken) {

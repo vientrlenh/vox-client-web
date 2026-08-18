@@ -73,6 +73,36 @@ export function isForbiddenApiError(error: unknown): boolean {
   })
 }
 
+/**
+ * "Trường chưa có gói subscription đang hoạt động" (BE `PlanLimitExceededException`) — tách khỏi
+ * các lỗi khác vì cách xử lý khác hẳn: thử lại không cứu được, cần điều hướng người dùng đi
+ * gia hạn/đăng ký gói thay vì toast lỗi chung chung.
+ *
+ * REST trả `status: 422` kèm `{ error: "PLAN_LIMIT_EXCEEDED", message: "..." }` (xem
+ * `GlobalExceptionHandler`); GraphQL không có mã HTTP riêng nên phân loại nằm ở
+ * `extensions.code` (xem `GlobalExceptionResolver`), giống cách `isForbiddenApiError` đọc
+ * `extensions.classification`.
+ */
+export function isPlanLimitExceededApiError(error: unknown): boolean {
+  const apiError = toApiError(error)
+
+  if (apiError.status === 422) {
+    const details = apiError.details as { error?: string } | undefined
+    if (details?.error === 'PLAN_LIMIT_EXCEEDED') {
+      return true
+    }
+  }
+
+  if (!Array.isArray(apiError.details)) {
+    return false
+  }
+
+  return apiError.details.some((detail) => {
+    const extensions = (detail as { extensions?: { code?: string } } | null)?.extensions
+    return extensions?.code === 'PLAN_LIMIT_EXCEEDED'
+  })
+}
+
 function isApiError(error: unknown): error is ApiError {
   return (
     typeof error === 'object' &&

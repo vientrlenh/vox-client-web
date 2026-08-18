@@ -48,7 +48,7 @@ async function fetchExamSessionProctoringAlerts(examSessionId: string) {
   return data.examSessionProctoringAlerts
 }
 
-async function fetchScheduleProctoringAlerts(scheduleId: string) {
+export async function fetchScheduleProctoringAlerts(scheduleId: string) {
   const data = await graphQLRequest<{ scheduleProctoringAlerts: ProctoringAlertDto[] }>(
     SCHEDULE_PROCTORING_ALERTS_QUERY,
     { scheduleId },

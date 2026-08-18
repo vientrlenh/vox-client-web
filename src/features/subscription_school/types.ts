@@ -1,7 +1,7 @@
 import { ClipboardList, FileCheck2, Headphones, type LucideIcon } from 'lucide-react'
 
 export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
-export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
+export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUSPENDED'
 export type RequestType = 'REGISTRATION' | 'UPGRADE'
 export type InvoiceStatus = 'PAID' | 'PENDING' | 'FAILED' | 'CANCELLED'
 export type SchoolDebtEventType = 'LOCKED' | 'CAP_EXCEEDED' | 'CLEARED'
@@ -63,6 +63,11 @@ export type RenewalPreview = {
   planChanged: boolean
   currentPlan: SubscriptionPlan
   renewalPlan: SubscriptionPlan
+  // Bù giá trị NGÀY CHƯA DÙNG của gói cũ, chỉ > 0 khi planChanged (bị ép đổi gói giữa chu kỳ do
+  // System Admin archive gói đang dùng) -- xem RenewalProrationService ở BE. amountDue = số tiền
+  // thật phải trả sau khi trừ bù (= renewalPlan.pricePerYear khi planChanged là false).
+  unusedCreditAmount: number
+  amountDue: number
 }
 
 export type MySubscription = {
@@ -74,6 +79,10 @@ export type MySubscription = {
   status: SubscriptionStatus
   pricePaidSnapshot: number
   cancelledAt: string | null
+  // System Admin cưỡng chế đình chỉ (mất quyền dùng NGAY, khác cancelledAt chỉ tắt gia hạn) — cả 2 null
+  // khi không bị đình chỉ.
+  suspendedAt: string | null
+  suspendedReason: string | null
   plan: SubscriptionPlan | null
 }
 
@@ -242,13 +251,17 @@ export function daysUntil(value?: string | null) {
   return Math.round((end.getTime() - todayVnAsUtcMidnight) / (1000 * 60 * 60 * 24))
 }
 
-const EXPIRING_THRESHOLD_DAYS = 30
+const EXPIRING_THRESHOLD_DAYS = 7
 
 export function getSubscriptionStatusDisplay(
   status: SubscriptionStatus,
   endDate?: string | null,
   cancelledAt?: string | null,
 ) {
+  if (status === 'SUSPENDED') {
+    return { label: 'Đã đình chỉ', tone: 'danger' as const }
+  }
+
   if (status === 'ACTIVE') {
     // Đã bấm Hủy nhưng gói không cắt ngay — dùng bình thường tới hết endDate (kiểu Claude), chỉ là
     // sẽ không tự gia hạn nữa.

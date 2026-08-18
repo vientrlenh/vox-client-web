@@ -6,7 +6,7 @@ export {
   getAuthTokens,
   saveAuthTokens,
 } from './authTokenStorage'
-export { isForbiddenApiError, toApiError } from './apiError'
+export { isForbiddenApiError, isPlanLimitExceededApiError, toApiError } from './apiError'
 export { requireSchoolId } from './schoolApiUtils'
 export type { ApiResponse, MutationResult } from './schoolApiUtils'
 export type { ApiError } from './apiError'

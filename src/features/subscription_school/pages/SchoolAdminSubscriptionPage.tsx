@@ -163,6 +163,16 @@ export function SchoolAdminSubscriptionPage() {
         paymentMethod,
         subscriptionId: subscription.id,
       })
+
+      // Bù trừ ngày chưa dùng đã chi trả đủ 100% giá gói mới -- BE chốt PAID ngay, không có cổng nào
+      // để điều hướng sang (xem CreatePaymentLinkForRenewalUseCase).
+      if (result.data.action === 'NONE') {
+        setToast({ text: 'Đã bù đủ 100% — gia hạn miễn phí thành công.', tone: 'success' })
+        setRenewalPreview(null)
+        void mySubscriptionQuery.refetch()
+        return
+      }
+
       goToCheckout(result.data)
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán gia hạn.', tone: 'error' })

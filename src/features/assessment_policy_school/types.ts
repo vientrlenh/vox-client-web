@@ -77,6 +77,7 @@ export type FrameworkVersionDetail = {
 
 export type RubricVersionDetail = {
   id: string;
+  rubricId: string;
   code: string;
   name: string;
   version: number;
@@ -170,7 +171,7 @@ export type RubricVersionOption = {
 // ==========================================
 export type CreateAssessmentPolicyPayload = {
   frameworkVersionId: string;
-  rubricVersionIds: string[];
+  rubricVersionId: string;
   languageId: string;
   targetFrameworkBandId: string;
   passingScore?: number;

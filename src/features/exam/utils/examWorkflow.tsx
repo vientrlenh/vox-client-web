@@ -68,9 +68,11 @@ export function getExamWorkflowSteps(
 
   // `?? []` vì không phải query nào cũng chọn `members` — thiếu thì coi như chưa phân công, đừng ném.
   const members = exam.members ?? []
-  const hasChair = members.some((member) => member.role === 'CHAIR')
-  const hasAuthor = members.some((member) => member.role === 'AUTHOR')
-  const peopleDone = hasChair && hasAuthor
+  // Trước đây là `hasChair && hasAuthor`. Quản trị trường và chủ tịch hội đồng đã tự chạy được trọn
+  // quy trình (`resolveExamAuthority`), và `requireCentralizedScheduleReadiness` của backend cũng
+  // không đòi thành viên nào — nên đòi đủ cả hai vai là luật FE-only, làm kỳ thi đã sẵn sàng lên lịch
+  // vẫn hiện "chưa xong". Có người được giao là đủ.
+  const peopleDone = members.length > 0
 
   const blueprintDone = Boolean(exam.blueprintVersionId)
 
@@ -102,9 +104,9 @@ export function getExamWorkflowSteps(
       done: peopleDone,
       label: 'Phân công giáo viên',
       pendingIcon: <Users size={24} />,
-      sublabel: peopleDone ? 'Đã phân công' : !hasChair ? 'Chưa có chủ tịch hội đồng' : 'Chưa có người ra đề',
+      sublabel: peopleDone ? `${members.length} thành viên` : 'Chưa phân công',
       tab: 'people',
-      todo: 'Kỳ thi cần cả chủ tịch hội đồng và người ra đề trước khi soạn đề.',
+      todo: 'Giao việc soạn / duyệt đề cho giáo viên. Quản trị trường và chủ tịch hội đồng vẫn tự làm được nếu không phân công ai.',
     },
     {
       cta: 'Chốt khung đề',

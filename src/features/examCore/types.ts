@@ -381,6 +381,19 @@ export type ProctorBusySlotDto = {
   teacherId: string
 }
 
+/**
+ * Một học sinh đang vướng lịch khi cân nhắc xếp vào `targetScheduleId`: đã được xếp ca
+ * `busyScheduleId` chạy [startDate, endDate).
+ * Chỉ dùng để làm mờ sẵn lựa chọn bị trùng — luật chặn thật nằm ở backend.
+ */
+export type StudentBusySlotDto = {
+  busyScheduleId: string
+  endDate?: string | null
+  startDate?: string | null
+  studentId: string
+  targetScheduleId: string
+}
+
 export type ExamScheduleDto = {
   candidateCount: number
   endDate?: string | null

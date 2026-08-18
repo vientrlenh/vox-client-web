@@ -361,12 +361,12 @@ function TokenNoSubscriptionCard() {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
       <div className="mb-5">
-        <h3 className="text-base font-extrabold tracking-tight text-slate-900">Sử dụng token</h3>
-        <p className="mt-0.5 text-[13px] text-slate-500">Hạn mức token AI của gói hiện tại</p>
+        <h3 className="text-base font-extrabold tracking-tight text-slate-900">Sử dụng hạn mức AI</h3>
+        <p className="mt-0.5 text-[13px] text-slate-500">Hạn mức AI (USD) của gói hiện tại</p>
       </div>
       <div className="flex items-center gap-2.5 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3.5 text-[13.5px] font-semibold text-orange-800">
         <Info aria-hidden="true" className="size-5 text-orange-600" />
-        <span>Chưa có gói đăng ký đang hoạt động — hạn mức token bằng 0.</span>
+        <span>Chưa có gói đăng ký đang hoạt động — hạn mức AI bằng $0.</span>
       </div>
     </div>
   )
@@ -405,7 +405,7 @@ function TokenQuotaPanel({ quotaType, usage }: { quotaType: QuotaType; usage: To
       </div>
       {level !== 'ok' && total > 0 ? (
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[12px] leading-4 text-amber-700">
-          Sắp đạt giới hạn — cân nhắc mua thêm token hoặc nâng cấp gói.
+          Sắp đạt giới hạn — cân nhắc mua thêm hạn mức hoặc nâng cấp gói.
         </p>
       ) : null}
     </div>
@@ -479,8 +479,8 @@ function TokenUsageTimeseriesSection({
     <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
       <div className="mb-4.5 flex flex-wrap items-start gap-3.5">
         <div>
-          <h3 className="text-base font-extrabold tracking-tight text-slate-900">Sử dụng token theo thời gian</h3>
-          <p className="mt-0.5 text-[13px] text-slate-500">Token AI tiêu thụ mỗi ngày, theo 3 nghiệp vụ dùng AI chấm/luyện</p>
+          <h3 className="text-base font-extrabold tracking-tight text-slate-900">Chi phí AI theo thời gian</h3>
+          <p className="mt-0.5 text-[13px] text-slate-500">Chi phí AI (USD) tiêu hao mỗi ngày, theo 3 nghiệp vụ dùng AI chấm/luyện</p>
         </div>
         <div className="ml-auto flex gap-0.5 rounded-[10px] bg-slate-100 p-0.5">
           {(Object.keys(TOKEN_WINDOW_DAYS) as TokenUsageWindow[]).map((w) => (
@@ -507,7 +507,7 @@ function TokenUsageTimeseriesSection({
       ) : null}
 
       <div className={isFetching ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
-        <div className="text-[13px] font-semibold text-slate-500">Tổng token đã dùng ({days} ngày)</div>
+        <div className="text-[13px] font-semibold text-slate-500">Tổng chi phí đã dùng ({days} ngày)</div>
         <div className="mt-1 text-4xl font-extrabold tracking-tight text-slate-900 tabular-nums">
           {formatUsd(data?.totalUsed ?? 0)}
         </div>
@@ -884,14 +884,12 @@ export function SchoolAdminDashboardPage() {
   const renewal = data.subscriptionRenewal
   const renewalDaysLeft = renewal ? daysUntil(renewal.endDate) : null
   const renewalExpired = renewalDaysLeft !== null && renewalDaysLeft < 0
-  const renewalUrgent = renewalDaysLeft !== null && renewalDaysLeft >= 0 && renewalDaysLeft <= 30
+  const renewalUrgent = renewalDaysLeft !== null && renewalDaysLeft >= 0 && renewalDaysLeft <= 7
   const renewalTint = !renewal
     ? { bg: 'bg-slate-100', fg: 'text-slate-500' }
-    : renewalExpired || (renewalDaysLeft !== null && renewalDaysLeft <= 7)
+    : renewalExpired || renewalUrgent
       ? { bg: 'bg-red-50', fg: 'text-red-700' }
-      : renewalUrgent
-        ? { bg: 'bg-amber-50', fg: 'text-amber-700' }
-        : { bg: 'bg-indigo-50', fg: 'text-indigo-700' }
+      : { bg: 'bg-indigo-50', fg: 'text-indigo-700' }
 
   return (
     <section className="grid gap-5">
@@ -899,7 +897,7 @@ export function SchoolAdminDashboardPage() {
         <div>
           <h1 className="mt-2.5 text-3xl font-extrabold tracking-tight text-slate-900">Tổng quan trường</h1>
           <p className="mt-1.5 max-w-160 text-[15px] text-slate-500">
-            Toàn cảnh hoạt động của trường — phòng thi, khiếu nại, mức dùng token và chi tiêu của trường
+            Toàn cảnh hoạt động của trường — phòng thi, khiếu nại, chi phí AI (USD) và chi tiêu của trường
             {user?.email ? ` · ${user.email}` : ''}.
           </p>
         </div>

@@ -1,7 +1,7 @@
 // src/features/assessment_policy_school/components/CreateAssessmentPolicyDialog.tsx
 
 import { useEffect, useState } from 'react';
-import { X, Loader2, Plus, Trash2 } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useAllFrameworkVersionsQuery, useFrameworkVersionCriteriaQuery } from '../api/useFrameworkVersionOptionsQuery';
@@ -12,18 +12,6 @@ import type { ClassFilters } from '@/features/classes/types';
 import type { AssessmentPolicyStrictness, CreateAssessmentPolicyPayload, RubricOption } from '../types';
 
 type ScoreRange = { min: number; max: number };
-
-// Thang điểm hợp lệ cho Điểm đạt = giao của thang điểm mọi Rubric Version đã chọn trong form
-// (vì 1 form có thể chọn Version từ nhiều Rubric khác nhau nhưng chỉ có 1 giá trị Điểm đạt chung).
-function getEffectiveScoreRange(rubricVersionIds: string[], scalesById: Record<string, ScoreRange>): ScoreRange | null {
-  const scales = rubricVersionIds.map((id) => scalesById[id]).filter((scale): scale is ScoreRange => Boolean(scale));
-  if (scales.length === 0) return null;
-
-  return {
-    max: Math.min(...scales.map((s) => s.max)),
-    min: Math.max(...scales.map((s) => s.min)),
-  };
-}
 
 type CreateAssessmentPolicyDialogProps = {
   isOpen: boolean;
@@ -52,7 +40,7 @@ type PolicyFormState = {
   frameworkId: string;
   frameworkVersionId: string;
   targetFrameworkBandId: string;
-  rubricVersionIds: string[];
+  rubricVersionId: string;
   rubricVersionScales: Record<string, ScoreRange>;
   passingScore: string;
   strictness: AssessmentPolicyStrictness | '';
@@ -70,7 +58,7 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
     frameworkId: '',
     frameworkVersionId: '',
     targetFrameworkBandId: '',
-    rubricVersionIds: [],
+    rubricVersionId: '',
     rubricVersionScales: {},
     passingScore: '',
     strictness: '',
@@ -82,20 +70,20 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
   };
 }
 
-// Danh sách Rubric Version của 1 Rubric cụ thể, cho phép tick chọn nhiều —
-// mỗi Rubric hiện 1 nhóm riêng vì BE không yêu cầu các version phải cùng 1 Rubric
-// (1 Assessment Policy luôn chỉ gắn đúng 1 Rubric Version, nhưng 1 lần tạo có thể
-// chọn Version từ nhiều Rubric khác nhau để sinh nhiều Policy cùng lúc).
+// Danh sách Rubric Version của 1 Rubric cụ thể — chỉ được chọn đúng 1 Version trong toàn bộ form
+// (1 Assessment Policy luôn chỉ gắn đúng 1 Rubric Version, và 1 Rubric Version chỉ dùng được cho
+// đúng 1 Policy). Mỗi Rubric hiện 1 nhóm riêng vì BE không yêu cầu Version phải cùng 1 Rubric.
 type RubricVersionGroupProps = {
   schoolId: string | undefined;
   rubric: RubricOption;
-  selectedIds: string[];
-  onToggle: (rubricVersionId: string) => void;
+  groupName: string;
+  selectedId: string;
+  onSelect: (rubricVersionId: string) => void;
   onVersionsLoaded: (scales: Record<string, ScoreRange>) => void;
   disabled: boolean;
 };
 
-function RubricVersionGroup({ schoolId, rubric, selectedIds, onToggle, onVersionsLoaded, disabled }: RubricVersionGroupProps) {
+function RubricVersionGroup({ schoolId, rubric, groupName, selectedId, onSelect, onVersionsLoaded, disabled }: RubricVersionGroupProps) {
   const { data: versions, isLoading } = useRubricVersionOptionsQuery(schoolId, rubric.id);
 
   useEffect(() => {
@@ -116,11 +104,12 @@ function RubricVersionGroup({ schoolId, rubric, selectedIds, onToggle, onVersion
           {versions.map((rv) => (
             <label key={rv.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50">
               <input
-                type="checkbox"
-                checked={selectedIds.includes(rv.id)}
-                onChange={() => onToggle(rv.id)}
+                type="radio"
+                name={groupName}
+                checked={selectedId === rv.id}
+                onChange={() => onSelect(rv.id)}
                 disabled={disabled}
-                className="size-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                className="size-4 border-slate-300 text-cyan-600 focus:ring-cyan-500"
               />
               <span>{rv.code} - {rv.name} (v{rv.version}) · {rv.status}</span>
             </label>
@@ -134,17 +123,14 @@ function RubricVersionGroup({ schoolId, rubric, selectedIds, onToggle, onVersion
 }
 
 // Toàn bộ khối field của 1 Assessment Policy (Ngôn ngữ -> ngày hiệu lực).
-// Được lặp lại cho mỗi policy trong danh sách khi tạo nhiều policy cùng lúc.
 type PolicyFormFieldsProps = {
   schoolId: string | undefined;
-  index: number;
   form: PolicyFormState;
   onChange: (patch: Partial<PolicyFormState>) => void;
-  onRemove?: () => void;
   isPending: boolean;
 };
 
-function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending }: PolicyFormFieldsProps) {
+function PolicyFormFields({ schoolId, form, onChange, isPending }: PolicyFormFieldsProps) {
   const { data: languages } = useLanguageOptionsQuery();
   const { data: allFrameworkVersions, isLoading: isLoadingFrameworkVersions } = useAllFrameworkVersionsQuery();
   const selectedFrameworkVersion = allFrameworkVersions?.find((fv) => fv.id === form.frameworkVersionId);
@@ -158,7 +144,7 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
   const classes = classesPage?.content ?? [];
 
   function handleLanguageChange(languageId: string) {
-    onChange({ languageId, rubricVersionIds: [] });
+    onChange({ languageId, rubricVersionId: '' });
   }
 
   // Chọn Framework Version trước — Khung năng lực (frameworkId) được tự suy ra từ Version đã chọn,
@@ -176,12 +162,8 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
     onChange({ rubricVersionScales: { ...form.rubricVersionScales, ...scales } });
   }
 
-  function handleToggleRubricVersion(rubricVersionId: string) {
-    onChange({
-      rubricVersionIds: form.rubricVersionIds.includes(rubricVersionId)
-        ? form.rubricVersionIds.filter((id) => id !== rubricVersionId)
-        : [...form.rubricVersionIds, rubricVersionId],
-    });
+  function handleSelectRubricVersion(rubricVersionId: string) {
+    onChange({ rubricVersionId });
   }
 
   // Chọn cấp rộng hơn thì xóa lựa chọn ở (các) cấp hẹp hơn vì chúng phụ thuộc vào cấp rộng.
@@ -193,39 +175,15 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
     onChange({ schoolGradeId, schoolClassId: '' });
   }
 
-  const effectiveScoreRange = getEffectiveScoreRange(form.rubricVersionIds, form.rubricVersionScales);
+  const effectiveScoreRange = form.rubricVersionScales[form.rubricVersionId] ?? null;
   const passingScoreValue = form.passingScore.trim() ? Number(form.passingScore) : null;
   const passingScoreError =
     passingScoreValue !== null && effectiveScoreRange && (passingScoreValue < effectiveScoreRange.min || passingScoreValue > effectiveScoreRange.max)
       ? `Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${effectiveScoreRange.min} – ${effectiveScoreRange.max})`
       : null;
 
-  const isSecondaryPolicy = index > 0;
-
   return (
-    <div
-      className={
-        isSecondaryPolicy ? 'rounded-xl border border-cyan-100 bg-cyan-50/40 p-5' : ''
-      }
-    >
-      {isSecondaryPolicy ? (
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-xs font-extrabold uppercase tracking-wide text-cyan-700">
-            Chính Sách Đánh Giá #{index + 1}
-          </p>
-          {onRemove ? (
-            <button
-              type="button"
-              onClick={onRemove}
-              disabled={isPending}
-              className="flex items-center gap-1.5 text-xs font-bold text-red-500 hover:text-red-600 disabled:opacity-50"
-            >
-              <Trash2 className="size-3.5" /> Xóa
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
+    <div>
       <div className="grid gap-5">
         <div>
           <label className="mb-1 block text-sm font-bold text-slate-700">Framework Version (đã PUBLISHED) <span className="text-red-500">*</span></label>
@@ -314,8 +272,9 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
                   key={rubric.id}
                   schoolId={schoolId}
                   rubric={rubric}
-                  selectedIds={form.rubricVersionIds}
-                  onToggle={handleToggleRubricVersion}
+                  groupName={`rubric-version-${form.key}`}
+                  selectedId={form.rubricVersionId}
+                  onSelect={handleSelectRubricVersion}
                   onVersionsLoaded={handleVersionsLoaded}
                   disabled={isPending}
                 />
@@ -431,22 +390,11 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
     setForms((current) => current.map((f) => (f.key === key ? { ...f, ...patch } : f)));
   }
 
-  function addPolicyForm() {
-    setForms((current) => {
-      const nextKey = current.reduce((max, f) => Math.max(max, f.key), 0) + 1;
-      return [...current, makeEmptyPolicyForm(nextKey)];
-    });
-  }
-
-  function removePolicyForm(key: number) {
-    setForms((current) => current.filter((f) => f.key !== key));
-  }
-
   function validateForm(form: PolicyFormState) {
     return (
       !form.languageId ||
       !form.frameworkVersionId ||
-      form.rubricVersionIds.length === 0 ||
+      !form.rubricVersionId ||
       !form.targetFrameworkBandId ||
       !form.effectiveFrom
     );
@@ -467,7 +415,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
       }
 
       if (form.passingScore.trim()) {
-        const range = getEffectiveScoreRange(form.rubricVersionIds, form.rubricVersionScales);
+        const range = form.rubricVersionScales[form.rubricVersionId] ?? null;
         const score = Number(form.passingScore);
         if (range && (score < range.min || score > range.max)) {
           showError(`Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${range.min} – ${range.max})!`);
@@ -490,7 +438,7 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
 
       return {
         frameworkVersionId: form.frameworkVersionId,
-        rubricVersionIds: form.rubricVersionIds,
+        rubricVersionId: form.rubricVersionId,
         languageId: form.languageId,
         targetFrameworkBandId: form.targetFrameworkBandId,
         effectiveFrom: toBackendDate(form.effectiveFrom),
@@ -519,27 +467,15 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid gap-6">
-            {forms.map((form, index) => (
+            {forms.map((form) => (
               <PolicyFormFields
                 key={form.key}
                 schoolId={schoolId}
-                index={index}
                 form={form}
                 onChange={(patch) => updateForm(form.key, patch)}
-                onRemove={index > 0 ? () => removePolicyForm(form.key) : undefined}
                 isPending={isPending}
               />
             ))}
-
-            <button
-              type="button"
-              onClick={addPolicyForm}
-              disabled={isPending}
-              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-400 bg-slate-50 py-3 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-            >
-              <Plus className="size-4.5" />
-              {forms.length < 2 ? 'Tạo Chính Sách Đánh Giá thứ 2' : `Thêm Chính Sách Đánh Giá thứ ${forms.length + 1}`}
-            </button>
           </div>
 
           <div className="mt-8 flex items-center justify-end gap-3 border-t border-slate-100 pt-5">

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 
-import { useExamQuery, useExamSchedulesQuery } from '@/features/examCore/api/queries'
+import { useExamSchedulesQuery } from '@/features/examCore/api/queries'
+
+import { useMonitorableExamQuery } from '../api/useMonitorableExams'
 import type { ExamScheduleDto } from '@/features/examCore/types'
 
 import { indexByScheduleId, useActiveSchedulesQuery } from '../api/useActiveSchedules'
@@ -30,7 +32,9 @@ function isRunningAt(schedule: ExamScheduleDto, now: number): boolean {
 export function MonitoringExamSchedulesPage() {
   const { examId } = useParams()
 
-  const examQuery = useExamQuery(examId ?? null)
+  // Đọc bằng quyền GIÁM SÁT, không phải `exam(id)` của màn quản lý: giám thị được phân công ca thi
+  // không phải thành viên hội đồng, và mở `exam(id)` cho họ là mở luôn dashboard kỳ thi.
+  const examQuery = useMonitorableExamQuery(examId ?? null)
   const schedulesQuery = useExamSchedulesQuery(examId ?? null)
 
   // scheduleIds rỗng nghĩa là "mọi ca đang diễn ra mà tôi được phép xem" - IssueMonitorTokenUseCase

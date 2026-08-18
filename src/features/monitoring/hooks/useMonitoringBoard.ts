@@ -61,8 +61,21 @@ export type ParticipantStatus = (typeof PARTICIPANT_STATUS_ORDER)[number]
 export type ParticipantBoardEntry = {
     candidateId: string
     candidateStatus?: null | string
-    /** Mọi stream của học viên, không lọc - dùng để đếm và để biết họ có những loại nào. */
+    /**
+     * Mọi stream của học viên, KỂ CẢ những luồng đã bị lần kết nối sau thay thế.
+     *
+     * <p>Không dùng để hiển thị - xem `currentStreams`. Nó tồn tại để tra cứu: cảnh báo nổ ra trong
+     * lần kết nối đầu mang `streamId` cũ, và bấm vào cảnh báo đó phải mở được đúng đoạn ghi ấy.
+     */
     allStreams: StreamView[]
+    /**
+     * Luồng hiện hành của mỗi loại - đây là những gì lưới và thanh tab hiện.
+     *
+     * <p>Tách khỏi `allStreams` vì một học viên rớt rồi vào lại sinh `streamId` MỚI cho cùng một
+     * loại, còn luồng cũ được giữ lại (xem `StreamView.endedAt`). Hai lần vào là bốn ô, ba lần vào
+     * là sáu - lưới đầy bản sao đã chết trong khi thứ giám thị cần là khung hình đang chạy.
+     */
+    currentStreams: StreamView[]
     /** Đã bị giám thị cấm (do buộc kết thúc) hay chưa - quyết định có cho hủy bài thi lần nữa không. */
     blockedAt?: null | string
     latestAlert?: AlertView
@@ -71,10 +84,48 @@ export type ParticipantBoardEntry = {
     /** Trạng thái phiên thi (IN_PROGRESS/INTERRUPTED/...) - chỉ phiên đang sống mới buộc kết thúc được. */
     sessionStatus?: null | string
     status: ParticipantStatus
-    /** Stream sau khi áp bộ lọc mật độ; có thể rỗng nếu học viên không có loại đang chọn. */
+    /** `currentStreams` sau khi áp bộ lọc mật độ; có thể rỗng nếu học viên không có loại đang chọn. */
     streams: StreamView[]
     studentEmail?: null | string
     studentName: string
+}
+
+/**
+ * Mốc bắt đầu dạng số.
+ *
+ * <p>`startedAt` có thể rỗng: một khung hình về trước sự kiện 'joined' tạo ô tạm chưa có trường này.
+ * `Date.parse('')` trả NaN, mà mọi so sánh với NaN đều false - thứ tự sẽ hỏng trong im lặng thay vì
+ * báo lỗi, nên quy về 0 ngay tại đây.
+ */
+function startedAtMs(stream: StreamView): number {
+    return Date.parse(stream.startedAt) || 0
+}
+
+/**
+ * Luồng nào đại diện cho một loại, khi cùng loại có nhiều luồng.
+ *
+ * <p>Luồng đang sống luôn thắng luồng đã ngừng, bất kể mốc bắt đầu: mốc thời gian ở đây đến từ nhiều
+ * nguồn khác nhau (sự kiện participant, snapshot, seed đọc từ Redis) nên lệch nhau vài giây là
+ * chuyện thường, còn "cái nào đang chạy" thì không mơ hồ.
+ */
+function outranks(candidate: StreamView, incumbent: StreamView): boolean {
+    const candidateLive = candidate.endedAt === undefined
+    if (candidateLive !== (incumbent.endedAt === undefined)) {
+        return candidateLive
+    }
+    return startedAtMs(candidate) > startedAtMs(incumbent)
+}
+
+/** Giữ lại đúng một luồng mới nhất cho mỗi loại, theo đúng thứ tự ban đầu. */
+function pickCurrentStreams(streams: StreamView[]): StreamView[] {
+    const bestByType = new Map<string, StreamView>()
+    for (const stream of streams) {
+        const best = bestByType.get(stream.streamType)
+        if (!best || outranks(stream, best)) {
+            bestByType.set(stream.streamType, stream)
+        }
+    }
+    return streams.filter((stream) => bestByType.get(stream.streamType) === stream)
 }
 
 function resolveStatus(
@@ -206,8 +257,10 @@ export function useMonitoringBoard({ alerts, candidates, filter, now, streams }:
         for (const [candidateId, candidateStreams] of streamsByCandidate) {
             const candidate = candidateById.get(candidateId)
             const latestAlert = alertByCandidate.get(candidateId)
+            const currentStreams = pickCurrentStreams(candidateStreams)
             entries.push({
                 allStreams: candidateStreams,
+                currentStreams,
                 blockedAt: candidate?.blockedAt,
                 candidateId,
                 candidateStatus: candidate?.status,
@@ -219,8 +272,8 @@ export function useMonitoringBoard({ alerts, candidates, filter, now, streams }:
                 status: resolveStatus(candidateStreams, latestAlert, candidate?.sessionStatus, now),
                 streams:
                     filter === 'all'
-                        ? candidateStreams
-                        : candidateStreams.filter((stream) => stream.streamType === filter),
+                        ? currentStreams
+                        : currentStreams.filter((stream) => stream.streamType === filter),
                 studentEmail: candidate?.studentEmail,
                 // Chưa join được roster thì hiện id thô còn hơn hiện ô trống - vẫn tra cứu được.
                 studentName: candidate?.studentName?.trim() || candidate?.studentEmail?.trim() || candidateId,

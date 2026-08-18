@@ -43,11 +43,15 @@ export type CreateClassTestRequest = {
    */
   aiConfidenceThresholdPercent?: number | null
   assessmentPolicyId?: string | null
-  closeAt?: string | null
+  /**
+   * Bắt buộc: với bài trên lớp, khung mở/đóng chính là ca thi, và phải nằm trong hạn gói dịch vụ
+   * của trường -- server từ chối nếu thiếu (`SubscriptionPeriodGuardService`).
+   */
+  closeAt: string
   description?: string | null
   maxAttempt?: number | null
   name: string
-  openAt?: string | null
+  openAt: string
   /**
    * Bắt buộc (không optional) dù server chấp nhận null, y hệt `CreateExamRequest`: cấu hình giám
    * sát không sửa được sau khi tạo, và bỏ trống nghĩa là học sinh KHÔNG vào thi được nếu ứng dụng

@@ -1,8 +1,13 @@
 export {
+  useExamProctoringAlertCountsQuery,
+  type AlertSeverityCounts,
+} from './api/useExamAlertCountsQuery'
+export {
   proctoringAlertQueryKeys,
   useExamSessionProctoringAlertsQuery,
   useScheduleProctoringAlertsQuery,
 } from './api/useProctoringAlertsQuery'
+export { ProctoringAlertCountBadge } from './components/ProctoringAlertCountBadge'
 export { ProctoringAlertsCard } from './components/ProctoringAlertsCard'
 export {
   getAlertSeverity,

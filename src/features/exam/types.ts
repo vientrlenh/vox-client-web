@@ -29,13 +29,17 @@ export type CreateExamRequest = {
   aiConfidenceThresholdPercent?: number | null
   assessmentPolicyId?: string | null
   blueprintId?: string | null
-  closeAt?: string | null
+  /**
+   * Bắt buộc: khung mở/đóng là ràng buộc ngoài của mọi ca thi và phải nằm trong hạn gói dịch vụ
+   * của trường -- server từ chối nếu thiếu (`SubscriptionPeriodGuardService`).
+   */
+  closeAt: string
   code: string
   description?: string | null
   languageId: string
   maxAttempt?: number | null
   name: string
-  openAt?: string | null
+  openAt: string
   requiresOtp?: boolean | null
   resultDecisionMethod?: ResultDecisionMethod | null
   /**

@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { DoorOpen, X } from 'lucide-react'
+import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
+import type { MySubscription } from '@/features/subscription_school/types'
 import { formatDateTime, formatDurationSeconds, toDateTimeLocalValue, type SchoolRoomLite } from '../../types'
+import { buildSubscriptionWindowError, getSubscriptionWindowBounds } from '../../utils/subscriptionWindow'
 import { RoomPickerModal } from './RoomPickerModal'
 
 type CreateScheduleModalProps = {
@@ -42,6 +45,7 @@ function validateWindow(input: {
   examTimeDurationSecond?: number | null
   isClassTest?: boolean
   startDate: string
+  subscription?: MySubscription | null
 }): string | null {
   const start = new Date(input.startDate).getTime()
   const end = new Date(input.endDate).getTime()
@@ -56,7 +60,13 @@ function validateWindow(input: {
     return `Ca thi phải dài tối thiểu ${formatDurationSeconds(minSeconds)} — bằng thời gian làm bài của kỳ thi.`
   }
   if (input.isClassTest) {
-    return null
+    // Ca thi của bài trên lớp CHÍNH LÀ khung mở/đóng của bài (BE ghi ngược lại vào exam), nên
+    // ràng buộc hạn gói dịch vụ áp thẳng vào đây thay cho ràng buộc "nằm trong khung kỳ thi".
+    return buildSubscriptionWindowError(
+      new Date(input.startDate).toISOString(),
+      new Date(input.endDate).toISOString(),
+      input.subscription,
+    )
   }
   const openAt = input.examOpenAt ? new Date(input.examOpenAt).getTime() : null
   if (openAt != null && !Number.isNaN(openAt) && start < openAt) {
@@ -85,6 +95,7 @@ export function CreateScheduleModal({
   const [startDate, setStartDate] = useState(toDateTimeLocalValue(initial?.startDate))
   const [endDate, setEndDate] = useState(toDateTimeLocalValue(initial?.endDate))
   const [showRoomPicker, setShowRoomPicker] = useState(false)
+  const subscription = useMySubscriptionQuery().data
 
   const windowError =
     startDate && endDate
@@ -95,13 +106,16 @@ export function CreateScheduleModal({
           examTimeDurationSecond,
           isClassTest,
           startDate,
+          subscription,
         })
       : null
   const canSubmit = Boolean(room && startDate && endDate) && windowError == null
 
-  // Kẹp luôn ở picker cho kỳ thi thường — CLASS_TEST không bị ràng khung nên để trống.
+  // Kẹp luôn ở picker: kỳ thi thường theo khung mở/đóng của kỳ thi, còn CLASS_TEST theo hạn gói
+  // dịch vụ — ca thi của nó chính là khung mở/đóng nên không có khung nào bao ngoài để dựa vào.
+  const subscriptionBounds = getSubscriptionWindowBounds(subscription)
   const windowBounds = isClassTest
-    ? { max: undefined, min: undefined }
+    ? { max: subscriptionBounds?.max, min: subscriptionBounds?.min }
     : {
         max: toDateTimeLocalValue(examCloseAt) || undefined,
         min: toDateTimeLocalValue(examOpenAt) || undefined,

@@ -29,6 +29,10 @@ import {
   type GradingTask,
   type ExamCandidateResultStatus,
 } from '@/features/grading'
+import {
+  ProctoringAlertCountBadge,
+  useExamProctoringAlertCountsQuery,
+} from '@/features/proctoring-alerts'
 import { toApiError } from '@/shared/api'
 import { Pagination } from '@/shared/components/Pagination'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
@@ -67,6 +71,8 @@ type QueueRow = {
   resultCode: string
   resultStatus?: ExamCandidateResultStatus | null
   score?: number | null
+  /** Khoá để tra số cảnh báo giám sát của bài này. */
+  sessionId?: string | null
   studentName?: string | null
 }
 
@@ -87,6 +93,7 @@ function fromTask(task: GradingTask): QueueRow {
     resultCode: task.resultCode,
     resultStatus: task.resultStatus,
     score: task.currentScore,
+    sessionId: task.sessionId,
     studentName: task.studentName,
   }
 }
@@ -106,6 +113,7 @@ function fromResult(row: GradingAssignmentRow): QueueRow {
     resultCode: row.resultCode,
     resultStatus: row.resultStatus,
     score: row.totalScore,
+    sessionId: row.sessionId,
     studentName: row.studentName,
   }
 }
@@ -142,6 +150,7 @@ export function ClassTestGradingQueuePage() {
   const resultsQuery = useClassTestGradingResultsQuery(examId, page, PAGE_SIZE, { unassignedOnly })
   const tasksQuery = useClassTestGradingTasksQuery(examId, page, PAGE_SIZE, { roundType, status })
   const statsQuery = useClassTestGradingStatsQuery(examId)
+  const alertCountsQuery = useExamProctoringAlertCountsQuery(examId || null)
   const finalizePreviewQuery = useFinalizePreviewQuery(finalizeOpen && examId ? examId : null)
   const claimMutation = useClaimClassTestGradingMutation()
   const finalizeMutation = useFinalizeExamResultsMutation()
@@ -448,6 +457,12 @@ export function ClassTestGradingQueuePage() {
                                   {attemptLabel}
                                 </span>
                               ) : null}
+                              {/* Bài trên lớp mặc định bật giám sát đầy đủ lúc tạo, nên nó sinh ra
+                                  cảnh báo y như kỳ thi tập trung -- mà trước đây hàng đợi này không
+                                  hiển thị chúng ở đâu cả. */}
+                              <ProctoringAlertCountBadge
+                                counts={row.sessionId ? alertCountsQuery.data?.get(row.sessionId) : undefined}
+                              />
                             </div>
                             <div className="truncate text-[11px] font-medium text-slate-500">
                               {row.className ? `Lớp ${row.className} · ` : ''}

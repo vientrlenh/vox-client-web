@@ -17,7 +17,65 @@ const SEEK_END_MARGIN_SECS = 0.25
 /** Nhịp vẽ lại thanh tua. Chạy theo timer chứ không theo `timeupdate` để số liệu vẫn nhích khi phát bị kẹt. */
 const SEEK_TICK_MS = 500
 
+/**
+ * Lệch quá ngần này giữa chỗ ta yêu cầu và chỗ playhead thật sự đáp xuống thì coi là lệnh tua đã bị
+ * từ chối. Rộng hơn một nhịp segment để việc trình phát nhích về keyframe gần nhất không bị báo nhầm.
+ */
+const SEEK_LANDING_TOLERANCE_SECS = 5
+
+/**
+ * Đặt playhead vào `target`, kẹp trong vùng tua được, và NÓI RA khi lệnh không đáp xuống nơi đã hẹn.
+ *
+ * <p>Gán `currentTime` là lệnh có thể bị từ chối trong im lặng: đích nằm ngoài `video.seekable` thì
+ * trình duyệt lặng lẽ kẹp về mép gần nhất -- không lỗi, không sự kiện, không dấu vết. Nhìn từ ngoài
+ * nó giống hệt "kéo thanh tua mà hình không nhúc nhích", và không có gì phân biệt được nó với việc
+ * chính phép tính đích ở đây sai. Đó là lý do chỗ này phải tự tố cáo: ba nguyên nhân rất khác nhau
+ * cùng cho ra một triệu chứng, nên đoán bằng mắt là không xong.
+ *
+ * @returns vị trí đã kẹp mà ta yêu cầu (không phải nơi trình duyệt thực sự đáp xuống).
+ */
+function applySeek(video: HTMLVideoElement, dvr: { end: number; start: number }, target: number): number {
+    const safeEnd = Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS)
+    const clamped = Math.min(safeEnd, Math.max(dvr.start + 0.05, target))
+    video.currentTime = clamped
+
+    const landed = video.currentTime
+    if (Math.abs(landed - clamped) > SEEK_LANDING_TOLERANCE_SECS) {
+        const seekable: [number, number][] = []
+        for (let index = 0; index < video.seekable.length; index += 1) {
+            seekable.push([video.seekable.start(index), video.seekable.end(index)])
+        }
+        console.warn(
+            'live rewind: lệnh tua không đáp xuống nơi đã hẹn -- trình duyệt đã kẹp nó lại',
+            { clamped, dvr, landed, requested: target, seekable },
+        )
+    }
+    return clamped
+}
+
 const MAX_MEDIA_ERROR_RECOVERIES = 3
+
+/**
+ * Số target duration mà hls.js cố tình đậu playhead lùi lại khỏi mép playlist.
+ *
+ * <p>Khai báo thành hằng thay vì viết thẳng vào config vì dung sai "coi như live" bên dưới phải suy
+ * ra TỪ nó: hai con số rời nhau sẽ lệch, và lúc lệch thì trạng thái live không bao giờ đúng.
+ */
+const LIVE_SYNC_DURATION_COUNT = 3
+
+/**
+ * Trong khoảng này thì coi như đang ở hiện tại.
+ *
+ * <p>Phải LỚN hơn `LIVE_SYNC_DURATION_COUNT`, không phải bằng: ngay cả khi bám live hoàn hảo,
+ * playhead vẫn nằm sau mép playlist đúng `LIVE_SYNC_DURATION_COUNT` nhịp. Lấy dung sai bằng đúng số
+ * đó nghĩa là "đang ở live" không bao giờ true. Cộng thêm một nhịp để bù việc cửa sổ trượt: mép
+ * playlist nhảy lên một segment mỗi lần server đóng file, nên khoảng cách dao động trong một nhịp mà
+ * không phải do người xem làm gì.
+ */
+const LIVE_EDGE_TOLERANCE_COUNT = LIVE_SYNC_DURATION_COUNT + 1
+
+/** Khớp FFMPEG_INGEST_HLS_SEGMENT_SECONDS mặc định phía vox-streaming. Chỉ dùng khi chưa đọc được playlist. */
+const DEFAULT_TARGET_DURATION_SECS = 4
 
 /**
  * `getStartDate()` là API riêng của Safari (bản đọc #EXT-X-PROGRAM-DATE-TIME của nền tảng) nên
@@ -33,6 +91,30 @@ export type PlayerStatus = {
 export type SeekReadout = {
     /** Mốc thời gian tuyệt đối có dựng được không (cần PROGRAM-DATE-TIME và giờ bắt đầu stream). */
     absolute: boolean
+    /**
+     * Có đang ở hiện tại hay không -- ĐO ĐƯỢC, không phải ý định của người xem.
+     *
+     * <p>Đây là thứ thay cho cờ "đang bám live" trước đây. Cờ đó chỉ đổi khi giám thị tự kéo thanh
+     * tua, nên một luồng bị stall rồi trôi lại phía sau vẫn tự nhận là đang trực tiếp - đúng cái
+     * trường hợp nguy hiểm nhất thì lại không có cảnh báo nào.
+     */
+    atLiveEdge: boolean
+    /**
+     * Khoảng cách từ playhead tới MÉP THU (fragment mới nhất server đã liệt kê), giây. Không âm.
+     *
+     * <p>Đo với mép thu chứ không với điểm đồng bộ live, nên khi đang bám live nó KHÔNG về 0 mà đứng
+     * quanh `LIVE_SYNC_DURATION_COUNT` nhịp -- đó chính là khoảng đệm hls.js giữ để khỏi đứt hình.
+     * Giữ nguyên con số đó là có chủ ý: "bạn đang xem chậm bao nhiêu so với thứ vừa quay được" là
+     * thông tin giám thị cần, và giấu nó đi là lý do khoảng hở trên thanh trở nên khó hiểu.
+     */
+    behindSecs: number
+    /**
+     * Mép phải của thang đo: điểm đồng bộ live, KHÔNG phải mép thu.
+     *
+     * <p>Đây là xa nhất mà trình phát thực sự sẽ tới. Vẽ thanh tới tận mép thu nghĩa là vẽ ra một
+     * đoạn cuối mà con trượt không bao giờ chạm được -- và tua tay vào đó thì đứng hình, vì hls.js
+     * chưa nạp tới đấy.
+     */
     domainEndOffset: number
     dvrEndOffset: number
     dvrStartOffset: number
@@ -99,7 +181,13 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
     /** Miền thời gian tuyệt đối thanh trượt đang vẽ. Đóng băng suốt thao tác kéo. */
     const seekDomainRef = useRef<null | { absolute: boolean; endMs: number; startMs: number }>(null)
     const draggingRef = useRef(false)
-    const followingLiveRef = useRef(true)
+    /**
+     * `#EXT-X-TARGETDURATION` của playlist đang phát. Đọc từ server thay vì viết cứng vì độ dài
+     * segment là cấu hình được (`FFMPEG_INGEST_HLS_SEGMENT_SECONDS`), và mọi ngưỡng live ở đây đều là
+     * bội số của nó -- viết cứng 4 giây thì một cụm đổi sang segment 6 giây sẽ báo "đang xem lại"
+     * suốt buổi thi.
+     */
+    const targetDurationRef = useRef(DEFAULT_TARGET_DURATION_SECS)
     const tokenRef = useRef<string | undefined>(token)
     /**
      * Đọc qua ref vì cùng một lý do với `token`: `stream` là object mới sau MỖI sự kiện frame (xem
@@ -107,13 +195,60 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
      * bên dưới khoá vào `streamId` - một primitive - thay vì vào identity của object.
      */
     const startedAtRef = useRef<string | undefined>(stream?.startedAt)
+    /**
+     * Luồng này đã đóng chưa. Cùng lý do đọc qua ref với `startedAt`.
+     *
+     * <p>Quyết định một điều mà phần còn lại của hook không tự suy được: có tồn tại "mép live" hay
+     * không. Playlist đã đóng bằng #EXT-X-ENDLIST thì không, và mọi phép tính lùi khỏi mép live đều
+     * trở thành vô nghĩa trên nó.
+     */
+    const endedAtRef = useRef<number | undefined>(stream?.endedAt)
     /** Cùng lý do với hai ref trên: giữ callback ngoài deps để không dựng lại trình phát. */
     const onAuthErrorRef = useRef(onAuthError)
     const lastAuthRefreshRef = useRef(0)
 
     const [status, setStatus] = useState<PlayerStatus>({ kind: 'idle', message: '' })
     const [seek, setSeek] = useState<null | SeekReadout>(null)
-    const [isFollowingLive, setIsFollowingLive] = useState(true)
+    /**
+     * Vị trí con trượt trong lúc NGƯỜI DÙNG đang kéo, tách khỏi `seek.playheadOffset`.
+     *
+     * <p>Không có nó thì nhịp vẽ lại 500ms ghi đè vị trí thumb giữa hai bước kéo, và con trượt giật
+     * ngược về playhead ngay dưới ngón tay.
+     */
+    const [dragOffset, setDragOffset] = useState<null | number>(null)
+    /**
+     * Vị trí đang chờ chốt của lần kéo hiện tại; null nghĩa là không còn gì để chốt.
+     *
+     * <p>Tồn tại vì thả tay sinh ra HAI sự kiện chứ không phải một: `input[type=range]` tự bắt con
+     * trỏ lúc nhấn xuống, nên lúc nhả trình duyệt bắn `pointerup` rồi `lostpointercapture`. Cả hai
+     * đều phải là đường chốt hợp lệ -- thả tay ra ngoài phạm vi thanh thì chỉ có cái sau. Nhưng React
+     * kịp render lại giữa hai lần đó và ghi giá trị cũ trở lại DOM, nên lần chốt thứ hai đọc
+     * `event.currentTarget.value` là đọc phải chính con số vừa bị bỏ đi, rồi tua ngược về đấy.
+     *
+     * <p>Nguồn sự thật vì thế phải là ref này, không phải DOM: nó do `onScrubMove` ghi, và lần chốt
+     * đầu tiên xoá nó đi khiến mọi lần sau thành vô hại.
+     */
+    const pendingOffsetRef = useRef<null | number>(null)
+    /**
+     * Mốc giám thị rời khỏi mép live, null khi đang ở hiện tại.
+     *
+     * <p>Tồn tại để phía trên SUY RA được "có cảnh báo nào xảy ra sau khi tôi ngừng xem hiện tại
+     * không" -- một phép so sánh thuần, thay cho việc theo dõi cảnh báo bằng effect + state.
+     * Cập nhật theo hàm (`prev ?? now`) chứ không ghi đè: mỗi lần kéo thanh tua tiếp mà đặt lại mốc
+     * sẽ xoá mất đúng cảnh báo vừa bỏ lỡ.
+     *
+     * <p>Đặt từ nhịp đo trong `tick`, không từ hành động kéo: rời khỏi hiện tại vì stall cũng là rời
+     * khỏi hiện tại, và đó mới là trường hợp giám thị không tự biết. Dùng `Date.now()` ở đây là đúng
+     * chỗ -- nó chỉ đem so với `receivedAt` của cảnh báo, cũng là mốc đóng bởi máy này.
+     */
+    const [leftLiveAtMs, setLeftLiveAtMs] = useState<null | number>(null)
+    const [isMuted, setIsMuted] = useState(false)
+    const [volume, setVolumeState] = useState(1)
+    /**
+     * Trình duyệt chặn autoplay. Phải lộ ra ngoài vì panel không còn `controls` mặc định để người
+     * xem tự bấm phát -- không có đường thoát này thì màn hình đứng im mà không nói tại sao.
+     */
+    const [autoplayBlocked, setAutoplayBlocked] = useState(false)
 
     useEffect(() => {
         tokenRef.current = token
@@ -122,6 +257,10 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
     useEffect(() => {
         startedAtRef.current = stream?.startedAt
     }, [stream?.startedAt])
+
+    useEffect(() => {
+        endedAtRef.current = stream?.endedAt
+    }, [stream?.endedAt])
 
     useEffect(() => {
         onAuthErrorRef.current = onAuthError
@@ -196,10 +335,22 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         dvrRangeRef.current = null
         wallAnchorRef.current = null
         seekDomainRef.current = null
-        followingLiveRef.current = true
-        setIsFollowingLive(true)
+        targetDurationRef.current = DEFAULT_TARGET_DURATION_SECS
+        setLeftLiveAtMs(null)
         setSeek(null)
+        setDragOffset(null)
+        setAutoplayBlocked(false)
         setStatus({ kind: 'loading', message: 'Đang tải luồng…' })
+
+        // Phát tường minh thay vì chỉ dựa vào thuộc tính `autoplay`: thuộc tính đó không trả về
+        // promise nên một lần bị chặn sẽ im lặng tuyệt đối. Panel đã bỏ `controls` mặc định, nên
+        // nếu không bắt được ở đây thì người xem ngồi trước khung hình đứng mà không có nút nào bấm.
+        const tryPlay = () => {
+            video.play().then(
+                () => setAutoplayBlocked(false),
+                () => setAutoplayBlocked(true),
+            )
+        }
 
         // Chỉ là token khởi tạo. Mọi request sau đó - kể cả manifest hls.js tự poll lại - đều được
         // xhrSetup ghi đè bằng `tokenRef.current`, nên URL này cũ đi không sao.
@@ -215,7 +366,10 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 usingNativeHlsRef.current = true
                 video.src = url
-                video.onloadedmetadata = () => setStatus({ kind: 'playing', message: '' })
+                video.onloadedmetadata = () => {
+                    setStatus({ kind: 'playing', message: '' })
+                    tryPlay()
+                }
                 video.onerror = () =>
                     setStatus({
                         kind: 'error',
@@ -231,7 +385,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         } else {
             usingNativeHlsRef.current = false
             const hls = new Hls({
-                liveSyncDurationCount: 3,
+                liveSyncDurationCount: LIVE_SYNC_DURATION_COUNT,
                 // Mọi request tới route /live/ - cả manifest hls.js tự poll lại lẫn các URL init/
                 // fragment mà manifest trỏ tới - đều được gắn token mới nhất. Nhờ vậy việc refetch
                 // token nền là đủ để xem quá TTL 5 phút mà không cần nạp lại nguồn.
@@ -249,6 +403,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 mediaErrorRecoveries = 0
                 setStatus({ kind: 'playing', message: '' })
+                tryPlay()
             })
 
             // Bắn ở MỌI lần nạp lại playlist, không chỉ lần đầu - đây là nơi duy nhất phản ánh vùng
@@ -261,6 +416,10 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
                 const first = frags[0]
                 const last = frags[frags.length - 1]
                 dvrRangeRef.current = { end: last.start + last.duration, start: first.start }
+                const target = data.details?.targetduration
+                if (typeof target === 'number' && Number.isFinite(target) && target > 0) {
+                    targetDurationRef.current = target
+                }
                 // Đọc lại mỗi lần thay vì cache từ lần đầu: sau một discontinuity server neo lại, và
                 // fragment đầu cửa sổ đổi khi cửa sổ trượt.
                 if (typeof first.programDateTime === 'number') {
@@ -306,6 +465,30 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             hls.attachMedia(video)
         }
 
+        /**
+         * Điểm đồng bộ live theo thời gian media: xa nhất trình phát thực sự sẽ tới.
+         *
+         * <p>`liveSyncPosition` là con số hls.js tự nhắm; chỉ tính tay khi không có nó -- nhánh native
+         * HLS của Safari, nơi engine tự quản việc bám live và không lộ ra giá trị này.
+         */
+        const liveSyncMediaTime = (dvr: { end: number; start: number }) => {
+            // Bản ghi đã đóng thì KHÔNG có mép live để lùi khỏi, nên cả đoạn đều tới được.
+            //
+            // Lùi lại vài nhịp ở đây là sai theo cách khó thấy: hls.js vẫn trả `liveSyncPosition`
+            // cho playlist VOD (nó tính từ `edge` cộng tuổi playlist rồi kẹp lại), nên nhánh dưới
+            // vẫn ra một con số trông hợp lý - chỉ là nó cắt mất chừng 12 giây cuối của bản ghi và
+            // con trượt không bao giờ tới được đoạn kết. Mà với xem lại bằng chứng thì đoạn kết
+            // thường đúng là đoạn cần xem.
+            if (endedAtRef.current !== undefined) {
+                return dvr.end
+            }
+            const syncPosition = hlsRef.current?.liveSyncPosition
+            if (typeof syncPosition === 'number' && Number.isFinite(syncPosition)) {
+                return Math.max(dvr.start, Math.min(dvr.end, syncPosition))
+            }
+            return Math.max(dvr.start, dvr.end - LIVE_SYNC_DURATION_COUNT * targetDurationRef.current)
+        }
+
         const tick = () => {
             // Đọc lại mỗi nhịp thay vì chốt một lần lúc dựng player: `streamsReducer` tạo entry tạm
             // với `startedAt: ''` khi frame về trước snapshot, nên giá trị thật có thể đến muộn. Đọc
@@ -320,42 +503,91 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             }
             dvrRangeRef.current = dvr
 
-            // Thanh trượt trải trên TOÀN BỘ thời gian stream đã chạy - [lúc gửi yêu cầu .. bây giờ] -
-            // chứ không chỉ phần tua được. Đó là thứ giữ cho độ dài thanh bằng đúng thời lượng stream
-            // dù trình phát gắn vào lúc nào hay đã bị dựng lại bao nhiêu lần.
+            // Mép phải của thanh là ĐIỂM ĐỒNG BỘ LIVE, không phải `Date.now()` và cũng không phải mép
+            // thu. Đây là xa nhất trình phát thực sự sẽ tới, nên khi bám live thì thumb chạm mép một
+            // cách tự nhiên. Lấy mép thu làm mép thanh thì luôn thừa ra một đoạn cuối mà con trượt
+            // không bao giờ tới được -- đúng cái khoảng hở nhìn thấy trên màn hình -- và tua tay vào
+            // đoạn đó thì đứng hình vì hls.js chưa nạp tới đấy.
+            //
+            // Còn `Date.now()` thì tệ hơn nữa: nó là phép so sánh giữa hai đồng hồ khác nhau, mép
+            // phải lấy từ đồng hồ của máy giám thị, còn playhead lấy từ PROGRAM-DATE-TIME của server.
+            // Máy giám thị nhanh hai phút là thanh mọc thêm hai phút vùng không thể tới, chậm hai
+            // phút thì thumb dính mép và GIẤU luôn độ tụt thật. Neo cả hai đầu vào đồng hồ server thì
+            // độ lệch đó biến mất khỏi hình học thanh, và phần còn lại đúng bằng độ trễ thật.
+            //
+            // Vẫn đóng băng suốt thao tác kéo: mép vùng tua nhảy lên một segment mỗi lần server đóng
+            // file, và thang đo đổi giữa lúc kéo sẽ làm thumb giật dưới ngón tay.
             const absolute = wallAnchorRef.current !== null && !Number.isNaN(streamStartMs)
+            const liveSyncMedia = liveSyncMediaTime(dvr)
             if (!draggingRef.current || !seekDomainRef.current) {
                 seekDomainRef.current = absolute
-                    ? { absolute: true, endMs: Date.now(), startMs: streamStartMs }
-                    : { absolute: false, endMs: 0, startMs: 0 }
+                    ? { absolute: true, endMs: mediaToDate(liveSyncMedia), startMs: streamStartMs }
+                    : { absolute: false, endMs: liveSyncMedia, startMs: 0 }
             }
             const domain = seekDomainRef.current
+            const tolerance = LIVE_EDGE_TOLERANCE_COUNT * targetDurationRef.current
+            // Trên một bản ghi đã đóng thì "đang ở hiện tại" không có nghĩa, và trả về true ở đoạn
+            // cuối kéo theo một hậu quả cụ thể: panel ghim con trượt vào mép phải, nên xem tới gần
+            // hết bản ghi là thanh tua khoá cứng ở cuối và không kéo đi đâu được nữa.
+            const isAtLiveEdge = (behind: number) => endedAtRef.current === undefined && behind <= tolerance
 
+            let behindSecs: number
             if (domain.absolute) {
                 const toOffset = (ms: number) => (ms - domain.startMs) / 1000
+                const dvrEndOffset = toOffset(mediaToDate(dvr.end))
+                const playheadOffset = toOffset(mediaToDate(video.currentTime))
+                behindSecs = Math.max(0, dvrEndOffset - playheadOffset)
                 setSeek({
                     absolute: true,
+                    atLiveEdge: isAtLiveEdge(behindSecs),
+                    behindSecs,
                     domainEndOffset: toOffset(domain.endMs),
-                    dvrEndOffset: toOffset(mediaToDate(dvr.end)),
+                    dvrEndOffset,
                     dvrStartOffset: toOffset(mediaToDate(dvr.start)),
-                    playheadOffset: toOffset(mediaToDate(video.currentTime)),
+                    playheadOffset,
                 })
             } else {
+                behindSecs = Math.max(0, dvr.end - video.currentTime)
                 setSeek({
                     absolute: false,
-                    domainEndOffset: dvr.end,
+                    atLiveEdge: isAtLiveEdge(behindSecs),
+                    behindSecs,
+                    domainEndOffset: domain.endMs,
                     dvrEndOffset: dvr.end,
                     dvrStartOffset: dvr.start,
                     playheadOffset: video.currentTime,
                 })
             }
+
+            // Mốc "từ lúc nào tôi không còn thấy hiện tại" được đo ở đây, không đặt lúc kéo thanh:
+            // trôi lại phía sau vì stall cũng là không thấy hiện tại, và đó là trường hợp giám thị
+            // không tự biết. `prev ?? now` để việc tụt kéo dài không đẩy mốc chạy theo và xoá mất
+            // cảnh báo vừa bỏ lỡ; cả hai nhánh đều idempotent nên gọi mỗi nhịp không gây render thêm.
+            // Bản ghi thì không có hiện tại để mà rời khỏi.
+            if (endedAtRef.current !== undefined || behindSecs <= tolerance) {
+                setLeftLiveAtMs(null)
+            } else {
+                setLeftLiveAtMs((previous) => previous ?? Date.now())
+            }
         }
+
+        // Thả con trượt khỏi vị trí vừa kéo ĐÚNG lúc playhead đáp xuống, không sớm hơn.
+        //
+        // Đây là mảnh còn lại của việc giữ `dragOffset` qua lúc chốt: giữ mà không có đường thả thì
+        // thumb đứng chết ở chỗ vừa thả trong khi hình chạy tiếp. Nghe 'seeked' thay vì hẹn giờ vì nó
+        // bắn ở đúng nơi playhead THẬT SỰ đáp xuống, kể cả khi đích bị kẹp về mép vùng tua.
+        const releaseScrub = () => {
+            setDragOffset(null)
+            tick()
+        }
+        video.addEventListener('seeked', releaseScrub)
 
         tick()
         const timer = setInterval(tick, SEEK_TICK_MS)
 
         return () => {
             clearInterval(timer)
+            video.removeEventListener('seeked', releaseScrub)
             if (hlsRef.current) {
                 hlsRef.current.destroy()
                 hlsRef.current = null
@@ -375,42 +607,178 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
         // nên chỉ những thứ thực sự bắt buộc phải dựng lại mới được đứng đây.
     }, [scheduleId, streamId, dateToMedia, mediaToDate, readDvrWindow, requestFreshToken])
 
+    // Không đặt cờ "đã rời live" ở đây nữa: nhịp đo trong `tick` tự thấy điều đó ngay sau lệnh tua, và
+    // một cờ ý định song song với phép đo là đúng cách để hai nguồn sự thật lệch nhau.
     const onScrubStart = useCallback(() => {
         draggingRef.current = true
-        followingLiveRef.current = false
-        setIsFollowingLive(false)
     }, [])
 
-    /** Tua tới `offsetSecs` giây kể từ lúc stream bắt đầu - chính là đơn vị của thanh trượt. */
-    const onScrubCommit = useCallback(
-        (offsetSecs: number) => {
-            draggingRef.current = false
-            const video = videoRef.current
-            const dvr = dvrRangeRef.current
-            const domain = seekDomainRef.current
-            if (!video || !dvr || !domain) {
-                return
-            }
-            // Đi qua giờ tuyệt đối chứ không coi offset là vị trí media: hai thứ chỉ trùng nhau khi
-            // trình phát gắn vào đúng lúc stream bắt đầu.
-            const target = domain.absolute ? dateToMedia(domain.startMs + offsetSecs * 1000) : offsetSecs
-            // Kẹp trong vùng tua được thay vì tin giá trị thô: thanh trượt trải cả thời gian đã chạy
-            // mà chỉ dvrRange là thực sự lấy được.
-            const safeEnd = Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS)
-            video.currentTime = Math.min(safeEnd, Math.max(dvr.start + 0.05, target))
-        },
-        [dateToMedia],
-    )
+    /**
+     * Người dùng đang kéo: CHỈ dời con trượt, không tua.
+     *
+     * <p>Tách khỏi `onScrubCommit` vì React bắn `onChange` của `input[type=range]` ở MỖI bước di
+     * chuyển chứ không phải lúc thả tay. Tua ngay tại đây nghĩa là kéo qua một ca thi 40 phút sẽ
+     * phát ra hàng trăm lệnh seek, mỗi lệnh khiến hls.js xả buffer và tải lại fragment -- thanh tua
+     * trở nên gần như không dùng được đúng lúc cần nó nhất.
+     */
+    const onScrubMove = useCallback((offsetSecs: number) => {
+        draggingRef.current = true
+        pendingOffsetRef.current = offsetSecs
+        setDragOffset(offsetSecs)
+    }, [])
 
-    const goLive = useCallback(() => {
-        followingLiveRef.current = true
-        setIsFollowingLive(true)
+    /**
+     * Chốt lần kéo hiện tại: tua tới vị trí người dùng vừa thả tay.
+     *
+     * <p>KHÔNG nhận vị trí từ người gọi. Đích lấy từ `pendingOffsetRef`, và lần chốt đầu tiên xoá nó
+     * đi -- xem doc của ref đó: trình duyệt gọi đường này hai lần cho một lần thả tay, và lần thứ hai
+     * chỉ còn đọc được giá trị DOM đã cũ.
+     *
+     * <p>Cũng không xoá `dragOffset` ngay. Con trượt phải ở nguyên chỗ vừa thả cho tới khi playhead
+     * thật sự tới nơi; trả nó về `seek.playheadOffset` lúc này là hiện một vị trí còn cũ hơn cả lệnh
+     * vừa phát ra, và người xem đọc cú giật đó đúng như tua hỏng.
+     */
+    const onScrubCommit = useCallback(() => {
+        const offsetSecs = pendingOffsetRef.current
+        if (offsetSecs === null) {
+            return
+        }
+        pendingOffsetRef.current = null
+        draggingRef.current = false
+
         const video = videoRef.current
         const dvr = dvrRangeRef.current
-        if (video && dvr) {
-            video.currentTime = Math.max(dvr.start, dvr.end - SEEK_END_MARGIN_SECS)
+        const domain = seekDomainRef.current
+        if (!video || !dvr || !domain) {
+            // Không tua được thì cũng không có 'seeked' nào tới thả con trượt ra.
+            setDragOffset(null)
+            return
+        }
+        // Đi qua giờ tuyệt đối chứ không coi offset là vị trí media: hai thứ chỉ trùng nhau khi
+        // trình phát gắn vào đúng lúc stream bắt đầu.
+        const target = domain.absolute ? dateToMedia(domain.startMs + offsetSecs * 1000) : offsetSecs
+        // Kẹp trong vùng tua được thay vì tin giá trị thô: thanh trượt trải cả thời gian đã chạy
+        // mà chỉ dvrRange là thực sự lấy được.
+        const previous = video.currentTime
+        const clamped = applySeek(video, dvr, target)
+        // Tua vào đúng chỗ đang đứng thì trình duyệt không bắn 'seeked', nên phải tự thả ở đây --
+        // nếu không con trượt đứng yên trong khi hình vẫn chạy tiếp.
+        if (Math.abs(clamped - previous) < 0.05) {
+            setDragOffset(null)
+        }
+    }, [dateToMedia])
+
+    /**
+     * Tua tới một MỐC GIỜ THỰC. Đây là thứ biến một cảnh báo thành điều hướng: cảnh báo mang
+     * `capturedAt` tuyệt đối, còn `wallAnchorRef` đã có sẵn ánh xạ giờ thực sang thời gian media.
+     *
+     * @returns
+     * `unavailable` khi chưa dựng được ánh xạ (playlist chưa có PROGRAM-DATE-TIME, hoặc trình phát
+     * còn đang tải) -- phía gọi nên thử lại chứ đừng báo lỗi. `out-of-range` khi mốc đó đã trôi ra
+     * ngoài cửa sổ tua: KHÔNG kẹp thầm về mép, vì nhảy tới một chỗ khác chỗ được bấm mà không nói gì
+     * là đúng kiểu làm người xem mất lòng tin vào thanh tua.
+     */
+    const seekToDate = useCallback((dateMs: number): 'ok' | 'out-of-range' | 'unavailable' => {
+        const video = videoRef.current
+        const dvr = dvrRangeRef.current
+        if (!video || !dvr || !wallAnchorRef.current || !Number.isFinite(dateMs)) {
+            return 'unavailable'
+        }
+
+        const anchor = wallAnchorRef.current
+        const target = anchor.mediaTime + (dateMs - anchor.dateMs) / 1000
+        if (target < dvr.start || target > dvr.end) {
+            return 'out-of-range'
+        }
+
+        // Xoá cả lần kéo đang chờ chốt: tua theo cảnh báo mà để lại một đích cũ trong hàng đợi thì
+        // sự kiện `lostpointercapture` tới sau sẽ kéo ngược người xem ra khỏi chỗ vừa nhảy tới.
+        pendingOffsetRef.current = null
+        draggingRef.current = false
+        setDragOffset(null)
+        applySeek(video, dvr, target)
+        return 'ok'
+    }, [])
+
+    const goLive = useCallback(() => {
+        setLeftLiveAtMs(null)
+        pendingOffsetRef.current = null
+        setDragOffset(null)
+        const video = videoRef.current
+        const dvr = dvrRangeRef.current
+        if (!video || !dvr) {
+            return
+        }
+        // Về ĐIỂM ĐỒNG BỘ LIVE, không về mép playlist.
+        //
+        // Mép playlist là điểm ngay sau segment cuối, và hls.js chưa buffer tới đó -- nhảy vào đấy là
+        // tự đặt playhead vào chỗ không có gì phía trước, phát hết segment cuối rồi đứng chờ segment
+        // kế. Nút "Về hiện tại" giờ nằm trong dải cảnh báo nên được bấm thường xuyên hơn, và một cú
+        // giật mỗi lần bấm sẽ dạy người ta đừng bấm nó.
+        //
+        // `liveSyncPosition` là con số hls.js tự nhắm tới; chỉ tính tay khi không có nó (nhánh native
+        // HLS của Safari, nơi engine tự quản việc bám live).
+        const syncPosition = hlsRef.current?.liveSyncPosition
+        const target =
+            typeof syncPosition === 'number' && Number.isFinite(syncPosition)
+                ? syncPosition
+                : dvr.end - LIVE_SYNC_DURATION_COUNT * targetDurationRef.current
+        applySeek(video, dvr, target)
+    }, [])
+
+    const toggleMute = useCallback(() => {
+        const video = videoRef.current
+        if (!video) {
+            return
+        }
+        video.muted = !video.muted
+        setIsMuted(video.muted)
+    }, [])
+
+    const setVolume = useCallback((next: number) => {
+        const video = videoRef.current
+        const clamped = Math.min(1, Math.max(0, next))
+        setVolumeState(clamped)
+        if (!video) {
+            return
+        }
+        video.volume = clamped
+        // Kéo âm lượng lên thì bỏ tắt tiếng luôn: để nguyên `muted` sẽ khiến thanh nhích mà vẫn
+        // không nghe được gì, và người xem kết luận là luồng không có tiếng.
+        if (clamped > 0 && video.muted) {
+            video.muted = false
+            setIsMuted(false)
         }
     }, [])
 
-    return { goLive, isFollowingLive, onScrubCommit, onScrubStart, seek, status, videoRef }
+    /** Phát lại sau khi trình duyệt chặn autoplay -- chỉ dùng cho đúng tình huống đó. */
+    const resume = useCallback(() => {
+        const video = videoRef.current
+        if (!video) {
+            return
+        }
+        video.play().then(
+            () => setAutoplayBlocked(false),
+            () => setAutoplayBlocked(true),
+        )
+    }, [])
+
+    return {
+        autoplayBlocked,
+        dragOffset,
+        goLive,
+        isMuted,
+        leftLiveAtMs,
+        onScrubCommit,
+        onScrubMove,
+        onScrubStart,
+        resume,
+        seek,
+        seekToDate,
+        setVolume,
+        status,
+        toggleMute,
+        videoRef,
+        volume,
+    }
 }

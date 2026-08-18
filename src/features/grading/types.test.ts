@@ -1,4 +1,5 @@
 import {
+  assignBlockedReason,
   clampToCriterion,
   countSections,
   describeReclaimResult,
@@ -224,6 +225,33 @@ describe('grading helpers', () => {
       // Bài đã chốt sổ không nhận vòng chấm nào nữa.
       expect(suggestedRoundFor('FINAL')).toBeNull()
       expect(suggestedRoundFor(null)).toBeNull()
+    })
+  })
+
+  describe('assignBlockedReason', () => {
+    it('lets admin assign the three statuses a round accepts', () => {
+      expect(assignBlockedReason('PENDING_REVIEW')).toBeNull()
+      expect(assignBlockedReason('RELEASED')).toBeNull()
+      expect(assignBlockedReason('INVALID')).toBeNull()
+    })
+
+    it('does not block on a missing status — BE mới là chỗ chốt', () => {
+      expect(assignBlockedReason(null)).toBeNull()
+      expect(assignBlockedReason(undefined)).toBeNull()
+    })
+
+    it('blocks bài đã chốt sổ', () => {
+      // Hồi quy: bảng điều phối chỉ ẩn nút theo phân công nên bài đã chốt mà chưa từng
+      // giao ai vẫn mời admin bấm "Phân công" rồi ăn 400.
+      for (const status of ['FINAL', 'PASSED', 'FAILED', 'RETAKE_REQUIRED'] as const) {
+        expect(assignBlockedReason(status)).toContain('chốt sổ')
+      }
+    })
+
+    it('sends appeal rounds to the appeal screen instead', () => {
+      // Vòng APPEAL không nằm trong ADMIN_ASSIGNABLE_ROUNDS — endpoint này từ chối.
+      expect(assignBlockedReason('APPEALED')).toContain('phúc khảo')
+      expect(assignBlockedReason('RE_GRADING')).toContain('phúc khảo')
     })
   })
 

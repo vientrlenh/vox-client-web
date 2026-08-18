@@ -1,6 +1,13 @@
 import { ArrowUpCircle, Clock, RefreshCw, ShoppingBag } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { formatDate, formatMinutes, formatVnd, getSubscriptionStatusDisplay, type MySubscription } from '../types'
+import {
+  daysUntil,
+  formatDate,
+  formatMinutes,
+  formatVnd,
+  getSubscriptionStatusDisplay,
+  type MySubscription,
+} from '../types'
 
 type MyPlanCardProps = {
   isCancelling: boolean
@@ -58,9 +65,23 @@ export function MyPlanCard({
       <p className="mt-1.5 text-sm text-white/75">
         {formatDate(subscription.startDate)} – {formatDate(subscription.endDate)}
       </p>
+      {isActive && !isCancelled && subscription.status !== 'SUSPENDED' ? (
+        (() => {
+          const remaining = daysUntil(subscription.endDate)
+          return remaining !== null && remaining >= 0 ? (
+            <p className="mt-1 text-xs font-bold text-white/70">Còn {remaining} ngày</p>
+          ) : null
+        })()
+      ) : null}
       {isCancelled ? (
         <p className="mt-1.5 text-sm text-amber-200">
           Bạn đã hủy — vẫn dùng bình thường tới hết {formatDate(subscription.endDate)}, sau đó sẽ không tự gia hạn.
+        </p>
+      ) : null}
+      {subscription.status === 'SUSPENDED' ? (
+        <p className="mt-1.5 text-sm text-red-200">
+          Gói đã bị đình chỉ{subscription.suspendedReason ? `: "${subscription.suspendedReason}"` : ''}. Liên hệ hệ
+          thống để biết thêm chi tiết.
         </p>
       ) : null}
       <p className="mt-2 flex items-center gap-1.5 text-sm text-white/85">

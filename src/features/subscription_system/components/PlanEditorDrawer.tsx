@@ -44,6 +44,10 @@ type PlanEditorDrawerProps = {
   onCreate: (payload: CreatePlanPayload) => void
   onUpdate: (id: string, payload: CreatePlanPayload) => void
   plan: SubscriptionPlan | null
+  // Điền sẵn Giá/Thời hạn khi mở form tạo mới từ luồng "Tạo gói thay thế" trong ArchivePlanDialog --
+  // bỏ qua nếu đang ở chế độ sửa (plan != null). Xem SystemAdminSubscriptionPage.handleCreateReplacementFromArchive.
+  prefillPricePerYear?: number | null
+  prefillValidityDays?: number | null
 }
 
 type QuotaFormState = Record<QuotaType, { includedQuantity: string }>
@@ -66,16 +70,20 @@ function emptyQuotas(): QuotaFormState {
   }
 }
 
-function createFormState(plan: SubscriptionPlan | null): FormState {
+function createFormState(
+  plan: SubscriptionPlan | null,
+  prefillPricePerYear?: number | null,
+  prefillValidityDays?: number | null,
+): FormState {
   if (!plan) {
     return {
       maxTimePerAttemptMin: '',
       name: '',
-      pricePerYear: '',
+      pricePerYear: prefillPricePerYear != null ? String(prefillPricePerYear) : '',
       quotas: emptyQuotas(),
       serviceFeeRatioPercent: DEFAULT_SERVICE_FEE_RATIO_PERCENT,
       tagline: '',
-      validityDays: '365',
+      validityDays: prefillValidityDays != null ? String(prefillValidityDays) : '365',
     }
   }
 
@@ -156,10 +164,13 @@ export function PlanEditorDrawer({
   onCreate,
   onUpdate,
   plan,
+  prefillPricePerYear,
+  prefillValidityDays,
 }: PlanEditorDrawerProps) {
-  const [form, setForm] = useState<FormState>(() => createFormState(plan))
+  const [form, setForm] = useState<FormState>(() => createFormState(plan, prefillPricePerYear, prefillValidityDays))
   const [validationMessage, setValidationMessage] = useState<string | null>(null)
   const isEditMode = Boolean(plan)
+  const isPrefilled = !isEditMode && (prefillPricePerYear != null || prefillValidityDays != null)
   const { data: quotaPricing } = useQuotaPricingQuery()
   const serviceFeeRatioPercentNumber = Number(form.serviceFeeRatioPercent)
   // BE tự tính đúng công thức này khi lưu gói (QuotaPricingService.tokenUnitPriceFor) -- ở đây chỉ
@@ -266,10 +277,10 @@ export function PlanEditorDrawer({
 
             <div className="grid grid-cols-2 gap-4">
               <label className="grid gap-2 text-sm font-bold text-blue-950">
-                Giá / năm (VNĐ) <span className="text-red-500">*</span>
+                Giá <span className="text-red-500">*</span>
                 <input
                   className={inputClassName}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isPrefilled}
                   inputMode="decimal"
                   onChange={(event) => updateField('pricePerYear', sanitizeNumericInput(event.target.value))}
                   placeholder="45,000,000"
@@ -290,6 +301,13 @@ export function PlanEditorDrawer({
                 />
               </label>
             </div>
+
+            {isPrefilled ? (
+              <p className="-mt-3 text-xs font-medium text-indigo-600">
+                Giá đã khoá theo gói bạn chọn (bắt buộc khớp để làm gói thay thế). Sau khi lưu, hệ thống sẽ TỰ ĐỘNG
+                xuất bản gói này và lưu trữ gói cũ — không cần làm thêm gì.
+              </p>
+            ) : null}
 
             <div>
               <label className="grid gap-2 text-sm font-bold text-blue-950">
@@ -395,7 +413,11 @@ export function PlanEditorDrawer({
             type="submit"
           >
             <Check aria-hidden="true" className="size-4" />
-            {isSubmitting ? 'Đang lưu...' : 'Lưu gói'}
+            {isSubmitting
+              ? 'Đang xử lý...'
+              : isPrefilled
+                ? 'Tạo, xuất bản & lưu trữ gói cũ'
+                : 'Lưu gói'}
           </button>
         </div>
       </aside>

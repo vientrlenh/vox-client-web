@@ -43,6 +43,7 @@ export function SchoolSubscriptionsFiltersBar({ filters, onChange, plans }: Scho
       >
         <option value="">Tất cả trạng thái</option>
         <option value="ACTIVE">Đang hoạt động</option>
+        <option value="SUSPENDED">Đã đình chỉ</option>
         <option value="EXPIRED">Đã hết hạn</option>
         <option value="CANCELLED">Đã hủy</option>
       </select>
