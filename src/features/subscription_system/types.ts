@@ -267,7 +267,7 @@ export function daysUntil(value?: string | null) {
   return Math.round(diffMs / (1000 * 60 * 60 * 24))
 }
 
-const EXPIRING_THRESHOLD_DAYS = 30
+const EXPIRING_THRESHOLD_DAYS = 7
 
 export function getSubscriptionStatusDisplay(
   status: SubscriptionStatus,

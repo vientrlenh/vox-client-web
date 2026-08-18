@@ -63,6 +63,11 @@ export type RenewalPreview = {
   planChanged: boolean
   currentPlan: SubscriptionPlan
   renewalPlan: SubscriptionPlan
+  // Bù giá trị NGÀY CHƯA DÙNG của gói cũ, chỉ > 0 khi planChanged (bị ép đổi gói giữa chu kỳ do
+  // System Admin archive gói đang dùng) -- xem RenewalProrationService ở BE. amountDue = số tiền
+  // thật phải trả sau khi trừ bù (= renewalPlan.pricePerYear khi planChanged là false).
+  unusedCreditAmount: number
+  amountDue: number
 }
 
 export type MySubscription = {
@@ -246,7 +251,7 @@ export function daysUntil(value?: string | null) {
   return Math.round((end.getTime() - todayVnAsUtcMidnight) / (1000 * 60 * 60 * 24))
 }
 
-const EXPIRING_THRESHOLD_DAYS = 30
+const EXPIRING_THRESHOLD_DAYS = 7
 
 export function getSubscriptionStatusDisplay(
   status: SubscriptionStatus,

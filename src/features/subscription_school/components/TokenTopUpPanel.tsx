@@ -20,6 +20,11 @@ const QUOTA_ICONS: Record<QuotaType, typeof FileCheck2> = {
 const MAX_USD = 500
 const STEP_USD = 5
 
+// serviceFeeRatio là tỉ lệ (vd 0.20 = 20%) -- xem PlanEditorDrawer/QuotaPricingService.tokenUnitPriceFor.
+function formatServiceFeeRatio(serviceFeeRatio: number) {
+  return `${Math.round(serviceFeeRatio * 100 * 100) / 100}%`
+}
+
 type TokenTopUpPanelProps = {
   isSubmitting: boolean
   onChange: (quotaType: QuotaType, amountUsd: number) => void
@@ -82,7 +87,11 @@ export function TokenTopUpPanel({
                 <div className="flex items-center gap-2.5">
                   <Icon aria-hidden="true" className="size-4.5 text-indigo-600" />
                   <span className="flex-1 text-sm font-bold text-slate-900">{QUOTA_LABELS[quotaType]}</span>
-                  <span className="text-xs text-slate-400">{formatVnd(pricePerUnit)} / $1</span>
+                  <span className="text-xs text-slate-400">
+                    {usdToVndRate != null
+                      ? `Tỷ giá ${formatVnd(usdToVndRate)} · Phí DV ${formatServiceFeeRatio(plan.serviceFeeRatio)}`
+                      : `${formatVnd(pricePerUnit)} / $1`}
+                  </span>
                 </div>
                 <div className="mt-3 flex items-center gap-4">
                   <input

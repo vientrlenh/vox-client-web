@@ -1,4 +1,4 @@
-import { ArrowRight, Archive, ClipboardList, Clock, FileCheck2, Headphones, Pencil, Rocket, Star, Trash2 } from 'lucide-react'
+import { ArrowRight, Archive, ClipboardList, Clock, FileCheck2, Headphones, Pencil, Percent, Rocket, Star, Trash2 } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import {
   formatMinutes,
@@ -21,6 +21,11 @@ const QUOTA_ICON_STYLES: Record<QuotaType, string> = {
   CLASS_TEST: 'bg-blue-50 text-blue-600',
   GRADING: 'bg-violet-50 text-violet-600',
   PRACTICE: 'bg-emerald-50 text-emerald-600',
+}
+
+// serviceFeeRatio là tỉ lệ (vd 0.20 = 20%) -- xem PlanEditorDrawer/QuotaPricingService.tokenUnitPriceFor.
+function formatServiceFeeRatio(serviceFeeRatio: number) {
+  return `${Math.round(serviceFeeRatio * 100 * 100) / 100}%`
 }
 
 type PlanCardProps = {
@@ -156,6 +161,13 @@ export function PlanCard({ getPlanName, onArchive, onDeleteDraft, onEdit, onPubl
             </span>
             <span className="flex-1 text-[13px] text-slate-600">Thời gian tối đa mỗi bài</span>
             <span className="text-sm font-extrabold text-slate-900">{formatMinutes(plan.maxTimePerAttemptMin)}</span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+              <Percent aria-hidden="true" className="size-3.5" />
+            </span>
+            <span className="flex-1 text-[13px] text-slate-600">Phí dịch vụ</span>
+            <span className="text-sm font-extrabold text-slate-900">{formatServiceFeeRatio(plan.serviceFeeRatio)}</span>
           </div>
         </div>
       </div>
