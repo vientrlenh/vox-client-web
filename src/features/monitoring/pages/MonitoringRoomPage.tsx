@@ -105,6 +105,10 @@ export function MonitoringRoomPage() {
                 receivedAt: Date.parse(row.capturedAt) || 0,
                 sessionId: row.examSessionId,
                 streamId: row.streamId ?? '',
+                // Mang theo để bấm vào một cảnh báo mở đúng LOẠI luồng đã sinh ra nó: cảnh báo camera
+                // dẫn tới camera, cảnh báo màn hình dẫn tới màn hình. Thiếu nó thì mọi cảnh báo đều
+                // rơi về luồng đầu tiên của học viên, và một nửa số lần bấm mở nhầm khung hình.
+                streamType: row.streamType as StreamType | undefined,
             }
             const key = alertDedupeKey(view)
             if (seen.has(key)) {
@@ -152,10 +156,20 @@ export function MonitoringRoomPage() {
                 return
             }
 
-            // Ưu tiên giữ nguyên loại luồng đang xem nếu học viên đó có; nếu không thì lấy luồng đầu.
+            // Ưu tiên đúng luồng đã SINH RA cảnh báo -- đó mới là chỗ có thứ để xem. Không xác định
+            // được thì mới giữ nguyên loại đang xem, rồi mới tới luồng đầu tiên.
+            const byAlertStream = alert.streamId
+                ? entry.allStreams.find((item) => item.streamId === alert.streamId)
+                : undefined
+            const byAlertType = alert.streamType
+                ? entry.allStreams.find((item) => item.streamType === alert.streamType)
+                : undefined
             const keepType = watching?.candidateId === candidateId ? watching.streamType : undefined
             const target =
-                (keepType && entry.allStreams.find((item) => item.streamType === keepType)) ?? entry.allStreams[0]
+                byAlertStream ??
+                byAlertType ??
+                (keepType && entry.allStreams.find((item) => item.streamType === keepType)) ??
+                entry.allStreams[0]
             setWatching({ candidateId, streamType: target.streamType })
             setSeekRequest((previous) => ({ atMs, requestId: (previous?.requestId ?? 0) + 1 }))
         },

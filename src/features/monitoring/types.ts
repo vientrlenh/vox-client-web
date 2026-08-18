@@ -46,6 +46,22 @@ export type StreamSnapshot = {
   streamType: StreamType
   latestFrameUrl?: string | null
 }
+/**
+ * Một luồng ca thi đã từng có, đọc từ `/schedules/{id}/streams`.
+ *
+ * <p>Cùng hình dạng với `StreamSnapshot` cộng đúng một trường mà snapshot không mang nổi: lúc nào
+ * luồng dừng. Nhờ trùng tên trường mà cả hai nguồn đổ chung vào một reducer được.
+ */
+export type ScheduleStreamRecord = {
+  /** ISO. Vắng mặt nghĩa là luồng còn đang chạy. */
+  endedAt?: string
+  participantId: string
+  sessionId?: string
+  startedAt: string
+  streamId: string
+  streamType: StreamType
+}
+
 export type FrameNotification = {
   frameUrl: string
   sequenceNo: number
@@ -84,6 +100,14 @@ export type AlertEvent = {
   participantId: string
   sessionId: string
   streamId: string
+  /**
+   * Loại luồng đã sinh ra cảnh báo, để bấm vào nó mở đúng khung hình.
+   *
+   * <p>Optional vì hai nguồn khác nhau: bản ghi lịch sử từ DB có mang, còn sự kiện realtime qua
+   * WebSocket thì chưa. Thiếu thì rơi về luồng đầu tiên của học viên -- kém chính xác nhưng không
+   * được phép làm hỏng việc điều hướng.
+   */
+  streamType?: StreamType
 }
 
 export type MonitorMessage =

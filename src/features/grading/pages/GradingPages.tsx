@@ -70,7 +70,11 @@ import {
   useMyGradingTasksQuery,
 } from '../api/useGradingQueries'
 import { ExamRecordingPlayer } from '@/features/exam-recordings'
-import { ProctoringAlertsCard } from '@/features/proctoring-alerts'
+import {
+  ProctoringAlertCountBadge,
+  ProctoringAlertsCard,
+  useExamProctoringAlertCountsQuery,
+} from '@/features/proctoring-alerts'
 import { AiEvaluationSummary } from '../components/AiEvaluationSummary'
 import { AiQualityPanel } from '../components/AiQualityPanel'
 import { AssignTeacherDialog } from '../components/AssignTeacherDialog'
@@ -293,6 +297,13 @@ export function SchoolAdminGradingPage({
   const fixedExamQuery = useExamQuery(fixedExamId ?? null)
   const examId = fixedExamId ?? selectedExam?.id ?? ''
   const selectedExamName = fixedExamQuery.data?.name ?? selectedExam?.name
+
+  // Cảnh báo giám sát của cả kỳ thi, gộp sẵn theo phiên thi.
+  //
+  // Trước đây những cảnh báo này chỉ hiện ở màn CHẤM chi tiết, tức chúng chỉ tới tay người đã được
+  // giao bài -- còn người QUYẾT ĐỊNH giao cho ai thì phân công trong bóng tối. Mức WARNING trong
+  // thang cảnh báo có nghĩa đúng là "xem lại lúc chấm", nên đây mới là nơi nó cần đến.
+  const alertCountsQuery = useExamProctoringAlertCountsQuery(examId || null)
 
   const debouncedSearch = useDebouncedValue(search, 350)
   const rowsQuery = useGradingAssignmentsQuery(page, PAGE_SIZE, {
@@ -1023,6 +1034,15 @@ export function SchoolAdminGradingPage({
                                       Có đơn
                                     </span>
                                   ) : null}
+                                  {/* Đứng cạnh "Nghi vấn" và "Có đơn" vì cùng trả lời một câu hỏi:
+                                      bài này có cần chú ý hơn bình thường không. */}
+                                  <ProctoringAlertCountBadge
+                                    counts={
+                                      row.sessionId
+                                        ? alertCountsQuery.data?.get(row.sessionId)
+                                        : undefined
+                                    }
+                                  />
                                 </div>
                                 <div className="mt-1 flex items-center gap-1.5">
                                   <span className="truncate text-[13px] font-semibold text-slate-900">

@@ -63,8 +63,22 @@ export type SeekReadout = {
      * trường hợp nguy hiểm nhất thì lại không có cảnh báo nào.
      */
     atLiveEdge: boolean
-    /** Khoảng cách từ playhead tới mép vùng tua, giây. Không âm. */
+    /**
+     * Khoảng cách từ playhead tới MÉP THU (fragment mới nhất server đã liệt kê), giây. Không âm.
+     *
+     * <p>Đo với mép thu chứ không với điểm đồng bộ live, nên khi đang bám live nó KHÔNG về 0 mà đứng
+     * quanh `LIVE_SYNC_DURATION_COUNT` nhịp -- đó chính là khoảng đệm hls.js giữ để khỏi đứt hình.
+     * Giữ nguyên con số đó là có chủ ý: "bạn đang xem chậm bao nhiêu so với thứ vừa quay được" là
+     * thông tin giám thị cần, và giấu nó đi là lý do khoảng hở trên thanh trở nên khó hiểu.
+     */
     behindSecs: number
+    /**
+     * Mép phải của thang đo: điểm đồng bộ live, KHÔNG phải mép thu.
+     *
+     * <p>Đây là xa nhất mà trình phát thực sự sẽ tới. Vẽ thanh tới tận mép thu nghĩa là vẽ ra một
+     * đoạn cuối mà con trượt không bao giờ chạm được -- và tua tay vào đó thì đứng hình, vì hls.js
+     * chưa nạp tới đấy.
+     */
     domainEndOffset: number
     dvrEndOffset: number
     dvrStartOffset: number
@@ -390,6 +404,20 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             hls.attachMedia(video)
         }
 
+        /**
+         * Điểm đồng bộ live theo thời gian media: xa nhất trình phát thực sự sẽ tới.
+         *
+         * <p>`liveSyncPosition` là con số hls.js tự nhắm; chỉ tính tay khi không có nó -- nhánh native
+         * HLS của Safari, nơi engine tự quản việc bám live và không lộ ra giá trị này.
+         */
+        const liveSyncMediaTime = (dvr: { end: number; start: number }) => {
+            const syncPosition = hlsRef.current?.liveSyncPosition
+            if (typeof syncPosition === 'number' && Number.isFinite(syncPosition)) {
+                return Math.max(dvr.start, Math.min(dvr.end, syncPosition))
+            }
+            return Math.max(dvr.start, dvr.end - LIVE_SYNC_DURATION_COUNT * targetDurationRef.current)
+        }
+
         const tick = () => {
             // Đọc lại mỗi nhịp thay vì chốt một lần lúc dựng player: `streamsReducer` tạo entry tạm
             // với `startedAt: ''` khi frame về trước snapshot, nên giá trị thật có thể đến muộn. Đọc
@@ -404,9 +432,13 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             }
             dvrRangeRef.current = dvr
 
-            // Mép phải của thanh là MÉP VÙNG TUA, không phải `Date.now()`.
+            // Mép phải của thanh là ĐIỂM ĐỒNG BỘ LIVE, không phải `Date.now()` và cũng không phải mép
+            // thu. Đây là xa nhất trình phát thực sự sẽ tới, nên khi bám live thì thumb chạm mép một
+            // cách tự nhiên. Lấy mép thu làm mép thanh thì luôn thừa ra một đoạn cuối mà con trượt
+            // không bao giờ tới được -- đúng cái khoảng hở nhìn thấy trên màn hình -- và tua tay vào
+            // đoạn đó thì đứng hình vì hls.js chưa nạp tới đấy.
             //
-            // Trước đây nó là `Date.now()`, và đó là một phép so sánh giữa hai đồng hồ khác nhau: mép
+            // Còn `Date.now()` thì tệ hơn nữa: nó là phép so sánh giữa hai đồng hồ khác nhau, mép
             // phải lấy từ đồng hồ của máy giám thị, còn playhead lấy từ PROGRAM-DATE-TIME của server.
             // Máy giám thị nhanh hai phút là thanh mọc thêm hai phút vùng không thể tới, chậm hai
             // phút thì thumb dính mép và GIẤU luôn độ tụt thật. Neo cả hai đầu vào đồng hồ server thì
@@ -415,10 +447,11 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
             // Vẫn đóng băng suốt thao tác kéo: mép vùng tua nhảy lên một segment mỗi lần server đóng
             // file, và thang đo đổi giữa lúc kéo sẽ làm thumb giật dưới ngón tay.
             const absolute = wallAnchorRef.current !== null && !Number.isNaN(streamStartMs)
+            const liveSyncMedia = liveSyncMediaTime(dvr)
             if (!draggingRef.current || !seekDomainRef.current) {
                 seekDomainRef.current = absolute
-                    ? { absolute: true, endMs: mediaToDate(dvr.end), startMs: streamStartMs }
-                    : { absolute: false, endMs: 0, startMs: 0 }
+                    ? { absolute: true, endMs: mediaToDate(liveSyncMedia), startMs: streamStartMs }
+                    : { absolute: false, endMs: liveSyncMedia, startMs: 0 }
             }
             const domain = seekDomainRef.current
             const tolerance = LIVE_EDGE_TOLERANCE_COUNT * targetDurationRef.current
@@ -444,7 +477,7 @@ export function useLiveRewindPlayer({ onAuthError, scheduleId, stream, token }: 
                     absolute: false,
                     atLiveEdge: behindSecs <= tolerance,
                     behindSecs,
-                    domainEndOffset: dvr.end,
+                    domainEndOffset: domain.endMs,
                     dvrEndOffset: dvr.end,
                     dvrStartOffset: dvr.start,
                     playheadOffset: video.currentTime,

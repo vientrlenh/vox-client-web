@@ -155,8 +155,15 @@ export function LiveRewindPanel({
     // Bản trước dùng `!isFollowingLive`, cờ chỉ đổi khi giám thị tự kéo thanh tua. Nghĩa là một luồng
     // bị stall rồi trôi lại ba phút phía sau vẫn tự nhận là đang trực tiếp, và dải cảnh báo không hiện
     // -- đúng cái trường hợp giám thị KHÔNG tự biết thì lại là trường hợp duy nhất không được báo.
+    // Luồng đã kết thúc là BẢN GHI, không phải luồng trực tiếp bị tụt lại.
+    //
+    // Server đóng playlist bằng #EXT-X-ENDLIST nên hls.js chuyển hẳn sang chế độ VOD: không còn mép
+    // live, không còn poll. Mọi thứ nói về "hiện tại" ở đây vì thế đều vô nghĩa -- và tệ hơn là gây
+    // hiểu nhầm: một dải vàng "đang xem lại, cách hiện tại 12 phút" trên một ca đã xong sẽ đẩy giám
+    // thị đi tìm một hiện tại không tồn tại.
+    const isRecorded = stream.endedAt !== undefined
     const behindSecs = seek?.behindSecs ?? 0
-    const isBehind = seek !== null && !seek.atLiveEdge
+    const isBehind = !isRecorded && seek !== null && !seek.atLiveEdge
     const isFarBehind = isBehind && behindSecs >= BEHIND_LIVE_WARNING_SECS
 
     // Cảnh báo xảy ra SAU khi giám thị rời khỏi mép live -- tức thứ họ đang không nhìn thấy. Suy ra
@@ -336,22 +343,27 @@ export function LiveRewindPanel({
                     <p className="text-xs font-medium text-slate-500">
                         {seek ? (
                             <>
-                                {seek.absolute ? (
-                                    <>
-                                        {/* `dvrEndOffset` chứ không `domainEndOffset`: cái sau bị đóng
-                                            băng trong lúc kéo để thang đo không đổi dưới ngón tay, nên
-                                            dùng nó ở đây sẽ khiến con số đứng im khi đang kéo. */}
-                                        đã live: {formatDuration(seek.dvrEndOffset)} · tua được:{' '}
-                                        {formatDuration(seek.dvrStartOffset)}–{formatDuration(seek.dvrEndOffset)}
-                                    </>
-                                ) : (
-                                    <>
-                                        tua được: {formatDuration(seek.dvrStartOffset)}–
-                                        {formatDuration(seek.dvrEndOffset)} (mốc tương đối)
-                                    </>
-                                )}
-                                {/* Trạng thái xem lại KHÔNG lặp lại ở đây nữa -- nó đã có dải riêng
-                                    phía trên video. Dòng này chỉ còn nói về vùng tua. */}
+                                {/*
+                                  Trước đây dòng này mở đầu bằng "đã live: X", mà X chính là
+                                  `dvrEndOffset` -- đúng bằng đầu phải của "tua được" ngay sau nó. Hai
+                                  con số giống hệt nhau đứng cạnh nhau, và con số thực sự thiếu thì
+                                  không có. Giờ ba số ở đây rời nhau hẳn: vùng tua được, đang xem ở
+                                  đâu, và chậm bao nhiêu so với thứ vừa quay được.
+                                */}
+                                tua được: {formatDuration(seek.dvrStartOffset)}–
+                                {formatDuration(seek.dvrEndOffset)}
+                                {seek.absolute ? '' : ' (mốc tương đối)'} · đang xem:{' '}
+                                {formatDuration(seek.playheadOffset)}
+                                {/* "chậm" chỉ có nghĩa khi còn một hiện tại để chậm so với nó. Trên
+                                    một bản ghi, cùng con số ấy chỉ là thời lượng còn lại. */}
+                                {/*
+                                  Độ trễ hiện thẳng ra thay vì để người xem tự đoán từ khoảng hở trên
+                                  thanh. Khi đang bám live nó không về 0 mà đứng quanh khoảng đệm
+                                  hls.js giữ lại -- đó là sàn độ trễ của hệ thống, và với giám sát thi
+                                  thì "bạn đang xem chậm chừng này" là thông tin cần biết, không phải
+                                  chi tiết kỹ thuật nên giấu.
+                                */}
+                                {isRecorded ? '' : ` · chậm ${formatDuration(behindSecs)}`}
                             </>
                         ) : (
                             'Chưa có đoạn nào để tua.'
@@ -405,19 +417,28 @@ export function LiveRewindPanel({
                           giám thị. Một cái đèn "Live" sáng trong lúc luồng đã trôi lại phía sau còn
                           tệ hơn không có đèn nào.
                         */}
-                        <button
-                            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                                seek?.atLiveEdge
-                                    ? 'border-red-200 bg-red-50 text-red-700'
-                                    : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700'
-                            }`}
-                            onClick={goLive}
-                            title={seek?.atLiveEdge ? 'Đang xem trực tiếp' : 'Về hiện tại'}
-                            type="button"
-                        >
-                            <Radio aria-hidden="true" className="size-3.5" />
-                            Live
-                        </button>
+                        {/* Bản ghi thì không có "Live" để về. Một nút Live bấm được trên một ca đã
+                            xong là lời mời đi tìm thứ không còn tồn tại. */}
+                        {isRecorded ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-500">
+                                <Radio aria-hidden="true" className="size-3.5" />
+                                Bản ghi
+                            </span>
+                        ) : (
+                            <button
+                                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
+                                    seek?.atLiveEdge
+                                        ? 'border-red-200 bg-red-50 text-red-700'
+                                        : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700'
+                                }`}
+                                onClick={goLive}
+                                title={seek?.atLiveEdge ? 'Đang xem trực tiếp' : 'Về hiện tại'}
+                                type="button"
+                            >
+                                <Radio aria-hidden="true" className="size-3.5" />
+                                Live
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
