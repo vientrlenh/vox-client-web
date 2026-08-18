@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ClipboardCheck,
   ClipboardList,
+  Eye,
   Gavel,
   Pencil,
   RefreshCw,
@@ -23,6 +24,7 @@ import { useSchoolAssessmentPolicyQuery } from '../api/useSchoolAssessmentPolicy
 import { useUpdateSchoolAssessmentPolicyMutation } from '../api/useUpdateSchoolAssessmentPolicyMutation';
 import { useDeleteSchoolAssessmentPolicyMutation } from '../api/useDeleteSchoolAssessmentPolicyMutation';
 import { usePublishSchoolAssessmentPolicyMutation } from '../api/usePublishSchoolAssessmentPolicyMutation';
+import { usePublishSchoolRubricVersionMutation } from '../api/usePublishSchoolRubricVersionMutation';
 import { useArchiveSchoolAssessmentPolicyMutation } from '../api/useArchiveSchoolAssessmentPolicyMutation';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
 import { useAppSelector } from '@/app/store/hooks';
@@ -70,13 +72,23 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   const { mutateAsync: updatePolicy, isPending: isUpdating } = useUpdateSchoolAssessmentPolicyMutation(schoolId);
   const { mutateAsync: deletePolicy, isPending: isDeleting } = useDeleteSchoolAssessmentPolicyMutation(schoolId);
   const { mutateAsync: publishPolicy, isPending: isPublishing } = usePublishSchoolAssessmentPolicyMutation(schoolId);
+  const { mutateAsync: publishRubricVersion, isPending: isPublishingRubricVersion } = usePublishSchoolRubricVersionMutation(schoolId);
   const { mutateAsync: archivePolicy, isPending: isArchiving } = useArchiveSchoolAssessmentPolicyMutation(schoolId);
   const { showError, feedbackToast } = useFeedbackToast();
+
+  // Publish 1 Assessment Policy thì luôn kéo theo publish luôn Rubric Version gắn với nó -- một
+  // policy PUBLISHED mà Rubric Version của nó còn DRAFT thì policy vẫn chưa dùng chấm bài được,
+  // nên tách hai bước sẽ chỉ để lại một trạng thái nửa vời.
+  const rubricVersionNeedsPublish = policy?.rubricVersion?.status === 'DRAFT';
 
   const handlePublishPolicy = async () => {
     if (!policyId) return;
 
-    const isConfirm = window.confirm('Xuất bản Chính Sách Đánh Giá này? Sau khi xuất bản, Chính Sách Đánh Giá sẽ có hiệu lực áp dụng.');
+    const isConfirm = window.confirm(
+      rubricVersionNeedsPublish
+        ? 'Xuất bản Chính Sách Đánh Giá này? Rubric Version đang gắn với nó (còn DRAFT) sẽ được xuất bản theo, và cả hai sẽ có hiệu lực áp dụng.'
+        : 'Xuất bản Chính Sách Đánh Giá này? Sau khi xuất bản, Chính Sách Đánh Giá sẽ có hiệu lực áp dụng.',
+    );
     if (!isConfirm) return;
 
     try {
@@ -84,7 +96,26 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
     } catch (error) {
       const err = error as Error;
       showError(err.message || 'Có lỗi xảy ra khi xuất bản Chính Sách Đánh Giá.');
+      return;
     }
+
+    // Từ đây Policy đã PUBLISHED thật trong DB -- đây là request REST riêng, không rollback
+    // được lại bước trên nếu fail. Vì vậy luôn refetch (kể cả khi bước dưới lỗi) để trang khớp
+    // với DB, và báo lỗi phải nói rõ Policy đã xuất bản xong, chỉ riêng Rubric Version chưa được.
+    if (rubricVersionNeedsPublish && policy?.rubricVersionId) {
+      try {
+        await publishRubricVersion(policy.rubricVersionId);
+      } catch (error) {
+        const err = error as Error;
+        showError(
+          `Đã xuất bản Chính Sách Đánh Giá thành công. Riêng Rubric Version thì ${err.message || 'có lỗi xảy ra.'}`,
+        );
+        await refetch();
+        return;
+      }
+    }
+
+    await refetch();
   };
 
   const handleArchivePolicy = async () => {
@@ -250,10 +281,10 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
             <button
               type="button"
               onClick={handlePublishPolicy}
-              disabled={isPublishing}
+              disabled={isPublishing || isPublishingRubricVersion}
               className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-5 text-sm font-medium text-emerald-600 transition hover:bg-emerald-100 disabled:opacity-50"
             >
-              {isPublishing ? <RefreshCw className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+              {isPublishing || isPublishingRubricVersion ? <RefreshCw className="size-4 animate-spin" /> : <Rocket className="size-4" />}
               Xuất bản
             </button>
           ) : null}
@@ -331,16 +362,32 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
           )}
 
           {activeTab === 'rubric' && (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <InfoField label="Mã">{policy.rubricVersion?.code || '—'}</InfoField>
-              <InfoField label="Tên">{policy.rubricVersion?.name || '—'}</InfoField>
-              <InfoField label="Version">{policy.rubricVersion ? `v${policy.rubricVersion.version}` : '—'}</InfoField>
-              <InfoField label="Trạng thái">{policy.rubricVersion?.status || '—'}</InfoField>
-              <InfoField label="Hiệu lực">
-                {policy.rubricVersion
-                  ? `${formatAssessmentPolicyDate(policy.rubricVersion.effectiveFrom)} – ${formatAssessmentPolicyDate(policy.rubricVersion.effectiveTo)}`
-                  : '—'}
-              </InfoField>
+            <div>
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                <InfoField label="Mã">{policy.rubricVersion?.code || '—'}</InfoField>
+                <InfoField label="Tên">{policy.rubricVersion?.name || '—'}</InfoField>
+                <InfoField label="Version">{policy.rubricVersion ? `v${policy.rubricVersion.version}` : '—'}</InfoField>
+                <InfoField label="Trạng thái">{policy.rubricVersion?.status || '—'}</InfoField>
+                <InfoField label="Hiệu lực">
+                  {policy.rubricVersion
+                    ? `${formatAssessmentPolicyDate(policy.rubricVersion.effectiveFrom)} – ${formatAssessmentPolicyDate(policy.rubricVersion.effectiveTo)}`
+                    : '—'}
+                </InfoField>
+              </div>
+
+              {policy.rubricVersion?.rubricId ? (
+                <button
+                  className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+                  onClick={() =>
+                    navigate(
+                      `/school-admin/rubrics/${policy.rubricVersion?.rubricId}/versions/${policy.rubricVersionId}`,
+                    )
+                  }
+                  type="button"
+                >
+                  <Eye className="size-4" /> Xem chi tiết Rubric Version
+                </button>
+              ) : null}
             </div>
           )}
         </div>

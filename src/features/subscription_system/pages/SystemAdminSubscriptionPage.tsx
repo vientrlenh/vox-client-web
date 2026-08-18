@@ -15,7 +15,12 @@ import {
   useUpdatePlanMutation,
 } from '../api/usePlanMutations'
 import { useSchoolSubscriptionsQuery } from '../api/useSchoolSubscriptionsQuery'
-import { useCancelSubscriptionMutation, useRenewSubscriptionMutation } from '../api/useSchoolSubscriptionMutations'
+import {
+  useCancelSubscriptionMutation,
+  useRenewSubscriptionMutation,
+  useSuspendSubscriptionMutation,
+  useUnsuspendSubscriptionMutation,
+} from '../api/useSchoolSubscriptionMutations'
 import { useSubscriptionRequestsQuery } from '../api/useSubscriptionRequestsQuery'
 import { useCreatePaymentLinkForRequestMutation, useRejectRequestMutation } from '../api/useSubscriptionRequestMutations'
 import { useSchoolLookup } from '../api/useSchoolLookup'
@@ -66,7 +71,7 @@ export function SystemAdminSubscriptionPage() {
   const [requestsStatus, setRequestsStatus] = useState<RequestStatus>('PENDING')
   const [requestsPage, setRequestsPage] = useState(DEFAULT_PAGE)
 
-  const { confirm, confirmWithSelection, dialog: confirmDialog } = useConfirmationDialog()
+  const { confirm, confirmWithReason, confirmWithSelection, dialog: confirmDialog } = useConfirmationDialog()
   const { getSchool, isLoading: isSchoolLookupLoading } = useSchoolLookup()
 
   const plansQuery = useSubscriptionPlansQuery(DEFAULT_PAGE, 50)
@@ -90,11 +95,14 @@ export function SystemAdminSubscriptionPage() {
   const deleteDraftPlanMutation = useDeleteDraftPlanMutation()
   const renewMutation = useRenewSubscriptionMutation()
   const cancelMutation = useCancelSubscriptionMutation()
+  const suspendMutation = useSuspendSubscriptionMutation()
+  const unsuspendMutation = useUnsuspendSubscriptionMutation()
   const paymentLinkMutation = useCreatePaymentLinkForRequestMutation()
   const rejectMutation = useRejectRequestMutation()
 
   const isSavingPlan = createPlanMutation.isPending || updatePlanMutation.isPending
-  const isSchoolActionPending = renewMutation.isPending || cancelMutation.isPending
+  const isSchoolActionPending =
+    renewMutation.isPending || cancelMutation.isPending || suspendMutation.isPending || unsuspendMutation.isPending
   const isRequestActionPending = paymentLinkMutation.isPending || rejectMutation.isPending
 
   function getPlanName(planId: string | null) {
@@ -268,6 +276,60 @@ export function SystemAdminSubscriptionPage() {
     }
   }
 
+  async function handleSuspend(subscription: SchoolSubscription) {
+    const school = getSchool(subscription.schoolId)
+    const result = await confirmWithReason({
+      confirmLabel: 'Đình chỉ',
+      message: `Đình chỉ NGAY gói của trường "${school?.name ?? subscription.schoolId}"? Trường sẽ mất quyền dùng ngay lập tức.`,
+      reasonLabel: 'Lý do đình chỉ',
+      reasonPlaceholder: 'Vd: phát hiện gian lận...',
+      requireReason: true,
+      title: 'Đình chỉ gói đăng ký',
+    })
+
+    if (!result.confirmed) {
+      return
+    }
+
+    try {
+      await suspendMutation.mutateAsync({
+        reason: result.reason,
+        schoolId: subscription.schoolId,
+        subscriptionId: subscription.id,
+      })
+      setToast({ text: 'Đã đình chỉ gói của trường', tone: 'success' })
+    } catch (error) {
+      setToast({ text: getErrorMessage(error) ?? 'Không thể đình chỉ gói.', tone: 'error' })
+    }
+  }
+
+  async function handleUnsuspend(subscription: SchoolSubscription) {
+    const school = getSchool(subscription.schoolId)
+    const result = await confirmWithReason({
+      confirmLabel: 'Gỡ đình chỉ',
+      message: `Gỡ đình chỉ gói của trường "${school?.name ?? subscription.schoolId}"? Trường sẽ được dùng lại bình thường.`,
+      reasonLabel: 'Ghi chú (không bắt buộc)',
+      reasonPlaceholder: 'Vd: đã xác minh không gian lận...',
+      requireReason: false,
+      title: 'Gỡ đình chỉ gói đăng ký',
+    })
+
+    if (!result.confirmed) {
+      return
+    }
+
+    try {
+      await unsuspendMutation.mutateAsync({
+        note: result.reason || undefined,
+        schoolId: subscription.schoolId,
+        subscriptionId: subscription.id,
+      })
+      setToast({ text: 'Đã gỡ đình chỉ gói của trường', tone: 'success' })
+    } catch (error) {
+      setToast({ text: getErrorMessage(error) ?? 'Không thể gỡ đình chỉ gói.', tone: 'error' })
+    }
+  }
+
   async function handlePay(request: SubscriptionRequest) {
     const school = getSchool(request.schoolId)
     const { confirmed, selection } = await confirmWithSelection({
@@ -403,6 +465,8 @@ export function SystemAdminSubscriptionPage() {
             isLoading={schoolsQuery.isLoading}
             onCancel={handleCancel}
             onRenew={handleRenew}
+            onSuspend={handleSuspend}
+            onUnsuspend={handleUnsuspend}
             onRetry={() => void schoolsQuery.refetch()}
             onViewDetail={openDetail}
             subscriptions={schoolsQuery.data?.content ?? []}

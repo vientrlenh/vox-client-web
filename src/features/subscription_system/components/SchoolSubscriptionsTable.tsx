@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Eye, Inbox, RefreshCw } from 'lucide-react'
+import { Eye, Inbox, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import type { SchoolLookupEntry } from '../api/useSchoolLookup'
 import { formatDate, formatVnd, getSubscriptionStatusDisplay, type SchoolSubscription } from '../types'
@@ -14,6 +14,8 @@ type SchoolSubscriptionsTableProps = {
   onCancel: (subscription: SchoolSubscription) => void
   onRenew: (subscription: SchoolSubscription) => void
   onRetry: () => void
+  onSuspend: (subscription: SchoolSubscription) => void
+  onUnsuspend: (subscription: SchoolSubscription) => void
   onViewDetail: (subscription: SchoolSubscription) => void
   subscriptions: SchoolSubscription[]
 }
@@ -28,6 +30,8 @@ export function SchoolSubscriptionsTable({
   onCancel,
   onRenew,
   onRetry,
+  onSuspend,
+  onUnsuspend,
   onViewDetail,
   subscriptions,
 }: SchoolSubscriptionsTableProps) {
@@ -133,6 +137,28 @@ export function SchoolSubscriptionsTable({
                               type="button"
                             >
                               Hủy
+                            </button>
+                          ) : null}
+                          {subscription.status === 'ACTIVE' ? (
+                            <button
+                              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={isActionPending}
+                              onClick={() => onSuspend(subscription)}
+                              type="button"
+                            >
+                              <ShieldAlert aria-hidden="true" className="size-3.5" />
+                              Đình chỉ
+                            </button>
+                          ) : null}
+                          {subscription.status === 'SUSPENDED' ? (
+                            <button
+                              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={isActionPending}
+                              onClick={() => onUnsuspend(subscription)}
+                              type="button"
+                            >
+                              <ShieldCheck aria-hidden="true" className="size-3.5" />
+                              Gỡ đình chỉ
                             </button>
                           ) : null}
                         </div>

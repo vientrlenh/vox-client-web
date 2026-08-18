@@ -21,6 +21,8 @@ const SCHOOL_SUBSCRIPTIONS_QUERY = `
         pricePaidSnapshot
         cancelledAt
         createdAt
+        suspendedAt
+        suspendedReason
         plan {
           id
           name

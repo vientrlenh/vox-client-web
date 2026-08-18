@@ -13,7 +13,7 @@ export function useCreateSchoolAssessmentPolicyMutation(schoolId: string | undef
       if (!schoolId) throw new Error('Không tìm thấy ID trường học');
 
       // BE nhận vào 1 mảng CreateSchoolAssessmentPolicyRequest (cho phép tạo nhiều Policy
-      // cùng lúc), mỗi request lại chứa 1 mảng rubricVersionIds -> 1 Policy / rubric version.
+      // cùng lúc), mỗi request chứa đúng 1 rubricVersionId -> 1 Policy / rubric version.
       const response = await apiClient.post(`/v1/assessment-policies/schools/${schoolId}`, payloads);
 
       // ApiResponse<List<UUID>> -> danh sách policyId vừa tạo nằm trong response.data.data

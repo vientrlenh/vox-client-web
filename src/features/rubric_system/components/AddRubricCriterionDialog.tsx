@@ -57,7 +57,7 @@ export function AddRubricCriterionDialog({ isOpen, onClose, onSubmit, isPending,
   const { data: frameworkVersions, isLoading: isLoadingVersions } = useFrameworkVersionsQuery(frameworkId);
   const { data: frameworkCriteriaAll, isLoading: isLoadingCriteria } = useFrameworkVersionCriteriaQuery(frameworkVersionId || undefined);
   const frameworkCriteria = frameworkCriteriaAll?.filter((fc) => !usedFrameworkCriterionIds.includes(fc.id));
-  // Mã Code luôn theo đúng Framework Criterion đã chọn — không cho gõ tay để tránh lệch dữ liệu.
+  // Mã Code luôn theo đúng Framework Criterion đã chọn — không cho gõ tay để tránh lệch dữ liệu..
   const selectedFrameworkCriterion = frameworkCriteria?.find((fc) => fc.id === formData.frameworkCriterionId);
 
   // Xoá lỗi cũ mỗi lần mở lại, để banner không tố cáo một lỗi đã không còn đúng.
