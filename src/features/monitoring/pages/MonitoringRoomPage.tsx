@@ -11,7 +11,7 @@ import type { ProctorCandidateSummaryDto } from '@/features/examCore/types'
 
 import { useScheduleProctoringAlertsQuery } from '@/features/proctoring-alerts'
 
-import { useScheduleMonitor, type AlertView } from '../api/useRoomMonitor'
+import { useScheduleMonitor, type AlertView, type StreamView } from '../api/useRoomMonitor'
 import { LiveRewindPanel, type LatestAlertNotice, type SeekRequest } from '../components/LiveRewindPanel'
 import { ParticipantCard } from '../components/ParticipantCard'
 import { RoomAlertFeed } from '../components/RoomAlertFeed'
@@ -54,6 +54,47 @@ const FILTER_OPTIONS: { label: string; value: StreamFilter }[] = [
     { label: 'Camera', value: 'camera' },
     { label: 'Màn hình', value: 'screen' },
 ]
+
+/**
+ * Luồng đang được xem trong panel.
+ *
+ * <p>Mang cả `streamId` lẫn `streamType` vì hai trường trả lời hai câu khác nhau, và trước đây chỉ
+ * có cái sau: thanh tab vẽ theo từng luồng nhưng báo ra ngoài mỗi loại, nên khi một học viên vào lại
+ * và có hai luồng camera, bấm tab camera thứ hai luôn giải ngược về camera thứ nhất - tab đó vĩnh
+ * viễn không tới được.
+ */
+type WatchTarget = {
+    candidateId: string
+    /**
+     * Ghim vào ĐÚNG `streamId` này thay vì bám luồng hiện hành của loại.
+     *
+     * <p>Chỉ bật khi giám thị chủ động chọn một luồng đã kết thúc (bấm cảnh báo cũ, hoặc bấm tab bản
+     * ghi) - lúc đó họ đang xem quá khứ có chủ đích và không được kéo về hiện tại. Khi đang xem một
+     * luồng còn sống thì tắt, để học viên rớt rồi vào lại là panel tự bám sang luồng mới thay vì
+     * đứng lại trên một bản ghi đã đóng trong khi người đó đã lên sóng trở lại.
+     */
+    pinned: boolean
+    streamId: string
+    streamType: StreamType
+}
+
+/**
+ * Luồng này có chứa mốc thời gian đó không.
+ *
+ * <p>Cần khi một học viên vào lại nhiều lần: cùng một loại luồng khi ấy có nhiều đoạn ghi nối nhau,
+ * và một cảnh báo cũ không mang `streamId` sẽ mở đoạn mới nhất - đoạn không chứa thời điểm cần xem,
+ * nên tua tới chỉ nhận lại "đã trôi khỏi cửa sổ tua lại".
+ *
+ * <p>Mốc bắt đầu không đọc được thì trả false chứ không coi là chứa: `Date.parse('')` ra NaN, và
+ * một cửa sổ bắt đầu từ NaN sẽ nhận vơ mọi thời điểm.
+ */
+function coversMoment(stream: StreamView, atMs: number): boolean {
+    const startedAt = Date.parse(stream.startedAt)
+    if (!Number.isFinite(startedAt) || atMs < startedAt) {
+        return false
+    }
+    return stream.endedAt === undefined || atMs <= stream.endedAt
+}
 
 export function MonitoringRoomPage() {
     const { examId, scheduleId } = useParams()
@@ -129,10 +170,28 @@ export function MonitoringRoomPage() {
         streams,
     })
 
-    // Lưu theo cặp (học viên, loại luồng) chứ không theo streamId: một lần reconnect sinh streamId
-    // mới, và giám thị đang xem sẽ bị đá ra ngoài dù học viên vẫn là người đó và vẫn đang stream.
-    const [watching, setWatching] = useState<null | { candidateId: string; streamType: StreamType }>(null)
+    const [watching, setWatching] = useState<null | WatchTarget>(null)
     const [seekRequest, setSeekRequest] = useState<null | SeekRequest>(null)
+
+    /**
+     * Chọn một luồng cụ thể để xem - dùng chung cho ô thumbnail và thanh tab của panel.
+     *
+     * <p>Cờ ghim suy ra từ chính luồng được chọn: chọn một luồng đã kết thúc là chọn xem lại, còn
+     * chọn một luồng đang sống là chọn theo dõi hiện tại. Không có tham số nào cho người gọi truyền
+     * sai.
+     */
+    const handleWatchStream = useCallback((entry: ParticipantBoardEntry, streamId: string) => {
+        const picked = entry.allStreams.find((item) => item.streamId === streamId)
+        if (!picked) {
+            return
+        }
+        setWatching({
+            candidateId: entry.candidateId,
+            pinned: picked.endedAt !== undefined,
+            streamId,
+            streamType: picked.streamType,
+        })
+    }, [])
 
     /**
      * Bấm một cảnh báo: mở luồng của học viên đó rồi tua tới đúng thời điểm.
@@ -156,21 +215,31 @@ export function MonitoringRoomPage() {
                 return
             }
 
-            // Ưu tiên đúng luồng đã SINH RA cảnh báo -- đó mới là chỗ có thứ để xem. Không xác định
-            // được thì mới giữ nguyên loại đang xem, rồi mới tới luồng đầu tiên.
+            // Ưu tiên đúng luồng đã SINH RA cảnh báo -- đó mới là chỗ có thứ để xem. Tra trong
+            // `allStreams` chứ không `currentStreams`: cảnh báo cũ thuộc về một luồng đã bị lần kết
+            // nối sau thay thế, và đó chính là luồng phải mở ra.
             const byAlertStream = alert.streamId
                 ? entry.allStreams.find((item) => item.streamId === alert.streamId)
                 : undefined
+            // Không có streamId thì lần theo loại - nhưng phải chọn đoạn CHỨA được mốc đó, vì một
+            // học viên vào lại nhiều lần có nhiều đoạn ghi cùng loại nối tiếp nhau.
             const byAlertType = alert.streamType
-                ? entry.allStreams.find((item) => item.streamType === alert.streamType)
+                ? (entry.allStreams.find(
+                      (item) => item.streamType === alert.streamType && coversMoment(item, atMs),
+                  ) ?? entry.currentStreams.find((item) => item.streamType === alert.streamType))
                 : undefined
             const keepType = watching?.candidateId === candidateId ? watching.streamType : undefined
             const target =
                 byAlertStream ??
                 byAlertType ??
-                (keepType && entry.allStreams.find((item) => item.streamType === keepType)) ??
-                entry.allStreams[0]
-            setWatching({ candidateId, streamType: target.streamType })
+                (keepType && entry.currentStreams.find((item) => item.streamType === keepType)) ??
+                entry.currentStreams[0]
+            setWatching({
+                candidateId,
+                pinned: target.endedAt !== undefined,
+                streamId: target.streamId,
+                streamType: target.streamType,
+            })
             setSeekRequest((previous) => ({ atMs, requestId: (previous?.requestId ?? 0) + 1 }))
         },
         [onScreen, resolveAlertCandidateId, watching],
@@ -181,15 +250,51 @@ export function MonitoringRoomPage() {
         [onScreen, watching],
     )
     const watchingStream = useMemo(() => {
-        if (!watchingEntry) {
+        if (!watchingEntry || !watching) {
             return undefined
         }
-        // Rơi về luồng còn lại nếu loại đang xem biến mất - xem tiếp camera vẫn hơn là màn hình đen.
+        // Đang xem lại có chủ đích thì giữ nguyên đúng luồng đó, kể cả khi học viên đã lên sóng lại
+        // bằng một luồng mới: bị kéo về hiện tại giữa lúc đang xem bằng chứng là mất chỗ đang xem.
+        if (watching.pinned) {
+            const pinned = watchingEntry.allStreams.find((stream) => stream.streamId === watching.streamId)
+            if (pinned) {
+                return pinned
+            }
+        }
+        // Ngược lại thì bám luồng HIỆN HÀNH của loại đang xem, nên một lần rớt rồi vào lại chỉ đổi
+        // nguồn phát chứ không đá giám thị ra ngoài. Rơi về luồng còn lại nếu loại đó biến mất --
+        // xem tiếp camera vẫn hơn là màn hình đen.
         return (
-            watchingEntry.allStreams.find((stream) => stream.streamType === watching?.streamType) ??
-            watchingEntry.allStreams[0]
+            watchingEntry.currentStreams.find((stream) => stream.streamType === watching.streamType) ??
+            watchingEntry.allStreams.find((stream) => stream.streamId === watching.streamId) ??
+            watchingEntry.currentStreams[0]
         )
     }, [watchingEntry, watching])
+
+    /**
+     * Các tab của panel: luồng hiện hành của mỗi loại, cộng những bản ghi cần giữ đường quay lại.
+     *
+     * <p>Nhờ vậy thanh tab bình thường chỉ có Camera và Màn hình, còn khi giám thị bấm vào một cảnh
+     * báo cũ thì đoạn ghi ấy hiện thêm một tab để họ thấy mình đang ở đâu và quay về hiện tại được.
+     */
+    const panelStreams = useMemo(() => {
+        if (!watchingEntry || !watchingStream) {
+            return []
+        }
+        const current = watchingEntry.currentStreams
+        const extras: StreamView[] = []
+        const keep = (stream?: StreamView) => {
+            if (stream && !current.includes(stream) && !extras.includes(stream)) {
+                extras.push(stream)
+            }
+        }
+        keep(watchingStream)
+        // Cả đoạn giám thị đã CHỌN trước đó, kể cả khi panel đã tự bám sang luồng mới: học viên rớt
+        // rồi vào lại đúng lúc đang tua lại bằng chứng là chuyện có thật, và nếu không giữ tab này
+        // thì đoạn đang xem dở biến mất khỏi màn hình mà không còn đường nào quay về nó.
+        keep(watchingEntry.allStreams.find((stream) => stream.streamId === watching?.streamId))
+        return extras.length === 0 ? current : [...current, ...extras]
+    }, [watching, watchingEntry, watchingStream])
 
     const nameByCandidateId = useMemo(() => {
         const map = new Map<string, string>()
@@ -319,7 +424,7 @@ export function MonitoringRoomPage() {
                     */}
                     {watchingEntry && watchingStream ? (
                         <LiveRewindPanel
-                            availableStreams={watchingEntry.allStreams}
+                            availableStreams={panelStreams}
                             latestAlert={latestAlertNotice}
                             onAuthError={() => void refreshStreamToken()}
                             onClose={handleCloseWatch}
@@ -328,9 +433,7 @@ export function MonitoringRoomPage() {
                                     'Thời điểm của cảnh báo này đã trôi khỏi cửa sổ tua lại. Bản ghi đầy đủ xem được ở màn chấm bài.',
                                 )
                             }
-                            onSelectStreamType={(streamType) =>
-                                setWatching({ candidateId: watchingEntry.candidateId, streamType })
-                            }
+                            onSelectStream={(streamId) => handleWatchStream(watchingEntry, streamId)}
                             participantName={watchingEntry.studentName}
                             scheduleId={scheduleId}
                             seekRequest={seekRequest}
@@ -360,15 +463,7 @@ export function MonitoringRoomPage() {
                                     key={entry.candidateId}
                                     now={now}
                                     onForceEnd={handleForceEnd}
-                                    onWatch={(streamId) => {
-                                        const picked = entry.allStreams.find((item) => item.streamId === streamId)
-                                        if (picked) {
-                                            setWatching({
-                                                candidateId: entry.candidateId,
-                                                streamType: picked.streamType,
-                                            })
-                                        }
-                                    }}
+                                    onWatch={(streamId) => handleWatchStream(entry, streamId)}
                                     watchingStreamId={watchingStream?.streamId}
                                 />
                             ))}

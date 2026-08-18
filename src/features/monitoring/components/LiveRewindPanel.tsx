@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { StreamView } from '../api/useRoomMonitor'
 import { formatDuration, useLiveRewindPlayer } from '../hooks/useLiveRewindPlayer'
-import { getStreamTypeLabel, type StreamType } from '../types'
+import { getStreamTypeLabel } from '../types'
 
 /** Một yêu cầu tua tới mốc giờ thực, thường phát ra khi giám thị bấm vào một cảnh báo. */
 export type SeekRequest = {
@@ -29,6 +29,26 @@ export type LatestAlertNotice = {
  */
 const BEHIND_LIVE_WARNING_SECS = 120
 
+/**
+ * Nhãn của một tab luồng.
+ *
+ * <p>Khi học viên rớt rồi vào lại, một bản ghi cũ có thể xuất hiện cạnh luồng đang chạy cùng loại.
+ * Hai tab cùng tên "Camera" thì không chọn được theo nghĩa thật - không có gì phân biệt đoạn nào với
+ * đoạn nào. Giờ bắt đầu là thứ giám thị đối chiếu thẳng được với giờ trên dòng cảnh báo.
+ */
+function streamTabLabel(stream: StreamView): string {
+    const label = getStreamTypeLabel(stream.streamType)
+    if (stream.endedAt === undefined) {
+        return label
+    }
+    const startedAt = Date.parse(stream.startedAt)
+    if (!Number.isFinite(startedAt)) {
+        return `${label} · bản ghi`
+    }
+    const clock = new Date(startedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    return `${label} · bản ghi ${clock}`
+}
+
 type LiveRewindPanelProps = {
     availableStreams: StreamView[]
     /**
@@ -40,7 +60,14 @@ type LiveRewindPanelProps = {
     onClose: () => void
     /** Báo ra ngoài khi mốc được yêu cầu đã trôi khỏi cửa sổ tua. */
     onSeekUnavailable?: () => void
-    onSelectStreamType: (streamType: StreamType) => void
+    /**
+     * Chọn một luồng cụ thể theo `streamId`.
+     *
+     * <p>Trước đây prop này báo ra ngoài mỗi `streamType`, trong khi tab lại vẽ theo từng luồng. Khi
+     * một học viên có hai luồng cùng loại, bên nhận giải ngược bằng `find(theo loại)` và luôn nhận
+     * về cái ĐẦU TIÊN - tab thứ hai bấm vào là nhảy về tab thứ nhất.
+     */
+    onSelectStream: (streamId: string) => void
     participantName: string
     scheduleId?: string
     seekRequest?: null | SeekRequest
@@ -54,7 +81,7 @@ export function LiveRewindPanel({
     onAuthError,
     onClose,
     onSeekUnavailable,
-    onSelectStreamType,
+    onSelectStream,
     participantName,
     scheduleId,
     seekRequest,
@@ -205,10 +232,10 @@ export function LiveRewindPanel({
                                     : 'text-slate-600 hover:text-slate-900'
                             }`}
                             key={candidate.streamId}
-                            onClick={() => onSelectStreamType(candidate.streamType)}
+                            onClick={() => onSelectStream(candidate.streamId)}
                             type="button"
                         >
-                            {getStreamTypeLabel(candidate.streamType)}
+                            {streamTabLabel(candidate)}
                         </button>
                     ))}
                 </div>

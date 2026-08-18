@@ -63,7 +63,8 @@ export function ParticipantCard({ entry, now, onForceEnd, onWatch, watchingStrea
                 <div className="min-w-0">
                     <p className="truncate text-sm font-black text-slate-950">{entry.studentName}</p>
                     <p className="truncate text-xs font-medium text-slate-500">
-                        {entry.allStreams.map((stream) => getStreamTypeLabel(stream.streamType)).join(' · ') || '—'}
+                        {entry.currentStreams.map((stream) => getStreamTypeLabel(stream.streamType)).join(' · ') ||
+                            '—'}
                     </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
