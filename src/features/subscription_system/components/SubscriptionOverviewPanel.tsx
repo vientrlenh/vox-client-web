@@ -43,6 +43,10 @@ export function SubscriptionOverviewPanel({
         schoolCount: subs.length,
       }
     })
+    // Bỏ gói không còn trường nào dùng (vd gói ARCHIVED đã hết trường, hoặc DRAFT chưa ai đăng ký)
+    // để biểu đồ không bị rối -- plans truyền vào giờ gồm CẢ gói archived để không bỏ sót trường vẫn
+    // đang dùng gói đã ngừng bán.
+    .filter((item) => item.schoolCount > 0)
     .sort((a, b) => b.revenue - a.revenue)
   const maxRevenue = Math.max(1, ...revenueByPlan.map((item) => item.revenue))
 

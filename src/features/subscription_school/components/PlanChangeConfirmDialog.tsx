@@ -31,7 +31,9 @@ export function PlanChangeConfirmDialog({
     return null
   }
 
-  const { currentPlan, renewalPlan } = preview
+  const { currentPlan, renewalPlan, unusedCreditAmount, amountDue } = preview
+  const hasCredit = unusedCreditAmount > 0
+  const isFree = amountDue === 0
   const currentQuotaByType = new Map(currentPlan.quotas.map((quota) => [quota.quotaType, quota]))
   const renewalQuotaByType = new Map(renewalPlan.quotas.map((quota) => [quota.quotaType, quota]))
 
@@ -51,8 +53,8 @@ export function PlanChangeConfirmDialog({
         </h2>
         <p className="mt-1.5 text-sm leading-6 text-slate-500">
           Gói <strong className="text-slate-700">{currentPlan.name}</strong> đã ngừng cung cấp. Khi gia hạn, bạn sẽ
-          chuyển sang gói <strong className="text-slate-700">{renewalPlan.name}</strong> — cùng mức giá, nhiều tính
-          năng hơn.
+          chuyển sang gói <strong className="text-slate-700">{renewalPlan.name}</strong> — cùng mức giá. Xem chi
+          tiết thay đổi hạn mức bên dưới.
         </p>
 
         <div className="mt-5 rounded-2xl border border-slate-200 p-4.5">
@@ -92,22 +94,36 @@ export function PlanChangeConfirmDialog({
             </div>
           </div>
 
-          <div className="mt-4 flex items-baseline justify-between border-t border-slate-100 pt-3.5">
-            <span className="text-[13px] font-bold text-slate-500">Giá gia hạn</span>
-            <span className="text-lg font-extrabold text-indigo-600">
-              {formatVnd(renewalPlan.pricePerYear)} / {renewalPlan.validityDays} ngày
-            </span>
+          <div className="mt-4 border-t border-slate-100 pt-3.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[13px] font-bold text-slate-500">Giá gói mới</span>
+              <span className="text-sm font-bold text-slate-700">
+                {formatVnd(renewalPlan.pricePerYear)} / {renewalPlan.validityDays} ngày
+              </span>
+            </div>
+            {hasCredit ? (
+              <div className="mt-1.5 flex items-baseline justify-between">
+                <span className="text-[13px] font-bold text-slate-500">Bù ngày chưa dùng của gói cũ</span>
+                <span className="text-sm font-bold text-emerald-600">-{formatVnd(unusedCreditAmount)}</span>
+              </div>
+            ) : null}
+            <div className="mt-1.5 flex items-baseline justify-between">
+              <span className="text-[13px] font-bold text-slate-500">Còn phải trả</span>
+              <span className="text-lg font-extrabold text-indigo-600">{formatVnd(amountDue)}</span>
+            </div>
           </div>
         </div>
 
-        <div className="mt-5">
-          <PaymentMethodField
-            disabled={isSubmitting}
-            name="renewal-payment-method"
-            onChange={onPaymentMethodChange}
-            value={paymentMethod}
-          />
-        </div>
+        {isFree ? null : (
+          <div className="mt-5">
+            <PaymentMethodField
+              disabled={isSubmitting}
+              name="renewal-payment-method"
+              onChange={onPaymentMethodChange}
+              value={paymentMethod}
+            />
+          </div>
+        )}
 
         <div className="mt-5.5 flex gap-3">
           <button
@@ -124,7 +140,13 @@ export function PlanChangeConfirmDialog({
             onClick={onConfirm}
             type="button"
           >
-            {isSubmitting ? 'Đang chuyển đến cổng thanh toán...' : 'Đồng ý, tiếp tục gia hạn'}
+            {isSubmitting
+              ? isFree
+                ? 'Đang xử lý...'
+                : 'Đang chuyển đến cổng thanh toán...'
+              : isFree
+                ? 'Đồng ý, gia hạn miễn phí'
+                : 'Đồng ý, tiếp tục gia hạn'}
           </button>
         </div>
       </section>
