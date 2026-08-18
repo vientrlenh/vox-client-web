@@ -14,4 +14,9 @@ export const appConfig = {
     vapidKey: '',
   },
   graphqlEndpoint: '/graphql',
+  // vox-streaming: manifest HLS và WebSocket giám sát. Có giá trị thật (dù là giả) chứ không để
+  // trống vì `manifestUrl` gọi thẳng `.replace` trên nó -- bỏ trống thì mọi test chạm trình phát
+  // live đều chết bằng TypeError thay vì bằng thứ nó định kiểm.
+  streamApiUrl: 'http://stream.test',
+  streamWsUrl: 'ws://stream.test',
 } as const
