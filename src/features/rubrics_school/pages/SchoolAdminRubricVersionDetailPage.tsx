@@ -216,14 +216,15 @@ export function SchoolAdminRubricVersionDetailPage() {
     }
   };
 
-  // Đã có sẵn Chính Sách Đánh Giá cho Version này rồi thì nút chuyển thành "Xem" thay vì "Tạo" --
-  // chỉ 1 policy thì vào thẳng trang chi tiết của nó, nhiều hơn thì về danh sách chung để tự lọc.
-  const handleViewOrCreatePolicy = () => {
-    if (linkedPolicies.length === 0) {
-      setIsCreatePolicyModalOpen(true);
-      return;
-    }
+  // Luôn cho phép tạo thêm Chính Sách Đánh Giá cho Version này, kể cả khi đã có sẵn policy khác
+  // liên kết (1 Rubric Version giờ dùng được cho nhiều Policy, ví dụ khác lớp/khối).
+  const handleOpenCreatePolicyModal = () => {
+    setIsCreatePolicyModalOpen(true);
+  };
 
+  // Xem policy đã liên kết -- chỉ 1 policy thì vào thẳng trang chi tiết của nó, nhiều hơn thì về
+  // danh sách chung để tự lọc.
+  const handleViewLinkedPolicies = () => {
     if (linkedPolicies.length === 1) {
       navigate(`/school-admin/assessment-policies/${linkedPolicies[0].id}`);
       return;
@@ -483,20 +484,22 @@ export function SchoolAdminRubricVersionDetailPage() {
             </button>
           )}
 
+          {linkedPolicies.length > 0 && (
+            <button
+              type="button"
+              onClick={handleViewLinkedPolicies}
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+            >
+              <Eye className="size-4" /> Xem Chính Sách Đánh Giá
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={handleViewOrCreatePolicy}
+            onClick={handleOpenCreatePolicyModal}
             className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
           >
-            {linkedPolicies.length > 0 ? (
-              <>
-                <Eye className="size-4" /> Xem Chính Sách Đánh Giá
-              </>
-            ) : (
-              <>
-                <ClipboardCheck className="size-4" /> Tạo Chính Sách Đánh Giá
-              </>
-            )}
+            <ClipboardCheck className="size-4" /> Tạo Chính Sách Đánh Giá
           </button>
 
           <button

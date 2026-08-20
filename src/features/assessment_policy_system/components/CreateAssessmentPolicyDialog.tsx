@@ -61,8 +61,8 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
 }
 
 // Danh sách Rubric Version của 1 Rubric cụ thể — chỉ được chọn đúng 1 Version trong toàn bộ form
-// (1 Assessment Policy luôn chỉ gắn đúng 1 Rubric Version, và 1 Rubric Version chỉ dùng được cho
-// đúng 1 Policy). Mỗi Rubric hiện 1 nhóm riêng vì BE không yêu cầu Version phải cùng 1 Rubric.
+// (1 Assessment Policy luôn chỉ gắn đúng 1 Rubric Version). Mỗi Rubric hiện 1 nhóm riêng vì BE
+// không yêu cầu Version phải cùng 1 Rubric.
 type RubricVersionGroupProps = {
   rubric: RubricOption;
   groupName: string;

@@ -63,7 +63,8 @@ export function SystemAdminSubscriptionPage() {
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   // Gói gốc đang được thay thế (nếu mở form tạo từ luồng "Tạo gói thay thế") -- có giá trị thì
-  // handleCreatePlan sẽ tự publish gói mới + archive gói này sau khi tạo xong.
+  // handleCreatePlan sẽ tự archive gói này sau khi tạo xong; gói mới vẫn ở trạng thái nháp (DRAFT),
+  // admin phải tự xuất bản khi sẵn sàng.
   const [replacingSourcePlan, setReplacingSourcePlan] = useState<SubscriptionPlan | null>(null)
 
   const [archivingPlan, setArchivingPlan] = useState<SubscriptionPlan | null>(null)
@@ -169,20 +170,20 @@ export function SystemAdminSubscriptionPage() {
       const created = await createPlanMutation.mutateAsync(payload)
 
       if (replacingSourcePlan) {
-        // Gói đã tạo thành công tại đây -- lỗi ở publish/archive KHÔNG rollback việc tạo, chỉ báo
-        // cho admin biết còn thiếu bước nào để tự hoàn tất thủ công (giống thao tác tay bình thường).
+        // Gói đã tạo thành công tại đây -- lỗi ở archive KHÔNG rollback việc tạo, chỉ báo cho admin
+        // biết còn thiếu bước nào để tự hoàn tất thủ công (giống thao tác tay bình thường). Gói mới
+        // vẫn ở trạng thái nháp (DRAFT) -- admin tự xuất bản khi sẵn sàng.
         try {
-          await publishPlanMutation.mutateAsync(created.data.id)
           await archivePlanMutation.mutateAsync({ id: replacingSourcePlan.id, replacedByPlanId: created.data.id })
           setToast({
-            text: `Đã tạo, xuất bản "${created.data.name}" và lưu trữ gói "${replacingSourcePlan.name}"`,
+            text: `Đã tạo gói "${created.data.name}" (đang ở trạng thái nháp) và lưu trữ gói "${replacingSourcePlan.name}". Hãy xuất bản gói mới khi sẵn sàng.`,
             tone: 'success',
           })
         } catch (chainError) {
           setToast({
             text:
               getErrorMessage(chainError) ??
-              'Đã tạo gói mới nhưng xuất bản/lưu trữ gói cũ chưa xong — vào danh sách gói để hoàn tất thủ công.',
+              'Đã tạo gói mới nhưng lưu trữ gói cũ chưa xong — vào danh sách gói để hoàn tất thủ công.',
             tone: 'error',
           })
         }
@@ -615,9 +616,7 @@ export function SystemAdminSubscriptionPage() {
         replacementOptions={
           archivingPlan
             ? activePlans
-                .filter(
-                  (candidate) => candidate.id !== archivingPlan.id && candidate.pricePerYear === archivingPlan.pricePerYear,
-                )
+                .filter((candidate) => candidate.id !== archivingPlan.id)
                 .map((candidate) => ({ label: `${candidate.name} — ${formatVnd(candidate.pricePerYear)}`, value: candidate.id }))
             : []
         }

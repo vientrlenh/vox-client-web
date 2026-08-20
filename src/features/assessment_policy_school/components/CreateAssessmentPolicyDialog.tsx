@@ -1,7 +1,7 @@
 // src/features/assessment_policy_school/components/CreateAssessmentPolicyDialog.tsx
 
 import { useEffect, useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useAllFrameworkVersionsQuery, useFrameworkVersionCriteriaQuery } from '../api/useFrameworkVersionOptionsQuery';
@@ -71,8 +71,8 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
 }
 
 // Danh sách Rubric Version của 1 Rubric cụ thể — chỉ được chọn đúng 1 Version trong toàn bộ form
-// (1 Assessment Policy luôn chỉ gắn đúng 1 Rubric Version, và 1 Rubric Version chỉ dùng được cho
-// đúng 1 Policy). Mỗi Rubric hiện 1 nhóm riêng vì BE không yêu cầu Version phải cùng 1 Rubric.
+// (1 Assessment Policy luôn chỉ gắn đúng 1 Rubric Version). Mỗi Rubric hiện 1 nhóm riêng vì BE
+// không yêu cầu Version phải cùng 1 Rubric.
 type RubricVersionGroupProps = {
   schoolId: string | undefined;
   rubric: RubricOption;
@@ -123,14 +123,17 @@ function RubricVersionGroup({ schoolId, rubric, groupName, selectedId, onSelect,
 }
 
 // Toàn bộ khối field của 1 Assessment Policy (Ngôn ngữ -> ngày hiệu lực).
+// Được lặp lại cho mỗi policy trong danh sách khi tạo nhiều policy cùng lúc.
 type PolicyFormFieldsProps = {
   schoolId: string | undefined;
+  index: number;
   form: PolicyFormState;
   onChange: (patch: Partial<PolicyFormState>) => void;
+  onRemove?: () => void;
   isPending: boolean;
 };
 
-function PolicyFormFields({ schoolId, form, onChange, isPending }: PolicyFormFieldsProps) {
+function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending }: PolicyFormFieldsProps) {
   const { data: languages } = useLanguageOptionsQuery();
   const { data: allFrameworkVersions, isLoading: isLoadingFrameworkVersions } = useAllFrameworkVersionsQuery();
   const selectedFrameworkVersion = allFrameworkVersions?.find((fv) => fv.id === form.frameworkVersionId);
@@ -182,8 +185,32 @@ function PolicyFormFields({ schoolId, form, onChange, isPending }: PolicyFormFie
       ? `Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${effectiveScoreRange.min} – ${effectiveScoreRange.max})`
       : null;
 
+  const isSecondaryPolicy = index > 0;
+
   return (
-    <div>
+    <div
+      className={
+        isSecondaryPolicy ? 'rounded-xl border border-cyan-100 bg-cyan-50/40 p-5' : ''
+      }
+    >
+      {isSecondaryPolicy ? (
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-xs font-extrabold uppercase tracking-wide text-cyan-700">
+            Chính Sách Đánh Giá #{index + 1}
+          </p>
+          {onRemove ? (
+            <button
+              type="button"
+              onClick={onRemove}
+              disabled={isPending}
+              className="flex items-center gap-1.5 text-xs font-bold text-red-500 hover:text-red-600 disabled:opacity-50"
+            >
+              <Trash2 className="size-3.5" /> Xóa
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="grid gap-5">
         <div>
           <label className="mb-1 block text-sm font-bold text-slate-700">Framework Version (đã PUBLISHED) <span className="text-red-500">*</span></label>
@@ -390,6 +417,17 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
     setForms((current) => current.map((f) => (f.key === key ? { ...f, ...patch } : f)));
   }
 
+  function addPolicyForm() {
+    setForms((current) => {
+      const nextKey = current.reduce((max, f) => Math.max(max, f.key), 0) + 1;
+      return [...current, makeEmptyPolicyForm(nextKey)];
+    });
+  }
+
+  function removePolicyForm(key: number) {
+    setForms((current) => current.filter((f) => f.key !== key));
+  }
+
   function validateForm(form: PolicyFormState) {
     return (
       !form.languageId ||
@@ -467,15 +505,27 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid gap-6">
-            {forms.map((form) => (
+            {forms.map((form, index) => (
               <PolicyFormFields
                 key={form.key}
                 schoolId={schoolId}
+                index={index}
                 form={form}
                 onChange={(patch) => updateForm(form.key, patch)}
+                onRemove={index > 0 ? () => removePolicyForm(form.key) : undefined}
                 isPending={isPending}
               />
             ))}
+
+            <button
+              type="button"
+              onClick={addPolicyForm}
+              disabled={isPending}
+              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-400 bg-slate-50 py-3 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            >
+              <Plus className="size-4.5" />
+              {forms.length < 2 ? 'Tạo Chính Sách Đánh Giá thứ 2' : `Thêm Chính Sách Đánh Giá thứ ${forms.length + 1}`}
+            </button>
           </div>
 
           <div className="mt-8 flex items-center justify-end gap-3 border-t border-slate-100 pt-5">

@@ -53,8 +53,8 @@ export function PlanChangeConfirmDialog({
         </h2>
         <p className="mt-1.5 text-sm leading-6 text-slate-500">
           Gói <strong className="text-slate-700">{currentPlan.name}</strong> đã ngừng cung cấp. Khi gia hạn, bạn sẽ
-          chuyển sang gói <strong className="text-slate-700">{renewalPlan.name}</strong> — cùng mức giá. Xem chi
-          tiết thay đổi hạn mức bên dưới.
+          chuyển sang gói <strong className="text-slate-700">{renewalPlan.name}</strong>. Xem chi tiết thay đổi hạn
+          mức và giá bên dưới.
         </p>
 
         <div className="mt-5 rounded-2xl border border-slate-200 p-4.5">
