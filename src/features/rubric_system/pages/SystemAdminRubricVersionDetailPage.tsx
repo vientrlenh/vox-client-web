@@ -2,7 +2,14 @@
 
 import { useParams, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, Edit, Plus, ListChecks, Layers, Calculator, Trash2, Archive, Search, Filter, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, ClipboardCheck, Edit, Eye, Plus, ListChecks, Layers, Calculator, Trash2, Archive, Search, Filter, FileSpreadsheet } from 'lucide-react';
+import {
+  CreateAssessmentPolicyDialog,
+  PublishRubricVersionDialog,
+  useCreateSystemAssessmentPolicyMutation,
+  useSystemAssessmentPoliciesQuery,
+  type CreateAssessmentPolicyPayload,
+} from '@/features/assessment_policy_system';
 
 import { useSystemRubricQuery } from '../api/useSystemRubricQuery';
 import { useSystemRubricVersionQuery } from '../api/useSystemRubricVersionQuery';
@@ -17,7 +24,6 @@ import {
 
 import { useUpdateSystemRubricVersionMutation, type UpdateRubricVersionPayload } from '../api/useUpdateSystemRubricVersionMutation';
 import { useDeleteSystemRubricVersionMutation } from '../api/useDeleteSystemRubricVersionMutation';
-import { useChangeSystemRubricVersionStatusMutation } from '../api/useChangeSystemRubricVersionStatusMutation';
 import { useArchiveSystemRubricVersionMutation } from '../api/useArchiveSystemRubricVersionMutation';
 import { useAddSystemRubricCriteriaMutation, type AddRubricCriteriaPayload } from '../api/useAddSystemRubricCriteriaMutation';
 import { useUpdateSystemRubricCriterionMutation, type UpdateRubricCriterionPayload } from '../api/useUpdateSystemRubricCriterionMutation';
@@ -46,14 +52,21 @@ import {
 } from '../types';
 import { ErrorBanner } from '@/shared/ui/ErrorBanner';
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
+import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 
 export function SystemAdminRubricVersionDetailPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { confirm, dialog } = useConfirmationDialog();
+  // Toast nổi (z-100) thay vì ErrorBanner thường: lỗi tạo Chính Sách Đánh Giá phải hiện được
+  // NGAY TRONG LÚC dialog tạo policy còn mở, mà ErrorBanner nằm trong luồng nội dung trang thì bị
+  // lớp backdrop-blur của modal che mất -- xem cùng lý do ở bản School Admin.
+  const { showError: showPolicyError, feedbackToast: policyFeedbackToast } = useFeedbackToast();
   const { rubricId, versionId } = useParams<{ rubricId: string; versionId: string }>();
   const navigate = useNavigate();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCreatePolicyModalOpen, setIsCreatePolicyModalOpen] = useState(false);
+  const [isPublishVersionDialogOpen, setIsPublishVersionDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'criteria' | 'bands'>('criteria');
 
   // State Phân trang + tìm kiếm cho từng Tab
@@ -152,8 +165,16 @@ export function SystemAdminRubricVersionDetailPage() {
   // --- 2. KHỞI TẠO CÁC API MUTATION (THÊM, SỬA, XÓA) ---
   const { mutateAsync: updateVersion, isPending: isUpdating } = useUpdateSystemRubricVersionMutation(versionId);
   const { mutateAsync: deleteVersion, isPending: isDeleting } = useDeleteSystemRubricVersionMutation();
-  const { mutateAsync: changeVersionStatus, isPending: isChangingStatus } = useChangeSystemRubricVersionStatusMutation(versionId);
   const { mutateAsync: archiveVersion, isPending: isArchiving } = useArchiveSystemRubricVersionMutation(versionId);
+  const { mutateAsync: createPolicy, isPending: isCreatingPolicy } = useCreateSystemAssessmentPolicyMutation();
+
+  // Version này đã có Chính Sách Đánh Giá nào chưa -- quyết định nút bên dưới là "Tạo" hay "Xem".
+  const { data: linkedPoliciesData } = useSystemAssessmentPoliciesQuery(
+    { rubricVersionId: versionId ?? null },
+    1,
+    100,
+  );
+  const linkedPolicies = linkedPoliciesData?.content ?? [];
 
   const { mutateAsync: addCriteria, isPending: isAddingCriterion } = useAddSystemRubricCriteriaMutation(versionId);
   const { mutateAsync: updateCriterion, isPending: isUpdatingCriterion } = useUpdateSystemRubricCriterionMutation(editingCriterion?.id);
@@ -174,15 +195,43 @@ export function SystemAdminRubricVersionDetailPage() {
     setIsEditModalOpen(false);
   };
 
-  // Hàm xử lý Chuyển trạng thái Version (hiện chỉ hỗ trợ DRAFT -> PUBLISHED)
-  const handlePublishVersion = async () => {
-    setErrorMessage(null);
+  // Tạo Chính Sách Đánh Giá gắn với Rubric Version này. Sau khi tạo xong, điều hướng luôn sang
+  // "Quản lý chính sách đánh giá" và tô nổi bật đúng policy vừa tạo — người dùng không cần tự đi
+  // tìm nó giữa danh sách.
+  const handleCreatePolicy = async (formDataList: CreateAssessmentPolicyPayload[]) => {
     try {
-      await changeVersionStatus('PUBLISHED');
+      const createdPolicyIds = await createPolicy(formDataList);
+      setIsCreatePolicyModalOpen(false);
+      navigate('/system-admin/assessment-policies', {
+        state: { highlightPolicyId: createdPolicyIds[0] },
+      });
     } catch (error) {
       const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi chuyển trạng thái phiên bản.');
+      showPolicyError(err.message || 'Có lỗi xảy ra khi tạo Chính Sách Đánh Giá.');
     }
+  };
+
+  // Luôn cho phép tạo thêm Chính Sách Đánh Giá cho Version này, kể cả khi đã có sẵn policy khác
+  // liên kết (1 Rubric Version giờ dùng được cho nhiều Policy, ví dụ khác ngôn ngữ/band).
+  const handleOpenCreatePolicyModal = () => {
+    setIsCreatePolicyModalOpen(true);
+  };
+
+  // Xem policy đã liên kết -- chỉ 1 policy thì vào thẳng trang chi tiết của nó, nhiều hơn thì về
+  // danh sách chung để tự lọc.
+  const handleViewLinkedPolicies = () => {
+    if (linkedPolicies.length === 1) {
+      navigate(`/system-admin/assessment-policies/${linkedPolicies[0].id}`);
+      return;
+    }
+
+    navigate('/system-admin/assessment-policies');
+  };
+
+  // Chuyển DRAFT -> PUBLISHED không còn tự làm ở đây: mở PublishRubricVersionDialog để người
+  // dùng thấy trước danh sách Chính Sách Đánh Giá sẽ được xuất bản cùng, rồi xác nhận trong đó.
+  const handlePublishVersion = () => {
+    setIsPublishVersionDialogOpen(true);
   };
 
   // Hàm xử lý Delete Version (chỉ áp dụng khi DRAFT)
@@ -316,6 +365,7 @@ export function SystemAdminRubricVersionDetailPage() {
   return (
     <section className="grid gap-6">
       {dialog}
+      {policyFeedbackToast}
       <ErrorBanner message={errorMessage} />
 
       {/* HEADER BAR */}
@@ -348,7 +398,7 @@ export function SystemAdminRubricVersionDetailPage() {
                 Mã Phiên bản: {version.code}
               </span>
               <RubricVersionStatusMenu
-                isPending={isChangingStatus || isArchiving}
+                isPending={isArchiving}
                 onPublish={handlePublishVersion}
                 onArchive={handleArchiveVersion}
                 status={version.status}
@@ -418,6 +468,24 @@ export function SystemAdminRubricVersionDetailPage() {
               Lưu trữ Version
             </button>
           )}
+
+          {linkedPolicies.length > 0 && (
+            <button
+              type="button"
+              onClick={handleViewLinkedPolicies}
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+            >
+              <Eye className="size-4" /> Xem Chính Sách Đánh Giá
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleOpenCreatePolicyModal}
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+          >
+            <ClipboardCheck className="size-4" /> Tạo Chính Sách Đánh Giá
+          </button>
 
           <button
             type="button"
@@ -637,6 +705,21 @@ export function SystemAdminRubricVersionDetailPage() {
         isOpen={Boolean(viewingResultBandId)}
         onClose={() => setViewingResultBandId(null)}
         resultBandId={viewingResultBandId ?? undefined}
+      />
+
+      <CreateAssessmentPolicyDialog
+        isOpen={isCreatePolicyModalOpen}
+        onClose={() => setIsCreatePolicyModalOpen(false)}
+        onSubmit={handleCreatePolicy}
+        isPending={isCreatingPolicy}
+      />
+
+      <PublishRubricVersionDialog
+        isOpen={isPublishVersionDialogOpen}
+        onClose={() => setIsPublishVersionDialogOpen(false)}
+        onPublished={() => void refetchVersion()}
+        rubricVersionId={versionId}
+        rubricVersionLabel={`${version.code} (v${version.version})`}
       />
     </section>
   );

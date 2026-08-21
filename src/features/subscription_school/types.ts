@@ -94,6 +94,11 @@ export type SubscriptionQuota = {
   usedQuantity: number
 }
 
+export type InvoiceQuotaItem = {
+  quotaType: QuotaType
+  amount: number
+}
+
 export type Invoice = {
   id: string
   invoiceNumber: string
@@ -108,6 +113,12 @@ export type Invoice = {
   paymentLinkId: string | null
   checkoutUrl: string | null
   paidAt: string | null
+  // Plan đã áp dụng cho hóa đơn (SUBSCRIPTION/SUBSCRIPTION_REQUEST) -- null nếu chưa resolve được
+  // hoặc hóa đơn loại TOKEN_PURCHASE.
+  resolvedPlanId: string | null
+  // Hạn mức USD từng loại quota gắn với hóa đơn -- rỗng nếu hóa đơn cũ trước khi có field này hoặc
+  // chưa resolve được plan (vd còn PENDING).
+  quotaItems: InvoiceQuotaItem[]
 }
 
 export type InvoicePage = {
