@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import type { QuestionQueryFilters } from '../api/useQuestionsQuery'
+import type { QuestionAssetTypeFilter, QuestionQueryFilters } from '../api/useQuestionsQuery'
 import type { QuestionSharing, QuestionType } from '../types'
 
 const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: '' | QuestionType }> = [
@@ -9,6 +9,18 @@ const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: '' | QuestionType }> 
   { label: 'Trả lời dài', value: 'LONG_ANSWER' },
   { label: 'Ý kiến', value: 'OPINION' },
   { label: 'Mô tả', value: 'DESCRIPTION' },
+]
+
+// 'NONE' không phải giá trị enum của backend mà là quy ước riêng của bộ lọc: câu KHÔNG có tài
+// nguyên nào. Hữu ích vì phần lớn ngân hàng là câu chay, và đó cũng là cách tìm nhanh những câu
+// còn thiếu ảnh/audio sau khi nhập hàng loạt.
+const QUESTION_ASSET_TYPE_FILTER_OPTIONS: Array<{ label: string; value: QuestionAssetTypeFilter }> = [
+  { label: 'Tất cả tài nguyên', value: '' },
+  { label: 'Không có tài nguyên', value: 'NONE' },
+  { label: 'Ảnh', value: 'IMAGE' },
+  { label: 'Âm thanh', value: 'AUDIO' },
+  { label: 'Video', value: 'VIDEO' },
+  { label: 'Đoạn văn', value: 'TEXT_PASSAGE' },
 ]
 
 const QUESTION_SHARING_OPTIONS: Array<{ label: string; value: '' | QuestionSharing }> = [
@@ -139,6 +151,26 @@ export function QuestionFiltersForm({
             value={draftFilters.type}
           >
             {QUESTION_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="grid gap-2 text-sm font-bold text-slate-700">
+          Tài nguyên
+          <select
+            className={fieldClassName}
+            onChange={(event) =>
+              onDraftChange({
+                ...draftFilters,
+                assetType: event.target.value as QuestionAssetTypeFilter,
+              })
+            }
+            value={draftFilters.assetType ?? ''}
+          >
+            {QUESTION_ASSET_TYPE_FILTER_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

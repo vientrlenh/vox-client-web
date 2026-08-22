@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Check, Eye, Search, X } from 'lucide-react'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
+import { useQuestionBanksQuery } from '@/features/question-bank/api/useQuestionBanksQuery'
+import type { QuestionAssetTypeFilter } from '@/features/question/api/useQuestionsQuery'
 import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
 import { useQuestionTopicQuery } from '@/features/question-topic/api/useQuestionTopicQuery'
+import { useQuestionTopicsQuery } from '@/features/question-topic/api/useQuestionTopicsQuery'
 import {
   formatDuration,
   formatNullableText,
@@ -40,6 +43,39 @@ type QuestionPickerProps = {
 
 const PAGE_SIZE = 8
 
+const QUESTION_ASSET_FILTER_OPTIONS: Array<{ label: string; value: QuestionAssetTypeFilter }> = [
+  { label: 'Tất cả tài nguyên', value: '' },
+  { label: 'Không có tài nguyên', value: 'NONE' },
+  { label: 'Ảnh', value: 'IMAGE' },
+  { label: 'Âm thanh', value: 'AUDIO' },
+  { label: 'Video', value: 'VIDEO' },
+  { label: 'Đoạn văn', value: 'TEXT_PASSAGE' },
+]
+
+const QUESTION_ASSET_BADGE_LABELS: Record<string, string> = {
+  AUDIO: 'Nghe',
+  IMAGE: 'Ảnh',
+  TEXT_PASSAGE: 'Đoạn văn',
+  VIDEO: 'Xem phim',
+}
+
+/**
+ * Nhãn tài nguyên của một câu hỏi, hoặc null nếu câu chay.
+ *
+ * <p>Audio/video kèm luôn thời lượng vì đó là phần CỘNG THÊM vào thời gian làm bài của mã đề (xem
+ * getQuestionAttemptSeconds) — người soạn cần thấy con số đó lúc chọn câu, không phải sau khi lưu.
+ */
+function getQuestionAssetBadge(question: QuestionDto): string | null {
+  const asset = question.assets?.[0]
+  if (!asset?.type) {
+    return null
+  }
+  const label = QUESTION_ASSET_BADGE_LABELS[asset.type] ?? asset.type
+  return asset.durationSeconds && asset.durationSeconds > 0
+    ? `${label} · ${formatDuration(asset.durationSeconds)}`
+    : label
+}
+
 export function QuestionPicker({
   questionDetailBasePath,
   excludeQuestionIds = [],
@@ -58,16 +94,30 @@ export function QuestionPicker({
 }: QuestionPickerProps) {
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
+  const [bankId, setBankId] = useState('')
+  const [topicId, setTopicId] = useState('')
+  const [assetType, setAssetType] = useState<QuestionAssetTypeFilter>('')
   // Tiêu chí có thể hẹp tới mức không còn câu nào khớp, nên phải cho bỏ lọc để thoát.
   const [applySlotFilter, setApplySlotFilter] = useState(true)
   const hasSlotFilter = Boolean(initialQuestionTopicId) || Boolean(initialType)
   const filterActive = hasSlotFilter && applySlotFilter
   const topicQuery = useQuestionTopicQuery(filterActive ? initialQuestionTopicId : null)
+
+  const bankOptionsQuery = useQuestionBanksQuery(scope, 0, 100)
+  // Chủ đề nạp theo NGÂN HÀNG ĐANG CHỌN, không nạp trước tất cả: danh sách chủ đề của mọi ngân
+  // hàng gộp lại vừa dài vừa có mã trùng nhau giữa các ngân hàng, chọn nhầm là chuyện sớm muộn.
+  const topicOptionsQuery = useQuestionTopicsQuery(scope, bankId, 0, 100, Boolean(bankId))
+
+  // Tiêu chí của ô blueprint (initialQuestionTopicId) VẪN THẮNG khi còn hiệu lực -- nó là ràng
+  // buộc của đề, còn hai ô dưới chỉ là bộ lọc để tìm cho nhanh. Bỏ lọc ô rồi thì hai ô này mới
+  // có tác dụng.
   const questionsQuery = useQuestionsQuery(scope, 'all', page, PAGE_SIZE, {
     keyword,
-    questionTopicId: filterActive ? (initialQuestionTopicId ?? undefined) : undefined,
+    questionBankId: bankId || undefined,
+    questionTopicId: filterActive ? (initialQuestionTopicId ?? undefined) : (topicId || undefined),
     scope: '',
     sharing: '',
+    assetType,
     status: publishedOnly ? 'PUBLISHED' : '',
     topicName: '',
     type: filterActive ? (initialType ?? '') : '',
@@ -118,7 +168,7 @@ export function QuestionPicker({
           </div>
         ) : null}
 
-        <div className="border-b border-slate-200 px-6 py-3.5">
+        <div className="grid gap-2.5 border-b border-slate-200 px-6 py-3.5">
           <div className="relative">
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -130,6 +180,71 @@ export function QuestionPicker({
               placeholder="Tìm theo mã hoặc nội dung câu hỏi…"
               value={keyword}
             />
+          </div>
+
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <select
+              aria-label="Lọc theo ngân hàng câu hỏi"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
+              onChange={(event) => {
+                setBankId(event.target.value)
+                // Chủ đề luôn thuộc về một ngân hàng, nên đổi ngân hàng mà giữ chủ đề cũ là để
+                // lại một bộ lọc không bao giờ khớp -> danh sách trống mà không rõ vì sao.
+                setTopicId('')
+                setPage(1)
+              }}
+              value={bankId}
+            >
+              <option value="">Tất cả ngân hàng</option>
+              {bankOptionsQuery.data?.content.map((bank) => (
+                <option key={bank.id} value={bank.id}>
+                  {bank.name} ({bank.code})
+                </option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Lọc theo chủ đề"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 disabled:bg-slate-100 disabled:text-slate-400"
+              disabled={!bankId || filterActive}
+              onChange={(event) => {
+                setTopicId(event.target.value)
+                setPage(1)
+              }}
+              title={
+                filterActive
+                  ? 'Đang lọc theo tiêu chí của ô — bỏ lọc ở trên để chọn chủ đề khác'
+                  : undefined
+              }
+              value={topicId}
+            >
+              <option value="">
+                {bankId ? 'Tất cả chủ đề' : 'Chọn ngân hàng trước'}
+              </option>
+              {topicOptionsQuery.data?.content.map((topic) => (
+                <option key={topic.id} value={topic.id}>
+                  {topic.name} ({topic.code})
+                </option>
+              ))}
+            </select>
+
+            {/* Không bị filterActive khoá như ô chủ đề: tiêu chí của ô blueprint ràng buộc chủ đề
+                và loại câu hỏi, không nói gì về tài nguyên — nên vẫn lọc được để tìm cho nhanh. */}
+            <select
+              aria-label="Lọc theo loại tài nguyên"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
+              onChange={(event) => {
+                setAssetType(event.target.value as QuestionAssetTypeFilter)
+                setPage(1)
+              }}
+              value={assetType}
+            >
+              {QUESTION_ASSET_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -227,6 +342,14 @@ export function QuestionPicker({
                         <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
                           Tối đa: {formatDuration(question.maxResponseSeconds)}
                         </span>
+                        {/* Loại tài nguyên đổi HẲN cách làm bài (nghe/xem một lần, tả tranh, đọc
+                            đoạn văn) và audio/video còn cộng thêm giờ vào mã đề, nên người soạn cần
+                            thấy ngay ở đây thay vì phải mở từng câu. */}
+                        {getQuestionAssetBadge(question) ? (
+                          <span className="w-fit rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700">
+                            {getQuestionAssetBadge(question)}
+                          </span>
+                        ) : null}
                       </div>
                     </button>
                     <a

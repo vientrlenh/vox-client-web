@@ -20,6 +20,8 @@ function subscription(overrides: Partial<MySubscription> = {}): MySubscription {
     schoolId: 'school-1',
     startDate: '2026-01-01',
     status: 'ACTIVE',
+    suspendedAt: null,
+    suspendedReason: null,
     ...overrides,
   }
 }

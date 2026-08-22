@@ -76,6 +76,10 @@ const EXAM_PAPER_FIELDS = `
         preparationTimeSeconds
         minResponseSeconds
         maxResponseSeconds
+        assets {
+          type
+          durationSeconds
+        }
       }
     }
   }
@@ -414,6 +418,10 @@ const BLUEPRINT_VERSION_FIELDS = `
         questionText
         preparationTimeSeconds
         maxResponseSeconds
+        assets {
+          type
+          durationSeconds
+        }
       }
     }
   }

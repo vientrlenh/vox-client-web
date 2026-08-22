@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import type {
+  QuestionAssetType,
   QuestionPage,
   QuestionScope,
   QuestionSharing,
@@ -11,7 +12,11 @@ import type {
 
 export type QuestionListView = 'all' | 'my' | 'review'
 
+/** 'NONE' = chỉ câu KHÔNG có tài nguyên; '' = không lọc theo tài nguyên. */
+export type QuestionAssetTypeFilter = '' | 'NONE' | QuestionAssetType
+
 export type QuestionQueryFilters = {
+  assetType?: QuestionAssetTypeFilter
   keyword: string
   questionBankId?: string
   questionTopicId?: string
@@ -35,6 +40,12 @@ const QUESTION_FIELDS = `
   preparationTimeSeconds
   minResponseSeconds
   maxResponseSeconds
+  # type + durationSeconds: cộng thời lượng phát AUDIO/VIDEO vào thời gian làm bài khi soạn mã đề
+  # (getQuestionAttemptSeconds), và hiện nhãn loại tài nguyên trong QuestionPicker.
+  assets {
+    type
+    durationSeconds
+  }
   sharing
   sourceQuestionId
   locked
@@ -84,6 +95,7 @@ const QUESTIONS_QUERY = `
     $status: QuestionStatus
     $type: QuestionType
     $sharing: QuestionSharing
+    $assetType: String
     $scope: QuestionScope
     $keyword: String
     $page: Int!
@@ -96,6 +108,7 @@ const QUESTIONS_QUERY = `
       status: $status
       type: $type
       sharing: $sharing
+      assetType: $assetType
       scope: $scope
       keyword: $keyword
       page: $page
@@ -120,6 +133,7 @@ const QUESTIONS_FOR_EXAM_PAPER_QUERY = `
     $status: QuestionStatus
     $type: QuestionType
     $sharing: QuestionSharing
+    $assetType: String
     $scope: QuestionScope
     $keyword: String
     $page: Int!
@@ -132,6 +146,7 @@ const QUESTIONS_FOR_EXAM_PAPER_QUERY = `
       status: $status
       type: $type
       sharing: $sharing
+      assetType: $assetType
       scope: $scope
       keyword: $keyword
       page: $page
@@ -206,6 +221,7 @@ export async function fetchQuestions({
     questionTopicId: filters.questionTopicId || undefined,
     scope: filters.scope || undefined,
     sharing: filters.sharing || undefined,
+    assetType: filters.assetType || undefined,
     size,
     status: filters.status || undefined,
     topicName: filters.topicName || undefined,
@@ -259,6 +275,7 @@ async function fetchQuestionsForExamPaper({
       questionTopicId: filters.questionTopicId || undefined,
       scope: filters.scope || undefined,
       sharing: filters.sharing || undefined,
+      assetType: filters.assetType || undefined,
       size,
       status: filters.status || undefined,
       topicName: filters.topicName || undefined,

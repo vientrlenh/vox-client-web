@@ -64,6 +64,20 @@ export type GradingTurn = {
   wordFeedback?: WordFeedback[] | null
 }
 
+/**
+ * Tài nguyên của câu hỏi, dùng lại đúng hình dạng mà `QuestionAssetPreview` cần.
+ * Không nhập từ `features/question` để hai màn không dính vào nhau qua một type dùng chung.
+ */
+export type GradingQuestionAsset = {
+  type: 'AUDIO' | 'IMAGE' | 'VIDEO' | 'TEXT_PASSAGE'
+  url?: string | null
+  title?: string | null
+  altText?: string | null
+  transcript?: string | null
+  description?: string | null
+  durationSeconds?: number | null
+}
+
 export type GradingCriterionScore = {
   criterionId: string
   criterionCode?: string | null
@@ -110,6 +124,14 @@ export type GradingTaskItem = {
    * là gì — chỉ thấy "Phần 1 · Câu 2".
    */
   questionText?: string | null
+  /**
+   * Tài nguyên đi kèm câu hỏi (ảnh / audio / video / đoạn văn). Null khi câu không có.
+   *
+   * Không có nó thì chấm một câu tả tranh là đọc transcript trong chân không — không biết thí
+   * sinh tả đúng hay bịa. `description`/`transcript` cũng chính là TOÀN BỘ những gì AI biết về
+   * tài nguyên này, nên giáo viên cần thấy để đánh giá điểm AI có công bằng không.
+   */
+  asset?: GradingQuestionAsset | null
   // Điểm của bản chấm đang có hiệu lực (lần đầu là bản AI) — mốc để đối chiếu.
   currentItemScore?: number | null
   currentFeedbackSummary?: string | null

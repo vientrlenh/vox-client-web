@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import {
+  useBulkUpdateQuestionBankStatusMutation,
   useCreateQuestionBankMutation,
   useDeleteQuestionBankMutation,
   useReviewQuestionBankMutation,
@@ -32,6 +33,10 @@ import {
 import type { CreateQuestionBankRequest, QuestionBankDto } from '../types'
 import { useAppSelector } from '@/app/store/hooks'
 import { useSupportedLanguagesQuery } from '@/features/languages/api/useSupportedLanguagesQuery'
+import type { BulkScopeStatusAction } from '@/shared/api'
+import { BulkScopeStatusResultDialog } from '@/shared/ui/BulkScopeStatusResultDialog'
+import type { BulkScopeStatusResult } from '@/shared/ui/BulkScopeStatusResultDialog'
+import { BulkScopeStatusToolbar } from '@/shared/ui/BulkScopeStatusToolbar'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 10
@@ -71,6 +76,9 @@ function QuestionBanksPage({
   const [dialogTarget, setDialogTarget] = useState<QuestionBankDto | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [pageMessage, setPageMessage] = useState<string | null>(null)
+  // Giữ xuyên trang: người dùng hay lọc/chuyển trang rồi mới bấm xuất bản một lượt.
+  const [bulkIds, setBulkIds] = useState<string[]>([])
+  const [bulkResult, setBulkResult] = useState<BulkScopeStatusResult | null>(null)
 
   const actorRole = getQuestionBankActorRole(user?.roles)
   const canManage = canManageQuestionBank(actorRole)
@@ -103,6 +111,7 @@ function QuestionBanksPage({
   const updateMutation = useUpdateQuestionBankMutation()
   const deleteMutation = useDeleteQuestionBankMutation()
   const statusMutation = useReviewQuestionBankMutation()
+  const bulkStatusMutation = useBulkUpdateQuestionBankStatusMutation()
   const isSubmitting =
     createMutation.isPending ||
     updateMutation.isPending ||
@@ -163,6 +172,58 @@ function QuestionBanksPage({
     }
   }
 
+  function toggleBulkId(id: string) {
+    setBulkIds((current) =>
+      current.includes(id)
+        ? current.filter((currentId) => currentId !== id)
+        : [...current, id],
+    )
+  }
+
+  function toggleBulkPage() {
+    const pageIds = questionBanks.map((bank) => bank.id)
+    const isPageFullyChecked = pageIds.every((id) => bulkIds.includes(id))
+
+    setBulkIds((current) =>
+      isPageFullyChecked
+        ? current.filter((id) => !pageIds.includes(id))
+        : [...new Set([...current, ...pageIds])],
+    )
+  }
+
+  async function handleBulkStatus(action: BulkScopeStatusAction) {
+    const actionVerb = action === 'PUBLISH' ? 'xuất bản' : 'lưu trữ'
+
+    try {
+      setPageMessage(null)
+      const result = await bulkStatusMutation.mutateAsync({ action, ids: bulkIds })
+      await refreshBanks()
+
+      // Chỉ bỏ chọn khi mọi mục đều đổi được: còn mục hỏng thì giữ lựa chọn để người dùng sửa
+      // trạng thái rồi thử lại mà không phải chọn lại từ đầu.
+      if (result.failed.length === 0) {
+        setBulkIds([])
+        setPageMessage(
+          `Đã ${actionVerb} ${result.updated.length} ngân hàng câu hỏi.`,
+        )
+        return
+      }
+
+      setBulkResult({
+        actionVerb,
+        entityNoun: 'ngân hàng câu hỏi',
+        failed: result.failed,
+        totalCount: bulkIds.length,
+        updatedCount: result.updated.length,
+      })
+    } catch (error) {
+      setPageMessage(
+        getErrorMessage(error) ??
+          `Không thể ${actionVerb} ngân hàng câu hỏi hàng loạt.`,
+      )
+    }
+  }
+
   async function handleDeleteBank(bank: QuestionBankDto) {
     if (!window.confirm(`Xóa ngân hàng câu hỏi "${bank.name}"?`)) {
       return
@@ -189,6 +250,11 @@ function QuestionBanksPage({
         description="Danh sách ngân hàng câu hỏi được phép xem theo quyền của bạn."
         isRefreshing={questionBanksQuery.isFetching}
         onCreate={canManage ? () => setDialogMode('create') : undefined}
+        onImport={
+          canManage
+            ? () => navigate(`${basePath}/question-banks/import`)
+            : undefined
+        }
         onRefresh={() => {
           void questionBanksQuery.refetch()
         }}
@@ -199,6 +265,21 @@ function QuestionBanksPage({
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
           {pageMessage}
         </div>
+      ) : null}
+
+      {canManage ? (
+        <BulkScopeStatusToolbar
+          entityNoun="ngân hàng câu hỏi"
+          isPending={bulkStatusMutation.isPending}
+          onArchive={() => {
+            void handleBulkStatus('ARCHIVE')
+          }}
+          onClearSelection={() => setBulkIds([])}
+          onPublish={() => {
+            void handleBulkStatus('PUBLISH')
+          }}
+          selectedCount={bulkIds.length}
+        />
       ) : null}
 
       <QuestionBankTable
@@ -283,11 +364,19 @@ function QuestionBanksPage({
           setSelectedId(id)
           navigate(`${basePath}/question-banks/${id}`)
         }}
+        onToggleSelectId={canManage ? toggleBulkId : undefined}
+        onToggleSelectPage={canManage ? toggleBulkPage : undefined}
         onViewTopics={(bank) =>
           navigate(`${basePath}/question-banks/${bank.id}?tab=topics`)
         }
         questionBanks={questionBanks}
         selectedId={effectiveSelectedId}
+        selectedIds={bulkIds}
+      />
+
+      <BulkScopeStatusResultDialog
+        onClose={() => setBulkResult(null)}
+        result={bulkResult}
       />
 
       <QuestionBankFormDialog

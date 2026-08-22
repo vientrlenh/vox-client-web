@@ -194,6 +194,9 @@ export type ExamPaperItemDto = {
   id: string
   order: number
   question?: {
+    // Chỉ lấy type + durationSeconds: dùng để cộng thời lượng phát AUDIO/VIDEO vào thời gian làm
+    // bài (xem getQuestionAttemptSeconds), không phải để hiển thị tài nguyên.
+    assets?: Array<{ durationSeconds?: number | null; type?: string | null }> | null
     code?: string | null
     id: string
     maxResponseSeconds?: number | null
@@ -236,6 +239,8 @@ export type ExamPaperDto = {
 
 export type ExamBlueprintSlotDto = {
   fixedQuestion?: {
+    // Xem chú thích ở ExamPaperItemDto.question.assets.
+    assets?: Array<{ durationSeconds?: number | null; type?: string | null }> | null
     code?: string | null
     id: string
     maxResponseSeconds?: number | null

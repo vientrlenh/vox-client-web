@@ -1,7 +1,7 @@
 import type { ChangeEvent, FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Copy, Plus, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Copy, Save, Trash2, Upload } from 'lucide-react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
 import { useSchoolUsersForRequesterQuery } from '@/features/classes/api/useSchoolUsersForRequesterQuery'
@@ -21,10 +21,10 @@ import {
   useUpdateQuestionMutation,
 } from '../api/useQuestionMutations'
 import { questionQueryKeys } from '../api/useQuestionsQuery'
+import { hasPlaybackDuration, nextDurationSeconds } from '../assetDuration'
 import { useReviewQuestionMutation } from '../api/useQuestionReviewMutation'
 import {
   useCreateQuestionAssetMutation,
-  useDeleteQuestionAssetMutation,
   useRegenerateQuestionAssetAnalysisMutation,
   useUploadQuestionAssetMutation,
   useUpdateQuestionAssetMutation,
@@ -59,12 +59,13 @@ import {
 
 type TabKey = 'assets' | 'content' | 'guide' | 'sharing' | 'workflow'
 
-// Tạm ẩn tab "Tài nguyên" khỏi UI (chưa cho người dùng tương tác) — logic/mutations giữ nguyên, chỉ bật lại bằng cách đổi hằng số này.
-const ASSETS_TAB_ENABLED = false
+// Bật lại tab "Tài nguyên": câu hỏi nhập từ Excel mang theo asset, nhưng URL tệp thật chỉ có sau khi
+// upload lên S3 nên phải sửa được bằng UI. Đổi hằng số này về false để ẩn lại.
+const ASSETS_TAB_ENABLED = true
 
-// Khớp đúng với việc backend hiện chỉ hỗ trợ IMAGE/VIDEO cho asset (AUDIO/TEXT_PASSAGE để sau)
-// và chặn content type ở GetQuestionAssetUploadUrlUseCase (Java) — giữ danh sách hẹp, cụ thể ở
-// đây thay vì "image/*"/"video/*" chung chung để tránh nhận nhầm định dạng ít dùng/khó phát ở WPF.
+// Backend nhận image/*, video/* và audio/* (GetQuestionAssetUploadUrlUseCase.validateContentType).
+// Ở đây cố ý hẹp hơn: liệt kê từng định dạng cụ thể thay vì "image/*"/"audio/*" chung chung, để
+// không nhận nhầm định dạng ít dùng mà WPF khó phát.
 const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png'])
 const ALLOWED_AUDIO_MIME_TYPES = new Set([
   'audio/aac',
@@ -137,13 +138,14 @@ const QUESTION_SHARING_OPTIONS: Array<{ label: string; value: QuestionSharing }>
 
 const QUESTION_ASSET_TYPE_OPTIONS: Array<{ label: string; value: QuestionAssetType }> = [
   { label: 'Ảnh', value: 'IMAGE' },
+  { label: 'Âm thanh', value: 'AUDIO' },
   { label: 'Video', value: 'VIDEO' },
   { label: 'Đoạn văn', value: 'TEXT_PASSAGE' },
 ]
 
-const LEGACY_QUESTION_ASSET_TYPE_LABELS: Partial<Record<QuestionAssetType, string>> = {
-  AUDIO: 'Âm thanh (cũ)',
-}
+// Giữ lại cơ chế nhãn "loại cũ" dù hiện không loại nào bị xếp vào đó: getAssetTypeOptions cần nó để
+// một asset mang loại ngoài danh sách trên vẫn hiện đúng loại của mình thay vì bị đổi âm thầm.
+const LEGACY_QUESTION_ASSET_TYPE_LABELS: Partial<Record<QuestionAssetType, string>> = {}
 
 function createInitialForm() {
   return {
@@ -249,9 +251,23 @@ function mergeAssetForms(
   })
 }
 
-function resetAssetFieldsForType(type: QuestionAssetType): Partial<AssetFormState> {
+/**
+ * Đổi loại thì tệp cũ hết dùng được, nên xoá luôn url và mọi thứ mô tả tệp đó — kể cả thời lượng.
+ * Quy tắc thời lượng viết ở {@link nextDurationSeconds} (có test riêng cho đủ 16 tổ hợp đổi loại).
+ */
+function resetAssetFieldsForType(
+  type: QuestionAssetType,
+  previousType: QuestionAssetType,
+  previousDuration: string,
+): Partial<AssetFormState> {
   return {
     description: '',
+    durationSeconds: nextDurationSeconds({
+      measuredDuration: undefined,
+      nextType: type,
+      previousDuration,
+      previousType,
+    }),
     localPreviewUrl: null,
     selectedFile: null,
     transcript: '',
@@ -268,6 +284,44 @@ function revokeObjectUrl(url?: string | null) {
   if (url?.startsWith('blob:')) {
     URL.revokeObjectURL(url)
   }
+}
+
+/**
+ * Đọc thời lượng thật của tệp audio/video vừa chọn, qua đúng object URL đã tạo cho phần xem trước.
+ *
+ * <p>Trả null khi không đọc được (định dạng trình duyệt không giải mã nổi, luồng không có thời lượng
+ * xác định nên duration ra Infinity, hoặc tải quá 10 giây) — nơi gọi để trống chứ không chặn lưu.
+ */
+function readMediaDurationSeconds(
+  url: string,
+  type: 'AUDIO' | 'VIDEO',
+): Promise<number | null> {
+  return new Promise((resolve) => {
+    const media = document.createElement(type === 'AUDIO' ? 'audio' : 'video')
+    let settled = false
+
+    const finish = (value: number | null) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      window.clearTimeout(timeoutId)
+      media.removeAttribute('src')
+      media.load()
+      resolve(value)
+    }
+
+    const timeoutId = window.setTimeout(() => finish(null), 10_000)
+
+    media.addEventListener('loadedmetadata', () => {
+      const seconds = media.duration
+      finish(Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : null)
+    })
+    media.addEventListener('error', () => finish(null))
+
+    media.preload = 'metadata'
+    media.src = url
+  })
 }
 
 function getAssetTypeOptions(currentType: QuestionAssetType) {
@@ -341,7 +395,6 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const reviewMutation = useReviewQuestionMutation()
   const createAssetMutation = useCreateQuestionAssetMutation()
   const updateAssetMutation = useUpdateQuestionAssetMutation()
-  const deleteAssetMutation = useDeleteQuestionAssetMutation()
   const regenerateAssetAnalysisMutation = useRegenerateQuestionAssetAnalysisMutation()
   const uploadAssetMutation = useUploadQuestionAssetMutation()
   const upsertGuideMutation = useUpsertQuestionEvaluationGuideMutation()
@@ -550,6 +603,26 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     )
   }
 
+  // Đối xứng với guard của chế độ tạo ở trên. Không có nhánh này thì trang vẫn render đủ khung,
+  // nhưng mọi khối bên trong đều bị canEdit/canManageAssetOrGuide tắt riêng lẻ -- người dùng thấy
+  // một trang trắng không lời giải thích, không biết là mình thiếu quyền hay dữ liệu hỏng.
+  // Quản trị viên trường CỐ Ý không sửa được câu hỏi (permissions.ts: role !== 'TEACHER' -> false):
+  // giáo viên soạn, quản trị viên trường duyệt và xuất bản.
+  if (mode === 'edit' && questionQuery.data && !canEdit && !canManageAssetOrGuide) {
+    return (
+      <section className="grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        <span className="font-semibold">
+          Vai trò hiện tại không được sửa câu hỏi này.
+        </span>
+        <span className="font-normal">
+          Chỉ giáo viên sở hữu câu hỏi hoặc cộng tác viên có quyền chỉnh sửa mới sửa được, và câu hỏi
+          phải đang ở trạng thái cho phép sửa. Quản trị viên trường xem chi tiết, duyệt và xuất bản
+          câu hỏi.
+        </span>
+      </section>
+    )
+  }
+
   async function handleContentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setErrorMessage(null)
@@ -682,6 +755,22 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       return
     }
 
+    // Chặn ngay ở client cho thông báo tới sớm; BE (QuestionAssetContentValidator) vẫn chặn lần
+    // nữa vì đây là ràng buộc về TÍNH ĐÚNG của dữ liệu chấm điểm, không phải tiện ích nhập liệu.
+    if (asset.type === 'IMAGE' && !asset.description.trim() && !asset.altText.trim()) {
+      setErrorMessage(
+        'Ảnh phải có mô tả nội dung (hoặc alt text). AI không nhìn thấy ảnh — nó chỉ biết ảnh qua phần mô tả này.',
+      )
+      return
+    }
+
+    if ((asset.type === 'AUDIO' || asset.type === 'VIDEO') && !asset.transcript.trim()) {
+      setErrorMessage(
+        'Audio/video phải có bản chép lời. AI không nghe được tệp — nó chỉ biết nội dung qua bản chép lời này.',
+      )
+      return
+    }
+
     if (!(await confirm({ message: asset.id ? 'Bạn có chắc muốn cập nhật tài nguyên này không?' : 'Bạn có chắc muốn tạo tài nguyên này không?' }))) {
       return
     }
@@ -750,7 +839,9 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
         : null
 
     if (!nextType) {
-      setErrorMessage('Chỉ hỗ trợ ảnh JPG/PNG hoặc video MP4.')
+      setErrorMessage(
+        'Chỉ hỗ trợ ảnh JPG/PNG, âm thanh MP3/WAV/M4A/AAC/OGG hoặc video MP4.',
+      )
       return
     }
 
@@ -763,13 +854,31 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     // description/transcript fields before choosing the file.
     const currentAsset = assetForm[index]
     const previousType = currentAsset.type
-    const resetValues = nextType !== previousType ? resetAssetFieldsForType(nextType) : {}
+    const resetValues = nextType !== previousType
+      ? resetAssetFieldsForType(nextType, previousType, currentAsset.durationSeconds)
+      : {}
     revokeObjectUrl(currentAsset.localPreviewUrl)
+    const previewUrl = URL.createObjectURL(file)
     updateAssetForm(index, {
       ...resetValues,
-      localPreviewUrl: URL.createObjectURL(file),
+      localPreviewUrl: previewUrl,
       selectedFile: file,
       type: nextType,
+    }, setAssetForm)
+
+    // Thời lượng KHÔNG cho nhập tay — đo thẳng từ tệp vừa chọn. Backend cộng số này vào thời gian
+    // làm bài của mã đề (xem PaperTimeCalculator), nên để trống là học sinh mất đúng chừng đó giây
+    // ngồi nghe mà không được bù. Đo hỏng thì để trống chứ không chặn lưu.
+    const measuredDuration = hasPlaybackDuration(nextType)
+      ? await readMediaDurationSeconds(previewUrl, nextType)
+      : null
+    updateAssetForm(index, {
+      durationSeconds: nextDurationSeconds({
+        measuredDuration,
+        nextType,
+        previousDuration: currentAsset.durationSeconds,
+        previousType,
+      }),
     }, setAssetForm)
   }
 
@@ -816,33 +925,6 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
       setErrorMessage(getErrorMessage(error))
     } finally {
       setRegeneratingAssetId(null)
-    }
-  }
-
-  async function handleDeleteAsset(index: number) {
-    const asset = assetForm[index]
-
-    if (!asset.id) {
-      revokeObjectUrl(asset.localPreviewUrl)
-      setAssetForm((current) => current.filter((_, currentIndex) => currentIndex !== index))
-      return
-    }
-
-    if (!questionId || !canManageAssetOrGuide) {
-      setErrorMessage('Bạn không có quyền xóa tài nguyên này.')
-      return
-    }
-
-    try {
-      const message = await deleteAssetMutation.mutateAsync({
-        assetId: asset.id,
-        questionId,
-      })
-      revokeObjectUrl(asset.localPreviewUrl)
-      await refreshQuestionData(questionId)
-      setSuccessMessage(message)
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error))
     }
   }
 
@@ -1112,6 +1194,18 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             }
             value={form.instructionText}
           />
+          {/* AI đọc phần này TRƯỚC khi hiện tài nguyên, nên đây là chỗ duy nhất nói cho thí sinh
+              biết phải nhìn/nghe vào đâu. Không có câu dẫn thì đề "What do you think?" đọc lên
+              giữa không trung. */}
+          {assetForm.length > 0 ? (
+            <p className="text-xs font-medium text-slate-500">
+              Câu hỏi có tài nguyên: hãy thêm câu dẫn để thí sinh biết nhìn/nghe vào đâu — ví dụ{' '}
+              <span className="font-bold">
+                “Look at the picture on your screen.”
+              </span>{' '}
+              hoặc <span className="font-bold">“Listen to the recording. It plays once.”</span>
+            </p>
+          ) : null}
           <TextareaField
             label="Đề bài"
             onChange={(value) =>
@@ -1126,6 +1220,16 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
             }
             value={form.preparationText}
           />
+
+          {/* Không có mặc định lẫn trần trong hệ (chỉ ràng >= 0), nên người soạn dễ để 0 và thí
+              sinh không có giây chuẩn bị nào. Số tham chiếu lấy từ các kỳ thi nói thật. */}
+          <p className="text-xs font-medium text-slate-500">
+            Gợi ý thời gian chuẩn bị: hỏi đáp ngắn <span className="font-bold">0s</span> · tả tranh{' '}
+            <span className="font-bold">20–30s</span> · nêu ý kiến / nói dài{' '}
+            <span className="font-bold">60s</span> · nghe rồi nói{' '}
+            <span className="font-bold">30s</span> (tính SAU khi nghe xong). Hệ chưa có ô ghi chú
+            cho thí sinh nên không nên đặt quá 30s.
+          </p>
 
           <div className="grid gap-4 md:grid-cols-3">
             <InputField
@@ -1204,17 +1308,11 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
               key={asset.id ?? `draft-${index}`}
               onSubmit={(event) => void handleAssetSubmit(index, event)}
             >
+              {/* Không đánh số và không có nút xóa/thêm: mỗi câu hỏi có đúng một tài nguyên
+                  (ràng buộc uk_question_assets_question_id), và mergeAssetForms luôn dựng sẵn một ô
+                  trống khi câu hỏi chưa có gì -- nên ô này vừa là chỗ tạo vừa là chỗ sửa. */}
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-black text-slate-950">
-                  Tài nguyên {index + 1}
-                </h2>
-                <button
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-bold text-red-600 transition hover:bg-red-50"
-                  onClick={() => void handleDeleteAsset(index)}
-                  type="button"
-                >
-                  Xóa
-                </button>
+                <h2 className="text-lg font-black text-slate-950">Tài nguyên</h2>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -1233,7 +1331,11 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                       revokeObjectUrl(asset.localPreviewUrl)
                       updateAssetForm(
                         index,
-                        resetAssetFieldsForType(event.target.value as QuestionAssetType),
+                        resetAssetFieldsForType(
+                          event.target.value as QuestionAssetType,
+                          asset.type,
+                          asset.durationSeconds,
+                        ),
                         setAssetForm,
                       )
                     }}
@@ -1251,14 +1353,33 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                     Tài nguyên dạng đoạn văn không cần upload tệp. Hãy nhập nội dung ở ô bên dưới.
                   </div>
                 ) : (
-                <label className="grid gap-2 text-sm font-bold text-slate-700">
-                  Tệp tài nguyên
-                  <input
-                    accept={ASSET_FILE_INPUT_ACCEPT}
-                    className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-950"
-                    onChange={(event) => void handleAssetFileSelected(index, event)}
-                    type="file"
-                  />
+                <div className="grid gap-2 text-sm font-bold text-slate-700">
+                  <span>Tệp tài nguyên</span>
+                  {/* label bọc input sr-only: bấm vào đâu trong label cũng mở hộp chọn tệp, nên
+                      trông và bấm như một nút thật. Cùng thủ thuật với SimpleImportWizard. */}
+                  <label
+                    className={`inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${
+                      uploadingAssetIndex === index
+                        ? 'cursor-not-allowed bg-slate-100 text-slate-400'
+                        : 'cursor-pointer bg-indigo-600 text-white hover:bg-indigo-500'
+                    }`}
+                  >
+                    <Upload aria-hidden="true" className="size-4" />
+                    {uploadingAssetIndex === index
+                      ? 'Đang upload...'
+                      : asset.url.trim()
+                        ? 'Đổi tệp'
+                        : 'Chọn tệp'}
+                    <input
+                      accept={ASSET_FILE_INPUT_ACCEPT}
+                      className="sr-only"
+                      disabled={uploadingAssetIndex === index}
+                      onChange={(event) => {
+                        void handleAssetFileSelected(index, event)
+                      }}
+                      type="file"
+                    />
+                  </label>
                   <span className="text-xs font-medium text-slate-500">
                     {uploadingAssetIndex === index
                       ? 'Đang upload file...'
@@ -1266,7 +1387,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                         ? 'Đã upload file asset.'
                         : 'Chưa có file được upload.'}
                   </span>
-                </label>
+                </div>
                 )}
                 <InputField
                   label="Văn bản thay thế"
@@ -1284,19 +1405,21 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
               />
 
               <TextareaField
-                label="Mô tả"
+                label={asset.type === 'IMAGE' ? 'Mô tả nội dung *' : 'Mô tả'}
                 onChange={(value) =>
                   updateAssetForm(index, { description: value }, setAssetForm)
                 }
                 value={asset.description}
               />
               <p className="text-xs font-medium text-slate-500">
-                Để trợ giúp hệ thống tự động tạo bằng AI sau khi upload xong.
+                {asset.type === 'IMAGE'
+                  ? 'Bắt buộc. AI KHÔNG nhìn thấy ảnh — nó chỉ biết ảnh qua đúng phần mô tả này. Để trống thì AI sẽ hỏi và chấm chung chung.'
+                  : 'Mô tả khách quan về nội dung tài nguyên, để AI bám vào khi hỏi và chấm.'}
               </p>
               {shouldShowTranscriptField(asset.type) ? (
                 <>
                   <TextareaField
-                    label={isTextPassage(asset.type) ? 'Đoạn văn' : 'Bản chép lời'}
+                    label={isTextPassage(asset.type) ? 'Đoạn văn *' : 'Bản chép lời *'}
                     onChange={(value) =>
                       updateAssetForm(index, { transcript: value }, setAssetForm)
                     }
@@ -1304,8 +1427,8 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
                   />
                   <p className="text-xs font-medium text-slate-500">
                     {isTextPassage(asset.type)
-                      ? 'Trường này bắt buộc với tài nguyên đoạn văn. AI chỉ tạo phần mô tả, không tạo bản chép lời cho đoạn văn.'
-                      : 'Để trợ giúp hệ thống tự động tạo bằng AI sau khi upload xong.'}
+                      ? 'Bắt buộc với tài nguyên đoạn văn.'
+                      : 'Bắt buộc. AI KHÔNG nghe được tệp — nó chỉ biết nội dung qua bản chép lời này. Để trống thì AI sẽ hỏi và chấm chung chung.'}
                   </p>
                 </>
               ) : null}
@@ -1340,19 +1463,6 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
               ))
             : null}
 
-          {questionId ? (
-            <div className="flex justify-end">
-            <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-              onClick={() => setAssetForm((current) => [...current, createAssetForm()])}
-              disabled={assetForm.length >= 1}
-              type="button"
-            >
-              <Plus aria-hidden="true" className="size-4" />
-              Thêm tài nguyên
-            </button>
-            </div>
-          ) : null}
         </div>
       ) : null}
 

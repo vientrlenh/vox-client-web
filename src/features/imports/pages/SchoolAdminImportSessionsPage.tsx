@@ -268,6 +268,14 @@ const IMPORT_TYPE_OPTION_GROUPS: ImportTypeOptionGroup[] = [
     ],
   },
   {
+    label: 'Câu hỏi',
+    options: [
+      { label: 'Ngân hàng câu hỏi', to: '/school-admin/question-banks/import' },
+      // Vào thẳng được: trang này có sẵn ô chọn ngân hàng, không cần bankId trên đường dẫn.
+      { label: 'Chủ đề câu hỏi', to: '/school-admin/question-topics/import' },
+    ],
+  },
+  {
     label: 'Đánh giá',
     options: [
       { label: 'Rubric (chọn rubric)', to: '/school-admin/rubrics' },

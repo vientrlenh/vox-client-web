@@ -68,6 +68,21 @@ export const IMPORT_FIELDS_BY_TYPE: Record<string, ImportField[]> = {
     { isRequired: true, label: 'Hiệu lực từ ngày', value: 'effectiveFrom' },
     { isRequired: false, label: 'Hiệu lực đến ngày', value: 'effectiveTo' },
   ],
+  QUESTION_BANK: [
+    { isRequired: true, label: 'Mã ngân hàng', value: 'code' },
+    { isRequired: true, label: 'Tên ngân hàng', value: 'name' },
+    { isRequired: false, label: 'Mô tả', value: 'description' },
+    // Bắt buộc khi TẠO MỚI (question_banks.language_id không nullable); dòng cập nhật ngân
+    // hàng đã có thì bỏ trống được và giữ nguyên ngôn ngữ cũ. Nhận cả mã ("en") lẫn tên đầy đủ.
+    { isRequired: true, label: 'Ngôn ngữ', value: 'language' },
+  ],
+  QUESTION_TOPIC: [
+    // Ngân hàng đích chọn ở màn upload rồi ghim vào phiên import, KHÔNG khai trong file —
+    // nên không có cột nào cho nó ở đây.
+    { isRequired: true, label: 'Mã chủ đề', value: 'code' },
+    { isRequired: true, label: 'Tên chủ đề', value: 'name' },
+    { isRequired: false, label: 'Mô tả', value: 'description' },
+  ],
   QUESTION: [
     { isRequired: false, label: 'Mã câu hỏi', value: 'code' },
     { isRequired: true, label: 'Loại câu hỏi', value: 'type' },
@@ -91,6 +106,16 @@ export const IMPORT_FIELDS_BY_TYPE: Record<string, ImportField[]> = {
       value: 'maxResponseSeconds',
     },
     { isRequired: false, label: 'Chia sẻ', value: 'sharing' },
+    // Tài nguyên kèm câu hỏi. Bỏ trống "Loại tài nguyên" thì câu hỏi không có tài nguyên.
+    // Có khai loại thì mô tả (ảnh) / bản chép lời (audio, video) là BẮT BUỘC — AI không nhìn
+    // được ảnh và không nghe được tệp, nó chỉ biết qua mấy dòng chữ đó.
+    { isRequired: false, label: 'Loại tài nguyên', value: 'assetType' },
+    { isRequired: false, label: 'Đường dẫn tài nguyên', value: 'assetUrl' },
+    { isRequired: false, label: 'Tiêu đề tài nguyên', value: 'assetTitle' },
+    { isRequired: false, label: 'Văn bản thay thế', value: 'assetAltText' },
+    { isRequired: false, label: 'Bản chép lời', value: 'assetTranscript' },
+    { isRequired: false, label: 'Mô tả tài nguyên', value: 'assetDescription' },
+    { isRequired: false, label: 'Thời lượng tài nguyên', value: 'assetDurationSeconds' },
     {
       isRequired: false,
       label: 'Nội dung mong đợi',

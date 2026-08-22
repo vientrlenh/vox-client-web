@@ -317,6 +317,18 @@ const MonitoringRoomPage = lazy(() =>
   })),
 );
 
+const SystemAdminQuestionBankImportPage = lazy(() =>
+  import("@/features/imports").then((m) => ({ default: m.SystemAdminQuestionBankImportPage })),
+);
+const SystemAdminQuestionTopicImportPage = lazy(() =>
+  import("@/features/imports").then((m) => ({ default: m.SystemAdminQuestionTopicImportPage })),
+);
+const SchoolAdminQuestionBankImportPage = lazy(() =>
+  import("@/features/imports").then((m) => ({ default: m.SchoolAdminQuestionBankImportPage })),
+);
+const SchoolAdminQuestionTopicImportPage = lazy(() =>
+  import("@/features/imports").then((m) => ({ default: m.SchoolAdminQuestionTopicImportPage })),
+);
 // question-bank
 const TeacherQuestionBanksPage = lazy(() =>
   import("@/features/question-bank").then((m) => ({ default: m.TeacherQuestionBanksPage })),
@@ -860,6 +872,8 @@ export function AppRoutes() {
             />
             <Route path="system-admin/question-banks" element={<SystemAdminQuestionBanksPage />} />
             <Route path="system-admin/question-banks/:bankId" element={<SystemAdminQuestionBankDetailPage />} />
+            <Route path="system-admin/question-banks/import" element={<SystemAdminQuestionBankImportPage />} />
+            <Route path="system-admin/question-topics/import" element={<SystemAdminQuestionTopicImportPage />} />
             <Route path="system-admin/question-topics/:topicId" element={<SystemAdminQuestionTopicDetailPage />} />
             <Route path="system-admin/questions/all" element={<SystemAdminQuestionsPage />} />
             <Route path="system-admin/questions/review" element={<SystemAdminReviewQuestionsPage />} />
@@ -1059,6 +1073,8 @@ export function AppRoutes() {
             <Route path="school-admin/frameworks/:frameworkId/versions/:versionId" element={<SchoolAdminFrameworkVersionDetailPage />} />
             <Route path="school-admin/question-banks" element={<SchoolAdminQuestionBanksPage />} />
             <Route path="school-admin/question-banks/:bankId" element={<SchoolAdminQuestionBankDetailPage />} />
+            <Route path="school-admin/question-banks/import" element={<SchoolAdminQuestionBankImportPage />} />
+            <Route path="school-admin/question-topics/import" element={<SchoolAdminQuestionTopicImportPage />} />
             <Route path="school-admin/question-topics/:topicId" element={<SchoolAdminQuestionTopicDetailPage />} />
             <Route path="school-admin/questions/all" element={<SchoolAdminQuestionsPage />} />
             <Route path="school-admin/questions/review" element={<SchoolAdminReviewQuestionsPage />} />

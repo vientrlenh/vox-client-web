@@ -239,6 +239,7 @@ const GRADING_TASK_DETAIL_QUERY = `
         sectionId
         orderInSection
         questionText
+        asset { type url title altText transcript description durationSeconds }
         currentItemScore
         currentFeedbackSummary
         currentScores { ${CRITERION_SCORE_FIELDS} }

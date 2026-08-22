@@ -48,8 +48,6 @@ export type QuestionAssetDto = {
   url: string | null
   transcript: string | null
   description: string | null
-  transcriptManuallyEdited: boolean
-  descriptionManuallyEdited: boolean
   order: number
 }
 

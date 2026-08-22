@@ -11,6 +11,8 @@ export const IMPORT_TYPE_VALUES = [
   'SCHOOL_GRADE',
   'SCHOOL_ROOM',
   'QUESTION',
+  'QUESTION_BANK',
+  'QUESTION_TOPIC',
   'RUBRIC_VERSION',
   'RUBRIC_CRITERION',
   'RUBRIC_CRITERION_BAND',
@@ -31,6 +33,8 @@ export const IMPORT_TYPE_LABELS: Record<ImportTypeValue, string> = {
   FRAMEWORK_RESULT_BAND: 'Thang kết quả khung đánh giá',
   FRAMEWORK_VERSION: 'Phiên bản khung đánh giá',
   QUESTION: 'Câu hỏi',
+  QUESTION_BANK: 'Ngân hàng câu hỏi',
+  QUESTION_TOPIC: 'Chủ đề câu hỏi',
   RUBRIC_CRITERION: 'Tiêu chí rubric',
   RUBRIC_CRITERION_BAND: 'Mức điểm tiêu chí',
   RUBRIC_RESULT_BAND: 'Mức điểm kết quả',
@@ -81,8 +85,12 @@ export const IMPORT_TYPE_GROUPS: ImportTypeGroup[] = [
     ],
   },
   {
+    label: 'Ngân hàng câu hỏi',
+    types: ['QUESTION_BANK', 'QUESTION_TOPIC', 'QUESTION'],
+  },
+  {
     label: 'Khác',
-    types: ['QUESTION', 'ASSESSMENT_POLICY'],
+    types: ['ASSESSMENT_POLICY'],
   },
 ]
 

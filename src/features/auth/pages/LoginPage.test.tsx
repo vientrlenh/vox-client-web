@@ -114,7 +114,7 @@ describe('LoginPage', () => {
     jest.mocked(apiClient.post).mockResolvedValue({
       data: {
         data: responseData,
-        message: 'ÄÄƒng nháº­p thÃ nh cÃ´ng',
+        message: 'Đăng nhập thành công',
       },
     } as AxiosResponse<ApiResponse<LoginResponse>>)
 

@@ -1,10 +1,12 @@
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, Upload } from 'lucide-react'
 
 type QuestionBankPageHeaderProps = {
   createLabel?: string
   description?: string
   isRefreshing: boolean
   onCreate?: () => void
+  /** Bỏ trống thì không hiện nút nhập — dùng cho vai trò chỉ được xem. */
+  onImport?: () => void
   onRefresh: () => void
   title?: string
 }
@@ -14,6 +16,7 @@ export function QuestionBankPageHeader({
   description = 'Theo dõi và quản lý ngân hàng câu hỏi theo quyền hiện tại.',
   isRefreshing,
   onCreate,
+  onImport,
   onRefresh,
   title = 'Ngân hàng câu hỏi',
 }: QuestionBankPageHeaderProps) {
@@ -42,6 +45,17 @@ export function QuestionBankPageHeader({
           />
           Làm mới
         </button>
+
+        {onImport ? (
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+            onClick={onImport}
+            type="button"
+          >
+            <Upload aria-hidden="true" className="size-4" />
+            Nhập từ Excel
+          </button>
+        ) : null}
 
         {onCreate ? (
           <button
