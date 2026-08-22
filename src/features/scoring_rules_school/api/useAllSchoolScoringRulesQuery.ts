@@ -21,7 +21,7 @@ export type ScoringRuleWithPolicy = ScoringRule & {
 
 function scopeLabel(policy: AssessmentPolicy) {
   const schoolLabel = policy.school?.name || policy.school?.code || 'Toàn trường';
-  const narrowest = policy.schoolClass ?? policy.schoolGrade ?? policy.schoolGradeLevel;
+  const narrowest = policy.schoolClass ?? policy.schoolGrade ?? policy.gradeLevel;
   const narrowestLabel = narrowest?.name || narrowest?.code;
   return narrowestLabel ? `${schoolLabel} - ${narrowestLabel}` : schoolLabel;
 }

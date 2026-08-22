@@ -94,7 +94,7 @@ export type AssessmentPolicyDetail = Omit<
 > & {
   schoolId?: string | null;
   school?: AssessmentPolicyRelatedEntity | null;
-  schoolGradeLevel?: AssessmentPolicyRelatedEntity | null;
+  gradeLevel?: AssessmentPolicyRelatedEntity | null;
   schoolGrade?: AssessmentPolicyRelatedEntity | null;
   schoolClass?: AssessmentPolicyRelatedEntity | null;
   language?: AssessmentPolicyRelatedEntity | null;

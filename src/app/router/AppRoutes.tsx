@@ -192,12 +192,6 @@ const SchoolAdminGradeLevelDetailPage = lazy(() =>
   })),
 )
 
-const SchoolAdminGradeLevelImportPage = lazy(() =>
-  import('@/features/grades').then((module) => ({
-    default: module.SchoolAdminGradeLevelImportPage,
-  })),
-)
-
 const SchoolAdminGradeImportPage = lazy(() =>
   import('@/features/grades').then((module) => ({
     default: module.SchoolAdminGradeImportPage,
@@ -707,6 +701,12 @@ const SchoolAdminAssessmentPolicyImportPage = lazy(() =>
   })),
 );
 
+const SchoolAdminAssessmentPolicyTemplatesPage = lazy(() =>
+  import("@/features/assessment_policy_school").then((module) => ({
+    default: module.SchoolAdminAssessmentPolicyTemplatesPage,
+  })),
+);
+
 const SchoolAdminScoringRulesPage = lazy(() =>
   import("@/features/scoring_rules_school").then((module) => ({
     default: module.SchoolAdminScoringRulesPage,
@@ -992,10 +992,11 @@ export function AppRoutes() {
               path="school-admin/grades"
               element={<SchoolAdminGradesPage />}
             />
-            <Route
-              path="school-admin/grades/import"
-              element={<SchoolAdminGradeLevelImportPage />}
-            />
+            {/*
+              Import khối lớp đã bị gỡ: khối giờ là catalog dùng chung toàn hệ thống, chỉ
+              SYSTEM_ADMIN tạo/xóa được và dữ liệu gốc do migration seed. Route cũ
+              "school-admin/grades/import" không còn tồn tại.
+            */}
             {/*
               Import năm học KHÔNG cần chọn khối trước: một file nạp được nhiều khối khác nhau,
               và trang import cũng không gửi gradeLevelId lên server -- nó chỉ dùng id đó cho
@@ -1134,6 +1135,11 @@ export function AppRoutes() {
             <Route
               path="school-admin/assessment-policies/import"
               element={<SchoolAdminAssessmentPolicyImportPage />}
+            />
+            {/* Đặt trước ":policyId" cho dễ đọc; React Router vốn đã ưu tiên đoạn tĩnh hơn tham số. */}
+            <Route
+              path="school-admin/assessment-policies/templates"
+              element={<SchoolAdminAssessmentPolicyTemplatesPage />}
             />
             <Route
               path="school-admin/assessment-policies/:policyId"

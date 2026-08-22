@@ -14,6 +14,7 @@ import {
   Plus,
   RefreshCw,
   Rocket,
+  LibraryBig,
   SlidersHorizontal,
   Upload,
 } from 'lucide-react';
@@ -250,6 +251,14 @@ export function SchoolAdminAssessmentPoliciesPage() {
             className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-950 transition hover:bg-slate-50"
           >
             <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/school-admin/assessment-policies/templates')}
+            className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
+          >
+            <LibraryBig className="size-4" /> Chính sách mẫu
           </button>
 
           <button

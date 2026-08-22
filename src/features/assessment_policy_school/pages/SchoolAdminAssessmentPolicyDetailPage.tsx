@@ -180,7 +180,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
     );
   }
 
-  const hasScope = Boolean(policy.school || policy.schoolGradeLevel || policy.schoolGrade || policy.schoolClass);
+  const hasScope = Boolean(policy.school || policy.gradeLevel || policy.schoolGrade || policy.schoolClass);
 
   const tabs: { id: TabId; icon: LucideIcon; title: string }[] = [
     { id: 'framework', icon: BookMarked, title: 'Framework Version' },
@@ -249,8 +249,8 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
                 {policy.school ? (
                   <span><span className="font-normal text-slate-400">Trường:</span> {policy.school.name}</span>
                 ) : null}
-                {policy.schoolGradeLevel ? (
-                  <span><span className="font-normal text-slate-400">Khối:</span> {policy.schoolGradeLevel.name}</span>
+                {policy.gradeLevel ? (
+                  <span><span className="font-normal text-slate-400">Khối:</span> {policy.gradeLevel.name}</span>
                 ) : null}
                 {policy.schoolGrade ? (
                   <span><span className="font-normal text-slate-400">Niên khóa:</span> {policy.schoolGrade.name}</span>

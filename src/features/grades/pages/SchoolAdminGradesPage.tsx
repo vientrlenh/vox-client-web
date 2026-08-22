@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
+import { useAppSelector } from '@/app/store/hooks'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import {
   SchoolGradeLevelFormDialog,
@@ -146,6 +147,7 @@ function DeleteDialog({
 }
 
 type GradeLevelTableProps = {
+  canManage: boolean
   errorMessage?: string
   gradeLevels: SchoolGradeLevel[]
   isError: boolean
@@ -157,6 +159,7 @@ type GradeLevelTableProps = {
 }
 
 function GradeLevelTable({
+  canManage,
   errorMessage,
   gradeLevels,
   isError,
@@ -200,7 +203,9 @@ function GradeLevelTable({
       <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
         <p className="text-base font-black text-slate-950">Chưa có khối</p>
         <p className="mt-2 text-sm font-medium text-slate-500">
-          Tạo khối đầu tiên cho trường của bạn.
+          {canManage
+            ? 'Tạo khối đầu tiên cho hệ thống.'
+            : 'Danh mục khối do quản trị hệ thống thiết lập.'}
         </p>
       </div>
     )
@@ -259,19 +264,25 @@ function GradeLevelTable({
                           onSelect: () => onView(gradeLevel),
                           tone: 'primary',
                         },
-                        {
-                          id: 'edit',
-                          label: 'Sửa khối',
-                          onSelect: () => onEdit(gradeLevel),
-                          tone: 'primary',
-                        },
-                        {
-                          icon: Trash2,
-                          id: 'delete',
-                          label: 'Xóa khối',
-                          onSelect: () => onDelete(gradeLevel),
-                          tone: 'danger',
-                        },
+                        // Sửa/Xóa chỉ dành cho SYSTEM_ADMIN: một bản ghi khối ảnh hưởng
+                        // tới mọi trường nên School Admin chỉ được đọc.
+                        ...(canManage
+                          ? ([
+                              {
+                                id: 'edit',
+                                label: 'Sửa khối',
+                                onSelect: () => onEdit(gradeLevel),
+                                tone: 'primary',
+                              },
+                              {
+                                icon: Trash2,
+                                id: 'delete',
+                                label: 'Xóa khối',
+                                onSelect: () => onDelete(gradeLevel),
+                                tone: 'danger',
+                              },
+                            ] as const)
+                          : []),
                       ]}
                     />
                   </div>
@@ -354,6 +365,11 @@ export function SchoolAdminGradesPage() {
   const [deleteTarget, setDeleteTarget] = useState<SchoolGradeLevel | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState('')
+
+  // Khối lớp là catalog dùng chung: BE chỉ cho SYSTEM_ADMIN ghi. Ẩn hẳn nút thay vì để
+  // School Admin bấm rồi nhận 403.
+  const roles = useAppSelector((state) => state.auth.user?.roles)
+  const canManage = roles?.includes('SYSTEM_ADMIN') ?? false
 
   const gradeLevelsQuery = useSchoolGradeLevelsQuery(page, pageSize, '', statusFilter)
   const gradeLevels = gradeLevelsQuery.data?.content ?? []
@@ -472,7 +488,9 @@ export function SchoolAdminGradesPage() {
             Danh sách khối học
           </h1>
           <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-            Tạo, cập nhật và quản lý các khối học của trường.
+            {canManage
+              ? 'Tạo, cập nhật và quản lý danh mục khối học dùng chung toàn hệ thống.'
+              : 'Danh mục khối học dùng chung toàn hệ thống, do quản trị hệ thống thiết lập. Bạn có thể xem và quản lý các năm học trong từng khối.'}
           </p>
         </div>
         <div className="flex gap-3">
@@ -487,17 +505,10 @@ export function SchoolAdminGradesPage() {
             <RefreshCw aria-hidden="true" className="size-4" />
             Làm mới
           </button>
-          <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
-            onClick={() => navigate('/school-admin/grades/import')}
-            type="button"
-          >
-            <Upload aria-hidden="true" className="size-4" />
-            Import khối
-          </button>
           {/*
             Vào thẳng import năm học, không bắt mở một khối trước. File nạp được nhiều khối
             cùng lúc nên bước chọn khối chỉ là thao tác thừa.
+            (Import khối lớp đã bị gỡ -- khối giờ là catalog dùng chung, không import theo trường.)
           */}
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 text-sm font-bold text-cyan-800 transition hover:bg-cyan-100"
@@ -507,14 +518,16 @@ export function SchoolAdminGradesPage() {
             <Upload aria-hidden="true" className="size-4" />
             Import năm học
           </button>
-          <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700"
-            onClick={openCreateDialog}
-            type="button"
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Tạo khối
-          </button>
+          {canManage ? (
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700"
+              onClick={openCreateDialog}
+              type="button"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              Tạo khối
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -541,6 +554,7 @@ export function SchoolAdminGradesPage() {
           </select>
         </label>
         <GradeLevelTable
+          canManage={canManage}
           errorMessage={getErrorMessage(gradeLevelsQuery.error)}
           gradeLevels={gradeLevels}
           isError={gradeLevelsQuery.isError}
