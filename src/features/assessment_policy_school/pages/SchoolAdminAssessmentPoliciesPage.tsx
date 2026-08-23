@@ -29,6 +29,7 @@ import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
 
 import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
 import { AssessmentPolicyTable } from '../components/AssessmentPolicyTable';
 import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPolicyDialog';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
@@ -155,6 +156,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
   const { mutateAsync: publishRubricVersion, isPending: isPublishingVersion } = usePublishSchoolRubricVersionMutation(schoolId);
   const isQuickPublishing = isPublishingPolicies || isPublishingVersion;
   const { showError, showSuccess, feedbackToast } = useFeedbackToast();
+  const { confirm, dialog: confirmationDialog } = useConfirmationDialog();
 
   const handleCreatePolicy = async (formDataList: CreateAssessmentPolicyPayload[]) => {
     try {
@@ -194,7 +196,11 @@ export function SchoolAdminAssessmentPoliciesPage() {
           }?`
         : `Cập nhật Rubric Version "${versionLabel}" sang PUBLISHED?`;
 
-    const isConfirm = window.confirm(confirmMessage);
+    const isConfirm = await confirm({
+      confirmLabel: 'Xuất bản',
+      message: confirmMessage,
+      title: 'Xuất bản hàng loạt',
+    });
     if (!isConfirm) return;
 
     try {
@@ -212,9 +218,11 @@ export function SchoolAdminAssessmentPoliciesPage() {
   };
 
   const handleDeletePolicy = async (policy: AssessmentPolicy) => {
-    const isConfirm = window.confirm(
-      'Bạn có chắc chắn muốn xóa vĩnh viễn Chính Sách Đánh Giá DRAFT này? Hành động này không thể hoàn tác!'
-    );
+    const isConfirm = await confirm({
+      confirmLabel: 'Xóa vĩnh viễn',
+      message: 'Bạn có chắc chắn muốn xóa vĩnh viễn Chính Sách Đánh Giá DRAFT này? Hành động này không thể hoàn tác!',
+      title: 'Xóa Chính Sách Đánh Giá',
+    });
     if (!isConfirm) return;
 
     try {
@@ -228,6 +236,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
   return (
     <section className="relative grid gap-6 overflow-hidden">
       {feedbackToast}
+      {confirmationDialog}
       {/* vox background decoration — đồng bộ với gradient nút */}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
@@ -253,12 +262,15 @@ export function SchoolAdminAssessmentPoliciesPage() {
             <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
           </button>
 
+          {/* Sao chính sách mẫu nay đi kèm việc sao BỘ TIÊU CHÍ, vì chính sách của trường chỉ gắn
+              được vào rubric của chính trường -- xem CloneSystemRubricToSchoolUseCase. Nên lối vào
+              nằm ở thư viện bộ tiêu chí mẫu chứ không còn là một màn riêng. */}
           <button
             type="button"
-            onClick={() => navigate('/school-admin/assessment-policies/templates')}
+            onClick={() => navigate('/school-admin/rubrics/templates')}
             className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
           >
-            <LibraryBig className="size-4" /> Chính sách mẫu
+            <LibraryBig className="size-4" /> Sao từ bản mẫu
           </button>
 
           <button

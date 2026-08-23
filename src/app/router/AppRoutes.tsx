@@ -574,9 +574,6 @@ const SchoolAdminBlueprintVersionDetailPage = lazy(() =>
 const SchoolAdminEditBlueprintVersionPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.SchoolAdminEditBlueprintVersionPage })),
 );
-const SchoolAdminSelectRubricVersionPage = lazy(() =>
-  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminSelectRubricVersionPage })),
-);
 const TeacherSelectRubricVersionPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.TeacherSelectRubricVersionPage })),
 );
@@ -698,12 +695,6 @@ const SchoolAdminAssessmentPolicyDetailPage = lazy(() =>
 const SchoolAdminAssessmentPolicyImportPage = lazy(() =>
   import("@/features/assessment_policy_school").then((module) => ({
     default: module.SchoolAdminAssessmentPolicyImportPage,
-  })),
-);
-
-const SchoolAdminAssessmentPolicyTemplatesPage = lazy(() =>
-  import("@/features/assessment_policy_school").then((module) => ({
-    default: module.SchoolAdminAssessmentPolicyTemplatesPage,
   })),
 );
 
@@ -1075,7 +1066,6 @@ export function AppRoutes() {
             <Route path="school-admin/exam-papers/:paperId/edit" element={<SchoolAdminExamPaperEditPage />} />
             <Route path="school-admin/exam-papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
-            <Route path="school-admin/rubric-versions/select" element={<SchoolAdminSelectRubricVersionPage />} />
             <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
             <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
             <Route path="school-admin/exam-results" element={<SchoolAdminExamResultsListPage />} />
@@ -1135,11 +1125,6 @@ export function AppRoutes() {
             <Route
               path="school-admin/assessment-policies/import"
               element={<SchoolAdminAssessmentPolicyImportPage />}
-            />
-            {/* Đặt trước ":policyId" cho dễ đọc; React Router vốn đã ưu tiên đoạn tĩnh hơn tham số. */}
-            <Route
-              path="school-admin/assessment-policies/templates"
-              element={<SchoolAdminAssessmentPolicyTemplatesPage />}
             />
             <Route
               path="school-admin/assessment-policies/:policyId"

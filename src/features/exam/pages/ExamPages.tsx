@@ -44,7 +44,10 @@ import {
   useExamDetailBundleQuery,
   useExamSchedulesQuery,
 } from '@/features/examCore/api/queries'
-import { useMatchingSchoolAssessmentPoliciesQuery } from '@/features/examCore/api/assessmentPolicyQueries'
+import {
+  RubricPolicySelectField,
+  type RubricPolicyChoice,
+} from '@/features/examCore/components/RubricPolicySelectField'
 import { formatScheduleProgressLabel } from '@/features/examCore/utils/scheduleProgress'
 import {
   buildSubscriptionWindowError,
@@ -64,7 +67,6 @@ import {
   formatDateTime,
   formatDurationSeconds,
   formatNullableText,
-  getAssessmentPolicyStrictnessLabel,
   getExamPaperStatusDisplay,
   getResultDecisionMethodDisplay,
   isExamLockedForEditing,
@@ -286,54 +288,26 @@ export function SchoolAdminExamsPage() {
   return <ExamListPage allowCreate basePath="/school-admin/exams" title="Kiểm tra tập trung" />
 }
 
-type ExamCreateDraft = {
-  // Ghi ở goToSelectRubricVersion, đọc lại ở useState của confidenceThreshold -- phải có
-  // trong type thì vòng đi/về mới type-check được.
-  aiConfidenceThresholdPercent: number | null
-  closeAt: string
-  code: string
-  description: string
-  languageId: string
-  maxAttempt: string
-  name: string
-  openAt: string
-}
-
-type SelectedRubricVersion = { code: string; id: string; name: string; version: number }
-
-type ExamCreateLocationState = {
-  draft?: ExamCreateDraft
-  selectedRubricVersion?: SelectedRubricVersion
-} | null
-
 export function SchoolAdminExamCreatePage() {
-  const location = useLocation()
-  // key={location.key} forces a full remount whenever navigate() lands here with a fresh
-  // history entry (e.g. returning from the rubric-version picker), so the useState
-  // initializers below can pick up the new location.state instead of going stale.
-  return <ExamCreateForm key={location.key} locationState={location.state as ExamCreateLocationState} />
-}
-
-function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationState }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createMutation = useCreateExamMutation()
   const languagesQuery = useSupportedLanguagesQuery(1, 100, ACTIVE_LANGUAGE_FILTERS)
-  const [name, setName] = useState(locationState?.draft?.name ?? '')
-  const [code, setCode] = useState(locationState?.draft?.code ?? '')
-  const [description, setDescription] = useState(locationState?.draft?.description ?? '')
-  // Đọc lại từ draft khi quay về từ trang chọn rubric -- xem chỗ dựng draft bên dưới.
-  const [confidenceThreshold, setConfidenceThreshold] = useState<number | null>(
-    locationState?.draft?.aiConfidenceThresholdPercent ?? null,
-  )
-  const [languageId, setLanguageId] = useState(locationState?.draft?.languageId ?? '')
-  const [maxAttempt] = useState(locationState?.draft?.maxAttempt ?? '1')
-  const [openAt, setOpenAt] = useState(locationState?.draft?.openAt ?? '')
-  const [closeAt, setCloseAt] = useState(locationState?.draft?.closeAt ?? '')
-  const [selectedRubricVersion, setSelectedRubricVersion] = useState<SelectedRubricVersion | null>(
-    locationState?.selectedRubricVersion ?? null,
-  )
-  const [manualPolicyId, setManualPolicyId] = useState<string | null>(null)
+  const [name, setName] = useState('')
+  const [code, setCode] = useState('')
+  const [description, setDescription] = useState('')
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number | null>(null)
+  const [languageId, setLanguageId] = useState('')
+  const [openAt, setOpenAt] = useState('')
+  const [closeAt, setCloseAt] = useState('')
+  // Chọn tại chỗ (Rubric -> phiên bản -> chính sách), không điều hướng đi trang khác: rời trang giữa
+  // chừng thì mọi ô đã điền phải tự gói vào history state mới sống sót, và trường nào quên gói là mất
+  // dữ liệu âm thầm.
+  const [policyChoice, setPolicyChoice] = useState<RubricPolicyChoice>({
+    assessmentPolicyId: null,
+    isBlocked: true,
+    rubricVersionId: null,
+  })
   // Mặc định mức giám sát đầy đủ, không phải "không giám sát": mặc định phải là phương án an toàn
   // và việc hạ nó xuống phải là hành động có ý thức.
   const [streamSetup, setStreamSetup] = useState<ExamStreamSetup>('BOTH_REQUIRED')
@@ -348,47 +322,9 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
   const subscriptionBounds = getSubscriptionWindowBounds(subscription)
   const hasSubscriptionPeriod = hasActiveSubscriptionPeriod(subscription)
 
-  const matchingPoliciesQuery = useMatchingSchoolAssessmentPoliciesQuery({
-    languageId,
-    rubricVersionId: selectedRubricVersion?.id,
-  })
-  const matchingPolicies = matchingPoliciesQuery.data ?? []
-  // Chỉ 1 chính sách khớp -> tự dùng luôn; nhiều chính sách khớp -> chờ người dùng chọn tay.
-  const assessmentPolicyId = matchingPolicies.length === 1 ? matchingPolicies[0].id : manualPolicyId
-  const isResolvingPolicy = Boolean(selectedRubricVersion) && matchingPoliciesQuery.isLoading
-  const hasNoMatchingPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length === 0
-  const hasAmbiguousPolicy = Boolean(selectedRubricVersion) && !isResolvingPolicy && matchingPolicies.length > 1 && !manualPolicyId
   // Không có gói đang hoạt động thì BE từ chối thẳng (422) -- chặn ngay ở nút thay vì để người dùng
   // điền hết form rồi mới biết.
-  const canSubmit =
-    Boolean(selectedRubricVersion) && !isResolvingPolicy && !hasAmbiguousPolicy && hasSubscriptionPeriod
-
-  function goToSelectRubricVersion() {
-    navigate('/school-admin/rubric-versions/select', {
-      state: {
-        // Ngưỡng phải đi theo draft: bấm chọn rubric là rời trang, quay lại thì state dựng lại
-        // từ draft này. Thiếu nó thì số vừa nhập biến mất mà không báo gì -- người dùng chỉ phát
-        // hiện khi mở lại kỳ thi và thấy ô trống.
-        draft: {
-          aiConfidenceThresholdPercent: confidenceThreshold,
-          closeAt,
-          code,
-          description,
-          languageId,
-          maxAttempt,
-          name,
-          openAt,
-        },
-        languageId,
-        returnTo: '/school-admin/exams/create',
-      },
-    })
-  }
-
-  function clearSelectedRubricVersion() {
-    setSelectedRubricVersion(null)
-    setManualPolicyId(null)
-  }
+  const canSubmit = !policyChoice.isBlocked && hasSubscriptionPeriod
 
   async function handleSubmit() {
     setErrorMessage(null)
@@ -417,8 +353,12 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
       setErrorMessage(subscriptionWindowError)
       return
     }
-    if (!selectedRubricVersion) {
-      setErrorMessage('Vui lòng chọn phiên bản thang đánh giá.')
+    if (!policyChoice.assessmentPolicyId) {
+      setErrorMessage(
+        policyChoice.rubricVersionId
+          ? 'Vui lòng chọn chính sách đánh giá cho phiên bản thang đánh giá đã chọn.'
+          : 'Vui lòng chọn thang đánh giá, phiên bản và chính sách đánh giá.',
+      )
       return
     }
     if (!(await confirm({ message: 'Bạn có chắc muốn tạo kỳ thi này không?' }))) {
@@ -426,7 +366,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
     }
     try {
       await createMutation.mutateAsync({
-        assessmentPolicyId,
+        assessmentPolicyId: policyChoice.assessmentPolicyId,
         closeAt: closeAtIso,
         code: code.trim(),
         description: description || null,
@@ -558,86 +498,7 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
           value={streamSetup}
         />
 
-        <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-          <span className="text-sm font-bold text-slate-700">Phiên bản thang đánh giá</span>
-          <p className="text-xs text-slate-500">
-            Bắt buộc — chọn để tự động gắn chính sách đánh giá phù hợp cho kỳ thi.
-          </p>
-
-          {!selectedRubricVersion ? (
-            <button
-              className="mt-1.5 inline-flex h-9.5 w-fit items-center justify-center rounded-full border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!languageId}
-              onClick={goToSelectRubricVersion}
-              title={!languageId ? 'Chọn ngôn ngữ trước' : undefined}
-              type="button"
-            >
-              Chọn phiên bản thang đánh giá
-            </button>
-          ) : null}
-
-          {!selectedRubricVersion ? (
-            <p className="mt-1 text-xs font-semibold text-red-600">Bắt buộc phải chọn phiên bản thang đánh giá.</p>
-          ) : (
-            <div className="mt-1.5 grid gap-2 rounded-lg border border-indigo-200 bg-white p-3.5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[13px] text-slate-700">
-                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b> ({selectedRubricVersion.code} · v
-                  {selectedRubricVersion.version})
-                </p>
-                <button
-                  className="shrink-0 text-xs font-bold text-slate-400 hover:text-red-600"
-                  onClick={clearSelectedRubricVersion}
-                  type="button"
-                >
-                  Bỏ chọn
-                </button>
-              </div>
-
-              {isResolvingPolicy ? <p className="text-xs text-slate-400">Đang tìm chính sách đánh giá phù hợp…</p> : null}
-
-              {hasNoMatchingPolicy ? (
-                <p className="text-xs font-semibold text-amber-700">
-                  Chưa có chính sách đánh giá đã xuất bản cho phiên bản này với ngôn ngữ đã chọn. Vẫn có thể tạo kỳ
-                  thi và gắn chính sách sau, hoặc chọn phiên bản khác.
-                </p>
-              ) : null}
-
-              {matchingPolicies.length > 1 ? (
-                <div className="grid gap-1.5">
-                  <p className="text-xs font-semibold text-slate-600">Có {matchingPolicies.length} chính sách khớp — chọn một:</p>
-                  {matchingPolicies.map((policy) => (
-                    <button
-                      className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-semibold ${
-                        manualPolicyId === policy.id
-                          ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                      key={policy.id}
-                      onClick={() => setManualPolicyId(policy.id)}
-                      type="button"
-                    >
-                      <span>
-                        Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt {policy.passingScore ?? '-'}
-                      </span>
-                      <span>
-                        {formatDate(policy.effectiveFrom)}
-                        {policy.effectiveTo ? ` – ${formatDate(policy.effectiveTo)}` : ''}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              {assessmentPolicyId && matchingPolicies.length === 1 ? (
-                <p className="text-xs font-semibold text-emerald-700">
-                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
-                  {matchingPolicies[0].passingScore ?? '-'}
-                </p>
-              ) : null}
-            </div>
-          )}
-        </div>
+        <RubricPolicySelectField languageId={languageId} onChange={setPolicyChoice} requiresLanguage scope="school" />
 
         <div className="flex justify-end">
           <button
@@ -645,11 +506,11 @@ function ExamCreateForm({ locationState }: { locationState: ExamCreateLocationSt
             disabled={createMutation.isPending || !canSubmit}
             onClick={() => void handleSubmit()}
             title={
-              !selectedRubricVersion
-                ? 'Chọn phiên bản thang đánh giá trước khi tạo'
-                : hasAmbiguousPolicy
-                  ? 'Chọn một chính sách đánh giá phù hợp trước khi tạo'
-                  : undefined
+              policyChoice.isBlocked
+                ? policyChoice.rubricVersionId
+                  ? 'Chọn một chính sách đánh giá trước khi tạo'
+                  : 'Chọn thang đánh giá, phiên bản và chính sách đánh giá trước khi tạo'
+                : undefined
             }
             type="button"
           >

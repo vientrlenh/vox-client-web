@@ -10,6 +10,9 @@ import {
   useSystemRubricTemplateVersionsQuery,
   type SystemRubricTemplate,
 } from '../api/useSystemRubricTemplatesQuery';
+import { useSystemPolicyTemplatesForVersionQuery } from '../api/useSystemPolicyTemplatesForVersionQuery';
+import { ClonePolicyTemplateRow } from './ClonePolicyTemplateRow';
+import { EMPTY_POLICY_SELECTION, type ClonePolicySelection } from './clonePolicySelection';
 import {
   RUBRIC_ALLOCATION_METHOD,
   RUBRIC_AVERAGE_METHOD,
@@ -26,9 +29,15 @@ type CloneSystemRubricDialogProps = {
   onClose: () => void;
   onSubmit: (payload: CloneSystemRubricPayload) => Promise<void>;
   isPending: boolean;
+  schoolId: string | undefined;
 };
 
 const SCORE_METHOD_OPTIONS = [RUBRIC_ALLOCATION_METHOD, RUBRIC_AVERAGE_METHOD];
+
+// Giống CreateAssessmentPolicyDialog: gửi kèm offset +07:00 để BE parse thẳng qua OffsetDateTime.
+function toBackendDate(value: string, endOfDay = false) {
+  return `${value}T${endOfDay ? '23:59:59' : '00:00:00'}+07:00`;
+}
 
 export function CloneSystemRubricDialog({
   isOpen,
@@ -36,6 +45,7 @@ export function CloneSystemRubricDialog({
   onClose,
   onSubmit,
   isPending,
+  schoolId,
 }: CloneSystemRubricDialogProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -48,6 +58,9 @@ export function CloneSystemRubricDialog({
   const [descriptionOverride, setDescriptionOverride] = useState<string | null>(null);
   const [methodOverride, setMethodOverride] = useState<string | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState('');
+  // Có mặt trong map = bản mẫu đó được chọn. Khóa theo id chính sách mẫu vì mỗi bản mẫu mang một
+  // phạm vi riêng.
+  const [policySelections, setPolicySelections] = useState<Record<string, ClonePolicySelection>>({});
 
   const {
     data: versions,
@@ -55,6 +68,12 @@ export function CloneSystemRubricDialog({
     isError: isVersionsError,
     refetch: refetchVersions,
   } = useSystemRubricTemplateVersionsQuery(template?.id, isOpen);
+
+  // Phải tính trước early-return bên dưới để thứ tự hook không đổi giữa các lần render. Cùng công
+  // thức với `selectedVersion` phía sau: chưa chọn thì lấy phiên bản đầu danh sách.
+  const effectiveVersionId = selectedVersionId || (versions ?? [])[0]?.id;
+  const { data: policyTemplates, isLoading: isPolicyTemplatesLoading } =
+    useSystemPolicyTemplatesForVersionQuery(effectiveVersionId, isOpen);
 
   // Reset form mỗi lần mở lại
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -68,6 +87,7 @@ export function CloneSystemRubricDialog({
       setMethodOverride(null);
       setSelectedVersionId('');
       setIsPreviewOpen(false);
+      setPolicySelections({});
     }
   }
 
@@ -86,6 +106,8 @@ export function CloneSystemRubricDialog({
   const isFlatteningWeights =
     isAllocationMethod(sourceMethod) && totalScoreMethod === RUBRIC_AVERAGE_METHOD;
 
+  const availablePolicyTemplates = policyTemplates ?? [];
+
   const criteria = [...(selectedVersion?.criteria.content ?? [])].sort((a, b) => a.order - b.order);
   const resultBands = [...(selectedVersion?.resultBands.content ?? [])].sort(
     (a, b) => a.order - b.order
@@ -96,6 +118,24 @@ export function CloneSystemRubricDialog({
     // Cách tính là thuộc tính của phiên bản, nên đổi phiên bản thì lựa chọn quay về mặc định của
     // phiên bản mới thay vì giữ lại lựa chọn hợp lý cho phiên bản cũ.
     setMethodOverride(null);
+    // Chính sách mẫu gắn với đúng một phiên bản, nên lựa chọn cũ không còn nghĩa gì ở phiên bản mới.
+    setPolicySelections({});
+  };
+
+  const handleTogglePolicy = (policyId: string, selected: boolean) => {
+    setPolicySelections((current) => {
+      const next = { ...current };
+      if (selected) {
+        next[policyId] = EMPTY_POLICY_SELECTION;
+      } else {
+        delete next[policyId];
+      }
+      return next;
+    });
+  };
+
+  const handleChangePolicy = (policyId: string, selection: ClonePolicySelection) => {
+    setPolicySelections((current) => ({ ...current, [policyId]: selection }));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -111,6 +151,33 @@ export function CloneSystemRubricDialog({
       return;
     }
 
+    // Kiểm ngay tại form thay vì để backend trả lỗi: người dùng sửa được ngay ở đây, và một lỗi ở
+    // chính sách thứ hai sẽ cuộn lại cả bản sao rubric (hai use case chung một giao dịch).
+    const chosen = availablePolicyTemplates.filter((policy) => policySelections[policy.id]);
+    for (const policy of chosen) {
+      const selection = policySelections[policy.id];
+      const label = policy.targetFrameworkBand?.label ?? policy.targetFrameworkBand?.code ?? 'đã chọn';
+      if (!selection.effectiveFrom) {
+        setErrorMessage(`Chính sách "${label}": vui lòng chọn ngày bắt đầu hiệu lực.`);
+        return;
+      }
+      if (selection.effectiveTo && selection.effectiveTo < selection.effectiveFrom) {
+        setErrorMessage(`Chính sách "${label}": ngày kết thúc không được trước ngày bắt đầu.`);
+        return;
+      }
+      if (policy.gradeLevel) continue;
+      const scopeCount =
+        (selection.gradeLevelId ? 1 : 0) +
+        (selection.schoolGradeId ? 1 : 0) +
+        (selection.schoolClassId ? 1 : 0);
+      if (scopeCount !== 1) {
+        setErrorMessage(
+          `Chính sách "${label}": phải chọn đúng 1 phạm vi áp dụng — Khối, Niên khóa HOẶC Lớp.`
+        );
+        return;
+      }
+    }
+
     try {
       await onSubmit({
         sourceRubricVersionId: selectedVersion.id,
@@ -118,6 +185,20 @@ export function CloneSystemRubricDialog({
         name: name.trim(),
         description: description.trim() || undefined,
         totalScoreMethod,
+        policies: chosen.map((policy) => {
+          const selection = policySelections[policy.id];
+          // Bản mẫu đã khai Khối thì KHÔNG gửi phạm vi nào -- backend coi mọi giá trị ở đây là ý
+          // định ghi đè và từ chối cả yêu cầu.
+          const inheritsScope = Boolean(policy.gradeLevel);
+          return {
+            sourcePolicyId: policy.id,
+            gradeLevelId: inheritsScope ? undefined : selection.gradeLevelId || undefined,
+            schoolGradeId: inheritsScope ? undefined : selection.schoolGradeId || undefined,
+            schoolClassId: inheritsScope ? undefined : selection.schoolClassId || undefined,
+            effectiveFrom: toBackendDate(selection.effectiveFrom),
+            effectiveTo: selection.effectiveTo ? toBackendDate(selection.effectiveTo, true) : undefined,
+          };
+        }),
       });
     } catch (error) {
       // Lỗi máy chủ phải hiện ngay trong modal: banner của trang nằm sau lớp phủ nên không đọc được.
@@ -404,12 +485,48 @@ export function CloneSystemRubricDialog({
                 }
               />
             </div>
+
+            {/* 4. CHÍNH SÁCH CHẤM ĐI KÈM */}
+            <div className="mt-6">
+              <p className="mb-1 text-sm font-bold text-slate-700">Chính sách chấm cho bản sao</p>
+              <p className="mb-3 text-xs leading-5 text-slate-500">
+                Bản sao ra ở trạng thái Nháp và chỉ ban hành được khi đã có chính sách chấm liên kết,
+                nên chọn luôn ở đây là bước tự nhiên. Mỗi chính sách cần một phạm vi RIÊNG — hai chính
+                sách trùng phạm vi sẽ bị từ chối.
+              </p>
+
+              {isPolicyTemplatesLoading ? (
+                <p className="flex items-center gap-2 py-2 text-sm text-slate-500">
+                  <RefreshCw className="size-4 animate-spin text-indigo-600" /> Đang tải chính sách mẫu...
+                </p>
+              ) : availablePolicyTemplates.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-500">
+                  Phiên bản mẫu này chưa có chính sách chấm mẫu nào được ban hành. Vẫn sao bộ tiêu chí
+                  về được, nhưng phải tự tạo chính sách cho nó trước khi ban hành.
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {availablePolicyTemplates.map((policy) => (
+                    <ClonePolicyTemplateRow
+                      key={policy.id}
+                      isPending={isPending}
+                      onChange={(next) => handleChangePolicy(policy.id, next)}
+                      onToggle={(selected) => handleTogglePolicy(policy.id, selected)}
+                      schoolId={schoolId}
+                      selection={policySelections[policy.id] ?? null}
+                      template={policy}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-4">
             <p className="text-xs leading-5 text-slate-500">
-              Bản sao được tạo ở trạng thái <span className="font-bold text-slate-700">Nháp</span>, để
-              trường gắn chính sách đánh giá trước khi ban hành.
+              Bộ tiêu chí và chính sách đều được tạo ở trạng thái{' '}
+              <span className="font-bold text-slate-700">Nháp</span>, để trường rà lại trước khi ban
+              hành.
             </p>
             <div className="flex shrink-0 items-center gap-3">
               <button

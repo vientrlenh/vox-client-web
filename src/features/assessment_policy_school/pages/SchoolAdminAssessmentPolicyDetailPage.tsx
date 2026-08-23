@@ -20,12 +20,14 @@ import {
 } from 'lucide-react';
 
 import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog';
 import { useSchoolAssessmentPolicyQuery } from '../api/useSchoolAssessmentPolicyQuery';
 import { useUpdateSchoolAssessmentPolicyMutation } from '../api/useUpdateSchoolAssessmentPolicyMutation';
 import { useDeleteSchoolAssessmentPolicyMutation } from '../api/useDeleteSchoolAssessmentPolicyMutation';
 import { usePublishSchoolAssessmentPolicyMutation } from '../api/usePublishSchoolAssessmentPolicyMutation';
 import { usePublishSchoolRubricVersionMutation } from '../api/usePublishSchoolRubricVersionMutation';
 import { useArchiveSchoolAssessmentPolicyMutation } from '../api/useArchiveSchoolAssessmentPolicyMutation';
+import { useRubricVersionPolicyUsageQuery } from '../api/useRubricVersionPolicyUsageQuery';
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
 import { useAppSelector } from '@/app/store/hooks';
 import { formatAssessmentPolicyDate } from '../types';
@@ -75,20 +77,39 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   const { mutateAsync: publishRubricVersion, isPending: isPublishingRubricVersion } = usePublishSchoolRubricVersionMutation(schoolId);
   const { mutateAsync: archivePolicy, isPending: isArchiving } = useArchiveSchoolAssessmentPolicyMutation(schoolId);
   const { showError, feedbackToast } = useFeedbackToast();
+  const { confirm, dialog: confirmationDialog } = useConfirmationDialog();
 
   // Publish 1 Assessment Policy thì luôn kéo theo publish luôn Rubric Version gắn với nó -- một
   // policy PUBLISHED mà Rubric Version của nó còn DRAFT thì policy vẫn chưa dùng chấm bài được,
   // nên tách hai bước sẽ chỉ để lại một trạng thái nửa vời.
   const rubricVersionNeedsPublish = policy?.rubricVersion?.status === 'DRAFT';
 
+  // Lưu trữ một chính sách kéo theo lưu trữ Rubric Version -- nhưng chỉ khi đó là chính sách cuối
+  // cùng còn hiệu lực dùng phiên bản đó, và phiên bản đang PUBLISHED. Phải soi đúng hai điều kiện
+  // backend dùng (ArchiveSchoolAssessmentPolicyUseCase), nếu không lời cảnh báo sẽ nói sai việc sắp
+  // xảy ra.
+  const { data: policiesOnRubricVersion, isLoading: isLoadingPolicyUsage } =
+    useRubricVersionPolicyUsageQuery(schoolId, policy?.rubricVersionId);
+  const hasOtherActivePolicyOnRubricVersion = (policiesOnRubricVersion ?? []).some(
+    (candidate) =>
+      candidate.id !== policyId && (candidate.status === 'DRAFT' || candidate.status === 'PUBLISHED'),
+  );
+  // Chưa tải xong thì coi như KHÔNG có chính sách nào khác: cảnh báo thừa còn hơn để người dùng lưu
+  // trữ mất một Rubric Version mà không được báo trước.
+  const archiveAlsoArchivesRubricVersion =
+    policy?.rubricVersion?.status === 'PUBLISHED' &&
+    (isLoadingPolicyUsage || !hasOtherActivePolicyOnRubricVersion);
+
   const handlePublishPolicy = async () => {
     if (!policyId) return;
 
-    const isConfirm = window.confirm(
-      rubricVersionNeedsPublish
+    const isConfirm = await confirm({
+      confirmLabel: 'Xuất bản',
+      message: rubricVersionNeedsPublish
         ? 'Xuất bản Chính Sách Đánh Giá này? Rubric Version đang gắn với nó (còn DRAFT) sẽ được xuất bản theo, và cả hai sẽ có hiệu lực áp dụng.'
         : 'Xuất bản Chính Sách Đánh Giá này? Sau khi xuất bản, Chính Sách Đánh Giá sẽ có hiệu lực áp dụng.',
-    );
+      title: 'Xuất bản Chính Sách Đánh Giá',
+    });
     if (!isConfirm) return;
 
     try {
@@ -121,7 +142,19 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   const handleArchivePolicy = async () => {
     if (!policyId) return;
 
-    const isConfirm = window.confirm('Bạn có chắc chắn muốn Lưu trữ (ARCHIVE) Chính Sách Đánh Giá này? Sau khi lưu trữ sẽ không thể chỉnh sửa hoặc sử dụng nữa.');
+    // Message đi vào một thẻ <p> thường (ConfirmationDialog), nên viết liền mạch chứ không xuống
+    // dòng bằng \n -- newline sẽ bị gộp thành khoảng trắng.
+    const rubricVersionLabel = policy?.rubricVersion?.name ?? policy?.rubricVersion?.code ?? '';
+    const isConfirm = await confirm({
+      cancelLabel: 'Để sau',
+      confirmLabel: archiveAlsoArchivesRubricVersion ? 'Vẫn lưu trữ cả hai' : 'Lưu trữ',
+      message: archiveAlsoArchivesRubricVersion
+        ? `Đây là chính sách duy nhất còn hiệu lực đang dùng Rubric Version "${rubricVersionLabel}", nên phiên bản đó sẽ được LƯU TRỮ THEO. Sau đó không kỳ thi mới nào chọn được phiên bản này, và cũng không gắn thêm chính sách nào vào nó được nữa. Muốn giữ lại Rubric Version thì tạo một chính sách khác trỏ vào nó trước, rồi hãy quay lại lưu trữ chính sách này.`
+        : 'Lưu trữ (ARCHIVE) Chính Sách Đánh Giá này? Sau khi lưu trữ sẽ không thể chỉnh sửa hoặc sử dụng nữa.',
+      title: archiveAlsoArchivesRubricVersion
+        ? 'Lưu trữ kèm cả Rubric Version'
+        : 'Lưu trữ Chính Sách Đánh Giá',
+    });
     if (!isConfirm) return;
 
     try {
@@ -145,9 +178,11 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   };
 
   const handleDeletePolicy = async () => {
-    const isConfirm = window.confirm(
-      'Bạn có chắc chắn muốn xóa vĩnh viễn Chính Sách Đánh Giá DRAFT này? Hành động này không thể hoàn tác!'
-    );
+    const isConfirm = await confirm({
+      confirmLabel: 'Xóa vĩnh viễn',
+      message: 'Bạn có chắc chắn muốn xóa vĩnh viễn Chính Sách Đánh Giá DRAFT này? Hành động này không thể hoàn tác!',
+      title: 'Xóa Chính Sách Đánh Giá',
+    });
     if (!isConfirm || !policyId) return;
 
     try {
@@ -191,6 +226,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   return (
     <section className="relative grid gap-6 overflow-hidden">
       {feedbackToast}
+      {confirmationDialog}
       <div
         className="pointer-events-none absolute -right-40 -top-44 size-[480px] rounded-full blur-[10px]"
         style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.16), rgba(6,182,212,0.10) 55%, transparent 75%)' }}
