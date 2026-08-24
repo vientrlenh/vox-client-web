@@ -2,8 +2,9 @@
 
 import { useParams, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, ClipboardCheck, Edit, Eye, Plus, ListChecks, Layers, Calculator, Trash2, Archive, Search, Filter, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, GitMerge, RefreshCw, AlertTriangle, ClipboardCheck, Edit, Eye, Plus, ListChecks, Layers, Calculator, Trash2, Search, Filter, FileSpreadsheet } from 'lucide-react';
 import {
+  ArchiveRubricVersionDialog,
   CreateAssessmentPolicyDialog,
   PublishRubricVersionDialog,
   useCreateSystemAssessmentPolicyMutation,
@@ -24,7 +25,6 @@ import {
 
 import { useUpdateSystemRubricVersionMutation, type UpdateRubricVersionPayload } from '../api/useUpdateSystemRubricVersionMutation';
 import { useDeleteSystemRubricVersionMutation } from '../api/useDeleteSystemRubricVersionMutation';
-import { useArchiveSystemRubricVersionMutation } from '../api/useArchiveSystemRubricVersionMutation';
 import { useAddSystemRubricCriteriaMutation, type AddRubricCriteriaPayload } from '../api/useAddSystemRubricCriteriaMutation';
 import { useUpdateSystemRubricCriterionMutation, type UpdateRubricCriterionPayload } from '../api/useUpdateSystemRubricCriterionMutation';
 import { useDeleteSystemRubricCriterionMutation } from '../api/useDeleteSystemRubricCriterionMutation';
@@ -67,6 +67,7 @@ export function SystemAdminRubricVersionDetailPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreatePolicyModalOpen, setIsCreatePolicyModalOpen] = useState(false);
   const [isPublishVersionDialogOpen, setIsPublishVersionDialogOpen] = useState(false);
+  const [isArchiveVersionDialogOpen, setIsArchiveVersionDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'criteria' | 'bands'>('criteria');
 
   // State Phân trang + tìm kiếm cho từng Tab
@@ -165,7 +166,6 @@ export function SystemAdminRubricVersionDetailPage() {
   // --- 2. KHỞI TẠO CÁC API MUTATION (THÊM, SỬA, XÓA) ---
   const { mutateAsync: updateVersion, isPending: isUpdating } = useUpdateSystemRubricVersionMutation(versionId);
   const { mutateAsync: deleteVersion, isPending: isDeleting } = useDeleteSystemRubricVersionMutation();
-  const { mutateAsync: archiveVersion, isPending: isArchiving } = useArchiveSystemRubricVersionMutation(versionId);
   const { mutateAsync: createPolicy, isPending: isCreatingPolicy } = useCreateSystemAssessmentPolicyMutation();
 
   // Version này đã có Chính Sách Đánh Giá nào chưa -- quyết định nút bên dưới là "Tạo" hay "Xem".
@@ -225,7 +225,7 @@ export function SystemAdminRubricVersionDetailPage() {
       return;
     }
 
-    navigate('/system-admin/assessment-policies');
+    navigate('/system-admin/assessment-policies', { state: { rubricId, rubricVersionId: versionId } });
   };
 
   // Chuyển DRAFT -> PUBLISHED không còn tự làm ở đây: mở PublishRubricVersionDialog để người
@@ -256,15 +256,10 @@ export function SystemAdminRubricVersionDetailPage() {
     }
   };
 
-  // Hàm xử lý Lưu trữ (ARCHIVE) Version (chỉ áp dụng khi PUBLISHED)
-  const handleArchiveVersion = async () => {
-    setErrorMessage(null);
-    try {
-      await archiveVersion();
-    } catch (error) {
-      const err = error as Error;
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi lưu trữ phiên bản.');
-    }
+  // Lưu trữ (ARCHIVE) Version giờ đi qua ArchiveRubricVersionDialog (chỉ áp dụng khi PUBLISHED) --
+  // dialog đó tự lo mutation + liệt kê Chính Sách Đánh Giá liên quan, mirror PublishRubricVersionDialog.
+  const handleArchiveVersion = () => {
+    setIsArchiveVersionDialogOpen(true);
   };
 
   // Hàm xử lý Thêm Tiêu chí
@@ -398,7 +393,6 @@ export function SystemAdminRubricVersionDetailPage() {
                 Mã Phiên bản: {version.code}
               </span>
               <RubricVersionStatusMenu
-                isPending={isArchiving}
                 onPublish={handlePublishVersion}
                 onArchive={handleArchiveVersion}
                 status={version.status}
@@ -457,18 +451,6 @@ export function SystemAdminRubricVersionDetailPage() {
             </button>
           )}
 
-          {version.status === 'PUBLISHED' && (
-            <button
-              type="button"
-              onClick={handleArchiveVersion}
-              disabled={isArchiving}
-              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-            >
-              {isArchiving ? <RefreshCw className="size-4 animate-spin" /> : <Archive className="size-4" />}
-              Lưu trữ Version
-            </button>
-          )}
-
           {linkedPolicies.length > 0 && (
             <button
               type="button"
@@ -479,13 +461,15 @@ export function SystemAdminRubricVersionDetailPage() {
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handleOpenCreatePolicyModal}
-            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
-          >
-            <ClipboardCheck className="size-4" /> Tạo Chính Sách Đánh Giá
-          </button>
+          {version.status !== 'ARCHIVED' && (
+            <button
+              type="button"
+              onClick={handleOpenCreatePolicyModal}
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+            >
+              <ClipboardCheck className="size-4" /> Tạo Chính Sách Đánh Giá
+            </button>
+          )}
 
           <button
             type="button"
@@ -718,6 +702,18 @@ export function SystemAdminRubricVersionDetailPage() {
         isOpen={isPublishVersionDialogOpen}
         onClose={() => setIsPublishVersionDialogOpen(false)}
         onPublished={() => void refetchVersion()}
+        rubricVersionId={versionId}
+        rubricVersionLabel={`${version.code} (v${version.version})`}
+      />
+
+      <ArchiveRubricVersionDialog
+        isOpen={isArchiveVersionDialogOpen}
+        onClose={() => setIsArchiveVersionDialogOpen(false)}
+        onArchived={() => void refetchVersion()}
+        onViewLinkedPolicies={() => {
+          setIsArchiveVersionDialogOpen(false);
+          handleViewLinkedPolicies();
+        }}
         rubricVersionId={versionId}
         rubricVersionLabel={`${version.code} (v${version.version})`}
       />

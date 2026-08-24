@@ -7,6 +7,7 @@ import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useAllFrameworkVersionsQuery, useFrameworkVersionCriteriaQuery } from '../api/useFrameworkVersionOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
 import { useGradeLevelOptionsQuery, useSchoolGradeOptionsQuery } from '../api/useSchoolScopeOptionsQuery';
+import { useGradeLevelBandCeilingQuery } from '../api/useGradeLevelBandCeilingQuery';
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery';
 import type { ClassFilters } from '@/features/classes/types';
 import type { AssessmentPolicyStrictness, CreateAssessmentPolicyPayload, RubricOption } from '../types';
@@ -21,6 +22,13 @@ type CreateAssessmentPolicyDialogProps = {
   onSubmit: (data: CreateAssessmentPolicyPayload[]) => Promise<void>;
   isPending: boolean;
 };
+
+// Dự án chỉ phục vụ THPT (Khối 10-12) theo chuẩn VSTEP -- toàn bộ mặt bằng thực tế chỉ nằm trong
+// Bậc 3 (mặc định mọi khối) đến Bậc 4 (trần cho lớp chuyên). Bậc 1/2 (A1/A2) thấp hơn hẳn sàn, còn
+// Bậc 5/6 (C1/C2) là chuẩn giáo viên chứ không phải học sinh -- ẩn hẳn cả hai đầu khỏi lựa chọn,
+// không chỉ disable như trường hợp vượt TRẦN theo khối/lớp.
+const MIN_VISIBLE_BAND_ORDER = 3;
+const MAX_VISIBLE_BAND_ORDER = 4;
 
 const STRICTNESS_OPTIONS: { value: AssessmentPolicyStrictness; label: string }[] = [
   { value: 'LENIENT', label: 'Lỏng (LENIENT)' },
@@ -40,6 +48,9 @@ type PolicyFormState = {
   frameworkId: string;
   frameworkVersionId: string;
   targetFrameworkBandId: string;
+  // true khi người dùng tự tay chọn band -- ngăn không cho auto-fill theo trần khối ghi đè lựa
+  // chọn có chủ đích của họ (vd. cố tình chọn bậc cao hơn mặc định cho lớp chuyên, trong giới hạn trần).
+  bandTouched: boolean;
   rubricVersionId: string;
   rubricVersionScales: Record<string, ScoreRange>;
   passingScore: string;
@@ -58,6 +69,7 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
     frameworkId: '',
     frameworkVersionId: '',
     targetFrameworkBandId: '',
+    bandTouched: false,
     rubricVersionId: '',
     rubricVersionScales: {},
     passingScore: '',
@@ -85,6 +97,8 @@ type RubricVersionGroupProps = {
 
 function RubricVersionGroup({ schoolId, rubric, groupName, selectedId, onSelect, onVersionsLoaded, disabled }: RubricVersionGroupProps) {
   const { data: versions, isLoading } = useRubricVersionOptionsQuery(schoolId, rubric.id);
+  // BE chặn gán Policy vào Rubric Version đã ARCHIVED -- không hiện lựa chọn chắc chắn bị từ chối.
+  const selectableVersions = versions?.filter((rv) => rv.status !== 'ARCHIVED');
 
   useEffect(() => {
     if (!versions?.length) return;
@@ -99,9 +113,9 @@ function RubricVersionGroup({ schoolId, rubric, groupName, selectedId, onSelect,
       <p className="text-sm font-bold text-slate-800">{rubric.code} - {rubric.name}</p>
       {isLoading ? (
         <p className="mt-1 text-xs font-medium text-slate-400">Đang tải phiên bản...</p>
-      ) : versions?.length ? (
+      ) : selectableVersions?.length ? (
         <div className="mt-2 grid gap-1">
-          {versions.map((rv) => (
+          {selectableVersions.map((rv) => (
             <label key={rv.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50">
               <input
                 type="radio"
@@ -116,7 +130,7 @@ function RubricVersionGroup({ schoolId, rubric, groupName, selectedId, onSelect,
           ))}
         </div>
       ) : (
-        <p className="mt-1 text-xs font-medium text-slate-400">Rubric này chưa có phiên bản nào.</p>
+        <p className="mt-1 text-xs font-medium text-slate-400">Rubric này chưa có phiên bản nào (DRAFT/PUBLISHED).</p>
       )}
     </div>
   );
@@ -146,6 +160,22 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
   const { data: classesPage } = useSchoolClassesQuery(1, 100, classFilter, { enabled: Boolean(form.schoolGradeId) });
   const classes = classesPage?.content ?? [];
 
+  // Trần bậc mục tiêu theo phạm vi + framework đã chọn -- null nghĩa là chưa cấu hình trần (mở).
+  const { data: bandCeiling } = useGradeLevelBandCeilingQuery(
+    schoolId,
+    { gradeLevelId: form.gradeLevelId, schoolGradeId: form.schoolGradeId, schoolClassId: form.schoolClassId },
+    form.frameworkVersionId || undefined,
+  );
+
+  // Gợi ý sẵn bậc mặc định của khối ngay khi trần vừa xác định xong, trừ khi người dùng đã tự tay
+  // chọn band -- so sánh lúc render (không qua useEffect) để không có khung hình nào hiện giá trị
+  // cũ, theo đúng idiom "đặt lại state theo giá trị suy ra từ bên ngoài" đã dùng ở nơi khác trong repo.
+  const [lastAppliedDefaultBandId, setLastAppliedDefaultBandId] = useState<string | null>(null);
+  if (!form.bandTouched && bandCeiling && bandCeiling.defaultBandId !== lastAppliedDefaultBandId) {
+    setLastAppliedDefaultBandId(bandCeiling.defaultBandId);
+    onChange({ targetFrameworkBandId: bandCeiling.defaultBandId });
+  }
+
   function handleLanguageChange(languageId: string) {
     onChange({ languageId, rubricVersionId: '' });
   }
@@ -158,7 +188,14 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
       frameworkVersionId,
       frameworkId: matched?.frameworkId ?? '',
       targetFrameworkBandId: '',
+      // Danh sách band của framework mới hoàn toàn khác -- "đã tự chọn" ở framework cũ không còn
+      // ý nghĩa, cho phép auto-fill theo trần khối gợi ý lại từ đầu.
+      bandTouched: false,
     });
+  }
+
+  function handleTargetBandChange(targetFrameworkBandId: string) {
+    onChange({ targetFrameworkBandId, bandTouched: true });
   }
 
   function handleVersionsLoaded(scales: Record<string, ScoreRange>) {
@@ -273,15 +310,62 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
         </div>
 
         <div>
+          <label className="mb-1 block text-sm font-bold text-slate-700">Phạm vi áp dụng</label>
+          <div className="grid grid-cols-3 gap-3">
+            <select
+              value={form.gradeLevelId} onChange={(e) => handleGradeLevelChange(e.target.value)} disabled={isPending}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+            >
+              <option value="">-- Khối --</option>
+              {gradeLevels?.map((gl) => <option key={gl.id} value={gl.id}>{gl.code} - {gl.name}</option>)}
+            </select>
+            <select
+              value={form.schoolGradeId} onChange={(e) => handleGradeChange(e.target.value)}
+              disabled={isPending || !form.gradeLevelId}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+            >
+              <option value="">{form.gradeLevelId ? '-- Niên khóa --' : '-- Chọn Khối trước --'}</option>
+              {grades?.map((grade) => <option key={grade.id} value={grade.id}>{grade.code || grade.name}</option>)}
+            </select>
+            <select
+              value={form.schoolClassId} onChange={(e) => onChange({ schoolClassId: e.target.value })}
+              disabled={isPending || !form.schoolGradeId}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+            >
+              <option value="">{form.schoolGradeId ? '-- Lớp --' : '-- Chọn Niên khóa trước --'}</option>
+              {classes.map((schoolClass) => (
+                <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.code} - {schoolClass.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
           <label className="mb-1 block text-sm font-bold text-slate-700">Target Band <span className="text-red-500">*</span></label>
           <select
-            value={form.targetFrameworkBandId} onChange={(e) => onChange({ targetFrameworkBandId: e.target.value })}
+            value={form.targetFrameworkBandId} onChange={(e) => handleTargetBandChange(e.target.value)}
             disabled={isPending || !form.frameworkVersionId}
             className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
           >
             <option value="">-- Chọn target band --</option>
-            {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
+            {resultBands
+              ?.filter((band) => band.order >= MIN_VISIBLE_BAND_ORDER && band.order <= MAX_VISIBLE_BAND_ORDER)
+              .map((band) => (
+              <option
+                key={band.id}
+                value={band.id}
+                disabled={Boolean(bandCeiling) && band.order > bandCeiling!.hardMaxBandOrder}
+              >
+                {band.code} - {band.label}
+                {bandCeiling && band.order > bandCeiling.hardMaxBandOrder ? ' (vượt trần)' : ''}
+              </option>
+            ))}
           </select>
+          {bandCeiling ? (
+            <p className="mt-1 text-xs text-slate-400">
+              Theo phạm vi đã chọn: mặc định {bandCeiling.defaultBandLabel}, tối đa {bandCeiling.hardMaxBandLabel}.
+            </p>
+          ) : null}
         </div>
 
         <div>
@@ -312,37 +396,6 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
               Không có Rubric nào cho ngôn ngữ này.
             </p>
           )}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-bold text-slate-700">Phạm vi áp dụng</label>
-          <div className="grid grid-cols-3 gap-3">
-            <select
-              value={form.gradeLevelId} onChange={(e) => handleGradeLevelChange(e.target.value)} disabled={isPending}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">-- Khối --</option>
-              {gradeLevels?.map((gl) => <option key={gl.id} value={gl.id}>{gl.code} - {gl.name}</option>)}
-            </select>
-            <select
-              value={form.schoolGradeId} onChange={(e) => handleGradeChange(e.target.value)}
-              disabled={isPending || !form.gradeLevelId}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">{form.gradeLevelId ? '-- Niên khóa --' : '-- Chọn Khối trước --'}</option>
-              {grades?.map((grade) => <option key={grade.id} value={grade.id}>{grade.code || grade.name}</option>)}
-            </select>
-            <select
-              value={form.schoolClassId} onChange={(e) => onChange({ schoolClassId: e.target.value })}
-              disabled={isPending || !form.schoolGradeId}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">{form.schoolGradeId ? '-- Lớp --' : '-- Chọn Niên khóa trước --'}</option>
-              {classes.map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.code} - {schoolClass.name}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

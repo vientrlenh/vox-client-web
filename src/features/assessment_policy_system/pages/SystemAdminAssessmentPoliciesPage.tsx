@@ -2,7 +2,7 @@
 // UI restyle theo vox design system — logic/hooks giữ nguyên.
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import {
   BookOpen,
   ChevronDown,
@@ -76,14 +76,25 @@ function FilterSelect({ id, icon: Icon, label, value, disabled, placeholder, opt
 
 export function SystemAdminAssessmentPoliciesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Policy vừa tạo từ trang chi tiết Rubric Version (điều hướng qua đây kèm state) — tô nổi bật
+  // đúng dòng đó, hoặc từ trang chi tiết Version (bấm "Xem Chính Sách Đánh Giá") — tự lọc sẵn theo
+  // đúng Rubric + Phiên bản đó để người dùng không phải tự mò trong danh sách.
+  const navigationState = location.state as { highlightPolicyId?: string; rubricId?: string; rubricVersionId?: string } | null;
+  const highlightPolicyId = navigationState?.highlightPolicyId ?? null;
+
   const [page, setPage] = useState(DEFAULT_PAGE);
   const [pageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedLanguageId, setSelectedLanguageId] = useState('');
-  const [selectedRubricId, setSelectedRubricId] = useState('');
-  const [selectedRubricVersionId, setSelectedRubricVersionId] = useState('');
+  const [selectedRubricId, setSelectedRubricId] = useState(navigationState?.rubricId ?? '');
+  const [selectedRubricVersionId, setSelectedRubricVersionId] = useState(navigationState?.rubricVersionId ?? '');
 
+  // Không dọn location.state sau khi đọc: nếu "replace" state về null ngay, bấm back từ trang chi
+  // tiết policy sẽ quay lại đúng history entry này nhưng state đã bị null hóa, làm mất filter/tô
+  // nổi bật đang xem. Vào lại trang này từ menu chính vốn đã là 1 navigation mới không mang state
+  // cũ, nên không cần dọn thủ công.
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<AssessmentPolicy | null>(null);
 
@@ -347,6 +358,7 @@ export function SystemAdminAssessmentPoliciesPage() {
           onViewDetails={(policy) => navigate(`/system-admin/assessment-policies/${policy.id}`)}
           onEdit={(policy) => setEditingPolicy(policy)}
           onDelete={handleDeletePolicy}
+          highlightId={highlightPolicyId}
         />
         {!isLoading && !isError && policies.length > 0 && (
           <Pagination currentPage={page} totalPages={totalPages} totalElements={totalElements} itemName="assessment policy" onPageChange={setPage} />

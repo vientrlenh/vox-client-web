@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
+import { useGradeLevelBandCeilingQuery } from '../api/useGradeLevelBandCeilingQuery';
 import type { AssessmentPolicy, AssessmentPolicyStrictness, UpdateAssessmentPolicyPayload } from '../types';
 
 // Chỉ cần các field sẽ sửa được, để dialog dùng chung được cho cả AssessmentPolicy (list)
@@ -10,17 +11,27 @@ import type { AssessmentPolicy, AssessmentPolicyStrictness, UpdateAssessmentPoli
 // "frameworkVersion" (kèm resultBands) được lấy trực tiếp từ 2 query trên thay vì gọi thêm
 // query "schoolFrameworkVersion(id)" vì BE đã bỏ query đó (School Admin không còn quyền
 // gọi query đơn lẻ theo id — chỉ SYSTEM_ADMIN dùng được "frameworkVersion(id)").
+// gradeLevel/schoolGrade/schoolClass: dùng để tra trần bậc mục tiêu theo phạm vi hiện có của
+// policy (phạm vi không sửa được sau khi tạo, giống frameworkVersion/rubricVersion).
 export type EditableAssessmentPolicy = Pick<
   AssessmentPolicy,
-  'id' | 'frameworkVersionId' | 'targetFrameworkBandId' | 'passingScore' | 'strictness' | 'effectiveFrom' | 'effectiveTo' | 'frameworkVersion' | 'rubricVersion'
+  'id' | 'frameworkVersionId' | 'targetFrameworkBandId' | 'passingScore' | 'strictness' | 'effectiveFrom' | 'effectiveTo' | 'frameworkVersion' | 'rubricVersion' | 'gradeLevel' | 'schoolGrade' | 'schoolClass'
 >;
 
 type UpdateAssessmentPolicyDialogProps = {
+  schoolId: string | undefined;
   policy: EditableAssessmentPolicy | null;
   onClose: () => void;
   onSubmit: (data: UpdateAssessmentPolicyPayload) => Promise<void>;
   isPending: boolean;
 };
+
+// Dự án chỉ phục vụ THPT (Khối 10-12) theo chuẩn VSTEP -- toàn bộ mặt bằng thực tế chỉ nằm trong
+// Bậc 3 (mặc định mọi khối) đến Bậc 4 (trần cho lớp chuyên). Bậc 1/2 (A1/A2) thấp hơn hẳn sàn, còn
+// Bậc 5/6 (C1/C2) là chuẩn giáo viên chứ không phải học sinh -- ẩn hẳn cả hai đầu khỏi lựa chọn,
+// không chỉ disable như trường hợp vượt TRẦN theo khối/lớp.
+const MIN_VISIBLE_BAND_ORDER = 3;
+const MAX_VISIBLE_BAND_ORDER = 4;
 
 const STRICTNESS_OPTIONS: { value: AssessmentPolicyStrictness; label: string }[] = [
   { value: 'LENIENT', label: 'Lỏng (LENIENT)' },
@@ -44,9 +55,21 @@ function toBackendDate(value: string, endOfDay = false) {
   return `${value}T${endOfDay ? '23:59:59' : '00:00:00'}+07:00`;
 }
 
-export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPending }: UpdateAssessmentPolicyDialogProps) {
+export function UpdateAssessmentPolicyDialog({ schoolId, policy, onClose, onSubmit, isPending }: UpdateAssessmentPolicyDialogProps) {
   const resultBands = policy?.frameworkVersion?.resultBands ?? [];
   const { showError, feedbackToast } = useFeedbackToast();
+
+  // Trần bậc mục tiêu theo phạm vi hiện có của policy -- chỉ disable option vượt trần, KHÔNG
+  // auto-điền lại band: đang sửa 1 giá trị đã có, tự nhảy về mặc định sẽ gây bất ngờ.
+  const { data: bandCeiling } = useGradeLevelBandCeilingQuery(
+    schoolId,
+    {
+      gradeLevelId: policy?.gradeLevel?.id,
+      schoolGradeId: policy?.schoolGrade?.id,
+      schoolClassId: policy?.schoolClass?.id,
+    },
+    policy?.frameworkVersionId,
+  );
 
   const [form, setForm] = useState(() => ({
     targetFrameworkBandId: policy?.targetFrameworkBandId ?? '',
@@ -137,8 +160,24 @@ export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPend
                 className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
               >
                 <option value="">-- Chọn target band --</option>
-                {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
+                {resultBands
+                  ?.filter((band) => band.order >= MIN_VISIBLE_BAND_ORDER && band.order <= MAX_VISIBLE_BAND_ORDER)
+                  .map((band) => (
+                  <option
+                    key={band.id}
+                    value={band.id}
+                    disabled={Boolean(bandCeiling) && band.order > bandCeiling!.hardMaxBandOrder}
+                  >
+                    {band.code} - {band.label}
+                    {bandCeiling && band.order > bandCeiling.hardMaxBandOrder ? ' (vượt trần)' : ''}
+                  </option>
+                ))}
               </select>
+              {bandCeiling ? (
+                <p className="mt-1 text-xs text-slate-400">
+                  Theo phạm vi của policy: mặc định {bandCeiling.defaultBandLabel}, tối đa {bandCeiling.hardMaxBandLabel}.
+                </p>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

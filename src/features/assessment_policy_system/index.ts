@@ -4,6 +4,7 @@ export { SystemAdminAssessmentPolicyDetailPage } from './pages/SystemAdminAssess
 export { SystemAdminAssessmentPolicyImportPage } from './pages/SystemAdminAssessmentPolicyImportPage';
 export { CreateAssessmentPolicyDialog } from './components/CreateAssessmentPolicyDialog';
 export { PublishRubricVersionDialog } from './components/PublishRubricVersionDialog';
+export { ArchiveRubricVersionDialog } from './components/ArchiveRubricVersionDialog';
 export { useSystemAssessmentPoliciesQuery } from './api/useSystemAssessmentPoliciesQuery';
 export type { SystemAssessmentPolicyFilter } from './api/useSystemAssessmentPoliciesQuery';
 export { useCreateSystemAssessmentPolicyMutation } from './api/useCreateSystemAssessmentPolicyMutation';

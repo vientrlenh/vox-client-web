@@ -154,7 +154,7 @@ describe('LoginPage', () => {
 
   it('clears tokens and blocks unsupported roles', async () => {
     const user = userEvent.setup()
-    const responseData = createLoginResponse(['TEACHER'])
+    const responseData = createLoginResponse([])
     jest.mocked(apiClient.post).mockResolvedValue({
       data: {
         data: responseData,

@@ -74,6 +74,8 @@ type RubricVersionGroupProps = {
 
 function RubricVersionGroup({ rubric, groupName, selectedId, onSelect, onVersionsLoaded, disabled }: RubricVersionGroupProps) {
   const { data: versions, isLoading } = useRubricVersionOptionsQuery(rubric.id);
+  // BE chặn gán Policy vào Rubric Version đã ARCHIVED -- không hiện lựa chọn chắc chắn bị từ chối.
+  const selectableVersions = versions?.filter((rv) => rv.status !== 'ARCHIVED');
 
   useEffect(() => {
     if (!versions?.length) return;
@@ -88,9 +90,9 @@ function RubricVersionGroup({ rubric, groupName, selectedId, onSelect, onVersion
       <p className="text-sm font-bold text-slate-800">{rubric.code} - {rubric.name}</p>
       {isLoading ? (
         <p className="mt-1 text-xs font-medium text-slate-400">Đang tải phiên bản...</p>
-      ) : versions?.length ? (
+      ) : selectableVersions?.length ? (
         <div className="mt-2 grid gap-1">
-          {versions.map((rv) => (
+          {selectableVersions.map((rv) => (
             <label key={rv.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50">
               <input
                 type="radio"
@@ -105,7 +107,7 @@ function RubricVersionGroup({ rubric, groupName, selectedId, onSelect, onVersion
           ))}
         </div>
       ) : (
-        <p className="mt-1 text-xs font-medium text-slate-400">Rubric này chưa có phiên bản nào.</p>
+        <p className="mt-1 text-xs font-medium text-slate-400">Rubric này chưa có phiên bản nào (DRAFT/PUBLISHED).</p>
       )}
     </div>
   );

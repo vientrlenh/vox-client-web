@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -42,10 +42,19 @@ async function openPickerAndSelectVersion(onChange: (selection: RubricPolicySele
   renderWithProviders(<RubricPolicyPicker languageId="lang-1" onChange={onChange} scope="teacher" />)
 
   await user.click(screen.getByRole('button', { name: 'Đổi chính sách đánh giá' }))
-  await waitFor(() => expect(screen.getByLabelText(/Thang đánh giá/)).not.toBeDisabled())
-  await user.selectOptions(screen.getByLabelText(/Thang đánh giá/), 'rubric-1')
-  await waitFor(() => expect(screen.getByLabelText(/Phiên bản đã xuất bản/)).not.toBeDisabled())
-  await user.selectOptions(screen.getByLabelText(/Phiên bản đã xuất bản/), 'version-1')
+
+  await user.click(await screen.findByRole('button', { name: 'Chọn thang đánh giá' }))
+  const rubricDialog = await screen.findByRole('dialog')
+  await user.click(within(rubricDialog).getByText(rubric.name))
+  await user.click(within(rubricDialog).getByRole('button', { name: 'Xác nhận' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+  await user.click(await screen.findByRole('button', { name: 'Chọn phiên bản' }))
+  const versionDialog = await screen.findByRole('dialog')
+  await user.click(within(versionDialog).getByText('v1'))
+  await user.click(within(versionDialog).getByRole('button', { name: 'Xác nhận' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
   return user
 }
 

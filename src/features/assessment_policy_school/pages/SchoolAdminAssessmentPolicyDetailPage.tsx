@@ -10,7 +10,6 @@ import {
   ClipboardCheck,
   ClipboardList,
   Eye,
-  Gavel,
   Pencil,
   RefreshCw,
   Rocket,
@@ -249,13 +248,17 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
             <ClipboardCheck className="size-[26px] text-indigo-600" /> Chi tiết Chính sách Đánh giá
           </h1>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate(`/school-admin/assessment-policies/${policyId}/scoring-rules`)}
-          className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
-        >
-          <Gavel className="size-4" /> Scoring Rules
-        </button>
+        {policy.rubricVersion?.rubricId ? (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`/school-admin/rubrics/${policy.rubricVersion?.rubricId}/versions/${policy.rubricVersionId}`)
+            }
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
+          >
+            <Eye className="size-4" /> Xem chi tiết phiên bản tiêu chí đánh giá
+          </button>
+        ) : null}
       </div>
 
       {/* THÔNG TIN CHUNG */}
@@ -410,26 +413,13 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
                     : '—'}
                 </InfoField>
               </div>
-
-              {policy.rubricVersion?.rubricId ? (
-                <button
-                  className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
-                  onClick={() =>
-                    navigate(
-                      `/school-admin/rubrics/${policy.rubricVersion?.rubricId}/versions/${policy.rubricVersionId}`,
-                    )
-                  }
-                  type="button"
-                >
-                  <Eye className="size-4" /> Xem chi tiết Rubric Version
-                </button>
-              ) : null}
             </div>
           )}
         </div>
       </div>
 
       <UpdateAssessmentPolicyDialog
+        schoolId={schoolId}
         policy={isEditModalOpen ? policy : null}
         onClose={() => setIsEditModalOpen(false)}
         onSubmit={handleUpdatePolicy}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import {
   useMatchingSchoolAssessmentPoliciesQuery,
   useMatchingTeacherAssessmentPoliciesQuery,
@@ -9,6 +10,10 @@ import {
   useTeacherRubricsQuery,
 } from '../api/rubricQueries'
 import { formatDate, getAssessmentPolicyStrictnessLabel } from '../types'
+import { TablePickerDialog } from './TablePickerDialog'
+
+const TRIGGER_CLASS =
+  'flex h-11 w-full items-center justify-between overflow-hidden rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950 outline-none transition hover:bg-slate-50 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:opacity-70'
 
 export type RubricPolicyChoice = {
   /** Thứ duy nhất đi vào payload: exam chỉ lưu assessment_policy_id, không lưu rubric/phiên bản. */
@@ -29,9 +34,6 @@ type RubricPolicySelectFieldProps = {
   requiresLanguage?: boolean
   scope: 'school' | 'teacher'
 }
-
-const SELECT_CLASS =
-  'h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400'
 
 /**
  * Chọn chính sách đánh giá cho bài SẮP TẠO, đi tuần tự Rubric -> Phiên bản đã xuất bản -> Chính sách.
@@ -54,6 +56,8 @@ export function RubricPolicySelectField({
   const [rubricVersionId, setRubricVersionId] = useState('')
   const [pickedPolicyId, setPickedPolicyId] = useState<string | null>(null)
   const [lastLanguageId, setLastLanguageId] = useState(languageId)
+  const [isRubricPickerOpen, setIsRubricPickerOpen] = useState(false)
+  const [isVersionPickerOpen, setIsVersionPickerOpen] = useState(false)
 
   // Đổi ngôn ngữ là đổi cả danh sách rubric lẫn danh sách chính sách, nên mọi lựa chọn cũ đều hết
   // hiệu lực. Đặt lại ngay trong lúc render (không qua useEffect) là cách React khuyến nghị cho việc
@@ -83,6 +87,8 @@ export function RubricPolicySelectField({
     ? (schoolRubricsQuery.data?.find((rubric) => rubric.id === rubricId)?.versions ?? [])
     : (teacherVersionsQueries[0]?.data ?? [])
   const isLoadingVersions = isSchool ? schoolRubricsQuery.isLoading : Boolean(teacherVersionsQueries[0]?.isLoading)
+  const selectedRubric = rubrics.find((rubric) => rubric.id === rubricId) ?? null
+  const selectedVersion = versions.find((version) => version.id === rubricVersionId) ?? null
 
   const schoolPoliciesQuery = useMatchingSchoolAssessmentPoliciesQuery(
     { languageId, rubricVersionId },
@@ -126,6 +132,7 @@ export function RubricPolicySelectField({
   }
 
   return (
+    <>
     <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
       <span className="text-sm font-bold text-slate-700">Chính sách đánh giá</span>
       <p className="text-xs text-slate-500">
@@ -134,24 +141,26 @@ export function RubricPolicySelectField({
       </p>
 
       <div className="mt-1.5 grid gap-2.5 rounded-lg border border-slate-200 bg-white p-3.5">
-        <label className="grid gap-1.5 text-[13px] font-bold text-slate-700">
+        <div className="grid gap-1.5 text-[13px] font-bold text-slate-700">
           Thang đánh giá (Rubric)
-          <select
-            className={SELECT_CLASS}
+          <button
+            className={TRIGGER_CLASS}
             disabled={isLanguageMissing || isLoadingRubrics}
-            onChange={(event) => selectRubric(event.target.value)}
-            value={rubricId}
+            onClick={() => setIsRubricPickerOpen(true)}
+            type="button"
           >
-            <option value="">
-              {isLanguageMissing ? 'Chọn ngôn ngữ trước' : isLoadingRubrics ? 'Đang tải…' : 'Chọn thang đánh giá'}
-            </option>
-            {rubrics.map((rubric) => (
-              <option key={rubric.id} value={rubric.id}>
-                {rubric.name} ({rubric.code})
-              </option>
-            ))}
-          </select>
-        </label>
+            <span className={`truncate ${selectedRubric ? 'text-slate-950' : 'text-slate-400'}`}>
+              {isLanguageMissing
+                ? 'Chọn ngôn ngữ trước'
+                : isLoadingRubrics
+                  ? 'Đang tải…'
+                  : selectedRubric
+                    ? `${selectedRubric.name} (${selectedRubric.code})`
+                    : 'Chọn thang đánh giá'}
+            </span>
+            <ChevronDown aria-hidden="true" className="ml-2 size-4 shrink-0 text-slate-400" />
+          </button>
+        </div>
 
         {!isLanguageMissing && !isLoadingRubrics && rubrics.length === 0 ? (
           <p className="text-xs font-semibold text-amber-700">
@@ -159,22 +168,26 @@ export function RubricPolicySelectField({
           </p>
         ) : null}
 
-        <label className="grid gap-1.5 text-[13px] font-bold text-slate-700">
+        <div className="grid gap-1.5 text-[13px] font-bold text-slate-700">
           Phiên bản đã xuất bản
-          <select
-            className={SELECT_CLASS}
+          <button
+            className={TRIGGER_CLASS}
             disabled={!rubricId || isLoadingVersions}
-            onChange={(event) => selectRubricVersion(event.target.value)}
-            value={rubricVersionId}
+            onClick={() => setIsVersionPickerOpen(true)}
+            type="button"
           >
-            <option value="">{isLoadingVersions ? 'Đang tải…' : 'Chọn phiên bản'}</option>
-            {versions.map((version) => (
-              <option key={version.id} value={version.id}>
-                v{version.version} · {version.code} · {version.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            <span className={`truncate ${selectedVersion ? 'text-slate-950' : 'text-slate-400'}`}>
+              {!rubricId
+                ? 'Chọn thang đánh giá trước'
+                : isLoadingVersions
+                  ? 'Đang tải…'
+                  : selectedVersion
+                    ? `v${selectedVersion.version} · ${selectedVersion.code} · ${selectedVersion.name}`
+                    : 'Chọn phiên bản'}
+            </span>
+            <ChevronDown aria-hidden="true" className="ml-2 size-4 shrink-0 text-slate-400" />
+          </button>
+        </div>
 
         {rubricId && !isLoadingVersions && versions.length === 0 ? (
           <p className="text-xs font-semibold text-amber-700">
@@ -229,5 +242,43 @@ export function RubricPolicySelectField({
         </div>
       </div>
     </div>
+
+    <TablePickerDialog
+      columns={[
+        { header: 'Tên', render: (rubric) => rubric.name },
+        { header: 'Mã', render: (rubric) => rubric.code },
+      ]}
+      emptyMessage="Trường chưa có thang đánh giá nào cho ngôn ngữ này."
+      getId={(rubric) => rubric.id}
+      getSelectedLabel={(rubric) => `${rubric.name} (${rubric.code})`}
+      initialSelectedId={rubricId}
+      isLoading={isLoadingRubrics}
+      isOpen={isRubricPickerOpen}
+      items={rubrics}
+      onClose={() => setIsRubricPickerOpen(false)}
+      onConfirm={(rubric) => selectRubric(rubric.id)}
+      subtitle="Chọn thang đánh giá dùng để chấm bài."
+      title="Chọn thang đánh giá"
+    />
+
+    <TablePickerDialog
+      columns={[
+        { header: 'Phiên bản', render: (version) => `v${version.version}` },
+        { header: 'Mã', render: (version) => version.code },
+        { header: 'Tên', render: (version) => version.name },
+      ]}
+      emptyMessage="Thang đánh giá này chưa có phiên bản nào được xuất bản."
+      getId={(version) => version.id}
+      getSelectedLabel={(version) => `v${version.version} · ${version.code} · ${version.name}`}
+      initialSelectedId={rubricVersionId}
+      isLoading={isLoadingVersions}
+      isOpen={isVersionPickerOpen}
+      items={versions}
+      onClose={() => setIsVersionPickerOpen(false)}
+      onConfirm={(version) => selectRubricVersion(version.id)}
+      subtitle="Chọn phiên bản đã xuất bản của thang đánh giá."
+      title="Chọn phiên bản"
+    />
+    </>
   )
 }
