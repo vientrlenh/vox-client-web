@@ -62,7 +62,7 @@ const GET_SYSTEM_ASSESSMENT_POLICY_DETAIL = `
         name
         code
       }
-      schoolGradeLevel {
+      gradeLevel {
         id
         name
         code

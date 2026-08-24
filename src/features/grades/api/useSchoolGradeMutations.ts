@@ -12,8 +12,8 @@ import type {
 } from '../types'
 
 type CreateSchoolGradeInput = {
+  gradeLevelId: string
   payload: CreateSchoolGradeRequest
-  schoolGradeLevelId: string
 }
 
 type UpdateSchoolGradeInput = {
@@ -36,12 +36,14 @@ type UpdateSchoolGradeMutationData = {
 }
 
 export async function createSchoolGrade({
+  gradeLevelId,
   payload,
-  schoolGradeLevelId,
 }: CreateSchoolGradeInput): Promise<MutationResult<string>> {
   const schoolId = requireSchoolId()
+  // Năm học vẫn thuộc về trường nên đường dẫn giữ nguyên /{schoolId}; chỉ khối lớp mới
+  // chuyển thành catalog toàn cục.
   const response = await apiClient.post<ApiResponse<string>>(
-    `/v1/schools/${schoolId}/grade-levels/${schoolGradeLevelId}/grades`,
+    `/v1/schools/${schoolId}/grade-levels/${gradeLevelId}/grades`,
     payload,
   )
 

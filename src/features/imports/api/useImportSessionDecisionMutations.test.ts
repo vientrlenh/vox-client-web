@@ -127,7 +127,6 @@ describe('import session decision mutations', () => {
   })
 
   it.each([
-    ['SCHOOL_GRADE_LEVEL', 'grade-levels'],
     ['SCHOOL_GRADE', 'grades'],
     ['SCHOOL_ROOM', 'rooms'],
   ])('accepts a %s session via the %s endpoint', async (type, segment) => {

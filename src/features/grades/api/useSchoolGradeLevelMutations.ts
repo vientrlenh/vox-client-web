@@ -4,12 +4,15 @@ import {
   type MutationResult,
   apiClient,
   graphQLRequest,
-  requireSchoolId,
 } from '@/shared/api'
 import type {
   CreateSchoolGradeLevelRequest,
   UpdateSchoolGradeLevelRequest,
 } from '../types'
+
+// Khối lớp là catalog dùng chung toàn hệ thống -> 3 thao tác ghi dưới đây CHỈ SYSTEM_ADMIN gọi
+// được (BE: @PreAuthorize hasRole('SYSTEM_ADMIN')) và đường dẫn không còn nằm dưới /{schoolId}.
+// School Admin chỉ đọc; UI phải ẩn nút thay vì để người dùng bấm rồi nhận 403.
 
 type CreateSchoolGradeLevelInput = {
   payload: CreateSchoolGradeLevelRequest
@@ -24,22 +27,21 @@ type DeleteSchoolGradeLevelInput = {
   gradeLevelId: string
 }
 
-const UPDATE_SCHOOL_GRADE_LEVEL_MUTATION = `
-  mutation UpdateGradeLevel($schoolId: ID!, $gradeLevelId: ID!, $input: UpdateSchoolGradeLevelInput!) {
-    updateSchoolGradeLevel(schoolId: $schoolId, gradeLevelId: $gradeLevelId, input: $input)
+const UPDATE_GRADE_LEVEL_MUTATION = `
+  mutation UpdateGradeLevel($gradeLevelId: ID!, $input: UpdateGradeLevelInput!) {
+    updateGradeLevel(gradeLevelId: $gradeLevelId, input: $input)
   }
 `
 
-type UpdateSchoolGradeLevelMutationData = {
-  updateSchoolGradeLevel: string
+type UpdateGradeLevelMutationData = {
+  updateGradeLevel: string
 }
 
 export async function createSchoolGradeLevel({
   payload,
 }: CreateSchoolGradeLevelInput): Promise<MutationResult<string>> {
-  const schoolId = requireSchoolId()
   const response = await apiClient.post<ApiResponse<string>>(
-    `/v1/schools/${schoolId}/grade-levels`,
+    '/v1/schools/grade-levels',
     payload,
   )
 
@@ -50,18 +52,16 @@ export async function updateSchoolGradeLevel({
   gradeLevelId,
   payload,
 }: UpdateSchoolGradeLevelInput): Promise<MutationResult<{ gradeLevelId: string }>> {
-  const schoolId = requireSchoolId()
-  const data = await graphQLRequest<UpdateSchoolGradeLevelMutationData>(
-    UPDATE_SCHOOL_GRADE_LEVEL_MUTATION,
+  const data = await graphQLRequest<UpdateGradeLevelMutationData>(
+    UPDATE_GRADE_LEVEL_MUTATION,
     {
       gradeLevelId,
       input: payload,
-      schoolId,
     },
   )
 
   return {
-    data: { gradeLevelId: data.updateSchoolGradeLevel },
+    data: { gradeLevelId: data.updateGradeLevel },
     message: 'Cập nhật khối thành công.',
   }
 }
@@ -69,9 +69,8 @@ export async function updateSchoolGradeLevel({
 export async function deleteSchoolGradeLevel({
   gradeLevelId,
 }: DeleteSchoolGradeLevelInput): Promise<MutationResult<null>> {
-  const schoolId = requireSchoolId()
   const response = await apiClient.delete<ApiResponse<null>>(
-    `/v1/schools/${schoolId}/grade-levels/${gradeLevelId}`,
+    `/v1/schools/grade-levels/${gradeLevelId}`,
   )
 
   return response.data

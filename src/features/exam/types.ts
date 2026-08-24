@@ -64,7 +64,7 @@ export type CreateBlueprintInlineRequest = {
   description?: string | null
   languageId: string
   name: string
-  schoolGradeLevelId?: string | null
+  gradeLevelId?: string | null
 }
 
 export type AttachExamBlueprintRequest = {

@@ -146,7 +146,7 @@ export function SystemAdminAssessmentPolicyDetailPage() {
     );
   }
 
-  const hasScope = Boolean(policy.school || policy.schoolGradeLevel || policy.schoolGrade || policy.schoolClass);
+  const hasScope = Boolean(policy.school || policy.gradeLevel || policy.schoolGrade || policy.schoolClass);
 
   const tabs: { id: TabId; icon: LucideIcon; title: string }[] = [
     { id: 'framework', icon: BookMarked, title: 'Framework Version' },
@@ -211,7 +211,7 @@ export function SystemAdminAssessmentPolicyDetailPage() {
           <InfoField label="Cập nhật lúc">{formatAssessmentPolicyDate(policy.updatedAt)}</InfoField>
           <InfoField label="Phạm vi áp dụng">
             {hasScope
-              ? [policy.school?.name, policy.schoolGradeLevel?.name, policy.schoolGrade?.name, policy.schoolClass?.name]
+              ? [policy.school?.name, policy.gradeLevel?.name, policy.schoolGrade?.name, policy.schoolClass?.name]
                   .filter(Boolean)
                   .join(' · ')
               : 'Áp dụng toàn hệ thống'}

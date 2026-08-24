@@ -192,12 +192,6 @@ const SchoolAdminGradeLevelDetailPage = lazy(() =>
   })),
 )
 
-const SchoolAdminGradeLevelImportPage = lazy(() =>
-  import('@/features/grades').then((module) => ({
-    default: module.SchoolAdminGradeLevelImportPage,
-  })),
-)
-
 const SchoolAdminGradeImportPage = lazy(() =>
   import('@/features/grades').then((module) => ({
     default: module.SchoolAdminGradeImportPage,
@@ -591,9 +585,6 @@ const SchoolAdminBlueprintVersionDetailPage = lazy(() =>
 );
 const SchoolAdminEditBlueprintVersionPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.SchoolAdminEditBlueprintVersionPage })),
-);
-const SchoolAdminSelectRubricVersionPage = lazy(() =>
-  import("@/features/examCore").then((m) => ({ default: m.SchoolAdminSelectRubricVersionPage })),
 );
 const TeacherSelectRubricVersionPage = lazy(() =>
   import("@/features/examCore").then((m) => ({ default: m.TeacherSelectRubricVersionPage })),
@@ -1006,10 +997,11 @@ export function AppRoutes() {
               path="school-admin/grades"
               element={<SchoolAdminGradesPage />}
             />
-            <Route
-              path="school-admin/grades/import"
-              element={<SchoolAdminGradeLevelImportPage />}
-            />
+            {/*
+              Import khối lớp đã bị gỡ: khối giờ là catalog dùng chung toàn hệ thống, chỉ
+              SYSTEM_ADMIN tạo/xóa được và dữ liệu gốc do migration seed. Route cũ
+              "school-admin/grades/import" không còn tồn tại.
+            */}
             {/*
               Import năm học KHÔNG cần chọn khối trước: một file nạp được nhiều khối khác nhau,
               và trang import cũng không gửi gradeLevelId lên server -- nó chỉ dùng id đó cho
@@ -1090,7 +1082,6 @@ export function AppRoutes() {
             <Route path="school-admin/exam-papers/:paperId/edit" element={<SchoolAdminExamPaperEditPage />} />
             <Route path="school-admin/exam-papers/:paperId" element={<SchoolAdminExamPaperViewPage />} />
             <Route path="school-admin/exams/create" element={<SchoolAdminExamCreatePage />} />
-            <Route path="school-admin/rubric-versions/select" element={<SchoolAdminSelectRubricVersionPage />} />
             <Route path="school-admin/exams/:examId" element={<SchoolAdminExamDetailPage />} />
             <Route path="school-admin/exams" element={<SchoolAdminExamsPage />} />
             <Route path="school-admin/exam-results" element={<SchoolAdminExamResultsListPage />} />

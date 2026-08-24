@@ -88,8 +88,6 @@ export function getAcceptUrl(
       return `/v1/schools/${schoolId}/classes/users/import/${sessionId}/accept`
     case 'SCHOOL_GRADE':
       return `/v1/schools/${schoolId}/grades/import/${sessionId}/accept`
-    case 'SCHOOL_GRADE_LEVEL':
-      return `/v1/schools/${schoolId}/grade-levels/import/${sessionId}/accept`
     case 'SCHOOL_ROOM':
       return `/v1/schools/${schoolId}/rooms/import/${sessionId}/accept`
     case 'USER':

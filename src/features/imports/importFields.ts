@@ -220,12 +220,6 @@ export const IMPORT_FIELDS_BY_TYPE: Record<string, ImportField[]> = {
     { isRequired: true, label: 'Ngày kết thúc', value: 'endDate' },
     { isRequired: false, label: 'Mô tả', value: 'description' },
   ],
-  SCHOOL_GRADE_LEVEL: [
-    { isRequired: true, label: 'Mã khối', value: 'code' },
-    { isRequired: true, label: 'Tên khối', value: 'name' },
-    { isRequired: true, label: 'Thứ tự', value: 'order' },
-    { isRequired: false, label: 'Mô tả', value: 'description' },
-  ],
   SCHOOL_ROOM: [
     { isRequired: true, label: 'Mã phòng', value: 'code' },
     { isRequired: true, label: 'Tên phòng', value: 'name' },

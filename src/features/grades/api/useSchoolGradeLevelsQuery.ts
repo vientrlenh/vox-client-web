@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { graphQLRequest, requireSchoolId } from '@/shared/api'
+import { graphQLRequest } from '@/shared/api'
 import type { SchoolGradeLevel, SchoolGradeLevelPage } from '../types'
 
-const SCHOOL_GRADE_LEVEL_FIELDS = `
+// Khối lớp là catalog DÙNG CHUNG toàn hệ thống: không còn schoolId trong query lẫn trong
+// field set. Trước đây mỗi trường tự khai một bộ khối riêng nên phải truyền schoolId.
+const GRADE_LEVEL_FIELDS = `
   id
-  schoolId
   code
   name
   description
@@ -14,11 +15,11 @@ const SCHOOL_GRADE_LEVEL_FIELDS = `
   updatedAt
 `
 
-const SCHOOL_GRADE_LEVELS_QUERY = `
-  query GetGradeLevels($schoolId: ID!, $page: Int, $size: Int, $search: String, $status: String) {
-    schoolGradeLevels(schoolId: $schoolId, page: $page, size: $size, search: $search, status: $status) {
+const GRADE_LEVELS_QUERY = `
+  query GetGradeLevels($page: Int, $size: Int, $search: String, $status: String) {
+    gradeLevels(page: $page, size: $size, search: $search, status: $status) {
       content {
-        ${SCHOOL_GRADE_LEVEL_FIELDS}
+        ${GRADE_LEVEL_FIELDS}
       }
       page
       size
@@ -28,20 +29,20 @@ const SCHOOL_GRADE_LEVELS_QUERY = `
   }
 `
 
-const SCHOOL_GRADE_LEVEL_QUERY = `
-  query GetGradeLevel($schoolId: ID!, $gradeLevelId: ID!) {
-    schoolGradeLevel(schoolId: $schoolId, gradeLevelId: $gradeLevelId) {
-      ${SCHOOL_GRADE_LEVEL_FIELDS}
+const GRADE_LEVEL_QUERY = `
+  query GetGradeLevel($gradeLevelId: ID!) {
+    gradeLevel(gradeLevelId: $gradeLevelId) {
+      ${GRADE_LEVEL_FIELDS}
     }
   }
 `
 
-type SchoolGradeLevelsQueryData = {
-  schoolGradeLevels: SchoolGradeLevelPage
+type GradeLevelsQueryData = {
+  gradeLevels: SchoolGradeLevelPage
 }
 
-type SchoolGradeLevelQueryData = {
-  schoolGradeLevel: SchoolGradeLevel
+type GradeLevelQueryData = {
+  gradeLevel: SchoolGradeLevel
 }
 
 export const gradeLevelManagementQueryKeys = {
@@ -70,29 +71,26 @@ export async function fetchSchoolGradeLevels(
   search: string,
   status: string,
 ) {
-  const schoolId = requireSchoolId()
-  const data = await graphQLRequest<SchoolGradeLevelsQueryData>(
-    SCHOOL_GRADE_LEVELS_QUERY,
+  const data = await graphQLRequest<GradeLevelsQueryData>(
+    GRADE_LEVELS_QUERY,
     {
       page,
-      schoolId,
       search: search || undefined,
       size,
       status: status || undefined,
     },
   )
 
-  return data.schoolGradeLevels
+  return data.gradeLevels
 }
 
 export async function fetchSchoolGradeLevel(gradeLevelId: string) {
-  const schoolId = requireSchoolId()
-  const data = await graphQLRequest<SchoolGradeLevelQueryData>(
-    SCHOOL_GRADE_LEVEL_QUERY,
-    { gradeLevelId, schoolId },
+  const data = await graphQLRequest<GradeLevelQueryData>(
+    GRADE_LEVEL_QUERY,
+    { gradeLevelId },
   )
 
-  return data.schoolGradeLevel
+  return data.gradeLevel
 }
 
 export function useSchoolGradeLevelsQuery(
