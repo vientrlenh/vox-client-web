@@ -1620,7 +1620,6 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
   const activeTab: ClassTestDetailTab = tab ?? 'papers'
   const statusDisplay = getClassTestStatusDisplay(exam.status)
-  const candidates = candidatesQuery.data ?? []
   // Cảnh báo chủ động trước khi BE chặn (ClassTestTokenQuotaGuardService) — không thay cho việc
   // BE thật sự chặn, chỉ để giáo viên biết trước thay vì bấm xong mới ăn lỗi.
   const gradingQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'GRADING')

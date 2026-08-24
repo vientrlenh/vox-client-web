@@ -1,7 +1,14 @@
 import type { QuestionAssetType } from './types'
 
 /** Chỉ hai loại này mới có thời lượng phát; ảnh và đoạn văn hiện suốt lúc chuẩn bị. */
-export function hasPlaybackDuration(type: QuestionAssetType): boolean {
+/**
+ * Type predicate chứ không phải `boolean`: nơi gọi cần TypeScript thu hẹp kiểu qua nhánh true,
+ * vì `readMediaDurationSeconds` chỉ nhận đúng 'AUDIO' | 'VIDEO'. Trả `boolean` thì compiler không
+ * biết hàm này đã lọc, và nơi gọi phải ép kiểu tại chỗ -- ép một lần là mở đường cho lần sau.
+ */
+export function hasPlaybackDuration(
+  type: QuestionAssetType,
+): type is 'AUDIO' | 'VIDEO' {
   return type === 'AUDIO' || type === 'VIDEO'
 }
 

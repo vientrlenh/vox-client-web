@@ -260,9 +260,13 @@ const IMPORT_TYPE_OPTION_GROUPS: ImportTypeOptionGroup[] = [
       { label: 'Lớp học', to: '/school-admin/classes/import' },
       { label: 'Người dùng trong lớp', to: '/school-admin/classes/users/import' },
       { label: 'Người dùng', to: '/school-admin/students/import' },
-      { label: 'Khối', to: '/school-admin/grades/import' },
-      // Vào thẳng trang import, không thả xuống danh sách khối rồi bắt mở một khối. File năm
-      // học nạp được nhiều khối cùng lúc và trang import cũng không cần biết khối nào.
+      // KHÔNG có mục "Khối": khối giờ là catalog dùng chung toàn hệ thống, chỉ SYSTEM_ADMIN
+      // tạo/xóa được và dữ liệu gốc do initializer seed -- không còn luồng import nào cho nó.
+      // Mục này từng trỏ tới "/school-admin/grades/import", một route đã bị gỡ khỏi AppRoutes,
+      // nên bấm vào chỉ ra trang không tồn tại.
+      //
+      // Vào thẳng trang import năm học, không thả xuống danh sách khối rồi bắt mở một khối. File
+      // năm học nạp được nhiều khối cùng lúc và trang import cũng không cần biết khối nào.
       { label: 'Năm học', to: '/school-admin/grades/years/import' },
       { label: 'Phòng học', to: '/school-admin/rooms/import' },
     ],

@@ -438,7 +438,14 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
                     <div className="mt-2.5 flex items-center gap-2.5">
                       {slot.fixedQuestion ? (
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-semibold text-slate-700">
+                          {/* line-clamp-2 thay cho truncate: đề nói cả tình huống lẫn yêu cầu nên
+                              một dòng cắt ngang thường mất đúng phần yêu cầu ở cuối, người soạn
+                              không phân biệt được hai câu cùng mở đầu. title giữ nguyên văn cho
+                              trường hợp vẫn tràn quá 2 dòng. */}
+                          <p
+                            className="line-clamp-2 text-xs font-semibold text-slate-700"
+                            title={`${slot.fixedQuestion.code} · ${slot.fixedQuestion.questionText}`}
+                          >
                             {slot.fixedQuestion.code} · {slot.fixedQuestion.questionText}
                           </p>
                           <QuestionTimingSummary question={slot.fixedQuestion} />
@@ -459,7 +466,7 @@ function CreateBlueprintVersionPage({ basePath }: CreateBlueprintVersionPageProp
                         </a>
                       ) : null}
                       <button
-                        className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-600 hover:bg-slate-50"
+                        className="h-8 shrink-0 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-600 hover:bg-slate-50"
                         onClick={() => setPickerForSlotKey(slot.key)}
                         type="button"
                       >
