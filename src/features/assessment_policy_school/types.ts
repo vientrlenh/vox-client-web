@@ -42,7 +42,7 @@ export type AssessmentPolicy = {
   targetFrameworkBand?: { code: string; label: string } | null;
   school?: { id: string; code?: string | null; name?: string | null } | null;
   // Chỉ School Admin mới có phạm vi áp dụng hẹp hơn (tất cả null = áp dụng toàn trường).
-  schoolGradeLevel?: { id: string; code?: string | null; name?: string | null } | null;
+  gradeLevel?: { id: string; code?: string | null; name?: string | null } | null;
   schoolGrade?: { id: string; code?: string | null; name?: string | null } | null;
   schoolClass?: { id: string; code?: string | null; name?: string | null } | null;
 };
@@ -98,11 +98,11 @@ export type FrameworkResultBandDetail = {
 
 export type AssessmentPolicyDetail = Omit<
   AssessmentPolicy,
-  'language' | 'frameworkVersion' | 'rubricVersion' | 'targetFrameworkBand' | 'school' | 'schoolGradeLevel' | 'schoolGrade' | 'schoolClass'
+  'language' | 'frameworkVersion' | 'rubricVersion' | 'targetFrameworkBand' | 'school' | 'gradeLevel' | 'schoolGrade' | 'schoolClass'
 > & {
   schoolId?: string | null;
   school?: AssessmentPolicyRelatedEntity | null;
-  schoolGradeLevel?: AssessmentPolicyRelatedEntity | null;
+  gradeLevel?: AssessmentPolicyRelatedEntity | null;
   schoolGrade?: AssessmentPolicyRelatedEntity | null;
   schoolClass?: AssessmentPolicyRelatedEntity | null;
   language?: AssessmentPolicyRelatedEntity | null;
@@ -180,7 +180,7 @@ export type CreateAssessmentPolicyPayload = {
   effectiveTo?: string;
   // Tùy chọn: giới hạn phạm vi áp dụng hẹp hơn toàn trường — chỉ set 1 trong 3,
   // ứng với cấp hẹp nhất được chọn (chọn Lớp thì không cần set Khối/Niên khóa).
-  schoolGradeLevelId?: string;
+  gradeLevelId?: string;
   schoolGradeId?: string;
   schoolClassId?: string;
 };

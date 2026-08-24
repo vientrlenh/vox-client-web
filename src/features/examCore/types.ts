@@ -291,7 +291,7 @@ export type ExamBlueprintDto = {
   languageId: string
   name: string
   sectionCount?: number
-  schoolGradeLevelId?: string | null
+  gradeLevelId?: string | null
   schoolId: string
   updatedAt?: string | null
   versionCount?: number
@@ -568,7 +568,7 @@ export type CreateExamBlueprintRequest = {
   description?: string | null
   languageId: string
   name: string
-  schoolGradeLevelId?: string | null
+  gradeLevelId?: string | null
 }
 
 export type CreateExamPaperRequest = {

@@ -15,8 +15,8 @@ const SCHOOL_GRADE_FIELDS = `
 `
 
 const SCHOOL_GRADES_QUERY = `
-  query SchoolGrades($schoolId: ID!, $schoolGradeLevelId: ID, $page: Int, $size: Int) {
-    schoolGrades(schoolId: $schoolId, schoolGradeLevelId: $schoolGradeLevelId, page: $page, size: $size) {
+  query SchoolGrades($schoolId: ID!, $gradeLevelId: ID, $page: Int, $size: Int) {
+    schoolGrades(schoolId: $schoolId, gradeLevelId: $gradeLevelId, page: $page, size: $size) {
       content {
         ${SCHOOL_GRADE_FIELDS}
       }
@@ -47,15 +47,15 @@ type SchoolGradeQueryData = {
 export const gradeManagementQueryKeys = {
   all: ['grade-management'] as const,
   detail: (id: string) => [...gradeManagementQueryKeys.all, 'detail', id] as const,
-  grades: (page: number, size: number, schoolGradeLevelId?: string) =>
-    [...gradeManagementQueryKeys.all, 'list', page, size, schoolGradeLevelId] as const,
+  grades: (page: number, size: number, gradeLevelId?: string) =>
+    [...gradeManagementQueryKeys.all, 'list', page, size, gradeLevelId] as const,
 }
 
-export async function fetchSchoolGrades(page: number, size: number, schoolGradeLevelId?: string) {
+export async function fetchSchoolGrades(page: number, size: number, gradeLevelId?: string) {
   const schoolId = requireSchoolId()
   const data = await graphQLRequest<SchoolGradesQueryData>(SCHOOL_GRADES_QUERY, {
+    gradeLevelId: gradeLevelId || undefined,
     page,
-    schoolGradeLevelId: schoolGradeLevelId || undefined,
     schoolId,
     size,
   })
@@ -69,10 +69,10 @@ export async function fetchSchoolGrade(id: string) {
   return data.schoolGrade
 }
 
-export function useSchoolGradesQuery(page: number, size: number, schoolGradeLevelId?: string) {
+export function useSchoolGradesQuery(page: number, size: number, gradeLevelId?: string) {
   return useQuery({
-    queryFn: () => fetchSchoolGrades(page, size, schoolGradeLevelId),
-    queryKey: gradeManagementQueryKeys.grades(page, size, schoolGradeLevelId),
+    queryFn: () => fetchSchoolGrades(page, size, gradeLevelId),
+    queryKey: gradeManagementQueryKeys.grades(page, size, gradeLevelId),
   })
 }
 

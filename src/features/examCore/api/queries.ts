@@ -423,7 +423,7 @@ const BLUEPRINT_FIELDS = `
   id
   schoolId
   languageId
-  schoolGradeLevelId
+  gradeLevelId
   code
   name
   description
@@ -441,7 +441,7 @@ const BLUEPRINT_DETAIL_FIELDS = `
   id
   schoolId
   languageId
-  schoolGradeLevelId
+  gradeLevelId
   code
   name
   description

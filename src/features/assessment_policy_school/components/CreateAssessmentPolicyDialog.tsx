@@ -6,7 +6,7 @@ import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useAllFrameworkVersionsQuery, useFrameworkVersionCriteriaQuery } from '../api/useFrameworkVersionOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
-import { useSchoolGradeLevelOptionsQuery, useSchoolGradeOptionsQuery } from '../api/useSchoolScopeOptionsQuery';
+import { useGradeLevelOptionsQuery, useSchoolGradeOptionsQuery } from '../api/useSchoolScopeOptionsQuery';
 import { useSchoolClassesQuery } from '@/features/classes/api/useSchoolClassesQuery';
 import type { ClassFilters } from '@/features/classes/types';
 import type { AssessmentPolicyStrictness, CreateAssessmentPolicyPayload, RubricOption } from '../types';
@@ -46,7 +46,7 @@ type PolicyFormState = {
   strictness: AssessmentPolicyStrictness | '';
   effectiveFrom: string;
   effectiveTo: string;
-  schoolGradeLevelId: string;
+  gradeLevelId: string;
   schoolGradeId: string;
   schoolClassId: string;
 };
@@ -64,7 +64,7 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
     strictness: '',
     effectiveFrom: '',
     effectiveTo: '',
-    schoolGradeLevelId: '',
+    gradeLevelId: '',
     schoolGradeId: '',
     schoolClassId: '',
   };
@@ -140,8 +140,8 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
   const resultBands = selectedFrameworkVersion?.resultBands;
   const { data: frameworkCriteria, isLoading: isLoadingCriteria } = useFrameworkVersionCriteriaQuery(form.frameworkVersionId || undefined);
   const { data: rubrics } = useRubricSearchOptionsQuery(schoolId, form.languageId || undefined);
-  const { data: gradeLevels } = useSchoolGradeLevelOptionsQuery(schoolId);
-  const { data: grades } = useSchoolGradeOptionsQuery(schoolId, form.schoolGradeLevelId || undefined);
+  const { data: gradeLevels } = useGradeLevelOptionsQuery(Boolean(schoolId));
+  const { data: grades } = useSchoolGradeOptionsQuery(schoolId, form.gradeLevelId || undefined);
   const classFilter: ClassFilters = { languageId: '', schoolGradeId: form.schoolGradeId || '', search: '', status: 'ACTIVE' };
   const { data: classesPage } = useSchoolClassesQuery(1, 100, classFilter, { enabled: Boolean(form.schoolGradeId) });
   const classes = classesPage?.content ?? [];
@@ -170,8 +170,8 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
   }
 
   // Chọn cấp rộng hơn thì xóa lựa chọn ở (các) cấp hẹp hơn vì chúng phụ thuộc vào cấp rộng.
-  function handleGradeLevelChange(schoolGradeLevelId: string) {
-    onChange({ schoolGradeLevelId, schoolGradeId: '', schoolClassId: '' });
+  function handleGradeLevelChange(gradeLevelId: string) {
+    onChange({ gradeLevelId, schoolGradeId: '', schoolClassId: '' });
   }
 
   function handleGradeChange(schoolGradeId: string) {
@@ -318,7 +318,7 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
           <label className="mb-1 block text-sm font-bold text-slate-700">Phạm vi áp dụng</label>
           <div className="grid grid-cols-3 gap-3">
             <select
-              value={form.schoolGradeLevelId} onChange={(e) => handleGradeLevelChange(e.target.value)} disabled={isPending}
+              value={form.gradeLevelId} onChange={(e) => handleGradeLevelChange(e.target.value)} disabled={isPending}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
             >
               <option value="">-- Khối --</option>
@@ -326,10 +326,10 @@ function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending
             </select>
             <select
               value={form.schoolGradeId} onChange={(e) => handleGradeChange(e.target.value)}
-              disabled={isPending || !form.schoolGradeLevelId}
+              disabled={isPending || !form.gradeLevelId}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
             >
-              <option value="">{form.schoolGradeLevelId ? '-- Niên khóa --' : '-- Chọn Khối trước --'}</option>
+              <option value="">{form.gradeLevelId ? '-- Niên khóa --' : '-- Chọn Khối trước --'}</option>
               {grades?.map((grade) => <option key={grade.id} value={grade.id}>{grade.code || grade.name}</option>)}
             </select>
             <select
@@ -470,8 +470,8 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
         ? { schoolClassId: form.schoolClassId }
         : form.schoolGradeId
           ? { schoolGradeId: form.schoolGradeId }
-          : form.schoolGradeLevelId
-            ? { schoolGradeLevelId: form.schoolGradeLevelId }
+          : form.gradeLevelId
+            ? { gradeLevelId: form.gradeLevelId }
             : {};
 
       return {

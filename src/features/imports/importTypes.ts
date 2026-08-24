@@ -7,7 +7,6 @@ export const IMPORT_TYPE_VALUES = [
   'SCHOOL_CLASS',
   'SCHOOL_CLASS_USER',
   'SCHOOL_DIRECTORY',
-  'SCHOOL_GRADE_LEVEL',
   'SCHOOL_GRADE',
   'SCHOOL_ROOM',
   'QUESTION',
@@ -39,7 +38,6 @@ export const IMPORT_TYPE_LABELS: Record<ImportTypeValue, string> = {
   SCHOOL_CLASS_USER: 'Người dùng trong lớp',
   SCHOOL_DIRECTORY: 'Danh mục trường',
   SCHOOL_GRADE: 'Năm học',
-  SCHOOL_GRADE_LEVEL: 'Khối',
   SCHOOL_ROOM: 'Phòng học',
   USER: 'Người dùng',
 }
@@ -56,7 +54,6 @@ export const IMPORT_TYPE_GROUPS: ImportTypeGroup[] = [
       'SCHOOL_CLASS',
       'SCHOOL_CLASS_USER',
       'USER',
-      'SCHOOL_GRADE_LEVEL',
       'SCHOOL_GRADE',
       'SCHOOL_ROOM',
       'SCHOOL_DIRECTORY',

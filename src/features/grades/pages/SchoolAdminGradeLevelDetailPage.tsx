@@ -12,6 +12,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { useAppSelector } from '@/app/store/hooks'
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton'
 import {
   SchoolGradeLevelFormDialog,
@@ -369,8 +370,8 @@ function GradesTab({ gradeLevelId }: GradesTabProps) {
     try {
       setGradeDialogError(null)
       const result = await createMutation.mutateAsync({
+        gradeLevelId,
         payload,
-        schoolGradeLevelId: gradeLevelId,
       })
 
       setTabMessage({ text: result.message ?? 'Tạo năm học thành công.', tone: 'success' })
@@ -612,6 +613,11 @@ export function SchoolAdminGradeLevelDetailPage() {
   const [editError, setEditError] = useState<string | null>(null)
   const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
 
+  // Sửa khối = ghi vào catalog dùng chung -> chỉ SYSTEM_ADMIN. School Admin vào đây để
+  // quản lý các năm học trong khối, không sửa được chính khối đó.
+  const roles = useAppSelector((state) => state.auth.user?.roles)
+  const canManage = roles?.includes('SYSTEM_ADMIN') ?? false
+
   const gradeLevelQuery = useSchoolGradeLevelQuery(gradeLevelId ?? null)
   const updateMutation = useUpdateSchoolGradeLevelMutation()
   const gradeLevel = gradeLevelQuery.data
@@ -768,17 +774,19 @@ export function SchoolAdminGradeLevelDetailPage() {
             <ArrowLeft aria-hidden="true" className="size-4" />
             Quay lại
           </Link>
-          <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-5 text-sm font-black text-white shadow-sm shadow-cyan-950/20 transition hover:bg-cyan-700"
-            onClick={() => {
-              setEditError(null)
-              setIsEditDialogOpen(true)
-            }}
-            type="button"
-          >
-            <Pencil aria-hidden="true" className="size-4" />
-            Chỉnh sửa
-          </button>
+          {canManage ? (
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-5 text-sm font-black text-white shadow-sm shadow-cyan-950/20 transition hover:bg-cyan-700"
+              onClick={() => {
+                setEditError(null)
+                setIsEditDialogOpen(true)
+              }}
+              type="button"
+            >
+              <Pencil aria-hidden="true" className="size-4" />
+              Chỉnh sửa
+            </button>
+          ) : null}
         </div>
       </div>
 

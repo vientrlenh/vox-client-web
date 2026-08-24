@@ -21,7 +21,7 @@ describe('imports type helpers', () => {
       expect(getImportTypeDisplay(type)).not.toBe(type)
     })
 
-    expect(getImportTypeDisplay('SCHOOL_GRADE_LEVEL')).toBe('Khối')
+    expect(getImportTypeDisplay('SCHOOL_GRADE')).toBe('Năm học')
     expect(getImportTypeDisplay('QUESTION')).toBe('Câu hỏi')
     expect(getImportTypeDisplay('RUBRIC_CRITERION_BAND')).toBe(
       'Mức điểm tiêu chí',
