@@ -1,6 +1,14 @@
 import { ExternalLink, Receipt, X } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { formatDate, formatDateTime, formatVnd, getInvoiceStatusDisplay, type Invoice } from '../types'
+import {
+  formatDate,
+  formatDateTime,
+  formatUsd,
+  formatVnd,
+  getInvoiceStatusDisplay,
+  QUOTA_LABELS,
+  type Invoice,
+} from '../types'
 
 const SOURCE_LABELS: Record<Invoice['sourceType'], string> = {
   SUBSCRIPTION: 'Gia hạn gói',
@@ -67,6 +75,18 @@ export function InvoiceDetailDialog({ invoice, onClose }: InvoiceDetailDialogPro
             <span className="font-bold text-slate-900">{formatDateTime(invoice.paidAt)}</span>
           </div>
         </div>
+
+        {invoice.quotaItems.length > 0 ? (
+          <div className="mt-5 grid gap-2.5 rounded-2xl border border-slate-200 p-4.5 text-sm">
+            <p className="font-bold text-slate-700">Hạn mức</p>
+            {invoice.quotaItems.map((item) => (
+              <div className="flex items-center justify-between" key={item.quotaType}>
+                <span className="text-slate-500">{QUOTA_LABELS[item.quotaType]}</span>
+                <span className="font-bold text-slate-900">{formatUsd(item.amount)}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <div className="mt-5.5 flex gap-3">
           {invoice.status === 'PENDING' && invoice.checkoutUrl ? (

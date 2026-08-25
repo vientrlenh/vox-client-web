@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router'
 import { toApiError } from '@/shared/api'
 import { Pagination } from '@/shared/components/Pagination'
@@ -7,6 +7,7 @@ import { useSchoolsQuery } from '../api/useSchoolsQuery'
 import { useUpdateSchoolStatusMutation } from '../api/useUpdateSchoolStatusMutation'
 import { SchoolDetailDialog } from '../components/SchoolDetailDialog'
 import { SchoolPageHeader } from '../components/SchoolPageHeader'
+import { SchoolsFiltersBar, type SchoolStatusFilter } from '../components/SchoolsFiltersBar'
 import { SchoolTable } from '../components/SchoolTable'
 import type { School } from '../types'
 
@@ -29,7 +30,24 @@ export function SystemAdminSchoolsPage() {
   )
   const { confirm, dialog } = useConfirmationDialog()
 
-  const schoolsQuery = useSchoolsQuery(page, DEFAULT_PAGE_SIZE)
+  const [keyword, setKeyword] = useState('')
+  const [debouncedKeyword, setDebouncedKeyword] = useState('')
+  const [statusFilter, setStatusFilter] = useState<SchoolStatusFilter>('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedKeyword(keyword)
+      setPage(DEFAULT_PAGE)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [keyword])
+
+  const schoolsQuery = useSchoolsQuery(
+    page,
+    DEFAULT_PAGE_SIZE,
+    debouncedKeyword.trim() ? debouncedKeyword : null,
+    statusFilter === '' ? null : statusFilter === 'true',
+  )
   const updateStatusMutation = useUpdateSchoolStatusMutation()
 
   const schools = schoolsQuery.data?.content ?? []
@@ -72,6 +90,11 @@ export function SystemAdminSchoolsPage() {
     }
   }
 
+  function handleStatusFilterChange(value: SchoolStatusFilter) {
+    setStatusFilter(value)
+    setPage(DEFAULT_PAGE)
+  }
+
   return (
     <section aria-labelledby="system-admin-schools-title" className="grid gap-6">
       <SchoolPageHeader
@@ -96,6 +119,13 @@ export function SystemAdminSchoolsPage() {
           {pageMessage.text}
         </div>
       ) : null}
+
+      <SchoolsFiltersBar
+        keyword={keyword}
+        onKeywordChange={setKeyword}
+        onStatusChange={handleStatusFilterChange}
+        status={statusFilter}
+      />
 
       <SchoolTable
         errorMessage={

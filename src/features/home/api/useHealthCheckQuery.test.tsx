@@ -3,6 +3,7 @@ import type { AxiosResponse } from 'axios'
 import { apiClient } from '@/shared/api/apiClient'
 import { createTestProviders } from '@/test/renderWithProviders'
 import {
+  fetchHealthStatus,
   useHealthCheckQuery,
   type HealthCheckResponse,
 } from './useHealthCheckQuery'
@@ -27,10 +28,11 @@ describe('useHealthCheckQuery', () => {
 
     await waitFor(() => expect(result.current).toBe(null))
 
-    expect(mockedGet).resolves.toBe({
+    await expect(fetchHealthStatus()).resolves.toEqual({
       data: {
         status: 'ok'
       }
     })
+    expect(mockedGet).toHaveBeenCalledWith('/health')
   })
 })

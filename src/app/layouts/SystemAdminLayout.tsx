@@ -80,10 +80,6 @@ const navigationGroups: NavigationGroup[] = [
         label: 'Quản lý chính sách đánh giá',
         to: '/system-admin/assessment-policies',
       },
-      {
-        label: 'Quản lý quy tắc tính điểm',
-        to: '/system-admin/scoring-rules',
-      },
     ],
   },
   {

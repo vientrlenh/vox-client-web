@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Info } from 'lucide-react';
 
 type PopoverPosition = {
   left: number;
@@ -108,7 +107,6 @@ export function DetailPopoverButton({ label, ariaLabel, badgeClassName, children
         ref={triggerRef}
         type="button"
       >
-        <Info aria-hidden="true" className="size-3.5" />
         {label}
       </button>
       {popover}

@@ -41,6 +41,7 @@ const GET_SYSTEM_ASSESSMENT_POLICY_DETAIL = `
       }
       rubricVersion {
         id
+        rubricId
         code
         name
         version

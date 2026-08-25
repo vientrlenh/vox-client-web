@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -60,14 +60,30 @@ function renderField(onChange: (choice: RubricPolicyChoice) => void, languageId:
   return renderWithProviders(field(onChange, languageId))
 }
 
+/** Mở dialog chọn rubric, bấm đúng dòng rồi Xác nhận -- dialog phải đóng lại sau đó. */
+async function pickRubricViaDialog(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Chọn thang đánh giá' }))
+  const dialog = await screen.findByRole('dialog')
+  await user.click(within(dialog).getByText(rubric.name, { selector: 'td' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Xác nhận' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+}
+
+/** Mở dialog chọn phiên bản (rubric đã chọn từ trước), bấm dòng rồi Xác nhận. */
+async function pickVersionViaDialog(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Chọn phiên bản' }))
+  const dialog = await screen.findByRole('dialog')
+  await user.click(within(dialog).getByText('v1'))
+  await user.click(within(dialog).getByRole('button', { name: 'Xác nhận' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+}
+
 async function pickRubricAndVersion(onChange: (choice: RubricPolicyChoice) => void) {
   const user = userEvent.setup()
   const rendered = renderField(onChange)
 
-  await waitFor(() => expect(screen.getByLabelText(/Thang đánh giá/)).not.toBeDisabled())
-  await user.selectOptions(screen.getByLabelText(/Thang đánh giá/), 'rubric-1')
-  await waitFor(() => expect(screen.getByLabelText(/Phiên bản đã xuất bản/)).not.toBeDisabled())
-  await user.selectOptions(screen.getByLabelText(/Phiên bản đã xuất bản/), 'version-1')
+  await pickRubricViaDialog(user)
+  await pickVersionViaDialog(user)
   return { rendered, user }
 }
 
@@ -89,24 +105,24 @@ describe('RubricPolicySelectField', () => {
   it('không cho chọn rubric khi form chưa chọn ngôn ngữ', () => {
     renderField(jest.fn(), null)
 
-    expect(screen.getByLabelText(/Thang đánh giá/)).toBeDisabled()
-    expect(screen.getByText('Chọn ngôn ngữ trước')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Chọn ngôn ngữ trước' })).toBeDisabled()
     expect(mockedPost).not.toHaveBeenCalled()
   })
 
   it('đi tuần tự rubric -> phiên bản -> chính sách và tự chọn khi chỉ có một bản khớp', async () => {
     const onChange = jest.fn()
-    // Phiên bản chỉ mở sau khi chọn rubric: danh sách phiên bản thuộc về đúng rubric đó.
+    // Phiên bản chỉ mở sau khi chọn rubric: nút vẫn bị khoá cho tới lúc đó.
     renderField(onChange)
-    expect(screen.getByLabelText(/Phiên bản đã xuất bản/)).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Chọn thang đánh giá trước' })).toBeDisabled()
 
     const user = userEvent.setup()
-    await waitFor(() => expect(screen.getByLabelText(/Thang đánh giá/)).not.toBeDisabled())
-    expect(screen.getByRole('option', { name: 'Bộ tiêu chí nói Tiếng Anh - Khối 10 (SYS-ENG-K10)' })).toBeInTheDocument()
+    await pickRubricViaDialog(user)
+    expect(screen.getByRole('button', { name: `${rubric.name} (${rubric.code})` })).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByLabelText(/Thang đánh giá/), 'rubric-1')
-    await waitFor(() => expect(screen.getByLabelText(/Phiên bản đã xuất bản/)).not.toBeDisabled())
-    await user.selectOptions(screen.getByLabelText(/Phiên bản đã xuất bản/), 'version-1')
+    await pickVersionViaDialog(user)
+    expect(
+      screen.getByRole('button', { name: `v1 · ${version.code} · ${version.name}` }),
+    ).toBeInTheDocument()
 
     await waitFor(() =>
       expect(onChange).toHaveBeenLastCalledWith({
@@ -115,7 +131,7 @@ describe('RubricPolicySelectField', () => {
         rubricVersionId: 'version-1',
       }),
     )
-    expect(screen.getByRole('button', { pressed: true })).toHaveTextContent(/Phiên bản 3/)
+    expect(screen.getByRole('button', { name: /Phiên bản 3/, pressed: true })).toBeInTheDocument()
   })
 
   // Nhiều chính sách khớp mà tự chọn bừa một cái là chấm bài sai; phải chặn tới khi người dùng chỉ rõ.
@@ -169,7 +185,7 @@ describe('RubricPolicySelectField', () => {
     await waitFor(() =>
       expect(onChange).toHaveBeenLastCalledWith({ assessmentPolicyId: null, isBlocked: true, rubricVersionId: null }),
     )
-    expect(screen.getByLabelText(/Thang đánh giá/)).toHaveValue('')
-    expect(screen.getByLabelText(/Phiên bản đã xuất bản/)).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Chọn thang đánh giá' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Chọn thang đánh giá trước' })).toBeDisabled()
   })
 })

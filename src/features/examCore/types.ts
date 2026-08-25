@@ -333,13 +333,17 @@ export type RubricDto = {
 export type AssessmentPolicyDto = {
   effectiveFrom?: string | null
   effectiveTo?: string | null
+  gradeLevel?: { id: string; code?: string | null; name?: string | null } | null
   id: string
   languageId: string
   passingScore?: number | null
   rubricVersion?: RubricVersionDto | null
   rubricVersionId: string
+  schoolClass?: { id: string; code?: string | null; name?: string | null } | null
+  schoolGrade?: { id: string; code?: string | null; name?: string | null } | null
   status: string
   strictness: AssessmentPolicyStrictness
+  targetFrameworkBand?: { code: string; label: string } | null
   version: number
 }
 
@@ -634,6 +638,7 @@ export function formatDateTime(value?: string | null) {
     hour: '2-digit',
     minute: '2-digit',
     month: '2-digit',
+    timeZone: 'Asia/Ho_Chi_Minh',
     year: 'numeric',
   }).format(date)
 }
@@ -684,6 +689,7 @@ export function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat('vi-VN', {
     day: '2-digit',
     month: '2-digit',
+    timeZone: 'Asia/Ho_Chi_Minh',
     year: 'numeric',
   }).format(date)
 }
@@ -773,6 +779,19 @@ export function getAssessmentPolicyStrictnessLabel(strictness?: AssessmentPolicy
     default:
       return '-'
   }
+}
+
+// Lớp > Niên khóa > Khối > "Toàn trường" -- cùng thứ tự ưu tiên đã dùng ở
+// assessment_policy_school/components/AssessmentPolicyTable.tsx, để phân biệt các Assessment
+// Policy dùng chung 1 Rubric Version nhưng khác phạm vi (vd. CENTRALIZE theo Khối vs CLASS_TEST
+// neo vào 1 Lớp cụ thể) khi chúng hiện cạnh nhau trong danh sách "chọn một".
+export function getAssessmentPolicyScopeLabel(
+  policy: Pick<AssessmentPolicyDto, 'gradeLevel' | 'schoolGrade' | 'schoolClass'>,
+): string {
+  if (policy.schoolClass) return `Lớp ${policy.schoolClass.name || policy.schoolClass.code}`
+  if (policy.schoolGrade) return `Niên khóa ${policy.schoolGrade.name || policy.schoolGrade.code}`
+  if (policy.gradeLevel) return `Khối ${policy.gradeLevel.name || policy.gradeLevel.code}`
+  return 'Toàn trường'
 }
 
 export function getQuestionDifficultyDisplay(difficulty?: string | null): string {

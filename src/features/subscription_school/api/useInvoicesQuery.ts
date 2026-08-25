@@ -22,6 +22,11 @@ const INVOICES_QUERY = `
         paymentLinkId
         checkoutUrl
         paidAt
+        resolvedPlanId
+        quotaItems {
+          quotaType
+          amount
+        }
       }
       page
       size

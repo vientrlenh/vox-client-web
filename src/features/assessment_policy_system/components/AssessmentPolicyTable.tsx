@@ -14,6 +14,8 @@ type AssessmentPolicyTableProps = {
   onViewDetails: (policy: AssessmentPolicy) => void;
   onEdit: (policy: AssessmentPolicy) => void;
   onDelete: (policy: AssessmentPolicy) => void;
+  /** Policy vừa được tạo từ nơi khác (vd. trang chi tiết Rubric Version) — tô nổi bật để dễ tìm. */
+  highlightId?: string | null;
 };
 
 const strictnessLabels: Record<string, string> = {
@@ -45,6 +47,7 @@ export function AssessmentPolicyTable({
   onViewDetails,
   onEdit,
   onDelete,
+  highlightId,
 }: AssessmentPolicyTableProps) {
   if (isLoading) {
     return (
@@ -94,7 +97,9 @@ export function AssessmentPolicyTable({
             <tr
               key={policy.id}
               onClick={() => onViewDetails(policy)}
-              className="group cursor-pointer transition hover:bg-cyan-50/40"
+              className={`group cursor-pointer transition hover:bg-cyan-50/40 ${
+                policy.id === highlightId ? 'bg-cyan-50 ring-1 ring-inset ring-cyan-400' : ''
+              }`}
             >
               <td className="px-4 py-3 font-medium text-slate-900 group-hover:text-cyan-700">{policy.language?.name || '—'}</td>
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>

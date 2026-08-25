@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
+import { daysUntil } from '@/features/subscription_school/types'
 import { DateRangeFilter, type DateRangeValue } from '@/shared/ui/DateRangeFilter'
 import { useExamStatusRangeQuery } from '../api/useExamStatusRangeQuery'
 import { useNearestCentralizedExamQuery, type NearestCentralizedExam } from '../api/useNearestCentralizedExamQuery'
@@ -165,20 +166,12 @@ function formatExamDateTime(value: string | null) {
   return new Date(value).toLocaleString('vi-VN', { day: '2-digit', hour: '2-digit', minute: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-/** Số ngày còn lại đến `dateStr` (YYYY-MM-DD), tính từ đầu ngày hôm nay — âm nếu đã qua. */
-function daysUntil(dateStr: string) {
-  const end = new Date(`${dateStr}T00:00:00`)
-  const now = new Date()
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  return Math.round((end.getTime() - startOfToday.getTime()) / 86_400_000)
-}
-
 function formatDate(dateStr: string) {
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric' })
 }
 
 function formatShortDate(dateStr: string) {
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+  return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })
 }
 
 const NEAREST_EXAM_STATUS_DISPLAY: Record<NearestCentralizedExam['status'], { label: string; tone: string }> = {
@@ -421,9 +414,15 @@ const QUOTA_COLORS: Record<QuotaType, string> = {
 const TOKEN_WINDOW_DAYS = { '7': 7, '30': 30, '90': 90 } as const
 type TokenUsageWindow = keyof typeof TOKEN_WINDOW_DAYS
 
+const VN_TIMEZONE_OFFSET_MS = 7 * 60 * 60 * 1000
+
+/** yyyy-mm-dd của `days` ngày trước "hôm nay", neo theo lịch giờ VN — không phụ thuộc múi giờ trình
+ * duyệt, tránh lùi mất 1 ngày quanh mốc nửa đêm giờ VN khi máy client chạy múi giờ khác (xem
+ * daysUntil ở subscription_school/types.ts, cùng cách neo). */
 function isoDateDaysAgo(days: number) {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
+  const nowVn = new Date(Date.now() + VN_TIMEZONE_OFFSET_MS)
+  const d = new Date(Date.UTC(nowVn.getUTCFullYear(), nowVn.getUTCMonth(), nowVn.getUTCDate()))
+  d.setUTCDate(d.getUTCDate() - days)
   return d.toISOString().slice(0, 10)
 }
 
