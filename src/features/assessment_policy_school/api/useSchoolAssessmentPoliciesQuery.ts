@@ -72,7 +72,7 @@ const GET_SCHOOL_ASSESSMENT_POLICIES = `
           code
           name
         }
-        schoolGradeLevel {
+        gradeLevel {
           id
           code
           name

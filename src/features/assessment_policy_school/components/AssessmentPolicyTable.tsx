@@ -106,7 +106,7 @@ export function AssessmentPolicyTable({
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                 {(() => {
                   const schoolLabel = policy.school?.name || policy.school?.code || 'Toàn trường';
-                  const narrowestScope = policy.schoolClass ?? policy.schoolGrade ?? policy.schoolGradeLevel;
+                  const narrowestScope = policy.schoolClass ?? policy.schoolGrade ?? policy.gradeLevel;
                   const narrowestLabel = narrowestScope?.name || narrowestScope?.code;
                   const badgeLabel = narrowestLabel ? `${schoolLabel} - ${narrowestLabel}` : schoolLabel;
 
@@ -117,8 +117,8 @@ export function AssessmentPolicyTable({
                       label={badgeLabel}
                     >
                       <PopoverInfoRow label="Trường" value={schoolLabel} />
-                      {policy.schoolGradeLevel ? (
-                        <PopoverInfoRow label="Khối" value={policy.schoolGradeLevel.name || policy.schoolGradeLevel.code || '—'} />
+                      {policy.gradeLevel ? (
+                        <PopoverInfoRow label="Khối" value={policy.gradeLevel.name || policy.gradeLevel.code || '—'} />
                       ) : null}
                       {policy.schoolGrade ? (
                         <PopoverInfoRow label="Niên khóa" value={policy.schoolGrade.name || policy.schoolGrade.code || '—'} />

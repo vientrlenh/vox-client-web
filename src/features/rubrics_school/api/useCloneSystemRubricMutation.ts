@@ -7,6 +7,22 @@ import { rubricQueryKeys } from './useSchoolRubricsQuery';
 import { searchRubricKeys } from './useSearchSchoolRubricsQuery';
 import { rubricVersionQueryKeys } from './useSchoolRubricVersionsQuery';
 
+/**
+ * Một chính sách chấm mẫu được sao kèm, với PHẠM VI RIÊNG của nó.
+ *
+ * Phạm vi đi theo từng chính sách chứ không theo cả lần sao: mỗi phạm vi chỉ được đúng một chính
+ * sách còn hiệu lực, nên sao hai bản mẫu khác bậc mục tiêu vào cùng một phạm vi sẽ bị từ chối.
+ */
+export type CloneSystemRubricPolicyChoice = {
+  sourcePolicyId: string;
+  /** Chỉ gửi khi bản mẫu KHÔNG gắn Khối; khi đó phải có đúng 1 trong 3. */
+  gradeLevelId?: string;
+  schoolGradeId?: string;
+  schoolClassId?: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+};
+
 export type CloneSystemRubricPayload = {
   sourceRubricVersionId: string;
   code: string;
@@ -14,6 +30,11 @@ export type CloneSystemRubricPayload = {
   description?: string;
   /** Bỏ trống thì giữ nguyên cách tính của bản mẫu. */
   totalScoreMethod?: string;
+  /**
+   * Bỏ trống = chỉ sao bộ tiêu chí. Khi đó phiên bản mới nằm DRAFT tới khi trường tự gắn một chính
+   * sách, vì ban hành phiên bản đòi phải có chính sách liên kết đã PUBLISHED.
+   */
+  policies?: CloneSystemRubricPolicyChoice[];
 };
 
 export type CloneSystemRubricResult = {
@@ -74,6 +95,9 @@ export function useCloneSystemRubricMutation(schoolId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: rubricQueryKeys.all });
       queryClient.invalidateQueries({ queryKey: searchRubricKeys.all });
       queryClient.invalidateQueries({ queryKey: rubricVersionQueryKeys.all });
+      // Lần sao có kèm chính sách sẽ tạo Assessment Policy mới cho trường, nên danh sách chính sách
+      // đang mở ở tab khác cũng phải nạp lại.
+      queryClient.invalidateQueries({ queryKey: ['school-assessment-policies'] });
     },
   });
 }

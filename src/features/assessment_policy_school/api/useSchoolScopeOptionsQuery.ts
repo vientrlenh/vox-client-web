@@ -4,7 +4,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { graphQLRequest } from '@/shared/api/graphqlClient';
 
-export type SchoolGradeLevelOption = {
+export type GradeLevelOption = {
   id: string;
   code: string;
   name: string;
@@ -16,10 +16,11 @@ export type SchoolGradeOption = {
   name?: string | null;
 };
 
-// 1. Danh sách Khối (SchoolGradeLevel) của trường
-const GET_SCHOOL_GRADE_LEVELS = `
-  query GetSchoolGradeLevels($schoolId: ID!, $page: Int, $size: Int) {
-    schoolGradeLevels(schoolId: $schoolId, page: $page, size: $size) {
+// 1. Danh sách Khối (GradeLevel) -- catalog dùng chung toàn hệ thống, không lọc theo trường.
+//    Mọi vai trò đã đăng nhập đều đọc được nên không cần truyền schoolId nữa.
+const GET_GRADE_LEVELS = `
+  query GetGradeLevels($page: Int, $size: Int) {
+    gradeLevels(page: $page, size: $size) {
       content {
         id
         code
@@ -29,24 +30,24 @@ const GET_SCHOOL_GRADE_LEVELS = `
   }
 `;
 
-export function useSchoolGradeLevelOptionsQuery(schoolId: string | undefined) {
+export function useGradeLevelOptionsQuery(enabled = true) {
   return useQuery({
-    queryKey: ['school-assessment-policy-grade-level-options', schoolId],
+    queryKey: ['assessment-policy-grade-level-options'],
     queryFn: async () => {
-      const data = await graphQLRequest<{ schoolGradeLevels: { content: SchoolGradeLevelOption[] } }>(
-        GET_SCHOOL_GRADE_LEVELS,
-        { schoolId, page: 1, size: 100 }
+      const data = await graphQLRequest<{ gradeLevels: { content: GradeLevelOption[] } }>(
+        GET_GRADE_LEVELS,
+        { page: 1, size: 100 }
       );
-      return data.schoolGradeLevels.content;
+      return data.gradeLevels.content;
     },
-    enabled: Boolean(schoolId),
+    enabled,
   });
 }
 
 // 2. Danh sách Niên khóa (SchoolGrade) của trường, lọc theo Khối đã chọn (nếu có)
 const GET_SCHOOL_GRADES = `
-  query GetSchoolGrades($schoolId: ID!, $schoolGradeLevelId: ID, $page: Int, $size: Int) {
-    schoolGrades(schoolId: $schoolId, schoolGradeLevelId: $schoolGradeLevelId, page: $page, size: $size) {
+  query GetSchoolGrades($schoolId: ID!, $gradeLevelId: ID, $page: Int, $size: Int) {
+    schoolGrades(schoolId: $schoolId, gradeLevelId: $gradeLevelId, page: $page, size: $size) {
       content {
         id
         code
@@ -56,16 +57,16 @@ const GET_SCHOOL_GRADES = `
   }
 `;
 
-export function useSchoolGradeOptionsQuery(schoolId: string | undefined, schoolGradeLevelId?: string) {
+export function useSchoolGradeOptionsQuery(schoolId: string | undefined, gradeLevelId?: string) {
   return useQuery({
-    queryKey: ['school-assessment-policy-grade-options', schoolId, schoolGradeLevelId],
+    queryKey: ['school-assessment-policy-grade-options', schoolId, gradeLevelId],
     queryFn: async () => {
       const data = await graphQLRequest<{ schoolGrades: { content: SchoolGradeOption[] } }>(
         GET_SCHOOL_GRADES,
-        { schoolId, schoolGradeLevelId: schoolGradeLevelId || null, page: 1, size: 100 }
+        { schoolId, gradeLevelId: gradeLevelId || null, page: 1, size: 100 }
       );
       return data.schoolGrades.content;
     },
-    enabled: Boolean(schoolId) && Boolean(schoolGradeLevelId),
+    enabled: Boolean(schoolId) && Boolean(gradeLevelId),
   });
 }

@@ -24,7 +24,7 @@ type ApiResponse<T> = {
 }
 
 const schoolId = '33333333-3333-4333-8333-333333333333'
-const schoolGradeLevelId = '44444444-4444-4444-8444-444444444444'
+const gradeLevelId = '44444444-4444-4444-8444-444444444444'
 const payload: CreateSchoolGradeRequest = {
   code: 'NH2024-2025',
   endDate: '2025-05-31',
@@ -73,14 +73,14 @@ describe('grade management mutations', () => {
     } as AxiosResponse<ApiResponse<{ schoolGradeId: string }>>)
 
     await expect(
-      createSchoolGrade({ payload, schoolGradeLevelId }),
+      createSchoolGrade({ payload, gradeLevelId }),
     ).resolves.toEqual({
       data: { schoolGradeId: 'grade-1' },
       message: 'Created',
     })
 
     expect(apiClient.post).toHaveBeenCalledWith(
-      `/v1/schools/${schoolId}/grade-levels/${schoolGradeLevelId}/grades`,
+      `/v1/schools/${schoolId}/grade-levels/${gradeLevelId}/grades`,
       payload,
     )
   })
@@ -89,7 +89,7 @@ describe('grade management mutations', () => {
     saveSession(null)
 
     await expect(
-      createSchoolGrade({ payload, schoolGradeLevelId }),
+      createSchoolGrade({ payload, gradeLevelId }),
     ).rejects.toMatchObject({
       message: 'Missing schoolId in access token.',
     })

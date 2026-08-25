@@ -2,6 +2,7 @@ export type SchoolGradeLevelStatus = 'ACTIVE' | 'INACTIVE'
 
 export type SchoolGradeStatus = 'INACTIVE' | 'ACTIVE' | 'ARCHIVED'
 
+// Catalog khối lớp dùng chung toàn hệ thống -- không còn schoolId (BE: type GradeLevel).
 export type SchoolGradeLevel = {
   code: string
   createdAt: string | null
@@ -9,7 +10,6 @@ export type SchoolGradeLevel = {
   id: string
   name: string
   order: number
-  schoolId: string
   status: SchoolGradeLevelStatus | string
   updatedAt: string | null
 }

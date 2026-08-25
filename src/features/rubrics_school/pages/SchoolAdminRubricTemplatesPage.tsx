@@ -198,6 +198,7 @@ export function SchoolAdminRubricTemplatesPage() {
         onClose={() => setCloningTemplate(null)}
         onSubmit={handleClone}
         isPending={isCloning}
+        schoolId={schoolId}
       />
     </section>
   );
