@@ -9,7 +9,7 @@ import {
   useTeacherRubricVersionsQueries,
   useTeacherRubricsQuery,
 } from '../api/rubricQueries'
-import { formatDate, getAssessmentPolicyStrictnessLabel } from '../types'
+import { formatDate, getAssessmentPolicyScopeLabel, getAssessmentPolicyStrictnessLabel } from '../types'
 import { TablePickerDialog } from './TablePickerDialog'
 
 const TRIGGER_CLASS =
@@ -224,6 +224,9 @@ export function RubricPolicySelectField({
               type="button"
             >
               <span>
+                <span className="block text-indigo-700">
+                  {getAssessmentPolicyScopeLabel(policy)} · {policy.targetFrameworkBand?.label ?? '—'}
+                </span>
                 Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt{' '}
                 {policy.passingScore ?? '-'}
               </span>

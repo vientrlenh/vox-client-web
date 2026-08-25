@@ -419,7 +419,6 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
       </div>
 
       <UpdateAssessmentPolicyDialog
-        schoolId={schoolId}
         policy={isEditModalOpen ? policy : null}
         onClose={() => setIsEditModalOpen(false)}
         onSubmit={handleUpdatePolicy}

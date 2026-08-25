@@ -9,7 +9,7 @@ import {
   useTeacherRubricVersionsQueries,
   useTeacherRubricsQuery,
 } from '../api/rubricQueries'
-import { formatDate, getAssessmentPolicyStrictnessLabel } from '../types'
+import { formatDate, getAssessmentPolicyScopeLabel, getAssessmentPolicyStrictnessLabel } from '../types'
 import { TablePickerDialog } from './TablePickerDialog'
 
 const TRIGGER_CLASS =
@@ -199,6 +199,9 @@ export function RubricPolicyPicker({ languageId, onChange, scope }: RubricPolicy
                   type="button"
                 >
                   <span>
+                    <span className="block text-indigo-700">
+                      {getAssessmentPolicyScopeLabel(policy)} · {policy.targetFrameworkBand?.label ?? '—'}
+                    </span>
                     Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt{' '}
                     {policy.passingScore ?? '-'}
                   </span>
@@ -213,7 +216,9 @@ export function RubricPolicyPicker({ languageId, onChange, scope }: RubricPolicy
 
           {resolvedPolicyId && matchingPolicies.length === 1 ? (
             <p className="text-xs font-semibold text-emerald-700">
-              Sẽ đổi sang chính sách: {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
+              Sẽ đổi sang chính sách: {getAssessmentPolicyScopeLabel(matchingPolicies[0])} ·{' '}
+              {matchingPolicies[0].targetFrameworkBand?.label ?? '—'} ·{' '}
+              {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
               {matchingPolicies[0].passingScore ?? '-'}
             </p>
           ) : null}

@@ -446,7 +446,6 @@ export function SchoolAdminAssessmentPoliciesPage() {
       />
 
       <UpdateAssessmentPolicyDialog
-        schoolId={schoolId}
         policy={editingPolicy}
         onClose={() => setEditingPolicy(null)}
         onSubmit={handleUpdatePolicy}

@@ -86,6 +86,7 @@ import {
   formatDateTime,
   formatDurationSeconds,
   formatNullableText,
+  getAssessmentPolicyScopeLabel,
   getAssessmentPolicyStrictnessLabel,
   getExamChairName,
   getResultDecisionMethodDisplay,
@@ -750,7 +751,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
 
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <span className="text-sm font-bold text-slate-700">
-            Phiên bản thang đánh giá (Rubric Version) <span className="text-red-600">*</span>
+            Phiên bản thang đánh giá <span className="text-red-600">*</span>
           </span>
           <p className="text-xs text-slate-500">
             Bắt buộc — quyết định chính sách đánh giá dùng để chấm bài. Thiếu nó thì bài không chấm được.
@@ -768,8 +769,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
             <div className="mt-1.5 grid gap-2 rounded-lg border border-indigo-200 bg-white p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[13px] text-slate-700">
-                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b> ({selectedRubricVersion.code} · v
-                  {selectedRubricVersion.version})
+                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b>
                 </p>
                 <div className="flex shrink-0 items-center gap-3">
                   <button className="text-xs font-bold text-indigo-600" onClick={goToSelectRubricVersion} type="button">
@@ -809,6 +809,9 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
                       type="button"
                     >
                       <span>
+                        <span className="block text-indigo-700">
+                          {getAssessmentPolicyScopeLabel(policy)} · {policy.targetFrameworkBand?.label ?? '—'}
+                        </span>
                         Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt{' '}
                         {policy.passingScore ?? '-'}
                       </span>
@@ -823,7 +826,9 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
 
               {assessmentPolicyId && matchingPolicies.length === 1 ? (
                 <p className="text-xs font-semibold text-emerald-700">
-                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
+                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyScopeLabel(matchingPolicies[0])} ·{' '}
+                  {matchingPolicies[0].targetFrameworkBand?.label ?? '—'} ·{' '}
+                  {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
                   {matchingPolicies[0].passingScore ?? '-'}
                 </p>
               ) : null}
