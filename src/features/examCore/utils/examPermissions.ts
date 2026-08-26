@@ -34,7 +34,6 @@ export type ExamAuthority = {
   /** Lên lịch / bắt đầu / đóng / công bố kết quả. */
   canManageStatus: boolean
   /** Mở khoá ngân hàng câu hỏi sau kỳ thi — thao tác của hội đồng, không phải của quản trị trường. */
-  canReleaseSecurePool: boolean
 }
 
 const NO_AUTHORITY: ExamAuthority = {
@@ -47,7 +46,6 @@ const NO_AUTHORITY: ExamAuthority = {
   canManagePapers: false,
   canManageSchedule: false,
   canManageStatus: false,
-  canReleaseSecurePool: false,
 }
 
 export function resolveExamAuthority(input: {
@@ -72,7 +70,6 @@ export function resolveExamAuthority(input: {
     canManagePapers: isSchoolAdmin || isChair || isAuthor,
     canManageSchedule: isSchoolAdmin || isChair,
     canManageStatus: isSchoolAdmin || isChair,
-    canReleaseSecurePool: isChair,
   }
 }
 

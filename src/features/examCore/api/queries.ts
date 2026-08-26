@@ -151,10 +151,6 @@ const EXAM_SUMMARY_FIELDS = `
   aiConfidenceThresholdPercent
   requiredStreamType
   streamTypePermission
-  securePool {
-    id
-    status
-  }
   members {
     ${EXAM_MEMBER_FIELDS}
   }
@@ -189,10 +185,6 @@ const EXAM_DETAIL_FIELDS = `
   aiConfidenceThresholdPercent
   requiredStreamType
   streamTypePermission
-  securePool {
-    id
-    status
-  }
   members {
     ${EXAM_MEMBER_FIELDS}
   }

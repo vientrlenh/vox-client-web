@@ -43,6 +43,16 @@ type QuestionPickerProps = {
 
 const PAGE_SIZE = 8
 
+// Cùng nhãn với bộ lọc ở màn ngân hàng câu hỏi (QuestionFiltersForm) -- hai nơi gọi khác tên cho
+// cùng một loại là người dùng phải học hai lần.
+const QUESTION_TYPE_FILTER_OPTIONS: Array<{ label: string; value: '' | QuestionType }> = [
+  { label: 'Tất cả loại câu', value: '' },
+  { label: 'Trả lời ngắn', value: 'SHORT_ANSWER' },
+  { label: 'Trả lời dài', value: 'LONG_ANSWER' },
+  { label: 'Ý kiến', value: 'OPINION' },
+  { label: 'Mô tả', value: 'DESCRIPTION' },
+]
+
 const QUESTION_ASSET_FILTER_OPTIONS: Array<{ label: string; value: QuestionAssetTypeFilter }> = [
   { label: 'Tất cả tài nguyên', value: '' },
   { label: 'Không có tài nguyên', value: 'NONE' },
@@ -97,6 +107,7 @@ export function QuestionPicker({
   const [bankId, setBankId] = useState('')
   const [topicId, setTopicId] = useState('')
   const [assetType, setAssetType] = useState<QuestionAssetTypeFilter>('')
+  const [questionType, setQuestionType] = useState<'' | QuestionType>('')
   // Tiêu chí có thể hẹp tới mức không còn câu nào khớp, nên phải cho bỏ lọc để thoát.
   const [applySlotFilter, setApplySlotFilter] = useState(true)
   const hasSlotFilter = Boolean(initialQuestionTopicId) || Boolean(initialType)
@@ -114,13 +125,16 @@ export function QuestionPicker({
   const questionsQuery = useQuestionsQuery(scope, 'all', page, PAGE_SIZE, {
     keyword,
     questionBankId: bankId || undefined,
-    questionTopicId: filterActive ? (initialQuestionTopicId ?? undefined) : (topicId || undefined),
+    // Người dùng chọn gì thì theo nấy; KHÔNG chọn mới rơi về tiêu chí của ô. Trước đây tiêu chí
+    // của ô luôn thắng và hai ô lọc bị khoá cứng, nên muốn thu hẹp trong phạm vi ô là phải tắt cả
+    // bộ lọc -- mất luôn ràng buộc của ô. Giờ thu hẹp được từng chiều một.
+    questionTopicId: topicId || (filterActive ? (initialQuestionTopicId ?? undefined) : undefined),
     scope: '',
     sharing: '',
     assetType,
     status: publishedOnly ? 'PUBLISHED' : '',
     topicName: '',
-    type: filterActive ? (initialType ?? '') : '',
+    type: questionType || (filterActive ? (initialType ?? '') : ''),
   })
   const questions = questionsQuery.data?.content ?? []
 
@@ -206,16 +220,11 @@ export function QuestionPicker({
             <select
               aria-label="Lọc theo chủ đề"
               className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 disabled:bg-slate-100 disabled:text-slate-400"
-              disabled={!bankId || filterActive}
+              disabled={!bankId}
               onChange={(event) => {
                 setTopicId(event.target.value)
                 setPage(1)
               }}
-              title={
-                filterActive
-                  ? 'Đang lọc theo tiêu chí của ô — bỏ lọc ở trên để chọn chủ đề khác'
-                  : undefined
-              }
               value={topicId}
             >
               <option value="">
@@ -230,6 +239,22 @@ export function QuestionPicker({
 
             {/* Không bị filterActive khoá như ô chủ đề: tiêu chí của ô blueprint ràng buộc chủ đề
                 và loại câu hỏi, không nói gì về tài nguyên — nên vẫn lọc được để tìm cho nhanh. */}
+            <select
+              aria-label="Lọc theo loại câu hỏi"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
+              onChange={(event) => {
+                setQuestionType(event.target.value as '' | QuestionType)
+                setPage(1)
+              }}
+              value={questionType}
+            >
+              {QUESTION_TYPE_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
             <select
               aria-label="Lọc theo loại tài nguyên"
               className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400"

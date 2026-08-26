@@ -8,6 +8,18 @@ export type ImportField = {
   value: string
 }
 
+// Hai cột này quyết định AI hiểu tài nguyên tới đâu, mà tên cột thì không tự nói ra điều đó.
+// AI KHÔNG nhìn được ảnh, KHÔNG nghe được tệp — nó chỉ biết qua đúng mấy dòng chữ ở đây.
+const ASSET_TRANSCRIPT_HINT =
+  'NỘI DUNG của tài nguyên. TEXT_PASSAGE: dán nguyên văn đoạn đọc vào đây (bắt buộc). AUDIO/VIDEO: chép lại lời nói, đúng thứ tự, ghi rõ ai nói nếu có nhiều giọng (bắt buộc). IMAGE: bỏ trống.'
+
+// Đo trên dữ liệu thật 2026-08-26: mô tả của IMAGE dài trung bình ~2750 ký tự, AUDIO ~2325,
+// VIDEO ~2211, còn TEXT_PASSAGE chỉ ~156 — mỏng gấp 17 lần. Không phải người soạn lười: với
+// TEXT_PASSAGE thì nguyên văn đã nằm ở "Bản chép lời" nên mô tả có vẻ thừa. Thực ra không thừa,
+// nó chỉ phải nói THỨ KHÁC — xem gợi ý bên dưới.
+const ASSET_DESCRIPTION_HINT =
+  'BỐI CẢNH, không phải nội dung. IMAGE: tả kỹ những gì có trong ảnh (bắt buộc nếu không có văn bản thay thế) — đây là toàn bộ thứ AI "thấy". AUDIO/VIDEO: giọng ai, ở đâu, giọng điệu, tốc độ. TEXT_PASSAGE: KHÔNG kể lại nội dung (đã có ở bản chép lời) mà ghi thứ giúp chấm đúng — hai luồng quan điểm trong bài là gì, chi tiết nào đáng được trích dẫn, và kiểu lạc đề hay gặp. Ghi rõ nếu học sinh được phép PHẢN ĐỐI đoạn văn.'
+
 const FRAMEWORK_SIGNAL_HINT =
   'Cú pháp mỗi tín hiệu: code|description|importance|evidenceHint. Nhiều tín hiệu cách nhau bằng dấu ";". importance thuộc {HIGH, MEDIUM, LOW}. VD: CLR1|Phát âm rõ ràng|HIGH|Nghe được toàn bộ câu;CLR2|Ngập ngừng nhẹ|LOW|'
 
@@ -113,8 +125,8 @@ export const IMPORT_FIELDS_BY_TYPE: Record<string, ImportField[]> = {
     { isRequired: false, label: 'Đường dẫn tài nguyên', value: 'assetUrl' },
     { isRequired: false, label: 'Tiêu đề tài nguyên', value: 'assetTitle' },
     { isRequired: false, label: 'Văn bản thay thế', value: 'assetAltText' },
-    { isRequired: false, label: 'Bản chép lời', value: 'assetTranscript' },
-    { isRequired: false, label: 'Mô tả tài nguyên', value: 'assetDescription' },
+    { hint: ASSET_TRANSCRIPT_HINT, isRequired: false, label: 'Bản chép lời', value: 'assetTranscript' },
+    { hint: ASSET_DESCRIPTION_HINT, isRequired: false, label: 'Mô tả tài nguyên', value: 'assetDescription' },
     { isRequired: false, label: 'Thời lượng tài nguyên', value: 'assetDurationSeconds' },
     {
       isRequired: false,

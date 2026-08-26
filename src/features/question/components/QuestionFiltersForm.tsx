@@ -4,7 +4,6 @@ import type { QuestionSharing, QuestionType } from '../types'
 
 const QUESTION_TYPE_OPTIONS: Array<{ label: string; value: '' | QuestionType }> = [
   { label: 'Tất cả loại', value: '' },
-  { label: 'Đọc to', value: 'READ_ALOUD' },
   { label: 'Trả lời ngắn', value: 'SHORT_ANSWER' },
   { label: 'Trả lời dài', value: 'LONG_ANSWER' },
   { label: 'Ý kiến', value: 'OPINION' },
