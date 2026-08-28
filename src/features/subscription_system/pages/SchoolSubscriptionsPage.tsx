@@ -7,6 +7,7 @@ import {
   useSuspendSubscriptionMutation,
   useUnsuspendSubscriptionMutation,
 } from '../api/useSchoolSubscriptionMutations'
+import { useSchoolsWithOngoingExamQuery } from '../api/useSchoolsWithOngoingExamQuery'
 import { useSchoolSubscriptionsQuery } from '../api/useSchoolSubscriptionsQuery'
 import { useSubscriptionPlansQuery } from '../api/useSubscriptionPlansQuery'
 import { SchoolSubscriptionTable } from '../components/SchoolSubscriptionTable'
@@ -38,10 +39,17 @@ export function SchoolSubscriptionsPage() {
 
   const subscriptionsQuery = useSchoolSubscriptionsQuery(filters, page, pageSize)
   const plansQuery = useSubscriptionPlansQuery(DEFAULT_PAGE, PLAN_OPTIONS_PAGE_SIZE)
+  const ongoingExamQuery = useSchoolsWithOngoingExamQuery()
   const suspendMutation = useSuspendSubscriptionMutation()
   const unsuspendMutation = useUnsuspendSubscriptionMutation()
 
   const subscriptions = useMemo(() => subscriptionsQuery.data?.content ?? [], [subscriptionsQuery.data])
+
+  // Lỗi hoặc chưa tải xong -> tập rỗng, tức KHÔNG chặn nút nào. BE vẫn là chốt cuối.
+  const schoolsWithOngoingExam = useMemo(
+    () => new Set(ongoingExamQuery.data ?? []),
+    [ongoingExamQuery.data],
+  )
 
   const planOptions = useMemo(
     () =>
@@ -166,6 +174,7 @@ export function SchoolSubscriptionsPage() {
           onUnsuspend={(subscription) =>
             handleUnsuspend(subscription.id, subscription.school?.name ?? subscription.schoolId)
           }
+          suspendBlockedSchoolIds={schoolsWithOngoingExam}
         />
         <SubscriptionPagination
           isDisabled={subscriptionsQuery.isFetching}
