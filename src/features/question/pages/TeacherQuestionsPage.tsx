@@ -358,11 +358,12 @@ function QuestionsPage({
     [statusCounts, statusTabs],
   )
 
-  const banksQuery = useQuestionBanksQuery(scope, 0, REFERENCE_OPTIONS_PAGE_SIZE)
+  // Trang 1, KHÔNG phải 0 -- backend đếm trang từ 1 rồi tự trừ đi 1 trước khi dựng PageRequest.
+  const banksQuery = useQuestionBanksQuery(scope, 1, REFERENCE_OPTIONS_PAGE_SIZE)
   const topicsQuery = useQuestionTopicsQuery(
     scope,
     draftFilters.questionBankId ?? '',
-    0,
+    1,
     REFERENCE_OPTIONS_PAGE_SIZE,
     Boolean(draftFilters.questionBankId),
   )
