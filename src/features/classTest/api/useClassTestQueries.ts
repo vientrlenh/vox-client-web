@@ -26,7 +26,7 @@ async function fetchClassTests(filters: {
 }) {
   const data = await graphQLRequest<{ classTests: Paged<ExamDto> }>(CLASS_TESTS_QUERY, {
     keyword: filters.keyword?.trim() || null,
-    page: filters.page - 1,
+    page: filters.page,
     schoolClassId: filters.schoolClassId || null,
     size: filters.size,
     status: filters.status || null,
@@ -44,7 +44,6 @@ export function useClassTestsQuery(filters: {
   return useQuery({
     queryFn: () => fetchClassTests(filters),
     queryKey: examQueryKeys.classTests(filters),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 

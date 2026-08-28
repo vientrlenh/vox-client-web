@@ -250,14 +250,10 @@ export function useQuestionsQuery(
     queryFn: () =>
       fetchQuestions({
         filters: resolvedFilters,
-        page: page - 1,
+        page,
         size,
       }),
     queryKey: questionQueryKeys.questions(view, page, size, resolvedFilters),
-    select: (data) => ({
-      ...data,
-      page: data.page + 1,
-    }),
   })
 }
 
@@ -294,13 +290,9 @@ export function useQuestionsForExamPaperQuery(
     queryFn: () =>
       fetchQuestionsForExamPaper({
         filters,
-        page: page - 1,
+        page,
         size,
       }),
     queryKey: [...questionQueryKeys.all, 'exam-paper', page, size, filters],
-    select: (data) => ({
-      ...data,
-      page: data.page + 1,
-    }),
   })
 }

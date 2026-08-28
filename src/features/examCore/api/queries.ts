@@ -626,7 +626,7 @@ async function fetchBlueprints(filters: { isActive?: boolean; keyword?: string; 
   const data = await graphQLRequest<{ examBlueprints: Paged<ExamBlueprintDto> }>(EXAM_BLUEPRINTS_QUERY, {
     isActive: filters.isActive ?? null,
     keyword: filters.keyword?.trim() || null,
-    page: filters.page - 1,
+    page: filters.page,
     size: filters.size,
   })
   return data.examBlueprints
@@ -694,7 +694,6 @@ export function useExamBlueprintsQuery(filters: { isActive?: boolean; keyword?: 
   return useQuery({
     queryFn: () => fetchBlueprints(filters),
     queryKey: examQueryKeys.blueprints(filters),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 
@@ -895,7 +894,7 @@ export async function fetchExamPickerOptions(input: FetchExamPickerOptionsInput)
   const data = await graphQLRequest<{ exams: Paged<ExamPickerOption> }>(EXAM_PICKER_QUERY, {
     keyword: input.keyword?.trim() || null,
     kind: input.kind ?? null,
-    page: input.page - 1,
+    page: input.page,
     size: input.size,
     status: input.status || null,
   })
@@ -909,6 +908,5 @@ export function useExamPickerOptionsQuery(input: FetchExamPickerOptionsInput) {
     placeholderData: (previousData) => previousData,
     queryFn: () => fetchExamPickerOptions(input),
     queryKey: examQueryKeys.examPicker(input),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }

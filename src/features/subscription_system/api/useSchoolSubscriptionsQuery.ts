@@ -53,7 +53,7 @@ async function fetchSchoolSubscriptions(
     SCHOOL_SUBSCRIPTIONS_QUERY,
     {
       keyword: filters.keyword.trim() || null,
-      page: page - 1,
+      page,
       planId: filters.planId || null,
       size,
       status: filters.status || null,
@@ -61,10 +61,7 @@ async function fetchSchoolSubscriptions(
   )
 
   const response = data.schoolSubscriptions
-  return {
-    ...response,
-    page: response.page + 1,
-  }
+  return response
 }
 
 export function useSchoolSubscriptionsQuery(filters: SchoolFilters, page: number, size: number) {

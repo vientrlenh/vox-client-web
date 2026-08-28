@@ -77,10 +77,7 @@ async function fetchSystemRubricTemplates(
   );
 
   const response = data.systemRubricTemplates;
-  return {
-    ...response,
-    page: response.page + 1, // Bù trừ 0-based từ Backend lên 1-based cho Pagination UI
-  };
+  return response;
 }
 
 export function useSystemRubricTemplatesQuery(

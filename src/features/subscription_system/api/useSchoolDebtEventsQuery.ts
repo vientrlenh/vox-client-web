@@ -33,16 +33,13 @@ const SCHOOL_DEBT_EVENTS_QUERY = `
 
 async function fetchSchoolDebtEvents(schoolId: string, page: number, size: number): Promise<SchoolDebtEventPage> {
   const data = await graphQLRequest<{ schoolDebtEvents: SchoolDebtEventPage }>(SCHOOL_DEBT_EVENTS_QUERY, {
-    page: page - 1,
+    page,
     schoolId,
     size,
   })
 
   const response = data.schoolDebtEvents
-  return {
-    ...response,
-    page: response.page + 1,
-  }
+  return response
 }
 
 export function useSchoolDebtEventsQuery(schoolId: string | null, page: number, size: number) {

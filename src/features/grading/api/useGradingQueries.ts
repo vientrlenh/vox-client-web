@@ -487,9 +487,8 @@ export function useGradingAssignmentsQuery(
 ) {
   const input: FetchGradingAssignmentsInput = { ...options, page, size }
   return useQuery({
-    queryFn: () => fetchGradingAssignments({ ...input, page: page - 1 }),
+    queryFn: () => fetchGradingAssignments(input),
     queryKey: gradingKeys.assignments(input),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 
@@ -512,9 +511,8 @@ export function useMyGradingTasksQuery(
 ) {
   const input: FetchMyGradingTasksInput = { ...options, page, size }
   return useQuery({
-    queryFn: () => fetchMyGradingTasks({ ...input, page: page - 1 }),
+    queryFn: () => fetchMyGradingTasks(input),
     queryKey: gradingKeys.myTasks(input),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 

@@ -109,14 +109,16 @@ function mockQuestionList() {
       } as AxiosResponse
     }
 
-    const isFirstPage = (variables?.page ?? 0) === 0
+    // `questions` đánh số trang từ 1 (đợt refactor subscription lật toàn bộ trường phân trang
+    // GraphQL sang 1-based), nên trang đầu là 1 chứ không phải 0.
+    const isFirstPage = (variables?.page ?? 1) === 1
 
     return {
       data: {
         data: {
           questions: {
             content: isFirstPage ? FIRST_PAGE : SECOND_PAGE,
-            page: variables?.page ?? 0,
+            page: variables?.page ?? 1,
             size: 10,
             totalElements: FIRST_PAGE.length + SECOND_PAGE.length,
             totalPages: 2,

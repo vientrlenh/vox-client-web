@@ -74,7 +74,7 @@ export const studentAppealQueryKeys = {
   list: (page: number) => ['student-appeals', 'list', page] as const,
 }
 
-export function useMyAppealsQuery(page = 0) {
+export function useMyAppealsQuery(page = 1) {
   return useQuery({
     queryFn: async () => {
       const data = await graphQLRequest<{ myAppeals: AppealPage }>(MY_APPEALS_QUERY, { page, size: 20 })

@@ -86,10 +86,7 @@ async function fetchSystemAssessmentPolicies(
 
   const response = data.viewSystemAssessmentPolicies;
 
-  return {
-    ...response,
-    page: response.page + 1,
-  };
+  return response;
 }
 
 export function useSystemAssessmentPoliciesQuery(

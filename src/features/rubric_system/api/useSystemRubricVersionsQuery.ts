@@ -49,10 +49,7 @@ async function fetchSystemRubricVersions(
 
   const response = data.viewSystemRubricVersions;
 
-  return {
-    ...response,
-    page: response.page + 1,
-  };
+  return response;
 }
 
 export function useSystemRubricVersionsQuery(

@@ -50,10 +50,7 @@ async function fetchSchoolRubricVersions(
 
   const response = data.viewSchoolRubricVersions;
 
-  return {
-    ...response,
-    page: response.page + 1,
-  };
+  return response;
 }
 
 export function useSchoolRubricVersionsQuery(
