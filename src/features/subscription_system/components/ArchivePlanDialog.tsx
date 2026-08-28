@@ -64,8 +64,9 @@ export function ArchivePlanDialog({
               <p className="mt-1 text-sm font-medium leading-6 text-slate-600">
                 Gói <strong>{plan.name}</strong> sẽ được lưu trữ và không còn hiển thị cho trường đăng ký mới. Các
                 trường đang dùng gói này không bị ảnh hưởng ngay, nhưng nếu không chọn gói thay thế, các trường sẽ
-                không gia hạn được cho tới khi có gói thay thế. Chỉ những gói đang hoạt động có cùng giá (
-                {formatVnd(plan.pricePerYear)}) mới được chọn làm gói thay thế.
+                không gia hạn được cho tới khi có gói thay thế. Giá của gói thay thế có thể khác gói hiện tại (
+                {formatVnd(plan.pricePerYear)}) — trường vẫn sẽ được xem trước và xác nhận giá mới trước khi bị
+                thu tiền ở lần gia hạn tới.
               </p>
             </div>
           </div>

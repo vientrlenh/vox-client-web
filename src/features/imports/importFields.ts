@@ -8,6 +8,18 @@ export type ImportField = {
   value: string
 }
 
+// Hai cột này quyết định AI hiểu tài nguyên tới đâu, mà tên cột thì không tự nói ra điều đó.
+// AI KHÔNG nhìn được ảnh, KHÔNG nghe được tệp — nó chỉ biết qua đúng mấy dòng chữ ở đây.
+const ASSET_TRANSCRIPT_HINT =
+  'NỘI DUNG của tài nguyên. TEXT_PASSAGE: dán nguyên văn đoạn đọc vào đây (bắt buộc). AUDIO/VIDEO: chép lại lời nói, đúng thứ tự, ghi rõ ai nói nếu có nhiều giọng (bắt buộc). IMAGE: bỏ trống.'
+
+// Đo trên dữ liệu thật 2026-08-26: mô tả của IMAGE dài trung bình ~2750 ký tự, AUDIO ~2325,
+// VIDEO ~2211, còn TEXT_PASSAGE chỉ ~156 — mỏng gấp 17 lần. Không phải người soạn lười: với
+// TEXT_PASSAGE thì nguyên văn đã nằm ở "Bản chép lời" nên mô tả có vẻ thừa. Thực ra không thừa,
+// nó chỉ phải nói THỨ KHÁC — xem gợi ý bên dưới.
+const ASSET_DESCRIPTION_HINT =
+  'BỐI CẢNH, không phải nội dung. IMAGE: tả kỹ những gì có trong ảnh (bắt buộc nếu không có văn bản thay thế) — đây là toàn bộ thứ AI "thấy". AUDIO/VIDEO: giọng ai, ở đâu, giọng điệu, tốc độ. TEXT_PASSAGE: KHÔNG kể lại nội dung (đã có ở bản chép lời) mà ghi thứ giúp chấm đúng — hai luồng quan điểm trong bài là gì, chi tiết nào đáng được trích dẫn, và kiểu lạc đề hay gặp. Ghi rõ nếu học sinh được phép PHẢN ĐỐI đoạn văn.'
+
 const FRAMEWORK_SIGNAL_HINT =
   'Cú pháp mỗi tín hiệu: code|description|importance|evidenceHint. Nhiều tín hiệu cách nhau bằng dấu ";". importance thuộc {HIGH, MEDIUM, LOW}. VD: CLR1|Phát âm rõ ràng|HIGH|Nghe được toàn bộ câu;CLR2|Ngập ngừng nhẹ|LOW|'
 
@@ -68,6 +80,21 @@ export const IMPORT_FIELDS_BY_TYPE: Record<string, ImportField[]> = {
     { isRequired: true, label: 'Hiệu lực từ ngày', value: 'effectiveFrom' },
     { isRequired: false, label: 'Hiệu lực đến ngày', value: 'effectiveTo' },
   ],
+  QUESTION_BANK: [
+    { isRequired: true, label: 'Mã ngân hàng', value: 'code' },
+    { isRequired: true, label: 'Tên ngân hàng', value: 'name' },
+    { isRequired: false, label: 'Mô tả', value: 'description' },
+    // Bắt buộc khi TẠO MỚI (question_banks.language_id không nullable); dòng cập nhật ngân
+    // hàng đã có thì bỏ trống được và giữ nguyên ngôn ngữ cũ. Nhận cả mã ("en") lẫn tên đầy đủ.
+    { isRequired: true, label: 'Ngôn ngữ', value: 'language' },
+  ],
+  QUESTION_TOPIC: [
+    // Ngân hàng đích chọn ở màn upload rồi ghim vào phiên import, KHÔNG khai trong file —
+    // nên không có cột nào cho nó ở đây.
+    { isRequired: true, label: 'Mã chủ đề', value: 'code' },
+    { isRequired: true, label: 'Tên chủ đề', value: 'name' },
+    { isRequired: false, label: 'Mô tả', value: 'description' },
+  ],
   QUESTION: [
     { isRequired: false, label: 'Mã câu hỏi', value: 'code' },
     { isRequired: true, label: 'Loại câu hỏi', value: 'type' },
@@ -91,6 +118,16 @@ export const IMPORT_FIELDS_BY_TYPE: Record<string, ImportField[]> = {
       value: 'maxResponseSeconds',
     },
     { isRequired: false, label: 'Chia sẻ', value: 'sharing' },
+    // Tài nguyên kèm câu hỏi. Bỏ trống "Loại tài nguyên" thì câu hỏi không có tài nguyên.
+    // Có khai loại thì mô tả (ảnh) / bản chép lời (audio, video) là BẮT BUỘC — AI không nhìn
+    // được ảnh và không nghe được tệp, nó chỉ biết qua mấy dòng chữ đó.
+    { isRequired: false, label: 'Loại tài nguyên', value: 'assetType' },
+    { isRequired: false, label: 'Đường dẫn tài nguyên', value: 'assetUrl' },
+    { isRequired: false, label: 'Tiêu đề tài nguyên', value: 'assetTitle' },
+    { isRequired: false, label: 'Văn bản thay thế', value: 'assetAltText' },
+    { hint: ASSET_TRANSCRIPT_HINT, isRequired: false, label: 'Bản chép lời', value: 'assetTranscript' },
+    { hint: ASSET_DESCRIPTION_HINT, isRequired: false, label: 'Mô tả tài nguyên', value: 'assetDescription' },
+    { isRequired: false, label: 'Thời lượng tài nguyên', value: 'assetDurationSeconds' },
     {
       isRequired: false,
       label: 'Nội dung mong đợi',

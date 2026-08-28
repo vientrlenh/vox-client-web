@@ -17,23 +17,18 @@ function actions(input: {
 }
 
 describe('resolveExamAuthority', () => {
-  /** Ba khác biệt dưới đây là toàn bộ ranh giới giữa hai vai — mọi quyền còn lại phải trùng khít. */
-  it('gives the chair everything the school admin has, apart from the three deliberate exceptions', () => {
+  /** Hai khác biệt dưới đây là toàn bộ ranh giới giữa hai vai — mọi quyền còn lại phải trùng khít. */
+  it('gives the chair everything the school admin has, apart from the two deliberate exceptions', () => {
     const except = (authority: typeof schoolAdmin) => {
       const rest = { ...authority }
       delete (rest as Partial<typeof authority>).canDeleteExam
       delete (rest as Partial<typeof authority>).canManageChairMembers
-      delete (rest as Partial<typeof authority>).canReleaseSecurePool
       return rest
     }
 
     expect(except(chair)).toEqual(except(schoolAdmin))
-    expect([schoolAdmin.canDeleteExam, schoolAdmin.canManageChairMembers, schoolAdmin.canReleaseSecurePool]).toEqual([
-      true,
-      true,
-      false,
-    ])
-    expect([chair.canDeleteExam, chair.canManageChairMembers, chair.canReleaseSecurePool]).toEqual([false, false, true])
+    expect([schoolAdmin.canDeleteExam, schoolAdmin.canManageChairMembers]).toEqual([true, true])
+    expect([chair.canDeleteExam, chair.canManageChairMembers]).toEqual([false, false])
   })
 
   it('keeps appointing a chair to the school admin alone', () => {

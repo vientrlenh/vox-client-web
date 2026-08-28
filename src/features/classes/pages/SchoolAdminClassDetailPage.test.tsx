@@ -328,7 +328,6 @@ describe('SchoolAdminClassDetailPage', () => {
       'aria-selected',
       'true',
     )
-    expect(screen.getAllByText(classId).length).toBeGreaterThan(0)
     expect(screen.getAllByText('ENG-6A').length).toBeGreaterThan(0)
     expect(screen.getByText('Lớp buổi sáng')).toBeInTheDocument()
     expect(screen.getByText('Trường VOX')).toBeInTheDocument()
@@ -391,9 +390,9 @@ describe('SchoolAdminClassDetailPage', () => {
       '01890f44-0c7a-7cc1-bc3b-2e7f4f001234',
     )
     expect(within(dialog).getByLabelText(/ngôn ngữ/i)).toBeDisabled()
-    expect(
-      within(dialog).getByDisplayValue('11111111-1111-0111-0111-111111111111'),
-    ).toBeInTheDocument()
+    // Niên học ở chế độ sửa hiện thành ô chỉ đọc, không còn input hiển thị ID thô --
+    // kiểm tra fallback vẫn hoạt động bằng cách xem tên niên học liên quan có hiện ra không.
+    expect(within(dialog).getByText('Khối 6')).toBeInTheDocument()
   })
 
   it('updates the class from the edit dialog', async () => {

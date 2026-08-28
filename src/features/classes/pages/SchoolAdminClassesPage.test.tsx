@@ -8,6 +8,10 @@ import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { graphqlApiClient } from '@/shared/api/graphqlClient'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { SupportedLanguage } from '@/features/languages/types'
+import type {
+  SchoolGrade,
+  SchoolGradeLevel,
+} from '@/features/grades/types'
 import type { PageResult, SchoolClass } from '../types'
 import { formatClassDate } from '../types'
 import { SchoolAdminClassesPage } from './SchoolAdminClassesPage'
@@ -101,6 +105,59 @@ function createLanguagePage(
   }
 }
 
+function createGradeLevel(
+  overrides: Partial<SchoolGradeLevel> = {},
+): SchoolGradeLevel {
+  return {
+    code: 'G6',
+    createdAt: '2026-06-01T00:00:00Z',
+    description: null,
+    id: 'grade-level-1',
+    name: 'Khối 6',
+    order: 1,
+    status: 'ACTIVE',
+    updatedAt: '2026-06-02T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function createGrade(overrides: Partial<SchoolGrade> = {}): SchoolGrade {
+  return {
+    code: 'G6',
+    createdAt: '2026-06-01T00:00:00Z',
+    description: null,
+    endDate: '2027-05-31',
+    id: gradeId,
+    name: 'Khối 6',
+    startDate: '2026-08-01',
+    status: 'ACTIVE',
+    updatedAt: '2026-06-02T00:00:00Z',
+    ...overrides,
+  }
+}
+
+async function selectGradeFromPicker(
+  user: ReturnType<typeof userEvent.setup>,
+  dialog: HTMLElement,
+  gradeName = 'Khối 6',
+) {
+  await user.click(
+    within(dialog).getByRole('button', { name: /chọn niên học/i }),
+  )
+  const gradePickerDialog = await screen.findByRole('dialog', {
+    name: /chọn niên học/i,
+  })
+
+  await user.click(
+    within(gradePickerDialog).getByRole('row', {
+      name: new RegExp(gradeName, 'i'),
+    }),
+  )
+  await user.click(
+    within(gradePickerDialog).getByRole('button', { name: /xác nhận/i }),
+  )
+}
+
 function createClassPage(
   content: SchoolClass[],
   overrides: Partial<PageResult<SchoolClass>> = {},
@@ -144,9 +201,13 @@ function mockGraphQLSuccess(
   pages: Record<number, PageResult<SchoolClass>>,
   {
     failLanguages = false,
+    grades = [createGrade()],
+    gradeLevels = [createGradeLevel()],
     languages = [createLanguage()],
   }: {
     failLanguages?: boolean
+    grades?: SchoolGrade[]
+    gradeLevels?: SchoolGradeLevel[]
     languages?: SupportedLanguage[]
   } = {},
 ) {
@@ -193,6 +254,38 @@ function mockGraphQLSuccess(
         data: {
           data: {
             supportedLanguages: createLanguagePage(languages),
+          },
+        },
+      })
+    }
+
+    if (request.query.includes('gradeLevels(')) {
+      return Promise.resolve({
+        data: {
+          data: {
+            gradeLevels: {
+              content: gradeLevels,
+              page: 1,
+              size: gradeLevels.length,
+              totalElements: gradeLevels.length,
+              totalPages: gradeLevels.length ? 1 : 0,
+            },
+          },
+        },
+      })
+    }
+
+    if (request.query.includes('schoolGrades(')) {
+      return Promise.resolve({
+        data: {
+          data: {
+            schoolGrades: {
+              content: grades,
+              page: 1,
+              size: grades.length,
+              totalElements: grades.length,
+              totalPages: grades.length ? 1 : 0,
+            },
           },
         },
       })
@@ -384,17 +477,21 @@ describe('SchoolAdminClassesPage', () => {
     await user.type(within(dialog).getByLabelText(/mã lớp/i), 'ENG-6A')
     await user.type(within(dialog).getByLabelText(/tên lớp/i), 'Tiếng Anh 6A')
     await user.selectOptions(within(dialog).getByLabelText(/ngôn ngữ/i), languageId)
-    await user.type(within(dialog).getByLabelText(/id khối lớp/i), gradeId)
+    // Niên học được lọc theo trường (requireSchoolId), nên thiếu schoolId trong token
+    // chặn ngay tại bước tải danh sách niên học trong picker -- không kịp đụng tới bước
+    // gọi API tạo lớp nữa. Nút "Lưu lớp học" cũng bị validate chặn vì chưa chọn được niên học.
     await user.click(
-      within(dialog).getByRole('button', { name: /lưu lớp học/i }),
+      within(dialog).getByRole('button', { name: /chọn niên học/i }),
     )
+    const gradePickerDialog = await screen.findByRole('dialog', {
+      name: /chọn niên học/i,
+    })
 
     expect(
-      await within(dialog).findByText(
-        /chưa xác định được trường học hiện tại.*đăng nhập lại/i,
+      await within(gradePickerDialog).findByText(
+        /không thể tải danh sách niên học/i,
       ),
     ).toBeInTheDocument()
-    expect(within(dialog).queryByText(/vite_school_id/i)).not.toBeInTheDocument()
     expect(mockedRestPost).not.toHaveBeenCalled()
   })
 
@@ -421,7 +518,7 @@ describe('SchoolAdminClassesPage', () => {
     expect(within(dialog).getByText('Không thể tải ngôn ngữ')).toBeInTheDocument()
   })
 
-  it('creates a class with relaxed uuid validation and invalidates the list', async () => {
+  it('creates a class using the grade picker and invalidates the list', async () => {
     mockGraphQLSuccess({
       1: createClassPage([]),
     })
@@ -443,7 +540,7 @@ describe('SchoolAdminClassesPage', () => {
     await user.type(within(dialog).getByLabelText(/mã lớp/i), 'ENG-6A')
     await user.type(within(dialog).getByLabelText(/tên lớp/i), 'Tiếng Anh 6A')
     await user.selectOptions(within(dialog).getByLabelText(/ngôn ngữ/i), languageId)
-    await user.type(within(dialog).getByLabelText(/id khối lớp/i), gradeId)
+    await selectGradeFromPicker(user, dialog)
     await user.click(
       within(dialog).getByRole('button', { name: /lưu lớp học/i }),
     )

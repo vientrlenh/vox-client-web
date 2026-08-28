@@ -1,7 +1,7 @@
 // src/features/assessment_policy_school/components/CreateAssessmentPolicyDialog.tsx
 
 import { useEffect, useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
 import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useAllFrameworkVersionsQuery, useFrameworkVersionCriteriaQuery } from '../api/useFrameworkVersionOptionsQuery';
@@ -71,8 +71,8 @@ function makeEmptyPolicyForm(key: number): PolicyFormState {
 }
 
 // Danh sách Rubric Version của 1 Rubric cụ thể — chỉ được chọn đúng 1 Version trong toàn bộ form
-// (1 Assessment Policy luôn chỉ gắn đúng 1 Rubric Version, và 1 Rubric Version chỉ dùng được cho
-// đúng 1 Policy). Mỗi Rubric hiện 1 nhóm riêng vì BE không yêu cầu Version phải cùng 1 Rubric.
+// (1 Assessment Policy luôn chỉ gắn đúng 1 Rubric Version). Mỗi Rubric hiện 1 nhóm riêng vì BE
+// không yêu cầu Version phải cùng 1 Rubric.
 type RubricVersionGroupProps = {
   schoolId: string | undefined;
   rubric: RubricOption;
@@ -85,6 +85,8 @@ type RubricVersionGroupProps = {
 
 function RubricVersionGroup({ schoolId, rubric, groupName, selectedId, onSelect, onVersionsLoaded, disabled }: RubricVersionGroupProps) {
   const { data: versions, isLoading } = useRubricVersionOptionsQuery(schoolId, rubric.id);
+  // BE chặn gán Policy vào Rubric Version đã ARCHIVED -- không hiện lựa chọn chắc chắn bị từ chối.
+  const selectableVersions = versions?.filter((rv) => rv.status !== 'ARCHIVED');
 
   useEffect(() => {
     if (!versions?.length) return;
@@ -99,9 +101,9 @@ function RubricVersionGroup({ schoolId, rubric, groupName, selectedId, onSelect,
       <p className="text-sm font-bold text-slate-800">{rubric.code} - {rubric.name}</p>
       {isLoading ? (
         <p className="mt-1 text-xs font-medium text-slate-400">Đang tải phiên bản...</p>
-      ) : versions?.length ? (
+      ) : selectableVersions?.length ? (
         <div className="mt-2 grid gap-1">
-          {versions.map((rv) => (
+          {selectableVersions.map((rv) => (
             <label key={rv.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50">
               <input
                 type="radio"
@@ -116,21 +118,24 @@ function RubricVersionGroup({ schoolId, rubric, groupName, selectedId, onSelect,
           ))}
         </div>
       ) : (
-        <p className="mt-1 text-xs font-medium text-slate-400">Rubric này chưa có phiên bản nào.</p>
+        <p className="mt-1 text-xs font-medium text-slate-400">Rubric này chưa có phiên bản nào (DRAFT/PUBLISHED).</p>
       )}
     </div>
   );
 }
 
 // Toàn bộ khối field của 1 Assessment Policy (Ngôn ngữ -> ngày hiệu lực).
+// Được lặp lại cho mỗi policy trong danh sách khi tạo nhiều policy cùng lúc.
 type PolicyFormFieldsProps = {
   schoolId: string | undefined;
+  index: number;
   form: PolicyFormState;
   onChange: (patch: Partial<PolicyFormState>) => void;
+  onRemove?: () => void;
   isPending: boolean;
 };
 
-function PolicyFormFields({ schoolId, form, onChange, isPending }: PolicyFormFieldsProps) {
+function PolicyFormFields({ schoolId, index, form, onChange, onRemove, isPending }: PolicyFormFieldsProps) {
   const { data: languages } = useLanguageOptionsQuery();
   const { data: allFrameworkVersions, isLoading: isLoadingFrameworkVersions } = useAllFrameworkVersionsQuery();
   const selectedFrameworkVersion = allFrameworkVersions?.find((fv) => fv.id === form.frameworkVersionId);
@@ -182,8 +187,32 @@ function PolicyFormFields({ schoolId, form, onChange, isPending }: PolicyFormFie
       ? `Điểm đạt phải nằm trong thang điểm của Rubric Version đã chọn (${effectiveScoreRange.min} – ${effectiveScoreRange.max})`
       : null;
 
+  const isSecondaryPolicy = index > 0;
+
   return (
-    <div>
+    <div
+      className={
+        isSecondaryPolicy ? 'rounded-xl border border-cyan-100 bg-cyan-50/40 p-5' : ''
+      }
+    >
+      {isSecondaryPolicy ? (
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-xs font-extrabold uppercase tracking-wide text-cyan-700">
+            Chính Sách Đánh Giá #{index + 1}
+          </p>
+          {onRemove ? (
+            <button
+              type="button"
+              onClick={onRemove}
+              disabled={isPending}
+              className="flex items-center gap-1.5 text-xs font-bold text-red-500 hover:text-red-600 disabled:opacity-50"
+            >
+              <Trash2 className="size-3.5" /> Xóa
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="grid gap-5">
         <div>
           <label className="mb-1 block text-sm font-bold text-slate-700">Framework Version (đã PUBLISHED) <span className="text-red-500">*</span></label>
@@ -246,6 +275,37 @@ function PolicyFormFields({ schoolId, form, onChange, isPending }: PolicyFormFie
         </div>
 
         <div>
+          <label className="mb-1 block text-sm font-bold text-slate-700">Phạm vi áp dụng</label>
+          <div className="grid grid-cols-3 gap-3">
+            <select
+              value={form.gradeLevelId} onChange={(e) => handleGradeLevelChange(e.target.value)} disabled={isPending}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+            >
+              <option value="">-- Khối --</option>
+              {gradeLevels?.map((gl) => <option key={gl.id} value={gl.id}>{gl.code} - {gl.name}</option>)}
+            </select>
+            <select
+              value={form.schoolGradeId} onChange={(e) => handleGradeChange(e.target.value)}
+              disabled={isPending || !form.gradeLevelId}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+            >
+              <option value="">{form.gradeLevelId ? '-- Niên khóa --' : '-- Chọn Khối trước --'}</option>
+              {grades?.map((grade) => <option key={grade.id} value={grade.id}>{grade.code || grade.name}</option>)}
+            </select>
+            <select
+              value={form.schoolClassId} onChange={(e) => onChange({ schoolClassId: e.target.value })}
+              disabled={isPending || !form.schoolGradeId}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
+            >
+              <option value="">{form.schoolGradeId ? '-- Lớp --' : '-- Chọn Niên khóa trước --'}</option>
+              {classes.map((schoolClass) => (
+                <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.code} - {schoolClass.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
           <label className="mb-1 block text-sm font-bold text-slate-700">Target Band <span className="text-red-500">*</span></label>
           <select
             value={form.targetFrameworkBandId} onChange={(e) => onChange({ targetFrameworkBandId: e.target.value })}
@@ -253,7 +313,7 @@ function PolicyFormFields({ schoolId, form, onChange, isPending }: PolicyFormFie
             className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
           >
             <option value="">-- Chọn target band --</option>
-            {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
+            {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.label}</option>)}
           </select>
         </div>
 
@@ -285,37 +345,6 @@ function PolicyFormFields({ schoolId, form, onChange, isPending }: PolicyFormFie
               Không có Rubric nào cho ngôn ngữ này.
             </p>
           )}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-bold text-slate-700">Phạm vi áp dụng</label>
-          <div className="grid grid-cols-3 gap-3">
-            <select
-              value={form.gradeLevelId} onChange={(e) => handleGradeLevelChange(e.target.value)} disabled={isPending}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">-- Khối --</option>
-              {gradeLevels?.map((gl) => <option key={gl.id} value={gl.id}>{gl.code} - {gl.name}</option>)}
-            </select>
-            <select
-              value={form.schoolGradeId} onChange={(e) => handleGradeChange(e.target.value)}
-              disabled={isPending || !form.gradeLevelId}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">{form.gradeLevelId ? '-- Niên khóa --' : '-- Chọn Khối trước --'}</option>
-              {grades?.map((grade) => <option key={grade.id} value={grade.id}>{grade.code || grade.name}</option>)}
-            </select>
-            <select
-              value={form.schoolClassId} onChange={(e) => onChange({ schoolClassId: e.target.value })}
-              disabled={isPending || !form.schoolGradeId}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
-            >
-              <option value="">{form.schoolGradeId ? '-- Lớp --' : '-- Chọn Niên khóa trước --'}</option>
-              {classes.map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.code} - {schoolClass.name}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -388,6 +417,17 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
 
   function updateForm(key: number, patch: Partial<PolicyFormState>) {
     setForms((current) => current.map((f) => (f.key === key ? { ...f, ...patch } : f)));
+  }
+
+  function addPolicyForm() {
+    setForms((current) => {
+      const nextKey = current.reduce((max, f) => Math.max(max, f.key), 0) + 1;
+      return [...current, makeEmptyPolicyForm(nextKey)];
+    });
+  }
+
+  function removePolicyForm(key: number) {
+    setForms((current) => current.filter((f) => f.key !== key));
   }
 
   function validateForm(form: PolicyFormState) {
@@ -467,15 +507,27 @@ export function CreateAssessmentPolicyDialog({ isOpen, onClose, schoolId, onSubm
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid gap-6">
-            {forms.map((form) => (
+            {forms.map((form, index) => (
               <PolicyFormFields
                 key={form.key}
                 schoolId={schoolId}
+                index={index}
                 form={form}
                 onChange={(patch) => updateForm(form.key, patch)}
+                onRemove={index > 0 ? () => removePolicyForm(form.key) : undefined}
                 isPending={isPending}
               />
             ))}
+
+            <button
+              type="button"
+              onClick={addPolicyForm}
+              disabled={isPending}
+              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-400 bg-slate-50 py-3 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            >
+              <Plus className="size-4.5" />
+              {forms.length < 2 ? 'Tạo Chính Sách Đánh Giá thứ 2' : `Thêm Chính Sách Đánh Giá thứ ${forms.length + 1}`}
+            </button>
           </div>
 
           <div className="mt-8 flex items-center justify-end gap-3 border-t border-slate-100 pt-5">

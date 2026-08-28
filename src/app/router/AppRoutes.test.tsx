@@ -287,7 +287,7 @@ describe('AppRoutes', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: /bảng điều khiển system admin/i,
+        name: /tổng quan hệ thống/i,
       }),
     ).toBeInTheDocument()
     expect(
@@ -459,7 +459,7 @@ describe('AppRoutes', () => {
     renderWithProviders(<AppRoutes />, { route: '/system-admin/dashboard' })
 
     await screen.findByRole('heading', {
-      name: /bảng điều khiển system admin/i,
+      name: /tổng quan hệ thống/i,
     })
 
     expect(
@@ -507,7 +507,7 @@ describe('AppRoutes', () => {
     renderWithProviders(<AppRoutes />, { route: '/system-admin/dashboard' })
 
     await screen.findByRole('heading', {
-      name: /bảng điều khiển system admin/i,
+      name: /tổng quan hệ thống/i,
     })
     await user.click(
       screen.getByRole('button', { name: /mở menu system admin/i }),
@@ -533,7 +533,7 @@ describe('AppRoutes', () => {
     renderWithProviders(<AppRoutes />, { route: '/system-admin/dashboard' })
 
     await screen.findByRole('heading', {
-      name: /bảng điều khiển system admin/i,
+      name: /tổng quan hệ thống/i,
     })
     await user.click(
       screen.getByRole('button', {

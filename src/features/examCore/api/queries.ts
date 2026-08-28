@@ -76,6 +76,10 @@ const EXAM_PAPER_FIELDS = `
         preparationTimeSeconds
         minResponseSeconds
         maxResponseSeconds
+        assets {
+          type
+          durationSeconds
+        }
       }
     }
   }
@@ -147,10 +151,6 @@ const EXAM_SUMMARY_FIELDS = `
   aiConfidenceThresholdPercent
   requiredStreamType
   streamTypePermission
-  securePool {
-    id
-    status
-  }
   members {
     ${EXAM_MEMBER_FIELDS}
   }
@@ -185,10 +185,6 @@ const EXAM_DETAIL_FIELDS = `
   aiConfidenceThresholdPercent
   requiredStreamType
   streamTypePermission
-  securePool {
-    id
-    status
-  }
   members {
     ${EXAM_MEMBER_FIELDS}
   }
@@ -414,6 +410,10 @@ const BLUEPRINT_VERSION_FIELDS = `
         questionText
         preparationTimeSeconds
         maxResponseSeconds
+        assets {
+          type
+          durationSeconds
+        }
       }
     }
   }

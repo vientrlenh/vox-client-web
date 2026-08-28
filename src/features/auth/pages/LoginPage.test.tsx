@@ -114,7 +114,7 @@ describe('LoginPage', () => {
     jest.mocked(apiClient.post).mockResolvedValue({
       data: {
         data: responseData,
-        message: 'ÄÄƒng nháº­p thÃ nh cÃ´ng',
+        message: 'Đăng nhập thành công',
       },
     } as AxiosResponse<ApiResponse<LoginResponse>>)
 
@@ -154,7 +154,7 @@ describe('LoginPage', () => {
 
   it('clears tokens and blocks unsupported roles', async () => {
     const user = userEvent.setup()
-    const responseData = createLoginResponse(['TEACHER'])
+    const responseData = createLoginResponse([])
     jest.mocked(apiClient.post).mockResolvedValue({
       data: {
         data: responseData,

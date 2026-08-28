@@ -70,6 +70,7 @@ export type FrameworkVersionDetail = {
 
 export type RubricVersionDetail = {
   id: string;
+  rubricId: string;
   code: string;
   name: string;
   version: number;

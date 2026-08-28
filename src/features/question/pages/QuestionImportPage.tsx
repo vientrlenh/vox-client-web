@@ -147,11 +147,6 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
       return
     }
 
-    if (!questionBankId || !questionTopicId) {
-      setError('Vui lòng chọn ngân hàng câu hỏi và chủ đề trước khi tải file.')
-      return
-    }
-
     if (!isAcceptedFile(file)) {
       setPreview(null)
       setError('File không hợp lệ. Vui lòng chọn file CSV hoac Excel.')
@@ -226,9 +221,13 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
             Nhập câu hỏi từ Excel
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-            Chọn ngân hàng và chủ đề, rồi tải file lên. Hệ thống tự nhận diện cột theo
-            tên tiêu đề. Nếu sai đầu mục hay nhầm cột, hệ thống sẽ báo lỗi cụ thể từng
-            dòng. Câu hỏi tạo từ import sẽ vào hàng đợi chờ duyệt.
+            Tải file lên, hệ thống tự nhận diện cột theo tên tiêu đề và báo lỗi cụ thể từng dòng.
+            Câu hỏi tạo từ import sẽ vào hàng đợi chờ duyệt.
+          </p>
+          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-indigo-700">
+            Để trống hai ô bên dưới để <span className="font-bold">nhập hàng loạt</span>: mỗi dòng
+            trong file tự khai <code>Mã ngân hàng</code> và <code>Mã chủ đề</code>, nên một file rải
+            được câu hỏi sang nhiều chủ đề. Chọn sẵn ngân hàng + chủ đề thì cả file vào đúng chủ đề đó.
           </p>
         </div>
         <div className="flex gap-3">
@@ -254,7 +253,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
 
       <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Ngân hàng câu hỏi
+          Ngân hàng câu hỏi (bỏ trống để nhập hàng loạt)
           <select
             className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
             disabled={Boolean(preview)}
@@ -273,7 +272,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
           </select>
         </label>
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Chủ đề
+          Chủ đề (bỏ trống để nhập hàng loạt)
           <select
             className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-950"
             disabled={Boolean(preview) || !questionBankId}
@@ -294,16 +293,12 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
         <div>
           <h2 className="text-lg font-black text-slate-950">Chọn file import</h2>
           <p className="mt-1 text-sm font-medium text-slate-500">
-            Hỗ trợ file .csv, .xlsx và .xls. Phải chọn ngân hàng + chủ đề trước.
+            Hỗ trợ file .csv, .xlsx và .xls.
           </p>
         </div>
 
         <label
-          className={`grid cursor-pointer place-items-center gap-3 rounded-lg border border-dashed px-4 py-8 text-center transition ${
-            questionBankId && questionTopicId
-              ? 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50'
-              : 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-60'
-          }`}
+          className="grid cursor-pointer place-items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center transition hover:border-indigo-400 hover:bg-indigo-50"
         >
           <span className="text-sm font-black text-slate-950">
             Chọn file CSV hoặc Excel
@@ -311,7 +306,7 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
           <input
             accept=".csv,.xlsx,.xls"
             className="sr-only"
-            disabled={isBusy || !questionBankId || !questionTopicId}
+            disabled={isBusy}
             onChange={(event) => {
               void handleFileChange(event.currentTarget.files?.[0])
               event.currentTarget.value = ''

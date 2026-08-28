@@ -11,7 +11,7 @@ export function useCreateSystemAssessmentPolicyMutation() {
   return useMutation({
     mutationFn: async (payloads: CreateAssessmentPolicyPayload[]) => {
       // BE nhận vào 1 mảng CreateSystemAssessmentPolicyRequest (cho phép tạo nhiều Policy
-      // cùng lúc), mỗi request chứa đúng 1 rubricVersionId -> 1 Policy / rubric version.
+      // cùng lúc), mỗi request chứa đúng 1 rubricVersionId.
       const response = await apiClient.post('/v1/assessment-policies/system', payloads);
 
       // ApiResponse<List<UUID>> -> danh sách policyId vừa tạo nằm trong response.data.data

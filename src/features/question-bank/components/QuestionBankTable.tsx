@@ -21,9 +21,13 @@ type QuestionBankTableProps = {
   onEdit?: (bank: QuestionBankDto) => void
   onRetry: () => void
   onSelect: (id: string) => void
+  /** Bật cột chọn hàng loạt. Không truyền thì bảng giữ nguyên hình dạng cũ, không có checkbox. */
+  onToggleSelectId?: (id: string) => void
+  onToggleSelectPage?: () => void
   onViewTopics: (bank: QuestionBankDto) => void
   questionBanks: QuestionBankDto[]
   selectedId: string | null
+  selectedIds?: string[]
 }
 
 function StatusBadge({ status }: { status: QuestionBankDto['status'] }) {
@@ -51,10 +55,20 @@ export function QuestionBankTable({
   onEdit,
   onRetry,
   onSelect,
+  onToggleSelectId,
+  onToggleSelectPage,
   onViewTopics,
   questionBanks,
   selectedId,
+  selectedIds,
 }: QuestionBankTableProps) {
+  const checkedIds = new Set(selectedIds ?? [])
+  const isBulkEnabled = Boolean(onToggleSelectId)
+  // "Chọn cả trang" chỉ tick khi MỌI dòng đang thấy đều đã chọn -- người dùng có thể đã chọn thêm ở
+  // trang khác, nhưng ô này chỉ nói về trang hiện tại.
+  const isPageFullyChecked =
+    questionBanks.length > 0 && questionBanks.every((bank) => checkedIds.has(bank.id))
+
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-6 py-5">
@@ -95,6 +109,17 @@ export function QuestionBankTable({
           <table className="w-full min-w-200 border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
+                {isBulkEnabled ? (
+                  <th className="w-12 px-4 py-4">
+                    <input
+                      aria-label="Chọn tất cả ngân hàng câu hỏi trên trang này"
+                      checked={isPageFullyChecked}
+                      className="size-4 cursor-pointer accent-indigo-600"
+                      onChange={() => onToggleSelectPage?.()}
+                      type="checkbox"
+                    />
+                  </th>
+                ) : null}
                 <th className="px-6 py-4">Tên ngân hàng</th>
                 <th className="px-4 py-4">Mô tả</th>
                 <th className="px-4 py-4">Mã</th>
@@ -115,6 +140,17 @@ export function QuestionBankTable({
                     ].join(' ')}
                     key={bank.id}
                   >
+                    {isBulkEnabled ? (
+                      <td className="px-4 py-5">
+                        <input
+                          aria-label={`Chọn ${formatNullableText(bank.name)}`}
+                          checked={checkedIds.has(bank.id)}
+                          className="size-4 cursor-pointer accent-indigo-600"
+                          onChange={() => onToggleSelectId?.(bank.id)}
+                          type="checkbox"
+                        />
+                      </td>
+                    ) : null}
                     <td className="px-6 py-5 font-bold">
                       {formatNullableText(bank.name)}
                     </td>
