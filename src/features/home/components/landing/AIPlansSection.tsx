@@ -1,8 +1,9 @@
-import { ArrowRight, ClipboardList, FileCheck2, Headphones, Star } from 'lucide-react'
+import { ArrowRight, Clock, FileCheck2, Headphones, Star } from 'lucide-react'
 import { Link } from 'react-router'
 import { useSubscriptionPlansQuery } from '@/features/subscription_system/api/useSubscriptionPlansQuery'
 import {
-  formatUsd,
+  formatMinutes,
+  formatPeriod,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -12,20 +13,15 @@ import { routeLinks } from '../../data/landingContent'
 import { Container, SectionHeading } from './landingShared'
 
 const QUOTA_ICONS: Record<QuotaType, typeof FileCheck2> = {
-  CLASS_TEST: ClipboardList,
-  GRADING: FileCheck2,
+  EXAM: FileCheck2,
   PRACTICE: Headphones,
-}
-
-const QUOTA_ICON_STYLES: Record<QuotaType, string> = {
-  CLASS_TEST: 'bg-blue-50 text-blue-600',
-  GRADING: 'bg-violet-50 text-violet-600',
-  PRACTICE: 'bg-emerald-50 text-emerald-600',
 }
 
 export function AIPlansSection() {
   const plansQuery = useSubscriptionPlansQuery(1, 50)
-  const activePlans = (plansQuery.data?.content ?? []).filter((plan) => plan.status === 'ACTIVE')
+  const activePlans = (plansQuery.data?.content ?? []).filter(
+    ({ subscription }) => subscription.status === 'ACTIVE',
+  )
 
   return (
     <section className="bg-slate-50 py-7 sm:py-16" id="ai-plans">
@@ -48,76 +44,79 @@ export function AIPlansSection() {
             Hiện chưa có gói nào đang mở đăng ký.
           </p>
         ) : (
-          <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {activePlans.map((plan) => {
+          <div className="mt-8 grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {activePlans.map(({ isMostPopular, subscription: plan }) => {
               const quotaByType = new Map(plan.quotas.map((quota) => [quota.quotaType, quota]))
 
               return (
                 <div
-                  className={`relative overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl ${
-                    plan.popular ? 'border-indigo-300 shadow-lg shadow-indigo-100' : 'border-slate-200'
+                  className={`relative overflow-hidden bg-white transition hover:scale-[1.02] ${
+                    isMostPopular
+                      ? 'rounded-[20px] border-[1.5px] border-indigo-600 p-7 sm:p-8'
+                      : 'rounded-[14px] border border-slate-200 p-6'
                   }`}
                   key={plan.id}
                 >
-                  <div
-                    className={`h-2 w-full ${
-                      plan.popular
-                        ? 'bg-linear-to-r from-blue-950 via-indigo-600 to-violet-600'
-                        : 'bg-linear-to-r from-indigo-500 to-cyan-500'
-                    }`}
-                  />
-
-                  {plan.popular ? (
-                    <span className="absolute top-5 right-5 inline-flex items-center gap-1.5 rounded-full bg-linear-to-r from-blue-950 via-indigo-600 to-violet-600 px-3 py-1 text-xs font-extrabold text-white shadow-sm">
-                      <Star aria-hidden="true" className="size-3.5" />
-                      Phổ biến nhất
+                  {/* Nhãn nằm GỌN trong góc thẻ, không lơ lửng ngoài viền: thẻ nào cũng có thể nằm
+                      trong một khối overflow-hidden, và nhãn tràn ra ngoài sẽ bị cắt mất ở đó. */}
+                  {isMostPopular ? (
+                    <span className="absolute top-0 right-0 inline-flex items-center gap-1.5 rounded-tr-[18px] rounded-bl-[12px] bg-indigo-600 px-4 py-1.5 text-xs font-medium text-white">
+                      <Star aria-hidden="true" className="size-3 fill-current" />
+                      Phổ biến
                     </span>
                   ) : null}
 
-                  <div className="p-6">
-                    <h3 className="text-lg font-extrabold text-blue-950">{plan.name}</h3>
-                    <p className="mt-1 min-h-9.5 text-[12.5px] leading-5 text-slate-500">{plan.tagline ?? ''}</p>
+                  <h3
+                    className={`text-lg font-medium text-blue-950 ${isMostPopular ? 'pr-26' : ''}`}
+                  >
+                    {plan.name}
+                  </h3>
+                  <p className="mt-1.5 min-h-10 text-sm leading-5 text-slate-500">{plan.tagline ?? ''}</p>
 
-                    <div className="mt-3.5 flex items-baseline gap-1.5">
-                      <span className="text-[26px] font-extrabold text-indigo-700">
-                        {formatVnd(plan.pricePerYear)}
-                      </span>
-                      <span className="text-sm text-slate-500">/ {plan.validityDays} ngày</span>
-                    </div>
-
-                    <div className="mt-4.5 grid gap-3 border-t border-slate-200 pt-4.5">
-                      {QUOTA_TYPES.map((quotaType) => {
-                        const quota = quotaByType.get(quotaType)
-                        const Icon = QUOTA_ICONS[quotaType]
-
-                        return (
-                          <div className="flex items-center gap-2.5" key={quotaType}>
-                            <span
-                              className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${QUOTA_ICON_STYLES[quotaType]}`}
-                            >
-                              <Icon aria-hidden="true" className="size-3.5" />
-                            </span>
-                            <span className="flex-1 text-[13px] text-slate-600">{QUOTA_LABELS[quotaType]}</span>
-                            <span className="text-sm font-extrabold text-slate-900">
-                              {formatUsd(quota?.includedQuantity)}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    <Link
-                      className={`mt-4.5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-black transition ${
-                        plan.popular
-                          ? 'bg-linear-to-r from-blue-950 via-indigo-600 to-violet-600 text-white hover:brightness-110'
-                          : 'border-1.5 border-indigo-600 bg-white text-indigo-700 hover:bg-indigo-50'
-                      }`}
-                      to={routeLinks.register}
-                    >
-                      Đăng ký
-                      <ArrowRight aria-hidden="true" className="size-4" />
-                    </Link>
+                  <div className="mt-5 flex items-baseline gap-1.5">
+                    <span className="text-[32px] font-bold tracking-tight text-blue-950 tabular-nums">
+                      {formatVnd(plan.priceVnd)}
+                    </span>
+                    <span className="text-sm text-slate-500">
+                      / {formatPeriod(plan.periodType, plan.periodCount)}
+                    </span>
                   </div>
+
+                  <div className="mt-5 grid gap-3.5 border-t border-slate-200 pt-5">
+                    {QUOTA_TYPES.map((quotaType) => {
+                      const quota = quotaByType.get(quotaType)
+                      const Icon = QUOTA_ICONS[quotaType]
+
+                      return (
+                        <div className="flex items-center gap-2.5" key={quotaType}>
+                          <Icon aria-hidden="true" className="size-5 shrink-0 text-indigo-600" />
+                          <span className="flex-1 text-sm text-slate-600">{QUOTA_LABELS[quotaType]}</span>
+                          <span className="text-[15px] font-medium text-blue-950 tabular-nums">
+                            {formatVnd(quota?.includedAmountVnd)}
+                          </span>
+                        </div>
+                      )
+                    })}
+                    <div className="flex items-center gap-2.5">
+                      <Clock aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
+                      <span className="flex-1 text-sm text-slate-600">Tối đa mỗi bài</span>
+                      <span className="text-[15px] font-medium text-blue-950 tabular-nums">
+                        {formatMinutes(plan.maxTimePerAttemptMin)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <Link
+                    className={`mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[15px] font-medium transition ${
+                      isMostPopular
+                        ? 'bg-linear-to-br from-indigo-600 to-cyan-500 text-white hover:brightness-110'
+                        : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                    }`}
+                    to={routeLinks.register}
+                  >
+                    Đăng ký
+                    <ArrowRight aria-hidden="true" className="size-4" />
+                  </Link>
                 </div>
               )
             })}

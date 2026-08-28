@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AlertTriangle, Archive, X } from 'lucide-react'
-import { formatVnd, type SubscriptionPlan } from '../types'
+import { formatPeriod, formatVnd, type SubscriptionPlan } from '../types'
 
 type SelectOption = {
   label: string
@@ -59,14 +59,14 @@ export function ArchivePlanDialog({
             </div>
             <div className="min-w-0">
               <h2 className="text-lg font-black text-blue-950" id="archive-plan-dialog-title">
-                Lưu trữ gói dịch vụ
+                Ngừng bán gói dịch vụ
               </h2>
               <p className="mt-1 text-sm font-medium leading-6 text-slate-600">
-                Gói <strong>{plan.name}</strong> sẽ được lưu trữ và không còn hiển thị cho trường đăng ký mới. Các
+                Gói <strong>{plan.name}</strong> sẽ ngừng bán và không còn hiển thị cho trường đăng ký mới. Các
                 trường đang dùng gói này không bị ảnh hưởng ngay, nhưng nếu không chọn gói thay thế, các trường sẽ
                 không gia hạn được cho tới khi có gói thay thế. Giá của gói thay thế có thể khác gói hiện tại (
-                {formatVnd(plan.pricePerYear)}) — trường vẫn sẽ được xem trước và xác nhận giá mới trước khi bị
-                thu tiền ở lần gia hạn tới.
+                {formatVnd(plan.priceVnd)} / {formatPeriod(plan.periodType, plan.periodCount)}) — trường vẫn sẽ
+                được xem trước và xác nhận giá mới trước khi bị thu tiền ở lần gia hạn tới.
               </p>
             </div>
           </div>
