@@ -9,7 +9,7 @@ import {
   ChevronLeft,
   ClipboardCheck,
   ClipboardList,
-  Gavel,
+  Eye,
   Pencil,
   RefreshCw,
   Rocket,
@@ -179,13 +179,17 @@ export function SystemAdminAssessmentPolicyDetailPage() {
             <ClipboardCheck className="size-[26px] text-indigo-600" /> Chi tiết Chính sách Đánh giá
           </h1>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate(`/system-admin/assessment-policies/${policyId}/scoring-rules`)}
-          className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
-        >
-          <Gavel className="size-4" /> Scoring Rules
-        </button>
+        {policy.rubricVersion?.rubricId ? (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`/system-admin/rubrics/${policy.rubricVersion?.rubricId}/versions/${policy.rubricVersionId}`)
+            }
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-indigo-600 transition hover:bg-slate-50"
+          >
+            <Eye className="size-4" /> Xem chi tiết phiên bản tiêu chí đánh giá
+          </button>
+        ) : null}
       </div>
 
       {/* THÔNG TIN CHUNG */}

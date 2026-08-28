@@ -21,6 +21,25 @@ const ASSESSMENT_POLICY_FIELDS = `
     name
     status
   }
+  targetFrameworkBand {
+    code
+    label
+  }
+  gradeLevel {
+    id
+    code
+    name
+  }
+  schoolGrade {
+    id
+    code
+    name
+  }
+  schoolClass {
+    id
+    code
+    name
+  }
 `
 
 const MATCHING_SCHOOL_ASSESSMENT_POLICIES_QUERY = `

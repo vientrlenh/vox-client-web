@@ -22,6 +22,11 @@ const INVOICES_QUERY = `
         paymentLinkId
         checkoutUrl
         paidAt
+        resolvedPlanId
+        quotaItems {
+          quotaType
+          amount
+        }
       }
       page
       size
@@ -34,16 +39,13 @@ const INVOICES_QUERY = `
 async function fetchInvoices(page: number, size: number): Promise<InvoicePage> {
   const schoolId = requireSchoolId()
   const data = await graphQLRequest<{ invoices: InvoicePage }>(INVOICES_QUERY, {
-    page: page - 1,
+    page,
     schoolId,
     size,
   })
 
   const response = data.invoices
-  return {
-    ...response,
-    page: response.page + 1,
-  }
+  return response
 }
 
 type UseInvoicesQueryOptions = {

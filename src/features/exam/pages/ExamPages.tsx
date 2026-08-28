@@ -59,7 +59,6 @@ import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import {
   useCreateExamPaperMutation,
-  useReleaseSecurePoolMutation,
   useUpdateExamPaperStatusMutation,
 } from '@/features/examCore/api/mutations'
 import {
@@ -559,7 +558,6 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const updatePaperStatusMutation = useUpdateExamPaperStatusMutation()
   const updateStatusMutation = useUpdateExamStatusMutation()
   const deleteMutation = useDeleteExamMutation()
-  const releaseSecurePoolMutation = useReleaseSecurePoolMutation()
   // Quay lại từ trang blueprint thì tab đã được chỉ định — coi như người dùng đã tự chọn tab để
   // hiệu ứng nhảy-về-bước-đang-dở bên dưới không hất họ sang tab khác.
   const [tab, setTab] = useState<ExamDetailTab | null>(requestedTab)
@@ -605,18 +603,6 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   async function handleUpdatePaperStatus(paperId: string, action: ExamPaperAction) {
     try {
       await updatePaperStatusMutation.mutateAsync({ paperId, payload: { action } })
-      await invalidate()
-    } catch (error) {
-      setErrorMessage(toApiError(error).message)
-    }
-  }
-
-  async function handleReleaseSecurePool(forExamId: string) {
-    if (!(await confirm({ message: 'Bạn có chắc muốn mở khóa câu hỏi đề thi không?' }))) {
-      return
-    }
-    try {
-      await releaseSecurePoolMutation.mutateAsync(forExamId)
       await invalidate()
     } catch (error) {
       setErrorMessage(toApiError(error).message)
@@ -855,18 +841,6 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
               <Lock aria-hidden="true" className="size-4 shrink-0" />
               Kỳ thi đã bắt đầu — không thể tạo, sao chép, soạn lại hay đổi trạng thái mã đề nữa. Chỉ còn
               xem lại nội dung đề.
-            </div>
-          ) : null}
-          {/* Mở khóa ngân hàng câu hỏi là việc hậu kỳ thi — cố tình không gác theo `examLocked`. */}
-          {authority.canReleaseSecurePool && exam.securePool?.status === 'SEALED' ? (
-            <div className="flex justify-end">
-              <button
-                className="inline-flex h-9.5 items-center justify-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-4 text-[13px] font-semibold text-amber-700 hover:bg-amber-100"
-                onClick={() => void handleReleaseSecurePool(exam.id)}
-                type="button"
-              >
-                Mở khóa câu hỏi đề thi
-              </button>
             </div>
           ) : null}
           {canComposePaper ? (

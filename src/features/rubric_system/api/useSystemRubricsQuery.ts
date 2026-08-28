@@ -45,10 +45,7 @@ async function fetchSystemRubrics(page: number, size: number): Promise<RubricPag
 
   const response = data.viewSystemRubrics;
 
-  return {
-    ...response,
-    page: response.page + 1
-  };
+  return response;
 }
 
 export function useSystemRubricsQuery(page: number, size: number) {

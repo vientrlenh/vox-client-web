@@ -558,7 +558,12 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                     <div className="mt-2.5 flex items-center gap-2.5">
                       {slot.fixedQuestion ? (
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-semibold text-slate-700">
+                          {/* line-clamp-2 thay cho truncate: xem chú thích cùng chỗ trong
+                              CreateBlueprintVersionPage. */}
+                          <p
+                            className="line-clamp-2 text-xs font-semibold text-slate-700"
+                            title={`${slot.fixedQuestion.code} · ${slot.fixedQuestion.questionText}`}
+                          >
                             {slot.fixedQuestion.code} · {slot.fixedQuestion.questionText}
                           </p>
                           <QuestionTimingSummary question={slot.fixedQuestion} />
@@ -583,7 +588,7 @@ function EditVersionForm({ basePath, blueprint, version }: EditVersionFormProps)
                         </a>
                       ) : null}
                       <button
-                        className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-600 hover:bg-slate-50"
+                        className="h-8 shrink-0 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-600 hover:bg-slate-50"
                         onClick={() => setPickerForSlotKey(slot.key)}
                         title={slot.fixedQuestionId && !slot.fixedQuestion ? 'Đã có câu hỏi được gán — đổi sẽ thay thế câu hỏi hiện tại' : undefined}
                         type="button"

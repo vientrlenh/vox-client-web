@@ -3,6 +3,11 @@ import type { QuestionAssetType } from '../types'
 
 type QuestionAssetPreviewProps = {
   altText?: string | null
+  /**
+   * Bản gọn cho những chỗ chật — cột chấm bài nằm trong lưới `1.15fr_1fr` nên chỉ rộng ~55%.
+   * Giảm chiều cao tối đa thay vì để ảnh chiếm hết màn hình và đẩy danh sách lượt nói xuống đáy.
+   */
+  compact?: boolean
   title?: string | null
   transcript?: string | null
   type: QuestionAssetType
@@ -26,6 +31,7 @@ function getAssetName(type: QuestionAssetType) {
 
 export function QuestionAssetPreview({
   altText,
+  compact = false,
   title,
   transcript,
   type,
@@ -33,6 +39,7 @@ export function QuestionAssetPreview({
 }: QuestionAssetPreviewProps) {
   const [loadFailed, setLoadFailed] = useState(false)
   const [trackedSource, setTrackedSource] = useState({ type, url })
+  const mediaHeightClass = compact ? 'max-h-52' : 'max-h-80'
 
   // reset the failed-load flag when switching to a different asset, without a
   // dedicated effect: this is the "adjust state while rendering" pattern React
@@ -48,7 +55,11 @@ export function QuestionAssetPreview({
         <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
           Xem trước đoạn văn
         </p>
-        <p className="whitespace-pre-wrap text-sm font-medium text-slate-700">
+        {/* Cuộn trong khung thay vì dài vô tận: một đoạn văn dài đẩy mọi thứ dưới nó
+            (danh sách lượt nói, ô nhận xét) xuống tận đáy trang. */}
+        <p
+          className={`${mediaHeightClass} overflow-y-auto whitespace-pre-wrap text-sm font-medium text-slate-700`}
+        >
           {transcript?.trim() || 'Chưa có nội dung đoạn văn để xem trước.'}
         </p>
       </div>
@@ -76,7 +87,7 @@ export function QuestionAssetPreview({
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-950/5">
         <img
           alt={altText?.trim() || title?.trim() || 'Xem trước ảnh'}
-          className="max-h-80 w-full object-contain"
+          className={`${mediaHeightClass} w-full object-contain`}
           onError={() => setLoadFailed(true)}
           src={url}
         />
@@ -104,7 +115,7 @@ export function QuestionAssetPreview({
     return (
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
         <video
-          className="max-h-80 w-full"
+          className={`${mediaHeightClass} w-full`}
           controls
           onError={() => setLoadFailed(true)}
           preload="metadata"

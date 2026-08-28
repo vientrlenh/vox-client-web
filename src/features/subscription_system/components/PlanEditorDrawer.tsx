@@ -280,7 +280,7 @@ export function PlanEditorDrawer({
                 Giá <span className="text-red-500">*</span>
                 <input
                   className={inputClassName}
-                  disabled={isSubmitting || isPrefilled}
+                  disabled={isSubmitting}
                   inputMode="decimal"
                   onChange={(event) => updateField('pricePerYear', sanitizeNumericInput(event.target.value))}
                   placeholder="45,000,000"
@@ -304,8 +304,8 @@ export function PlanEditorDrawer({
 
             {isPrefilled ? (
               <p className="-mt-3 text-xs font-medium text-indigo-600">
-                Giá đã khoá theo gói bạn chọn (bắt buộc khớp để làm gói thay thế). Sau khi lưu, hệ thống sẽ TỰ ĐỘNG
-                xuất bản gói này và lưu trữ gói cũ — không cần làm thêm gì.
+                Giá và thời hạn đã điền sẵn theo gói bạn chọn — có thể sửa lại nếu muốn giá khác. Sau khi lưu, hệ
+                thống sẽ TỰ ĐỘNG lưu trữ gói cũ; gói mới ở trạng thái nháp — bạn cần tự xuất bản khi sẵn sàng.
               </p>
             ) : null}
 
@@ -416,7 +416,7 @@ export function PlanEditorDrawer({
             {isSubmitting
               ? 'Đang xử lý...'
               : isPrefilled
-                ? 'Tạo, xuất bản & lưu trữ gói cũ'
+                ? 'Tạo & lưu trữ gói cũ'
                 : 'Lưu gói'}
           </button>
         </div>

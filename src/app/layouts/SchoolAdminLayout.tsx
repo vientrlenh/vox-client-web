@@ -131,10 +131,6 @@ const navigationGroups: NavigationGroup[] = [
         label: 'Quản lý chính sách đánh giá',
         to: '/school-admin/assessment-policies',
       },
-      {
-        label: 'Quản lý quy tắc tính điểm',
-        to: '/school-admin/scoring-rules',
-      },
     ],
   },
   {

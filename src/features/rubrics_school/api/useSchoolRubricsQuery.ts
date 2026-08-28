@@ -46,10 +46,7 @@ async function fetchSchoolRubrics(schoolId: string, page: number, size: number):
   
   const response = data.viewSchoolRubrics;
   
-  return {
-    ...response,
-    page: response.page + 1 
-  };
+  return response;
 }
 
 export function useSchoolRubricsQuery(schoolId: string | undefined, page: number, size: number) {

@@ -88,6 +88,7 @@ const EXAM_SESSION_RESULT_QUERY = `
         responseId
         sectionId
         questionText
+        asset { type url title altText transcript description durationSeconds }
         itemScore
         weightedScore
       }
@@ -286,6 +287,22 @@ export async function deleteExamSession(sessionId: string) {
 export function useDeleteExamSessionMutation() {
   return useMutation({
     mutationFn: (sessionId: string) => deleteExamSession(sessionId),
+  })
+}
+
+// AI chấm lỗi -> đưa bài vào hàng đợi cho người chấm. REST chứ không GraphQL vì backend chỉ phơi
+// endpoint này ở ExamSessionController (không có mutation tương ứng trong exam.graphqls).
+//
+// Trả về id của ExamCandidateResult vừa tạo ở PENDING_REVIEW. Phiên GIỮ NGUYÊN GRADING_FAILED --
+// backend cố ý không đổi trạng thái, nên nút chấm lại bằng AI vẫn dùng được sau đó.
+export async function handOffGradingToHuman(sessionId: string) {
+  const response = await apiClient.post<ApiEnvelope<string>>(`/v1/exam-sessions/${sessionId}/hand-off-grading`)
+  return response.data.data
+}
+
+export function useHandOffGradingToHumanMutation() {
+  return useMutation({
+    mutationFn: (sessionId: string) => handOffGradingToHuman(sessionId),
   })
 }
 

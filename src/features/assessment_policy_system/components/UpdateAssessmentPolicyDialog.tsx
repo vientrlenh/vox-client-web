@@ -135,7 +135,7 @@ export function UpdateAssessmentPolicyDialog({ policy, onClose, onSubmit, isPend
                 className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-500 disabled:bg-slate-50"
               >
                 <option value="">-- Chọn target band --</option>
-                {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.code} - {band.label}</option>)}
+                {resultBands?.map((band) => <option key={band.id} value={band.id}>{band.label}</option>)}
               </select>
             </div>
 

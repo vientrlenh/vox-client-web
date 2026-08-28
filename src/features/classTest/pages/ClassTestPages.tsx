@@ -71,6 +71,7 @@ import {
   NO_ACTIVE_SUBSCRIPTION_MESSAGE,
 } from '@/features/examCore/utils/subscriptionWindow'
 import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '@/features/examCore/utils/timeQuota'
+import { scaleEstimateByMaxAttempt, useExamTokenEstimateQuery } from '@/features/classTest/api/useExamTokenEstimateQuery'
 import { buildClassTestQuotaWarning } from '@/features/classTest/utils/classTestTokenQuota'
 import {
   getClassTestScheduleReadiness,
@@ -80,12 +81,12 @@ import {
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useMySubscriptionUsageQuery } from '@/features/subscription_school/api/useMySubscriptionUsageQuery'
 import { useMyClassTestQuotaAllocationQuery } from '@/features/subscription_school/api/useMyClassTestQuotaAllocationQuery'
-import { useQuotaPricingQuery } from '@/features/subscription_school/api/useQuotaPricingQuery'
 import {
   formatDate,
   formatDateTime,
   formatDurationSeconds,
   formatNullableText,
+  getAssessmentPolicyScopeLabel,
   getAssessmentPolicyStrictnessLabel,
   getExamChairName,
   getResultDecisionMethodDisplay,
@@ -750,7 +751,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
 
         <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <span className="text-sm font-bold text-slate-700">
-            Phiên bản thang đánh giá (Rubric Version) <span className="text-red-600">*</span>
+            Phiên bản thang đánh giá <span className="text-red-600">*</span>
           </span>
           <p className="text-xs text-slate-500">
             Bắt buộc — quyết định chính sách đánh giá dùng để chấm bài. Thiếu nó thì bài không chấm được.
@@ -768,8 +769,7 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
             <div className="mt-1.5 grid gap-2 rounded-lg border border-indigo-200 bg-white p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[13px] text-slate-700">
-                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b> ({selectedRubricVersion.code} · v
-                  {selectedRubricVersion.version})
+                  Đã chọn <b className="text-slate-900">{selectedRubricVersion.name}</b>
                 </p>
                 <div className="flex shrink-0 items-center gap-3">
                   <button className="text-xs font-bold text-indigo-600" onClick={goToSelectRubricVersion} type="button">
@@ -809,6 +809,9 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
                       type="button"
                     >
                       <span>
+                        <span className="block text-indigo-700">
+                          {getAssessmentPolicyScopeLabel(policy)} · {policy.targetFrameworkBand?.label ?? '—'}
+                        </span>
                         Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt{' '}
                         {policy.passingScore ?? '-'}
                       </span>
@@ -823,7 +826,9 @@ function ClassTestCreateForm({ locationState }: { locationState: ClassTestCreate
 
               {assessmentPolicyId && matchingPolicies.length === 1 ? (
                 <p className="text-xs font-semibold text-emerald-700">
-                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
+                  Sẽ gắn chính sách đánh giá: {getAssessmentPolicyScopeLabel(matchingPolicies[0])} ·{' '}
+                  {matchingPolicies[0].targetFrameworkBand?.label ?? '—'} ·{' '}
+                  {getAssessmentPolicyStrictnessLabel(matchingPolicies[0].strictness)} · Điểm đạt{' '}
                   {matchingPolicies[0].passingScore ?? '-'}
                 </p>
               ) : null}
@@ -1149,7 +1154,9 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const detailSubscriptionBounds = getSubscriptionWindowBounds(subscription)
   const subscriptionUsageQuery = useMySubscriptionUsageQuery()
   const myClassTestQuotaAllocationQuery = useMyClassTestQuotaAllocationQuery()
-  const quotaPricingQuery = useQuotaPricingQuery()
+  // Ước lượng chi phí do BE tính (không nhân lại ở FE) — một cái theo số lượt đã lưu, một cái theo
+  // số đang gõ trong modal sửa. Cái thứ hai chỉ chạy khi modal mở, và số lượt đã được debounce.
+  const examTokenEstimateQuery = useExamTokenEstimateQuery(examId)
   const updateQuestionsMutation = useUpdateClassTestQuestionsMutation()
   const updateExamMutation = useUpdateClassTestMutation()
   const updateStatusMutation = useUpdateClassTestStatusMutation()
@@ -1618,32 +1625,29 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
 
   const activeTab: ClassTestDetailTab = tab ?? 'papers'
   const statusDisplay = getClassTestStatusDisplay(exam.status)
-  const candidates = candidatesQuery.data ?? []
   // Cảnh báo chủ động trước khi BE chặn (ClassTestTokenQuotaGuardService) — không thay cho việc
   // BE thật sự chặn, chỉ để giáo viên biết trước thay vì bấm xong mới ăn lỗi.
   const gradingQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'GRADING')
   const classTestQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'CLASS_TEST')
   const currentQuotaWarning = buildClassTestQuotaWarning({
-    candidateCount: candidates.length,
     classTestQuota,
+    estimatedCostUsd: examTokenEstimateQuery.data?.estimatedCostUsd,
     examName: exam.name,
-    examTimeDurationSecond: exam.examTimeDurationSecond,
     gradingQuota,
-    maxAttempt: exam.maxAttempt,
     personalAllocation: myClassTestQuotaAllocationQuery.data,
-    pricePerSecondUsd: quotaPricingQuery.data?.estimatedCostPerExamSecondUsd,
   })
-  // Ước lượng "nếu lưu với giá trị đang sửa" trong modal — dùng editMaxAttempt thay vì exam.maxAttempt
-  // vì đây là số người dùng đang gõ, chưa lưu.
+  // Ước lượng "nếu lưu với số lượt đang gõ": chi phí tuyến tính theo maxAttempt nên chỉ cần nhân tỉ
+  // lệ con số BE đã trả về — đúng bằng cái BE sẽ tính, không phải gọi lại server mỗi lần gõ phím.
   const editQuotaWarning = buildClassTestQuotaWarning({
-    candidateCount: candidates.length,
     classTestQuota,
+    estimatedCostUsd: scaleEstimateByMaxAttempt(
+      examTokenEstimateQuery.data?.estimatedCostUsd,
+      exam.maxAttempt,
+      Number(editMaxAttempt) || 1,
+    ),
     examName: exam.name,
-    examTimeDurationSecond: exam.examTimeDurationSecond,
     gradingQuota,
-    maxAttempt: Number(editMaxAttempt) || 1,
     personalAllocation: myClassTestQuotaAllocationQuery.data,
-    pricePerSecondUsd: quotaPricingQuery.data?.estimatedCostPerExamSecondUsd,
   })
   const { completedCount, currentStep, steps } = workflow
   const scheduleReadiness = getClassTestScheduleReadiness(schedulesQuery.data, candidatesQuery.data)

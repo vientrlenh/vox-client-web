@@ -91,6 +91,7 @@ import { SegmentedControl, type SegmentItem } from '../components/SegmentedContr
 import { SetDeadlineDialog } from '../components/SetDeadlineDialog'
 import { SubmitGradingDialog } from '../components/SubmitGradingDialog'
 import { ValidityRulesCard } from '../components/ValidityRulesCard'
+import { QuestionAssetPanel } from '@/features/question/components/QuestionAssetPanel'
 import {
   assignBlockedReason,
   avatarClasses,
@@ -1959,6 +1960,23 @@ export function GradingTaskDetailView({
                   <p className="mt-2.5 text-[13px] leading-relaxed text-slate-700">
                     {item.questionText}
                   </p>
+                ) : null}
+                {/*
+                  Tài nguyên nằm ngay dưới đề bài và TRƯỚC bản ghi bài nói: phải thấy thí sinh đã
+                  nhìn/nghe gì rồi mới đọc được transcript của họ. Đặt sau danh sách lượt là bắt
+                  giáo viên đọc câu trả lời trước khi biết câu hỏi nói về cái gì.
+                */}
+                {item.asset ? (
+                  <QuestionAssetPanel
+                    altText={item.asset.altText}
+                    compact
+                    description={item.asset.description}
+                    durationSeconds={item.asset.durationSeconds}
+                    title={item.asset.title}
+                    transcript={item.asset.transcript}
+                    type={item.asset.type}
+                    url={item.asset.url}
+                  />
                 ) : null}
                 <AiEvaluationSummary item={item} />
                 <div className="mt-3.5">
