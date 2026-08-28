@@ -1,80 +1,55 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
 import { schoolSubscriptionQueryKeys } from './useSchoolSubscriptionsQuery'
-import type { MutationResult, SchoolSubscription } from '../types'
+import type { MutationResult } from '../types'
 
 type ApiResponse<TData> = {
   data: TData
   message: string
 }
 
-type SubscriptionActionInput = {
-  schoolId: string
-  subscriptionId: string
-}
-
-type SuspendSubscriptionInput = SubscriptionActionInput & {
+/**
+ * Đình chỉ / gỡ đình chỉ nhận ĐÚNG id gói đăng ký, không kèm schoolId — trường suy ra từ chính gói ở
+ * BE. Đường cũ /v1/schools/{schoolId}/subscriptions/{id}/suspend đã bị bỏ.
+ *
+ * KHÔNG có hành động hủy ở đây: PATCH /v1/subscriptions/cancellation là của SCHOOL_ADMIN và lấy
+ * trường từ token, nên System Admin không hủy gia hạn hộ trường được.
+ */
+async function suspendSubscription({
+  reason,
+  subscriptionId,
+}: {
   reason: string
-}
-
-type UnsuspendSubscriptionInput = SubscriptionActionInput & {
-  note?: string
-}
-
-async function renewSubscription({ schoolId, subscriptionId }: SubscriptionActionInput): Promise<
-  MutationResult<SchoolSubscription>
-> {
-  const response = await apiClient.post<ApiResponse<SchoolSubscription>>(
-    `/v1/schools/${schoolId}/subscriptions/${subscriptionId}/renew`,
-  )
-  return response.data
-}
-
-async function cancelSubscription({ schoolId, subscriptionId }: SubscriptionActionInput): Promise<
-  MutationResult<SchoolSubscription>
-> {
-  const response = await apiClient.post<ApiResponse<SchoolSubscription>>(
-    `/v1/schools/${schoolId}/subscriptions/${subscriptionId}/cancel`,
-  )
-  return response.data
-}
-
-async function suspendSubscription({ schoolId, subscriptionId, reason }: SuspendSubscriptionInput): Promise<
-  MutationResult<SchoolSubscription>
-> {
-  const response = await apiClient.post<ApiResponse<SchoolSubscription>>(
-    `/v1/schools/${schoolId}/subscriptions/${subscriptionId}/suspend`,
+  subscriptionId: string
+}): Promise<MutationResult<string>> {
+  const response = await apiClient.patch<ApiResponse<string>>(
+    `/v1/subscriptions/${subscriptionId}/suspension`,
     { reason },
   )
   return response.data
 }
 
-async function unsuspendSubscription({ schoolId, subscriptionId, note }: UnsuspendSubscriptionInput): Promise<
-  MutationResult<SchoolSubscription>
-> {
-  const response = await apiClient.post<ApiResponse<SchoolSubscription>>(
-    `/v1/schools/${schoolId}/subscriptions/${subscriptionId}/unsuspend`,
-    { note },
+async function unsuspendSubscription({
+  note,
+  subscriptionId,
+}: {
+  note?: string
+  subscriptionId: string
+}): Promise<MutationResult<string>> {
+  // DELETE có body: gỡ đình chỉ xóa trắng ba cột suspended_*, nên ghi chú là thứ duy nhất còn lại
+  // giải thích vì sao gỡ. axios đưa body của DELETE qua `data`.
+  const response = await apiClient.delete<ApiResponse<string>>(
+    `/v1/subscriptions/${subscriptionId}/suspension`,
+    { data: { note: note ?? null } },
   )
   return response.data
 }
 
-export function useRenewSubscriptionMutation() {
+function useSubscriptionMutation<TInput, TOutput>(mutationFn: (input: TInput) => Promise<TOutput>) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: renewSubscription,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: schoolSubscriptionQueryKeys.all })
-    },
-  })
-}
-
-export function useCancelSubscriptionMutation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: cancelSubscription,
+    mutationFn,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: schoolSubscriptionQueryKeys.all })
     },
@@ -82,23 +57,9 @@ export function useCancelSubscriptionMutation() {
 }
 
 export function useSuspendSubscriptionMutation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: suspendSubscription,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: schoolSubscriptionQueryKeys.all })
-    },
-  })
+  return useSubscriptionMutation(suspendSubscription)
 }
 
 export function useUnsuspendSubscriptionMutation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: unsuspendSubscription,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: schoolSubscriptionQueryKeys.all })
-    },
-  })
+  return useSubscriptionMutation(unsuspendSubscription)
 }

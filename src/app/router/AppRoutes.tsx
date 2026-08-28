@@ -734,9 +734,21 @@ const SystemAdminAllScoringRulesPage = lazy(() =>
   })),
 );
 
-const SystemAdminSubscriptionPage = lazy(() =>
+const SubscriptionPlanCatalogPage = lazy(() =>
   import("@/features/subscription_system").then((module) => ({
-    default: module.SystemAdminSubscriptionPage,
+    default: module.SubscriptionPlanCatalogPage,
+  })),
+);
+
+const SubscriptionPlanDetailPage = lazy(() =>
+  import("@/features/subscription_system").then((module) => ({
+    default: module.SubscriptionPlanDetailPage,
+  })),
+);
+
+const SystemAdminSchoolSubscriptionsPage = lazy(() =>
+  import("@/features/subscription_system").then((module) => ({
+    default: module.SchoolSubscriptionsPage,
   })),
 );
 
@@ -944,13 +956,26 @@ export function AppRoutes() {
               path="system-admin/scoring-rules"
               element={<SystemAdminAllScoringRulesPage />}
             />
+            {/* /subscription trần giờ chỉ là lối cũ — đẩy về danh mục gói để link đã lưu không chết. */}
             <Route
               path="system-admin/subscription"
-              element={<SystemAdminSubscriptionPage />}
+              element={<Navigate replace to="/system-admin/subscription/plans" />}
+            />
+            <Route
+              path="system-admin/subscription/plans"
+              element={<SubscriptionPlanCatalogPage />}
+            />
+            <Route
+              path="system-admin/subscription/plans/:planId"
+              element={<SubscriptionPlanDetailPage />}
+            />
+            <Route
+              path="system-admin/subscription/schools"
+              element={<SystemAdminSchoolSubscriptionsPage />}
             />
             <Route
               path="system-admin/subscription/payment-result"
-              element={<SystemAdminSubscriptionPaymentResultPage backTo="/system-admin/subscription" />}
+              element={<SystemAdminSubscriptionPaymentResultPage backTo="/system-admin/subscription/plans" />}
             />
           </Route>
         </Route>

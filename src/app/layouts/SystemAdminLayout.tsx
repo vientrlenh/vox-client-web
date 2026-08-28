@@ -5,9 +5,10 @@ import {
   ClipboardCheck,
   FileQuestion,
   Home,
+  Languages,
   LogOut,
   Menu,
-  Settings,
+  Package,
   ShieldCheck,
   UserRound,
   X,
@@ -42,7 +43,14 @@ const navigationItems: NavigationItem[] = [
     icon: Home,
     label: 'Tổng quan',
     to: '/system-admin/dashboard',
-  }
+  },
+  // Trước đây nằm trong nhóm "Hệ thống" cùng với gói dịch vụ. Khi gói tách ra thành nhóm riêng thì
+  // "Hệ thống" chỉ còn đúng một con — một nhóm một con thì tệ hơn là không có nhóm, nên giải thể.
+  {
+    icon: Languages,
+    label: 'Quản lý ngôn ngữ',
+    to: '/system-admin/languages',
+  },
 ]
 
 const navigationGroups: NavigationGroup[] = [
@@ -100,17 +108,20 @@ const navigationGroups: NavigationGroup[] = [
       },
     ],
   },
+  // "Gói dịch vụ" là một MIỀN riêng như Trường học / Đánh giá / Câu hỏi, không phải một mục cài đặt.
+  // Nhóm mang tên miền, hai trang con mang tên cụ thể — nếu để nhóm và con trùng tên "Gói dịch vụ"
+  // thì cây điều hướng đọc như bị lặp.
   {
-    icon: Settings,
-    label: 'Hệ thống',
+    icon: Package,
+    label: 'Gói dịch vụ',
     items: [
       {
-        label: 'Quản lý ngôn ngữ',
-        to: '/system-admin/languages',
+        label: 'Danh mục gói',
+        to: '/system-admin/subscription/plans',
       },
       {
-        label: 'Gói dịch vụ',
-        to: '/system-admin/subscription',
+        label: 'Trường & gói',
+        to: '/system-admin/subscription/schools',
       },
     ],
   },
