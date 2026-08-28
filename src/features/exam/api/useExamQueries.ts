@@ -41,7 +41,7 @@ async function fetchExams(filters: ExamsFilters) {
   const data = await graphQLRequest<{ exams: Paged<ExamDto> }>(EXAMS_QUERY, {
     keyword: filters.keyword?.trim() || null,
     kind: resolveKind(filters.kind),
-    page: filters.page - 1,
+    page: filters.page,
     size: filters.size,
     status: filters.status || null,
   })
@@ -54,7 +54,6 @@ export function useExamsQuery(filters: ExamsFilters) {
     // Chuẩn hoá `kind` TRƯỚC khi dựng khoá: nếu để nguyên `filters` thì "bỏ trống kind" và
     // "kind: 'CENTRALIZED'" thành hai ô cache riêng cho cùng một truy vấn.
     queryKey: examQueryKeys.exams({ ...filters, kind: resolveKind(filters.kind) }),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 

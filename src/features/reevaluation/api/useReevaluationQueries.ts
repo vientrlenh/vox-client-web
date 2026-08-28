@@ -181,9 +181,8 @@ export function useAppealsQuery(
     status: options?.status,
   }
   return useQuery({
-    queryFn: () => fetchAppeals({ ...input, page: page - 1 }),
+    queryFn: () => fetchAppeals(input),
     queryKey: reevaluationKeys.list(input),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 

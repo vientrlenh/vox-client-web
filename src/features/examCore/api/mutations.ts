@@ -14,7 +14,6 @@ import type {
   ExamPaperSectionDto,
   ExamScheduleDto,
   ExamScheduleOtpDto,
-  ExamSecurePoolDto,
   QuestionSelectionSpec,
   UpdateExamBlueprintVersionStatusRequest,
   UpdateExamPaperItemRequest,
@@ -24,17 +23,6 @@ import type {
 
 export function unwrap<T>(response: { data: ApiResponse<T> }) {
   return response.data.data
-}
-
-export function useReleaseSecurePoolMutation() {
-  return useMutation({
-    mutationFn: async (examId: string) => {
-      const response = await apiClient.patch<ApiResponse<ExamSecurePoolDto>>(`/v1/exams/${examId}/secure-pool/status`, {
-        action: 'RELEASE',
-      })
-      return unwrap(response)
-    },
-  })
 }
 
 export function useCreateExamPaperMutation() {

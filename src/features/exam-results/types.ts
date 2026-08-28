@@ -44,6 +44,16 @@ export type ExamResultSectionDto = {
   title?: string | null
 }
 
+export type ExamResultQuestionAsset = {
+  altText?: string | null
+  description?: string | null
+  durationSeconds?: number | null
+  title?: string | null
+  transcript?: string | null
+  type: 'AUDIO' | 'IMAGE' | 'VIDEO' | 'TEXT_PASSAGE'
+  url?: string | null
+}
+
 export type ExamResultItemDto = {
   /** Null khi câu chưa được chấm — bài vẫn trả về câu để hiện bản ghi bài nói. */
   itemScore: number | null
@@ -54,6 +64,12 @@ export type ExamResultItemDto = {
    * không phải đề bài, và nó chỉ được nạp khi người dùng mở thẻ ra.
    */
   questionText?: string | null
+  /**
+   * Tài nguyên đi kèm câu hỏi (ảnh / audio / video / đoạn văn). Null khi câu không có.
+   * Hiện cho cả giáo viên lẫn học sinh: đọc lại bài mà không thấy tấm ảnh thì không đối chiếu
+   * nổi câu trả lời với đề, và trang này vốn đã hiện `questionText` nên không lộ thêm gì.
+   */
+  asset?: ExamResultQuestionAsset | null
   responseId: string
   sectionId: string
   /** Null khi câu chưa được chấm. */

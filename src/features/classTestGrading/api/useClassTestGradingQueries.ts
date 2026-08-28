@@ -212,9 +212,8 @@ export function useClassTestGradingTasksQuery(
   const input: FetchClassTestGradingTasksInput = { ...options, examId, page, size }
   return useQuery({
     enabled: Boolean(examId),
-    queryFn: () => fetchClassTestGradingTasks({ ...input, page: page - 1 }),
+    queryFn: () => fetchClassTestGradingTasks(input),
     queryKey: classTestGradingKeys.tasks(input),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 
@@ -229,9 +228,8 @@ export function useClassTestGradingResultsQuery(
     enabled: Boolean(examId),
     // Giữ trang cũ trong lúc nạp trang/từ khoá mới, nếu không bảng chớp trắng mỗi lần gõ.
     placeholderData: (previousData) => previousData,
-    queryFn: () => fetchClassTestGradingResults({ ...input, page: page - 1 }),
+    queryFn: () => fetchClassTestGradingResults(input),
     queryKey: classTestGradingKeys.results(input),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 

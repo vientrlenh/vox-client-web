@@ -1,6 +1,10 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
 import type {
+  BulkScopeStatusApiResult,
+  BulkScopeStatusRequest,
+} from '@/shared/api'
+import type {
   CreateQuestionBankRequest,
   UpdateQuestionBankRequest,
 } from '../types'
@@ -68,6 +72,28 @@ export async function reviewQuestionBank(
   )
 
   return response.data.message
+}
+
+/**
+ * Đổi trạng thái nhiều ngân hàng câu hỏi trong một request.
+ *
+ * Backend trả "thành công một phần": mục hợp lệ nằm trong `updated`, mục bị từ chối nằm trong
+ * `failed` kèm lý do — nên KHÔNG được coi HTTP 200 là mọi mục đều đổi được.
+ */
+export async function bulkUpdateQuestionBankStatus(
+  payload: BulkScopeStatusRequest,
+) {
+  const response = await apiClient.patch<
+    ApiResponse<BulkScopeStatusApiResult<unknown>>
+  >('/v1/question-banks/bulk/status', payload)
+
+  return response.data.data
+}
+
+export function useBulkUpdateQuestionBankStatusMutation() {
+  return useMutation({
+    mutationFn: bulkUpdateQuestionBankStatus,
+  })
 }
 
 export function useCreateQuestionBankMutation() {

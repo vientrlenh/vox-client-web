@@ -9,5 +9,11 @@ export {
 export { isForbiddenApiError, isPlanLimitExceededApiError, toApiError } from './apiError'
 export { requireSchoolId } from './schoolApiUtils'
 export type { ApiResponse, MutationResult } from './schoolApiUtils'
+export type {
+  BulkScopeStatusAction,
+  BulkScopeStatusApiResult,
+  BulkScopeStatusFailure,
+  BulkScopeStatusRequest,
+} from './bulkScopeStatus'
 export type { ApiError } from './apiError'
 export type { AuthTokens } from './authTokenStorage'

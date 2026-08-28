@@ -54,10 +54,7 @@ async function searchSchoolRubricResultBands(
 
   const response = data.searchSchoolRubricResultBands;
 
-  return {
-    ...response,
-    page: response.page + 1, // Bù trừ 0-based từ Backend lên 1-based cho Pagination UI
-  };
+  return response;
 }
 
 export function useSearchSchoolRubricResultBandsQuery(

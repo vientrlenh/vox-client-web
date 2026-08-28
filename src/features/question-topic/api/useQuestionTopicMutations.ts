@@ -1,6 +1,10 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api'
 import type {
+  BulkScopeStatusApiResult,
+  BulkScopeStatusRequest,
+} from '@/shared/api'
+import type {
   CreateQuestionTopicRequest,
   UpdateQuestionTopicRequest,
 } from '../types'
@@ -49,6 +53,30 @@ export async function reviewQuestionTopic(
   )
 
   return response.data.message
+}
+
+/**
+ * Đổi trạng thái nhiều chủ đề câu hỏi trong một request.
+ *
+ * Đây là bước hay vấp nhất khi nạp dữ liệu: import câu hỏi CHỈ nhận chủ đề đã PUBLISHED, mà chủ đề
+ * nhập từ Excel luôn vào ở DRAFT — không có đường hàng loạt thì phải mở từng chủ đề một.
+ *
+ * Backend trả "thành công một phần", xem BulkScopeStatusApiResult.
+ */
+export async function bulkUpdateQuestionTopicStatus(
+  payload: BulkScopeStatusRequest,
+) {
+  const response = await apiClient.patch<
+    ApiResponse<BulkScopeStatusApiResult<unknown>>
+  >('/v1/question-topics/bulk/status', payload)
+
+  return response.data.data
+}
+
+export function useBulkUpdateQuestionTopicStatusMutation() {
+  return useMutation({
+    mutationFn: bulkUpdateQuestionTopicStatus,
+  })
 }
 
 export function useCreateQuestionTopicMutation() {

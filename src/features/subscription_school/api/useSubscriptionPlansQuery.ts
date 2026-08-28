@@ -36,15 +36,12 @@ const SUBSCRIPTION_PLANS_QUERY = `
 
 async function fetchSubscriptionPlans(page: number, size: number): Promise<SubscriptionPlanPage> {
   const data = await graphQLRequest<{ subscriptionPlans: SubscriptionPlanPage }>(SUBSCRIPTION_PLANS_QUERY, {
-    page: page - 1,
+    page,
     size,
   })
 
   const response = data.subscriptionPlans
-  return {
-    ...response,
-    page: response.page + 1,
-  }
+  return response
 }
 
 export function useSubscriptionPlansQuery(page: number, size: number) {

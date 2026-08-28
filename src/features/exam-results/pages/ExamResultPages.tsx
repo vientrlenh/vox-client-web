@@ -38,6 +38,7 @@ import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { TabPillGroup } from '@/shared/ui/TabPill'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { WordFeedbackText } from '@/shared/ui/WordFeedbackText'
+import { QuestionAssetPanel } from '@/features/question/components/QuestionAssetPanel'
 import {
   examResultQueryKeys,
   fetchExamItemEvaluation,
@@ -45,7 +46,7 @@ import {
   useExamSessionResultQuery,
   useExamSessionStatusQuery,
   useRetryGradingExamSessionMutation,
-  useRegradeExamSessionForTestMutation,
+  useHandOffGradingToHumanMutation,
   useDecideExamCandidateResultOutcomeMutation,
 } from '../api/useExamResultQueries'
 import {
@@ -685,6 +686,20 @@ export function QuestionEvaluationCard({
 
       {open ? (
         <div className="border-t border-slate-100 px-4 py-4">
+          {/* Tài nguyên đứng TRƯỚC mọi thứ trong thân thẻ: phải biết thí sinh đã nhìn/nghe gì rồi
+              mới đọc được transcript và điểm. Nằm ngoài nút gập vì bản thân nó cũng gập được —
+              lồng button trong button là HTML không hợp lệ. */}
+          {itemResult?.asset ? (
+            <QuestionAssetPanel
+              altText={itemResult.asset.altText}
+              description={itemResult.asset.description}
+              durationSeconds={itemResult.asset.durationSeconds}
+              title={itemResult.asset.title}
+              transcript={itemResult.asset.transcript}
+              type={itemResult.asset.type}
+              url={itemResult.asset.url}
+            />
+          ) : null}
           {/* `evaluation.id == null` là tín hiệu "chưa ai chấm câu này" do BE gửi. Không suy từ
               việc thiếu điểm — điểm 0 hợp lệ cũng thiếu điểm theo nghĩa đó. Chưa chấm thì vẫn
               hiện bản ghi bài nói: nó là bằng chứng, không phải điểm. */}
@@ -836,6 +851,7 @@ export function QuestionEvaluationCard({
 
 function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   const { sessionId } = useParams()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<string>('overview')
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
   const [message, setMessage] = useState<string | null>(null)
@@ -852,14 +868,7 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   const decideOutcomeMutation = useDecideExamCandidateResultOutcomeMutation()
   const forceEndExamSessionMutation = useForceEndExamSessionMutation()
   const retryGradingMutation = useRetryGradingExamSessionMutation()
-  const regradeForTestMutation = useRegradeExamSessionForTestMutation()
-  // Đã gửi yêu cầu chấm lại trong lần xem này chưa.
-  //
-  // `isPending` chỉ phủ lúc lời gọi còn bay. Chấm xong lời gọi là mutation hết pending, nhưng
-  // phiên phải chờ agents xử lý xong mới rời GRADING_FAILED -- giữa hai mốc đó nút mở lại và
-  // bấm thêm được, mỗi lần lại tốn một lượt gọi LLM cho cùng một bài. Cờ này khoá tới khi tải
-  // lại trang, lúc đó trạng thái phiên đã phản ánh thực tế.
-  const [regradeRequested, setRegradeRequested] = useState(false)
+  const handOffGradingMutation = useHandOffGradingToHumanMutation()
   const session = sessionQuery.data
   const result = resultQuery.data
   const examId = session?.examId ?? result?.examId ?? null
@@ -910,22 +919,18 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
   // Giáo viên/nhà trường cần xem điểm và breakdown của PENDING_REVIEW để có căn cứ duyệt.
   // Chỉ ẩn khi backend nói rõ điểm không được phép hiển thị cho user hiện tại.
   const hiddenPendingReview = Boolean(result && result.status === 'PENDING_REVIEW' && !result.scoreVisible)
-  const canRetry = session?.status === 'GRADING_FAILED' && examQuery.data?.status !== 'RESULTS_PUBLISHED'
-  // Chỉ chấm lại bằng AI khi lần chấm trước ĐÃ HỎNG.
+  // Hai lối ra cho bài AI chấm lỗi -- CHỈ khi bài chưa có kết quả nào.
   //
-  // Chấm lại là ghi ĐÈ (upsert): bấm trên bài đã chấm xong sẽ xoá điểm giáo viên sửa tay và thay
-  // bằng điểm AI mới, không hoàn tác được. GRADING_FAILED là lúc duy nhất chưa có gì để mất, vì
-  // chấm chưa từng thành công.
-  const regradeForTestBlockedReason =
-    session?.status !== 'GRADING_FAILED'
-      ? 'Chỉ chấm lại bằng AI khi lần chấm trước bị lỗi.'
-      : examQuery.data?.status === 'RESULTS_PUBLISHED'
-        ? 'Kỳ thi đã công bố kết quả, không thể chấm lại.'
-        : examQuery.data?.kind === 'CENTRALIZED' && candidate?.status !== 'ATTENDED'
-          ? 'Kỳ thi tập trung chỉ chấm lại bằng AI khi thí sinh đã được điểm danh có mặt.'
-          : result && result.items.length === 0
-            ? 'Phiên này không có câu trả lời được ghi nhận nên không có dữ liệu để gửi AI chấm lại.'
-            : null
+  // Cần thêm `!result` vì backend cố ý giữ phiên ở GRADING_FAILED sau khi chuyển sang chấm tay
+  // (xem HandOffGradingToHumanUseCase: đó là sự thật, AI đã chấm lỗi). Không có chốt này thì bài
+  // vừa chuyển xong hiện CẢ BỐN nút, trong đó "Chuyển người chấm" đã vô nghĩa -- bài nằm trong
+  // hàng đợi rồi -- và "Chấm lại" thì sẽ ghi điểm AI đè lên bản PENDING_REVIEW mà người chấm
+  // đang chờ xử lý.
+  //
+  // Có kết quả nghĩa là bài đã vào vòng đời chấm: từ đó chỉ còn nhóm nút của trạng thái kết quả.
+  const canRetry = session?.status === 'GRADING_FAILED'
+    && !result
+    && examQuery.data?.status !== 'RESULTS_PUBLISHED'
 
   if (!sessionId) {
     return null
@@ -1022,26 +1027,34 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
     }
   }
 
-  // TEST-ONLY: chấm lại bằng AI từ đầu bất kể trạng thái (kể cả đã GRADED). Cần agents Python
-  // đang chạy để xử lý; kết quả cũ bị ghi đè (upsert). Dùng để kiểm thử pipeline chấm điểm.
-  async function handleRegradeForTest() {
+  // Lối ra thứ hai khi AI chấm lỗi: đưa bài vào hàng đợi cho người chấm.
+  //
+  // Backend KHÔNG đổi trạng thái phiên (vẫn GRADING_FAILED) nên nút chấm lại bằng AI vẫn còn đó --
+  // hai lối ra cố ý không loại trừ nhau. Cũng không tự chọn giáo viên: bài vào hàng đợi ở dạng
+  // CHƯA PHÂN CÔNG để nhà trường tự điều phối.
+  async function handleHandOffGrading() {
     if (
       !(await confirm({
-        message: 'Chấm lại phiên thi này bằng AI từ đầu? Điểm và confidence cũ sẽ bị ghi đè.',
-        title: 'Xác nhận chấm lại bằng AI',
+        message:
+          'Đưa bài này vào hàng đợi cho người chấm? Bài sẽ vào hàng đợi ở dạng chưa phân công, '
+          + 'và bạn được chuyển ngay sang màn phân công để chọn giáo viên.',
+        title: 'Xác nhận chuyển sang chấm tay',
       }))
     ) {
       return
     }
 
     try {
-      await regradeForTestMutation.mutateAsync(currentSessionId)
-      setRegradeRequested(true)
+      await handOffGradingMutation.mutateAsync(currentSessionId)
       await invalidateDetail()
-      setMessage('Đã gửi yêu cầu chấm lại bằng AI. Chờ hệ thống chấm xong rồi tải lại trang.')
+      // Đi thẳng sang màn phân công, y như nút "Phân công chấm bài" của bài PENDING_REVIEW.
+      //
+      // Trước đây chỉ hiện toast rồi đứng lại: bài đã vào hàng đợi nhưng người dùng phải tự đi
+      // tìm màn phân công, mà việc còn dở của họ CHÍNH LÀ giao bài cho giáo viên. Chuyển bài sang
+      // chấm tay mà không giao ai thì chưa xong việc.
+      navigate(gradingPath)
     } catch (error) {
-      // KHÔNG khoá nút khi hỏng: gửi không thành công thì phải cho thử lại.
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể chấm lại phiên thi.')
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể chuyển bài sang chấm tay.')
     }
   }
 
@@ -1090,36 +1103,24 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
               </>
             ) : null}
             {canRetry ? (
-              <button
-                className="inline-flex h-10 items-center justify-center rounded-full bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
-                onClick={() => void handleRetryGrading()}
-                type="button"
-              >
-                Chấm lại
-              </button>
-            ) : null}
-            <>
+              <>
                 <button
-                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-dashed border-amber-400 bg-amber-50 px-4 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
-                  disabled={
-                    regradeForTestMutation.isPending ||
-                    regradeRequested ||
-                    Boolean(regradeForTestBlockedReason)
-                  }
-                  onClick={() => void handleRegradeForTest()}
-                  title={regradeForTestBlockedReason ?? undefined}
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700"
+                  onClick={() => void handleRetryGrading()}
                   type="button"
                 >
-                  {regradeForTestMutation.isPending
-                    ? 'Đang gửi...'
-                    : regradeRequested
-                      ? 'Đã gửi yêu cầu'
-                      : 'Chấm lại AI'}
+                  Chấm lại
                 </button>
-                {regradeForTestBlockedReason ? (
-                  <span className="max-w-80 text-xs font-semibold text-amber-700">{regradeForTestBlockedReason}</span>
-                ) : null}
-            </>
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-indigo-200 px-4 text-sm font-bold text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-50"
+                  disabled={handOffGradingMutation.isPending}
+                  onClick={() => void handleHandOffGrading()}
+                  type="button"
+                >
+                  {handOffGradingMutation.isPending ? 'Đang chuyển...' : 'Chuyển người chấm'}
+                </button>
+              </>
+            ) : null}
           </div>
         }
         metaItems={[

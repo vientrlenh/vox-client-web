@@ -83,8 +83,7 @@ export function useClassTestAppealsQuery(
   const input: FetchClassTestAppealsInput = { ...options, examId, page, size }
   return useQuery({
     enabled: Boolean(examId),
-    queryFn: () => fetchClassTestAppeals({ ...input, page: page - 1 }),
+    queryFn: () => fetchClassTestAppeals(input),
     queryKey: classTestAppealKeys.list(input),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }

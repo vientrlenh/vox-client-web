@@ -22,9 +22,9 @@ export async function fetchQuotaPricing(): Promise<QuotaPricing> {
   return data.quotaPricing
 }
 
-// Giá dùng để ước lượng worst-case chi phí AI trước khi publish/sửa bài kiểm tra trên lớp
-// (xem estimateClassTestCostUsd) — lấy từ BE thay vì hardcode ở FE để không bao giờ lệch với
-// giá trị QuotaPricingProperties mà ClassTestTokenQuotaGuardService thật sự dùng để chặn.
+// Giá quy đổi + tỷ giá để hiển thị (giá bán token, quy đổi VND). Ước lượng chi phí bài kiểm tra thì
+// KHÔNG nhân ở FE nữa — dùng query examTokenEstimate (useExamTokenEstimateQuery) để con số hiện ra
+// khớp đúng cái ClassTestTokenQuotaGuardService dùng để chặn.
 export function useQuotaPricingQuery() {
   return useQuery({
     queryFn: fetchQuotaPricing,

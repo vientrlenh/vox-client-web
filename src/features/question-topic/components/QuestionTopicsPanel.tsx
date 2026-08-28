@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import type { QuestionModuleScope } from '@/features/question-bank/api/useQuestionBanksQuery'
 import { useAppSelector } from '@/app/store/hooks'
@@ -10,11 +10,16 @@ import {
   useQuestionTopicsQuery,
 } from '../api/useQuestionTopicsQuery'
 import {
+  useBulkUpdateQuestionTopicStatusMutation,
   useCreateQuestionTopicMutation,
   useDeleteQuestionTopicMutation,
   useReviewQuestionTopicMutation,
   useUpdateQuestionTopicMutation,
 } from '../api/useQuestionTopicMutations'
+import type { BulkScopeStatusAction } from '@/shared/api'
+import { BulkScopeStatusResultDialog } from '@/shared/ui/BulkScopeStatusResultDialog'
+import type { BulkScopeStatusResult } from '@/shared/ui/BulkScopeStatusResultDialog'
+import { BulkScopeStatusToolbar } from '@/shared/ui/BulkScopeStatusToolbar'
 import { QuestionTopicFormDialog } from './QuestionTopicFormDialog'
 import type { QuestionTopicFormMode } from './QuestionTopicFormDialog'
 import { QuestionTopicPagination } from './QuestionTopicPagination'
@@ -71,10 +76,13 @@ export function QuestionTopicsPanel({
   const [dialogTarget, setDialogTarget] = useState<QuestionTopicDto | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [pageMessage, setPageMessage] = useState<string | null>(null)
+  // Giữ xuyên trang: một ngân hàng có thể có vài chục chủ đề, mà import câu hỏi đòi chủ đề PUBLISHED.
+  const [bulkIds, setBulkIds] = useState<string[]>([])
+  const [bulkResult, setBulkResult] = useState<BulkScopeStatusResult | null>(null)
 
   const actorRole = getQuestionTopicActorRole(user?.roles)
   const canManage = canManageQuestionTopic(actorRole)
-  const questionTopicsQuery = useQuestionTopicsQuery(scope, bankId, page - 1, pageSize)
+  const questionTopicsQuery = useQuestionTopicsQuery(scope, bankId, page, pageSize)
   const questionTopics = questionTopicsQuery.data?.content ?? []
   const selectedListTopic =
     questionTopics.find((topic) => topic.id === selectedId) ??
@@ -87,6 +95,7 @@ export function QuestionTopicsPanel({
   const updateMutation = useUpdateQuestionTopicMutation()
   const deleteMutation = useDeleteQuestionTopicMutation()
   const reviewMutation = useReviewQuestionTopicMutation()
+  const bulkStatusMutation = useBulkUpdateQuestionTopicStatusMutation()
   const isSubmitting =
     createMutation.isPending ||
     updateMutation.isPending ||
@@ -95,6 +104,55 @@ export function QuestionTopicsPanel({
 
   async function refreshTopics() {
     await queryClient.invalidateQueries({ queryKey: questionTopicQueryKeys.all })
+  }
+
+  function toggleBulkId(id: string) {
+    setBulkIds((current) =>
+      current.includes(id)
+        ? current.filter((currentId) => currentId !== id)
+        : [...current, id],
+    )
+  }
+
+  function toggleBulkPage() {
+    const pageIds = questionTopics.map((topic) => topic.id)
+    const isPageFullyChecked = pageIds.every((id) => bulkIds.includes(id))
+
+    setBulkIds((current) =>
+      isPageFullyChecked
+        ? current.filter((id) => !pageIds.includes(id))
+        : [...new Set([...current, ...pageIds])],
+    )
+  }
+
+  async function handleBulkStatus(action: BulkScopeStatusAction) {
+    const actionVerb = action === 'PUBLISH' ? 'xuất bản' : 'lưu trữ'
+
+    try {
+      setPageMessage(null)
+      const result = await bulkStatusMutation.mutateAsync({ action, ids: bulkIds })
+      await refreshTopics()
+
+      // Còn mục hỏng thì giữ lựa chọn để sửa rồi thử lại, không bắt chọn lại từ đầu.
+      if (result.failed.length === 0) {
+        setBulkIds([])
+        setPageMessage(`Đã ${actionVerb} ${result.updated.length} chủ đề câu hỏi.`)
+        return
+      }
+
+      setBulkResult({
+        actionVerb,
+        entityNoun: 'chủ đề câu hỏi',
+        failed: result.failed,
+        totalCount: bulkIds.length,
+        updatedCount: result.updated.length,
+      })
+    } catch (error) {
+      setPageMessage(
+        getErrorMessage(error) ??
+          `Không thể ${actionVerb} chủ đề câu hỏi hàng loạt.`,
+      )
+    }
   }
 
   async function handleSubmit(
@@ -171,6 +229,21 @@ export function QuestionTopicsPanel({
 
           {canManage ? (
             <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+              // Mang sẵn bankId sang trang nhập: người dùng đang đứng trong ngân hàng này rồi,
+              // bắt chọn lại là thừa và là chỗ dễ chọn nhầm sang ngân hàng khác.
+              onClick={() =>
+                navigate(`${basePath}/question-topics/import?questionBankId=${bankId}`)
+              }
+              type="button"
+            >
+              <Upload aria-hidden="true" className="size-4" />
+              Nhập từ Excel
+            </button>
+          ) : null}
+
+          {canManage ? (
+            <button
               className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-bold text-white transition hover:opacity-90"
               onClick={() => setDialogMode('create')}
               type="button"
@@ -186,6 +259,21 @@ export function QuestionTopicsPanel({
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
           {pageMessage}
         </div>
+      ) : null}
+
+      {canManage ? (
+        <BulkScopeStatusToolbar
+          entityNoun="chủ đề câu hỏi"
+          isPending={bulkStatusMutation.isPending}
+          onArchive={() => {
+            void handleBulkStatus('ARCHIVE')
+          }}
+          onClearSelection={() => setBulkIds([])}
+          onPublish={() => {
+            void handleBulkStatus('PUBLISH')
+          }}
+          selectedCount={bulkIds.length}
+        />
       ) : null}
 
       <QuestionTopicTable
@@ -296,8 +384,16 @@ export function QuestionTopicsPanel({
             `${basePath}/question-topics/${topicId}?bankId=${bankId}&bankName=${encodeURIComponent(bankName ?? '')}`,
           )
         }}
+        onToggleSelectId={canManage ? toggleBulkId : undefined}
+        onToggleSelectPage={canManage ? toggleBulkPage : undefined}
         questionTopics={questionTopics}
         selectedId={effectiveSelectedId}
+        selectedIds={bulkIds}
+      />
+
+      <BulkScopeStatusResultDialog
+        onClose={() => setBulkResult(null)}
+        result={bulkResult}
       />
 
       <QuestionTopicFormDialog

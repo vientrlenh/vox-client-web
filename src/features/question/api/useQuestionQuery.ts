@@ -59,8 +59,6 @@ const QUESTION_DETAIL_QUERY = `
         url
         transcript
         description
-        transcriptManuallyEdited
-        descriptionManuallyEdited
         order
       }
       evaluationGuide {

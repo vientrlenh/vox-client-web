@@ -12,8 +12,9 @@ type ApiResponse<T> = {
 
 type PreviewQuestionImportInput = {
   file: File
-  questionBankId: string
-  questionTopicId: string
+  /** Bỏ trống cả hai = import hàng loạt: mỗi dòng trong tệp tự khai mã ngân hàng + mã chủ đề. */
+  questionBankId?: string
+  questionTopicId?: string
 }
 
 type AcceptQuestionImportInput = {
@@ -28,8 +29,11 @@ export async function previewQuestionImport({
 }: PreviewQuestionImportInput) {
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('questionBankId', questionBankId)
-  formData.append('questionTopicId', questionTopicId)
+  // Không gửi khoá rỗng: backend phân biệt hai chế độ bằng việc tham số CÓ MẶT hay không.
+  if (questionBankId && questionTopicId) {
+    formData.append('questionBankId', questionBankId)
+    formData.append('questionTopicId', questionTopicId)
+  }
 
   const response = await apiClient.post<
     ApiResponse<PreviewQuestionImportResponse>

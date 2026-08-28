@@ -10,7 +10,7 @@ function bodyOf(callIndex = 0) {
   }
 }
 
-const emptyPage = { content: [], page: 0, size: 8, totalElements: 0, totalPages: 0 }
+const emptyPage = { content: [], page: 1, size: 8, totalElements: 0, totalPages: 0 }
 
 describe('fetchExamPickerOptions', () => {
   beforeEach(() => {
@@ -18,12 +18,17 @@ describe('fetchExamPickerOptions', () => {
     mockedPost.mockResolvedValue({ data: { data: { exams: emptyPage } } })
   })
 
-  it('converts the 1-based UI page to the 0-based page the server expects', async () => {
+  // Trước đây hàm này trừ 1 trước khi gửi vì `exams` trên GraphQL đánh số từ 0. Đợt refactor
+  // subscription đã lật toàn bộ trường phân trang GraphQL sang 1-based, nên phép trừ đó biến trang
+  // đầu thành page 0 -- backend gọi PageRequest.of(-1, size) và ném lỗi. Giờ gửi thẳng, không quy đổi.
+  //
+  // Lưu ý REST vẫn 0-based (GET /v1/exams, xem fetchMyExams): đừng suy từ test này sang bên đó.
+  it('sends the UI page straight through -- GraphQL paging is 1-based', async () => {
     await expect(fetchExamPickerOptions({ page: 1, size: 8 })).resolves.toEqual(emptyPage)
-    expect(bodyOf().variables).toMatchObject({ page: 0, size: 8 })
+    expect(bodyOf().variables).toMatchObject({ page: 1, size: 8 })
 
     await fetchExamPickerOptions({ page: 3, size: 8 })
-    expect(bodyOf(1).variables).toMatchObject({ page: 2 })
+    expect(bodyOf(1).variables).toMatchObject({ page: 3 })
   })
 
   it('sends null instead of an empty or blank keyword so the server drops the filter', async () => {
