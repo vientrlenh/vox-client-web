@@ -82,7 +82,7 @@ function QuestionBanksPage({
 
   const actorRole = getQuestionBankActorRole(user?.roles)
   const canManage = canManageQuestionBank(actorRole)
-  const questionBanksQuery = useQuestionBanksQuery(scope, page - 1, pageSize)
+  const questionBanksQuery = useQuestionBanksQuery(scope, page, pageSize)
   const questionBanks = questionBanksQuery.data?.content ?? []
   const selectedListBank =
     questionBanks.find((bank) => bank.id === selectedId) ??

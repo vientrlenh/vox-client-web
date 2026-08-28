@@ -82,7 +82,7 @@ export function QuestionTopicsPanel({
 
   const actorRole = getQuestionTopicActorRole(user?.roles)
   const canManage = canManageQuestionTopic(actorRole)
-  const questionTopicsQuery = useQuestionTopicsQuery(scope, bankId, page - 1, pageSize)
+  const questionTopicsQuery = useQuestionTopicsQuery(scope, bankId, page, pageSize)
   const questionTopics = questionTopicsQuery.data?.content ?? []
   const selectedListTopic =
     questionTopics.find((topic) => topic.id === selectedId) ??

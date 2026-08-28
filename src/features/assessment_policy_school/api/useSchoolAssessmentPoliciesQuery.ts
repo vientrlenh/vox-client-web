@@ -118,10 +118,7 @@ async function fetchSchoolAssessmentPolicies(
 
   const response = data.viewSchoolAssessmentPolicies;
 
-  return {
-    ...response,
-    page: response.page + 1,
-  };
+  return response;
 }
 
 export function useSchoolAssessmentPoliciesQuery(

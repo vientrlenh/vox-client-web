@@ -34,16 +34,13 @@ const SCHOOL_INVOICES_QUERY = `
 
 async function fetchSchoolInvoices(schoolId: string, page: number, size: number): Promise<InvoicePage> {
   const data = await graphQLRequest<{ invoices: InvoicePage }>(SCHOOL_INVOICES_QUERY, {
-    page: page - 1,
+    page,
     schoolId,
     size,
   })
 
   const response = data.invoices
-  return {
-    ...response,
-    page: response.page + 1,
-  }
+  return response
 }
 
 export function useSchoolInvoicesQuery(schoolId: string | null, page: number, size: number) {

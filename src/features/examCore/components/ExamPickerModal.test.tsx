@@ -94,11 +94,11 @@ describe('ExamPickerModal', () => {
     await screen.findByText('Kỳ thi giữa kỳ')
 
     await user.click(screen.getByRole('button', { name: 'Sau' }))
-    // UI 1-based, server 0-based: trang 2 trên UI = page 1 gửi đi.
-    await waitFor(() => expect(variablesOfLastCall().page).toBe(1))
+    // UI và GraphQL cùng 1-based nên không quy đổi nữa: trang 2 trên UI = page 2 gửi đi.
+    await waitFor(() => expect(variablesOfLastCall().page).toBe(2))
 
     await user.type(screen.getByLabelText('Tìm kỳ thi'), 'cuối')
-    await waitFor(() => expect(variablesOfLastCall().page).toBe(0))
+    await waitFor(() => expect(variablesOfLastCall().page).toBe(1))
   })
 
   it('chọn một kỳ thi thì trả về cả object và đóng modal', async () => {
