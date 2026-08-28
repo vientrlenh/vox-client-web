@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap">
+  <style>
+    body { margin: 0; font-family: "Be Vietnam Pro", system-ui, -apple-system, sans-serif; }
+    a { color: #4F46E5; } a:hover { color: #4338CA; }
+    .row { transition: all 0.2s ease; }
+    .row:hover { border-color: #C7D2FE; }
+    .num { font-variant-numeric: tabular-nums; }
+    .lbl { font-size: 12px; color: #94A3B8; }
+  </style>
+</helmet>
+
+<div style="width: 1200px; background: #F8FAFC; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
+
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <div style="font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #4F46E5;">Hướng C — Hàng so sánh</div>
+    <div style="font-size: 14px; color: #64748B;">Mỗi gói một hàng, các con số thẳng cột nên so được bằng mắt. Gói phổ biến đảo ô giá.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+
+    <!-- Gói thường -->
+    <div class="row" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px 24px; display: flex; align-items: center; gap: 24px;">
+      <div style="width: 260px; display: flex; flex-direction: column; gap: 3px;">
+        <div style="font-size: 18px; font-weight: 500; color: #0F172A;">Cơ bản</div>
+        <div style="font-size: 14px; line-height: 1.45; color: #64748B;">Đủ cho một tổ bộ môn chấm thi cả năm.</div>
+      </div>
+      <div style="flex-grow: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="lbl">Chấm thi &amp; kiểm tra</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; color: #0F172A;">6.000.000₫</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="lbl">Luyện nói cá nhân</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; color: #0F172A;">2.400.000₫</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="lbl">Tối đa mỗi bài</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; color: #0F172A;">10 phút</span>
+        </div>
+      </div>
+      <div style="width: 170px; display: flex; flex-direction: column; gap: 1px; align-items: flex-end; border-radius: 10px; padding: 8px 12px;">
+        <span class="num" style="font-size: 22px; font-weight: 700; color: #0F172A; letter-spacing: -0.01em;">9.600.000₫</span>
+        <span style="font-size: 12px; color: #94A3B8;">/ năm · 12 tháng</span>
+      </div>
+      <button type="button" style="width: 132px; height: 44px; border-radius: 9999px; border: 1px solid #E2E8F0; background: #FFFFFF; color: #4F46E5; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">Đăng ký</button>
+    </div>
+
+    <!-- Gói phổ biến nhất — đảo ô giá -->
+    <div class="row" style="background: #FFFFFF; border: 1.5px solid #4F46E5; border-radius: 14px; padding: 20px 24px; display: flex; align-items: center; gap: 24px;">
+      <div style="width: 260px; display: flex; flex-direction: column; gap: 3px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px; font-weight: 500; color: #0F172A;">Tiêu chuẩn</span>
+          <span style="display: inline-flex; align-items: center; gap: 4px; background: #EEF2FF; color: #4F46E5; border-radius: 9999px; padding: 3px 10px; font-size: 12px; font-weight: 500;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+              <path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1.002l3.093 -6.253l3.093 6.253l6.9 1.002l-5 4.867l1.179 6.873z" />
+            </svg>
+            Phổ biến
+          </span>
+        </div>
+        <div style="font-size: 14px; line-height: 1.45; color: #64748B;">Cả trường dùng chung, kèm hạn mức luyện nói.</div>
+      </div>
+      <div style="flex-grow: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="lbl">Chấm thi &amp; kiểm tra</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; color: #0F172A;">16.000.000₫</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="lbl">Luyện nói cá nhân</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; color: #0F172A;">6.000.000₫</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="lbl">Tối đa mỗi bài</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; color: #0F172A;">15 phút</span>
+        </div>
+      </div>
+      <div style="width: 170px; display: flex; flex-direction: column; gap: 1px; align-items: flex-end; background: #4F46E5; border-radius: 10px; padding: 8px 12px; box-sizing: border-box;">
+        <span class="num" style="font-size: 22px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.01em;">24.000.000₫</span>
+        <span style="font-size: 12px; color: #C7D2FE;">/ năm · 12 tháng</span>
+      </div>
+      <button type="button" style="width: 132px; height: 44px; border-radius: 9999px; border: none; background: linear-gradient(135deg, #4F46E5, #06B6D4); color: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">Đăng ký</button>
+    </div>
+
+    <!-- Gói đang dùng -->
+    <div class="row" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px 24px; display: flex; align-items: center; gap: 24px;">
+      <div style="width: 260px; display: flex; flex-direction: column; gap: 3px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px; font-weight: 500; color: #0F172A;">Nâng cao</span>
+          <span style="display: inline-flex; align-items: center; gap: 4px; background: #ECFDF5; color: #047857; border-radius: 9999px; padding: 3px 10px; font-size: 12px; font-weight: 500;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12l5 5l10 -10" />
+            </svg>
+            Đang dùng
+          </span>
+        </div>
+        <div style="font-size: 14px; line-height: 1.45; color: #64748B;">Cho trường nhiều cơ sở, thi tập trung quy mô lớn.</div>
+      </div>
+      <div style="flex-grow: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="lbl">Chấm thi &amp; kiểm tra</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; color: #0F172A;">34.000.000₫</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="lbl">Luyện nói cá nhân</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; color: #0F172A;">12.000.000₫</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="lbl">Tối đa mỗi bài</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; color: #0F172A;">20 phút</span>
+        </div>
+      </div>
+      <div style="width: 170px; display: flex; flex-direction: column; gap: 1px; align-items: flex-end; border-radius: 10px; padding: 8px 12px;">
+        <span class="num" style="font-size: 22px; font-weight: 700; color: #0F172A; letter-spacing: -0.01em;">48.000.000₫</span>
+        <span style="font-size: 12px; color: #94A3B8;">Còn 214 ngày</span>
+      </div>
+      <button type="button" style="width: 132px; height: 44px; border-radius: 9999px; border: 1px solid #E2E8F0; background: #F8FAFC; color: #94A3B8; font-family: inherit; font-size: 15px; font-weight: 500; cursor: not-allowed;">Gói hiện tại</button>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

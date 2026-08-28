@@ -1,11 +1,8 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { Check, ClipboardList, FileCheck2, Headphones, X } from 'lucide-react'
-import { useQuotaPricingQuery } from '../api/useQuotaPricingQuery'
-import type { CreatePlanPayload, QuotaType, SubscriptionPlan } from '../types'
-import { QUOTA_LABELS, QUOTA_TYPES, formatVnd } from '../types'
-
-const DEFAULT_SERVICE_FEE_RATIO_PERCENT = '20'
+import { FileCheck2, Headphones, X } from 'lucide-react'
+import type { CreateSubscriptionPlanPayload, QuotaType, SubscriptionPlan, SubscriptionPlanPeriod } from '../types'
+import { QUOTA_LABELS, QUOTA_TYPES } from '../types'
 
 // Cho các ô số lớn (giá, hạn mức) -- lưu trong form state dưới dạng số thuần không dấu phẩy,
 // chỉ định dạng lại lúc hiển thị để dễ đọc/dễ nhập (vd "1,000,000"). Input phải đổi sang
@@ -31,77 +28,84 @@ function sanitizeNumericInput(value: string): string {
 }
 
 const QUOTA_ICONS: Record<QuotaType, typeof FileCheck2> = {
-  CLASS_TEST: ClipboardList,
-  GRADING: FileCheck2,
+  EXAM: FileCheck2,
   PRACTICE: Headphones,
 }
+
+const PERIOD_OPTIONS: Array<{ label: string; value: SubscriptionPlanPeriod }> = [
+  { label: 'Ngày', value: 'DAY' },
+  { label: 'Tháng', value: 'MONTH' },
+  { label: 'Năm', value: 'YEAR' },
+]
+
+// school_subscription_quota_records.total_allocated_amount_vnd là numeric(18,6) -- chặn ở đây thay vì
+// để BE trả "numeric field overflow" khó hiểu.
+const MAX_QUOTA_AMOUNT_VND = 1_000_000_000_000
 
 type PlanEditorDrawerProps = {
   errorMessage?: string
   isOpen: boolean
   isSubmitting: boolean
   onClose: () => void
-  onCreate: (payload: CreatePlanPayload) => void
-  onUpdate: (id: string, payload: CreatePlanPayload) => void
+  onCreate: (payload: CreateSubscriptionPlanPayload) => void
+  onUpdate: (id: string, payload: CreateSubscriptionPlanPayload) => void
   plan: SubscriptionPlan | null
-  // Điền sẵn Giá/Thời hạn khi mở form tạo mới từ luồng "Tạo gói thay thế" trong ArchivePlanDialog --
-  // bỏ qua nếu đang ở chế độ sửa (plan != null). Xem SystemAdminSubscriptionPage.handleCreateReplacementFromArchive.
-  prefillPricePerYear?: number | null
-  prefillValidityDays?: number | null
+  // Điền sẵn giá/chu kỳ khi mở form từ luồng "tạo gói thay thế" -- bỏ qua khi đang sửa (plan != null).
+  prefillPeriodCount?: number | null
+  prefillPeriodType?: SubscriptionPlanPeriod | null
+  prefillPriceVnd?: number | null
 }
 
-type QuotaFormState = Record<QuotaType, { includedQuantity: string }>
+type QuotaFormState = Record<QuotaType, { includedAmountVnd: string }>
 
 type FormState = {
   maxTimePerAttemptMin: string
   name: string
-  pricePerYear: string
+  periodCount: string
+  periodType: SubscriptionPlanPeriod
+  priceVnd: string
   quotas: QuotaFormState
-  serviceFeeRatioPercent: string
   tagline: string
-  validityDays: string
 }
 
 function emptyQuotas(): QuotaFormState {
   return {
-    CLASS_TEST: { includedQuantity: '' },
-    GRADING: { includedQuantity: '' },
-    PRACTICE: { includedQuantity: '' },
+    EXAM: { includedAmountVnd: '' },
+    PRACTICE: { includedAmountVnd: '' },
   }
 }
 
 function createFormState(
   plan: SubscriptionPlan | null,
-  prefillPricePerYear?: number | null,
-  prefillValidityDays?: number | null,
+  prefillPriceVnd?: number | null,
+  prefillPeriodType?: SubscriptionPlanPeriod | null,
+  prefillPeriodCount?: number | null,
 ): FormState {
   if (!plan) {
     return {
       maxTimePerAttemptMin: '',
       name: '',
-      pricePerYear: prefillPricePerYear != null ? String(prefillPricePerYear) : '',
+      periodCount: prefillPeriodCount != null ? String(prefillPeriodCount) : '1',
+      periodType: prefillPeriodType ?? 'YEAR',
+      priceVnd: prefillPriceVnd != null ? String(prefillPriceVnd) : '',
       quotas: emptyQuotas(),
-      serviceFeeRatioPercent: DEFAULT_SERVICE_FEE_RATIO_PERCENT,
       tagline: '',
-      validityDays: prefillValidityDays != null ? String(prefillValidityDays) : '365',
     }
   }
 
   const quotas = emptyQuotas()
   for (const quota of plan.quotas) {
-    quotas[quota.quotaType] = {
-      includedQuantity: String(quota.includedQuantity),
-    }
+    quotas[quota.quotaType] = { includedAmountVnd: String(quota.includedAmountVnd) }
   }
 
   return {
     maxTimePerAttemptMin: plan.maxTimePerAttemptMin != null ? String(plan.maxTimePerAttemptMin) : '',
     name: plan.name,
-    pricePerYear: String(plan.pricePerYear),
+    periodCount: String(plan.periodCount),
+    periodType: plan.periodType,
+    priceVnd: String(plan.priceVnd),
     quotas,
-    serviceFeeRatioPercent: String(Math.round(plan.serviceFeeRatio * 100 * 100) / 100),
     tagline: plan.tagline ?? '',
-    validityDays: String(plan.validityDays),
   }
 }
 
@@ -110,46 +114,48 @@ function validate(form: FormState) {
     return 'Tên gói không được để trống.'
   }
 
-  if (!form.pricePerYear || Number(form.pricePerYear) <= 0) {
+  // BE đòi tagline NOT NULL (subscription_plans.tagline) -- chặn ở đây để không nhận lỗi 500 khó đọc.
+  if (!form.tagline.trim()) {
+    return 'Mô tả ngắn không được để trống.'
+  }
+
+  if (!form.priceVnd || Number(form.priceVnd) <= 0) {
     return 'Giá gói phải lớn hơn 0.'
   }
 
-  if (!form.validityDays || Number(form.validityDays) <= 0) {
-    return 'Thời hạn gói (ngày) phải lớn hơn 0.'
+  if (!form.periodCount || Number(form.periodCount) <= 0) {
+    return 'Số chu kỳ phải lớn hơn 0.'
   }
 
-  if (form.serviceFeeRatioPercent === '' || Number(form.serviceFeeRatioPercent) < 0) {
-    return 'Phí dịch vụ (%) không được để trống.'
+  if (!form.maxTimePerAttemptMin || Number(form.maxTimePerAttemptMin) <= 0) {
+    return 'Thời gian tối đa mỗi bài phải lớn hơn 0.'
   }
 
   for (const quotaType of QUOTA_TYPES) {
     const quota = form.quotas[quotaType]
-    if (quota.includedQuantity === '' || Number(quota.includedQuantity) < 0) {
+    if (quota.includedAmountVnd === '' || Number(quota.includedAmountVnd) < 0) {
       return `Hạn mức "${QUOTA_LABELS[quotaType]}" không hợp lệ.`
     }
-    // plan_quota.included_quantity là numeric(18,6) ở DB -- chặn ở đây thay vì để BE trả lỗi
-    // tràn số (numeric field overflow) khó hiểu.
-    if (Number(quota.includedQuantity) >= 1_000_000_000_000) {
-      return `Hạn mức "${QUOTA_LABELS[quotaType]}" vượt quá giới hạn cho phép (tối đa 999,999,999,999 USD).`
+    if (Number(quota.includedAmountVnd) >= MAX_QUOTA_AMOUNT_VND) {
+      return `Hạn mức "${QUOTA_LABELS[quotaType]}" vượt quá giới hạn cho phép.`
     }
   }
 
   return null
 }
 
-function toPayload(form: FormState): CreatePlanPayload {
+function toPayload(form: FormState): CreateSubscriptionPlanPayload {
   return {
-    maxTimePerAttemptMin: form.maxTimePerAttemptMin ? Number(form.maxTimePerAttemptMin) : null,
+    maxTimePerAttemptMin: Number(form.maxTimePerAttemptMin),
     name: form.name.trim(),
-    pricePerYear: Number(form.pricePerYear),
-    // FE nhập % (vd 20), BE lưu tỉ lệ (0.20) -- xem QuotaSellingPriceProperties/SubscriptionPlan.serviceFeeRatio.
-    serviceFeeRatio: Number(form.serviceFeeRatioPercent) / 100,
+    periodCount: Number(form.periodCount),
+    periodType: form.periodType,
+    priceVnd: Number(form.priceVnd),
     quotas: QUOTA_TYPES.map((quotaType) => ({
-      includedQuantity: Number(form.quotas[quotaType].includedQuantity),
+      includedAmountVnd: Number(form.quotas[quotaType].includedAmountVnd),
       quotaType,
     })),
-    tagline: form.tagline.trim() || null,
-    validityDays: Number(form.validityDays),
+    tagline: form.tagline.trim(),
   }
 }
 
@@ -164,21 +170,16 @@ export function PlanEditorDrawer({
   onCreate,
   onUpdate,
   plan,
-  prefillPricePerYear,
-  prefillValidityDays,
+  prefillPeriodCount,
+  prefillPeriodType,
+  prefillPriceVnd,
 }: PlanEditorDrawerProps) {
-  const [form, setForm] = useState<FormState>(() => createFormState(plan, prefillPricePerYear, prefillValidityDays))
+  const [form, setForm] = useState<FormState>(() =>
+    createFormState(plan, prefillPriceVnd, prefillPeriodType, prefillPeriodCount),
+  )
   const [validationMessage, setValidationMessage] = useState<string | null>(null)
   const isEditMode = Boolean(plan)
-  const isPrefilled = !isEditMode && (prefillPricePerYear != null || prefillValidityDays != null)
-  const { data: quotaPricing } = useQuotaPricingQuery()
-  const serviceFeeRatioPercentNumber = Number(form.serviceFeeRatioPercent)
-  // BE tự tính đúng công thức này khi lưu gói (QuotaPricingService.tokenUnitPriceFor) -- ở đây chỉ
-  // hiện trước cho admin xem, không gửi lên BE.
-  const suggestedTokenUnitPriceVnd =
-    quotaPricing && !Number.isNaN(serviceFeeRatioPercentNumber)
-      ? quotaPricing.usdToVndRate * (1 + serviceFeeRatioPercentNumber / 100)
-      : null
+  const isPrefilled = !isEditMode && prefillPriceVnd != null
 
   if (!isOpen) {
     return null
@@ -189,12 +190,12 @@ export function PlanEditorDrawer({
     setValidationMessage(null)
   }
 
-  function updateQuota(quotaType: QuotaType, field: 'includedQuantity', value: string) {
+  function updateQuota(quotaType: QuotaType, value: string) {
     setForm((current) => ({
       ...current,
       quotas: {
         ...current.quotas,
-        [quotaType]: { ...current.quotas[quotaType], [field]: value },
+        [quotaType]: { includedAmountVnd: value },
       },
     }))
     setValidationMessage(null)
@@ -238,7 +239,7 @@ export function PlanEditorDrawer({
             <h2 className="text-lg font-black text-blue-950" id="plan-editor-title">
               {isEditMode ? 'Chỉnh sửa gói' : 'Tạo gói mới'}
             </h2>
-            <p className="mt-1 text-sm font-medium text-slate-500">Định nghĩa giá, hạn mức và giá token mua thêm.</p>
+            <p className="mt-1 text-sm font-medium text-slate-500">Định nghĩa giá, chu kỳ và hạn mức của gói.</p>
           </div>
           <button
             aria-label="Đóng biểu mẫu gói"
@@ -265,7 +266,7 @@ export function PlanEditorDrawer({
             </label>
 
             <label className="grid gap-2 text-sm font-bold text-blue-950">
-              Mô tả ngắn
+              Mô tả ngắn <span className="text-red-500">*</span>
               <input
                 className={inputClassName}
                 disabled={isSubmitting}
@@ -275,82 +276,76 @@ export function PlanEditorDrawer({
               />
             </label>
 
+            <label className="grid gap-2 text-sm font-bold text-blue-950">
+              Giá (VND) <span className="text-red-500">*</span>
+              <input
+                className={inputClassName}
+                disabled={isSubmitting}
+                inputMode="decimal"
+                onChange={(event) => updateField('priceVnd', sanitizeNumericInput(event.target.value))}
+                placeholder="24,000,000"
+                type="text"
+                value={formatThousands(form.priceVnd)}
+              />
+            </label>
+
+            {/* Chu kỳ = periodCount x periodType, thay cho validityDays cũ. Gói tính theo tháng/năm thì
+                hạn phải rơi đúng ngày tương ứng — cộng thô theo số ngày sẽ lệch dần qua từng lần gia hạn. */}
             <div className="grid grid-cols-2 gap-4">
               <label className="grid gap-2 text-sm font-bold text-blue-950">
-                Giá <span className="text-red-500">*</span>
-                <input
-                  className={inputClassName}
-                  disabled={isSubmitting}
-                  inputMode="decimal"
-                  onChange={(event) => updateField('pricePerYear', sanitizeNumericInput(event.target.value))}
-                  placeholder="45,000,000"
-                  type="text"
-                  value={formatThousands(form.pricePerYear)}
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-bold text-blue-950">
-                Thời hạn (ngày) <span className="text-red-500">*</span>
+                Số chu kỳ <span className="text-red-500">*</span>
                 <input
                   className={inputClassName}
                   disabled={isSubmitting}
                   min={1}
-                  onChange={(event) => updateField('validityDays', event.target.value)}
-                  placeholder="365"
+                  onChange={(event) => updateField('periodCount', event.target.value)}
+                  placeholder="1"
                   type="number"
-                  value={form.validityDays}
+                  value={form.periodCount}
                 />
+              </label>
+              <label className="grid gap-2 text-sm font-bold text-blue-950">
+                Đơn vị chu kỳ <span className="text-red-500">*</span>
+                <select
+                  className={inputClassName}
+                  disabled={isSubmitting}
+                  onChange={(event) => updateField('periodType', event.target.value as SubscriptionPlanPeriod)}
+                  value={form.periodType}
+                >
+                  {PERIOD_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
 
             {isPrefilled ? (
               <p className="-mt-3 text-xs font-medium text-indigo-600">
-                Giá và thời hạn đã điền sẵn theo gói bạn chọn — có thể sửa lại nếu muốn giá khác. Sau khi lưu, hệ
-                thống sẽ TỰ ĐỘNG lưu trữ gói cũ; gói mới ở trạng thái nháp — bạn cần tự xuất bản khi sẵn sàng.
+                Giá và chu kỳ đã điền sẵn theo gói bạn chọn — có thể sửa lại nếu muốn khác. Gói mới ở trạng thái
+                nháp; bạn cần tự xuất bản khi sẵn sàng.
               </p>
             ) : null}
 
-            <div>
-              <label className="grid gap-2 text-sm font-bold text-blue-950">
-                Thời gian tối đa mỗi bài (phút)
-                <input
-                  className={inputClassName}
-                  disabled={isSubmitting}
-                  min={0}
-                  onChange={(event) => updateField('maxTimePerAttemptMin', event.target.value)}
-                  placeholder="60"
-                  type="number"
-                  value={form.maxTimePerAttemptMin}
-                />
-              </label>
-            </div>
-
-            <div>
-              <label className="grid gap-2 text-sm font-bold text-blue-950">
-                Phí dịch vụ (%) <span className="text-red-500">*</span>
-                <input
-                  className={inputClassName}
-                  disabled={isSubmitting}
-                  min={0}
-                  onChange={(event) => updateField('serviceFeeRatioPercent', event.target.value)}
-                  placeholder="20"
-                  step="0.1"
-                  type="number"
-                  value={form.serviceFeeRatioPercent}
-                />
-              </label>
-              {suggestedTokenUnitPriceVnd != null ? (
-                <p className="mt-1.5 text-xs font-medium text-slate-500">
-                  Giá áp dụng cho mỗi $1 hạn mức: <span className="font-bold text-indigo-600">{formatVnd(suggestedTokenUnitPriceVnd)}</span> (tỷ giá{' '}
-                  {formatVnd(quotaPricing?.usdToVndRate)}/$ × margin) — BE tự tính khi lưu gói, không nhập tay.
-                </p>
-              ) : null}
-            </div>
+            <label className="grid gap-2 text-sm font-bold text-blue-950">
+              Thời gian tối đa mỗi bài (phút) <span className="text-red-500">*</span>
+              <input
+                className={inputClassName}
+                disabled={isSubmitting}
+                min={1}
+                onChange={(event) => updateField('maxTimePerAttemptMin', event.target.value)}
+                placeholder="15"
+                type="number"
+                value={form.maxTimePerAttemptMin}
+              />
+            </label>
 
             <div className="border-t border-slate-200 pt-4">
-              <p className="text-sm font-black text-blue-950">Hạn mức &amp; giá mua thêm</p>
+              <p className="text-sm font-black text-blue-950">Hạn mức đi kèm gói</p>
               <p className="mt-1 text-xs text-slate-500">
-                Hạn mức tính theo USD chi phí AI ước tính được tặng miễn phí mỗi chu kỳ; giá áp dụng khi trường dùng vượt hạn mức
-                được BE tự tính theo tỷ giá + phí dịch vụ ở trên.
+                Hai ví tiêu tách riêng, tính bằng VND. Tiêu hết ví này không đụng tới ví kia; phần dùng vượt định
+                mức trừ thẳng vào số dư trường tự nạp.
               </p>
               <div className="mt-4 grid gap-4">
                 {QUOTA_TYPES.map((quotaType) => {
@@ -363,17 +358,15 @@ export function PlanEditorDrawer({
                       </p>
                       <div className="mt-3">
                         <label className="grid gap-1.5 text-xs font-bold text-slate-600">
-                          Hạn mức bao gồm (USD)
+                          Hạn mức bao gồm (VND)
                           <input
                             className={inputClassName}
                             disabled={isSubmitting}
                             inputMode="decimal"
-                            onChange={(event) =>
-                              updateQuota(quotaType, 'includedQuantity', sanitizeNumericInput(event.target.value))
-                            }
-                            placeholder="1,000"
+                            onChange={(event) => updateQuota(quotaType, sanitizeNumericInput(event.target.value))}
+                            placeholder="16,000,000"
                             type="text"
-                            value={formatThousands(form.quotas[quotaType].includedQuantity)}
+                            value={formatThousands(form.quotas[quotaType].includedAmountVnd)}
                           />
                         </label>
                       </div>
@@ -397,9 +390,9 @@ export function PlanEditorDrawer({
           </form>
         </div>
 
-        <div className="flex gap-3 border-t border-slate-200 px-6 py-5">
+        <footer className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
           <button
-            className="flex-1 inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSubmitting}
             onClick={onClose}
             type="button"
@@ -407,19 +400,14 @@ export function PlanEditorDrawer({
             Hủy
           </button>
           <button
-            className="flex-1 inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 text-sm font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSubmitting}
             form="plan-editor-form"
             type="submit"
           >
-            <Check aria-hidden="true" className="size-4" />
-            {isSubmitting
-              ? 'Đang xử lý...'
-              : isPrefilled
-                ? 'Tạo & lưu trữ gói cũ'
-                : 'Lưu gói'}
+            {isSubmitting ? 'Đang lưu...' : isEditMode ? 'Lưu thay đổi' : 'Tạo gói'}
           </button>
-        </div>
+        </footer>
       </aside>
     </div>
   )

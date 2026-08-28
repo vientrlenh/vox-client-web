@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap">
+  <style>
+    body { margin: 0; font-family: "Be Vietnam Pro", system-ui, -apple-system, sans-serif; }
+    a { color: #4F46E5; } a:hover { color: #4338CA; }
+    .num { font-variant-numeric: tabular-nums; }
+    .th { font-size: 12px; font-weight: 500; color: #64748B; }
+    .td { font-size: 14px; color: #0F172A; }
+    .chip { display: inline-flex; align-items: center; border-radius: 9999px; padding: 3px 10px; font-size: 12px; font-weight: 500; }
+    .act { background: none; border: none; padding: 0; font-family: inherit; font-size: 13px; font-weight: 500; color: #4F46E5; cursor: pointer; }
+    .field { height: 42px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 0 14px; font-family: inherit; font-size: 15px; color: #0F172A; display: flex; align-items: center; gap: 8px; }
+    .pill { height: 42px; box-sizing: border-box; border-radius: 9999px; padding: 0 22px; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+    .statlbl { font-size: 12px; font-weight: 500; color: #64748B; }
+    .statval { font-size: 22px; font-weight: 700; color: #0F172A; letter-spacing: -0.01em; }
+    .navgrp { display: flex; align-items: center; gap: 12px; min-height: 48px; border-radius: 8px; padding: 12px 16px; font-size: 14px; font-weight: 700; color: rgba(238, 242, 255, 0.9); }
+    .navgrp-on { background: rgba(255, 255, 255, 0.1); color: #FFFFFF; }
+    .navkid { display: flex; align-items: center; min-height: 44px; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 700; color: rgba(238, 242, 255, 0.9); }
+    .navkid-on { background: #8B5CF6; color: #FFFFFF; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; min-height: 860px; display: flex; background: #F8FAFC;">
+
+  <div style="width: 280px; flex-shrink: 0; background: linear-gradient(180deg, #172554 0%, #312E81 52%, #4C1D95 100%); padding: 28px 24px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="font-size: 30px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.02em; padding: 0 16px 20px;">vox</div>
+
+    <div class="navgrp">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l-2 0l9 -9l9 9l-2 0" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" /></svg>
+      <span style="flex-grow: 1;">Tổng quan</span>
+    </div>
+    <div class="navgrp">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l18 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v16" /><path d="M15 8h2a2 2 0 0 1 2 2v11" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /></svg>
+      <span style="flex-grow: 1;">Trường học</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6l6 -6" /></svg>
+    </div>
+    <div class="navgrp">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z" /><path d="M9 14l2 2l4 -4" /></svg>
+      <span style="flex-grow: 1;">Đánh giá</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6l6 -6" /></svg>
+    </div>
+    <div class="navgrp">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8a3.5 3 0 0 1 3.5 -3h1a3.5 3 0 0 1 3.5 3a3 3 0 0 1 -2 3a3 4 0 0 0 -2 4" /><path d="M12 19l0 .01" /></svg>
+      <span style="flex-grow: 1;">Câu hỏi</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6l6 -6" /></svg>
+    </div>
+
+    <div class="navgrp navgrp-on">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /></svg>
+      <span style="flex-grow: 1;">Gói dịch vụ</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(180deg);" aria-hidden="true"><path d="M6 9l6 6l6 -6" /></svg>
+    </div>
+    <div style="margin-left: 16px; padding-left: 16px; border-left: 1px solid rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; gap: 8px;">
+      <div class="navkid navkid-on">Danh mục gói</div>
+      <div class="navkid">Trường &amp; gói</div>
+    </div>
+
+    <div class="navgrp">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12" /><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4" /></svg>
+      <span style="flex-grow: 1;">Tài chính</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6l6 -6" /></svg>
+    </div>
+    <div class="navgrp">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h7" /><path d="M9 3v2c0 4.418 -2.239 8 -5 8" /><path d="M5 9c0 2.144 2.952 3.908 6.7 4" /><path d="M12 20l4 -9l4 9" /><path d="M19.1 18h-6.2" /></svg>
+      <span style="flex-grow: 1;">Quản lý ngôn ngữ</span>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; padding: 32px; display: flex; flex-direction: column; gap: 24px; min-width: 0;">
+
+    <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #64748B;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l14 0" /><path d="M5 12l6 6" /><path d="M5 12l6 -6" /></svg>
+      Danh mục gói
+    </div>
+
+    <div style="display: flex; align-items: flex-start; gap: 24px;">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <span style="font-size: 32px; font-weight: 700; color: #0F172A; letter-spacing: -0.02em; line-height: 1.2;">Tiêu chuẩn</span>
+          <span class="chip" style="background: #ECFDF5; color: #047857;">Đang bán</span>
+          <span class="chip" style="background: #EEF2FF; color: #4F46E5; gap: 4px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1.002l3.093 -6.253l3.093 6.253l6.9 1.002l-5 4.867l1.179 6.873z" /></svg>
+            Phổ biến nhất
+          </span>
+        </div>
+        <div style="font-size: 14px; color: #64748B;">Cả trường dùng chung, kèm hạn mức luyện nói cho học sinh.</div>
+        <div style="font-size: 13px; color: #94A3B8;">Chu kỳ 1 năm · phiên bản 3 · cập nhật 12/08/2026 bởi Nguyễn Văn A</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+        <button class="pill" style="border: none; background: #EEF2FF; color: #4F46E5;" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" /><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" /><path d="M16 5l3 3" /></svg>
+          Sửa gói
+        </button>
+        <button class="pill" style="border: 1px solid #E2E8F0; background: #FFFFFF; color: #64748B;" type="button">Ngừng bán</button>
+      </div>
+    </div>
+
+    <!-- Số liệu gói — phần đã bỏ khỏi bảng danh mục -->
+    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; display: flex;">
+      <div style="flex-grow: 1; padding: 18px 24px; display: flex; flex-direction: column; gap: 5px;">
+        <span class="statlbl">Giá gói</span>
+        <span class="statval num">24.000.000₫</span>
+        <span style="font-size: 12px; color: #94A3B8;">mỗi 1 năm</span>
+      </div>
+      <div style="width: 1px; background: #E2E8F0;"></div>
+      <div style="flex-grow: 1; padding: 18px 24px; display: flex; flex-direction: column; gap: 5px;">
+        <span class="statlbl">Chấm thi &amp; kiểm tra</span>
+        <span class="statval num">16.000.000₫</span>
+        <span style="font-size: 12px; color: #94A3B8;">ví EXAM</span>
+      </div>
+      <div style="width: 1px; background: #E2E8F0;"></div>
+      <div style="flex-grow: 1; padding: 18px 24px; display: flex; flex-direction: column; gap: 5px;">
+        <span class="statlbl">Luyện nói cá nhân</span>
+        <span class="statval num">6.000.000₫</span>
+        <span style="font-size: 12px; color: #94A3B8;">ví PRACTICE</span>
+      </div>
+      <div style="width: 1px; background: #E2E8F0;"></div>
+      <div style="flex-grow: 1; padding: 18px 24px; display: flex; flex-direction: column; gap: 5px;">
+        <span class="statlbl">Tối đa mỗi bài</span>
+        <span class="statval num">15 phút</span>
+        <span style="font-size: 12px; color: #94A3B8;">mỗi lượt thi</span>
+      </div>
+      <div style="width: 1px; background: #E2E8F0;"></div>
+      <div style="flex-grow: 1; padding: 18px 24px; display: flex; flex-direction: column; gap: 5px;">
+        <span class="statlbl">Trường đang dùng</span>
+        <span class="statval num">31</span>
+        <span style="font-size: 12px; color: #94A3B8;">28 đang chạy</span>
+      </div>
+    </div>
+
+    <!-- Danh sách trường -->
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="flex-grow: 1; font-size: 24px; font-weight: 700; color: #0F172A; letter-spacing: -0.01em;">Trường đang dùng gói này</div>
+      <div class="field" style="width: 260px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg>
+        <span style="color: #94A3B8;">Tìm theo tên trường</span>
+      </div>
+      <div class="field" style="width: 190px; justify-content: space-between;">
+        <span>Mọi trạng thái</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6l6 -6" /></svg>
+      </div>
+    </div>
+
+    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden;">
+
+      <div style="display: flex; align-items: center; padding: 14px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+        <div class="th" style="width: 300px; flex-shrink: 0;">Trường</div>
+        <div class="th" style="width: 230px; flex-shrink: 0;">Hiệu lực</div>
+        <div class="th" style="width: 160px; flex-shrink: 0; text-align: right;">Đã trả</div>
+        <div class="th" style="width: 190px; flex-shrink: 0; padding-left: 32px;">Trạng thái</div>
+        <div class="th" style="width: 176px; flex-shrink: 0; text-align: right;">Hành động</div>
+      </div>
+
+      <div style="display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #F1F5F9;">
+        <div class="td" style="width: 300px; flex-shrink: 0; font-weight: 500;">THPT Lê Quý Đôn</div>
+        <div class="td num" style="width: 230px; flex-shrink: 0; color: #64748B;">01/01/2026 → 01/01/2027</div>
+        <div class="td num" style="width: 160px; flex-shrink: 0; text-align: right; font-weight: 500;">24.000.000₫</div>
+        <div style="width: 190px; flex-shrink: 0; padding-left: 32px;"><span class="chip" style="background: #ECFDF5; color: #047857;">Đang chạy</span></div>
+        <div style="width: 176px; flex-shrink: 0; display: flex; justify-content: flex-end;"><button class="act" type="button">Quản lý</button></div>
+      </div>
+
+      <div style="display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #F1F5F9;">
+        <div class="td" style="width: 300px; flex-shrink: 0; font-weight: 500;">THCS Trần Phú</div>
+        <div class="td num" style="width: 230px; flex-shrink: 0; color: #64748B;">10/02/2026 → 10/02/2027</div>
+        <div class="td num" style="width: 160px; flex-shrink: 0; text-align: right; font-weight: 500;">24.000.000₫</div>
+        <div style="width: 190px; flex-shrink: 0; padding-left: 32px;"><span class="chip" style="background: #FEE2E2; color: #B91C1C;">Đình chỉ</span></div>
+        <div style="width: 176px; flex-shrink: 0; display: flex; justify-content: flex-end;"><button class="act" type="button">Quản lý</button></div>
+      </div>
+
+      <!-- Giá đã trả khác giá gói hiện tại — snapshot lúc mua -->
+      <div style="display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #F1F5F9;">
+        <div class="td" style="width: 300px; flex-shrink: 0; font-weight: 500;">THPT Việt Đức</div>
+        <div class="td num" style="width: 230px; flex-shrink: 0; color: #64748B;">05/11/2025 → 05/11/2026</div>
+        <div style="width: 160px; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 1px;">
+          <span class="td num" style="font-weight: 500;">22.000.000₫</span>
+          <span style="font-size: 12px; color: #94A3B8;">giá cũ</span>
+        </div>
+        <div style="width: 190px; flex-shrink: 0; padding-left: 32px;"><span class="chip" style="background: #ECFDF5; color: #047857;">Đang chạy</span></div>
+        <div style="width: 176px; flex-shrink: 0; display: flex; justify-content: flex-end;"><button class="act" type="button">Quản lý</button></div>
+      </div>
+
+      <div style="display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #F1F5F9;">
+        <div class="td" style="width: 300px; flex-shrink: 0; font-weight: 500;">THPT Kim Liên</div>
+        <div class="td num" style="width: 230px; flex-shrink: 0; color: #64748B;">20/04/2026 → 20/04/2027</div>
+        <div class="td num" style="width: 160px; flex-shrink: 0; text-align: right; font-weight: 500;">24.000.000₫</div>
+        <div style="width: 190px; flex-shrink: 0; padding-left: 32px;"><span class="chip" style="background: #ECFDF5; color: #047857;">Đang chạy</span></div>
+        <div style="width: 176px; flex-shrink: 0; display: flex; justify-content: flex-end;"><button class="act" type="button">Quản lý</button></div>
+      </div>
+
+      <div style="display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #F1F5F9;">
+        <div class="td" style="width: 300px; flex-shrink: 0; font-weight: 500;">THPT Phan Đình Phùng</div>
+        <div class="td num" style="width: 230px; flex-shrink: 0; color: #64748B;">01/09/2025 → 01/09/2026</div>
+        <div class="td num" style="width: 160px; flex-shrink: 0; text-align: right; font-weight: 500;">24.000.000₫</div>
+        <div style="width: 190px; flex-shrink: 0; padding-left: 32px; display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
+          <span class="chip" style="background: #FEF3C7; color: #92400E;">Đã hủy gia hạn</span>
+          <span style="font-size: 12px; color: #94A3B8;">Còn dùng tới 01/09</span>
+        </div>
+        <div style="width: 176px; flex-shrink: 0; display: flex; justify-content: flex-end;"><button class="act" type="button">Quản lý</button></div>
+      </div>
+
+      <div style="display: flex; align-items: center; padding: 15px 20px;">
+        <div class="td" style="width: 300px; flex-shrink: 0; font-weight: 500; color: #64748B;">THCS Ngô Sĩ Liên</div>
+        <div class="td num" style="width: 230px; flex-shrink: 0; color: #94A3B8;">15/07/2025 → 15/07/2026</div>
+        <div style="width: 160px; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 1px;">
+          <span class="td num" style="color: #94A3B8;">20.000.000₫</span>
+          <span style="font-size: 12px; color: #CBD5E1;">giá cũ</span>
+        </div>
+        <div style="width: 190px; flex-shrink: 0; padding-left: 32px;"><span class="chip" style="background: #F1F5F9; color: #475569;">Hết hạn</span></div>
+        <div style="width: 176px; flex-shrink: 0; display: flex; justify-content: flex-end;"><button class="act" type="button">Quản lý</button></div>
+      </div>
+
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <span style="flex-grow: 1; font-size: 13px; color: #64748B;">Hiển thị 1–6 trong 31 trường</span>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 36px; height: 36px; border-radius: 9999px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6l6 6" /></svg>
+        </div>
+        <div style="min-width: 36px; height: 36px; border-radius: 9999px; background: #4F46E5; color: #FFFFFF; font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center;">1</div>
+        <div style="min-width: 36px; height: 36px; border-radius: 9999px; border: 1px solid #E2E8F0; background: #FFFFFF; color: #475569; font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center;">2</div>
+        <div style="min-width: 36px; height: 36px; border-radius: 9999px; border: 1px solid #E2E8F0; background: #FFFFFF; color: #475569; font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center;">3</div>
+        <div style="min-width: 36px; height: 36px; border-radius: 9999px; border: 1px solid #E2E8F0; background: #FFFFFF; color: #475569; font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center;">4</div>
+        <div style="width: 36px; height: 36px; border-radius: 9999px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6l-6 6" /></svg>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
