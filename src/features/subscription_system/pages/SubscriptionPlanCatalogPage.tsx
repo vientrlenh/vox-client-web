@@ -22,6 +22,7 @@ import type {
   SubscriptionPlan,
   SubscriptionPlanPeriod,
   SubscriptionPlanStatus,
+  UpdateSubscriptionPlanPayload,
 } from '../types'
 import { formatPeriod, getErrorMessage } from '../types'
 
@@ -128,7 +129,7 @@ export function SubscriptionPlanCatalogPage() {
     }
   }
 
-  async function handleUpdate(id: string, payload: CreateSubscriptionPlanPayload) {
+  async function handleUpdate(id: string, payload: UpdateSubscriptionPlanPayload) {
     try {
       await updateMutation.mutateAsync({ id, payload })
       setEditorOpen(false)

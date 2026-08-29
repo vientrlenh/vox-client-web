@@ -16,7 +16,7 @@ import { useSubscriptionPlanQuery } from '../api/useSubscriptionPlansQuery'
 import { PlanEditorDrawer } from '../components/PlanEditorDrawer'
 import { SchoolSubscriptionTable } from '../components/SchoolSubscriptionTable'
 import { SubscriptionPagination } from '../components/SubscriptionPagination'
-import type { CreateSubscriptionPlanPayload, QuotaType, SchoolSubscriptionStatus } from '../types'
+import type { QuotaType, SchoolSubscriptionStatus, UpdateSubscriptionPlanPayload } from '../types'
 import {
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -99,7 +99,7 @@ export function SubscriptionPlanDetailPage() {
   // đọc con số nhỏ hơn thành "đã có trường rời gói".
   const runningOnPage = subscriptions.filter((item) => item.status === 'ACTIVE').length
 
-  async function handleUpdate(id: string, payload: CreateSubscriptionPlanPayload) {
+  async function handleUpdate(id: string, payload: UpdateSubscriptionPlanPayload) {
     try {
       await updateMutation.mutateAsync({ id, payload })
       setEditorOpen(false)

@@ -1,7 +1,13 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { FileCheck2, Headphones, X } from 'lucide-react'
-import type { CreateSubscriptionPlanPayload, QuotaType, SubscriptionPlan, SubscriptionPlanPeriod } from '../types'
+import type {
+  CreateSubscriptionPlanPayload,
+  QuotaType,
+  SubscriptionPlan,
+  SubscriptionPlanPeriod,
+  UpdateSubscriptionPlanPayload,
+} from '../types'
 import { QUOTA_LABELS, QUOTA_TYPES } from '../types'
 
 // Cho các ô số lớn (giá, hạn mức) -- lưu trong form state dưới dạng số thuần không dấu phẩy,
@@ -48,7 +54,7 @@ type PlanEditorDrawerProps = {
   isSubmitting: boolean
   onClose: () => void
   onCreate: (payload: CreateSubscriptionPlanPayload) => void
-  onUpdate: (id: string, payload: CreateSubscriptionPlanPayload) => void
+  onUpdate: (id: string, payload: UpdateSubscriptionPlanPayload) => void
   plan: SubscriptionPlan | null
   // Điền sẵn giá/chu kỳ khi mở form từ luồng "tạo gói thay thế" -- bỏ qua khi đang sửa (plan != null).
   prefillPeriodCount?: number | null
@@ -159,6 +165,22 @@ function toPayload(form: FormState): CreateSubscriptionPlanPayload {
   }
 }
 
+// KHÔNG gồm periodType: cột period_type ở BE là updatable = false (UpdateSubscriptionPlanInput không
+// khai field này) -- gửi kèm sẽ bị GraphQL từ chối "field name 'periodType' is not defined".
+function toUpdatePayload(form: FormState): UpdateSubscriptionPlanPayload {
+  return {
+    maxTimePerAttemptMin: Number(form.maxTimePerAttemptMin),
+    name: form.name.trim(),
+    periodCount: Number(form.periodCount),
+    priceVnd: Number(form.priceVnd),
+    quotas: QUOTA_TYPES.map((quotaType) => ({
+      includedAmountVnd: Number(form.quotas[quotaType].includedAmountVnd),
+      quotaType,
+    })),
+    tagline: form.tagline.trim(),
+  }
+}
+
 const inputClassName =
   'h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium text-blue-950 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50'
 
@@ -210,14 +232,12 @@ export function PlanEditorDrawer({
       return
     }
 
-    const payload = toPayload(form)
-
     if (isEditMode && plan) {
-      onUpdate(plan.id, payload)
+      onUpdate(plan.id, toUpdatePayload(form))
       return
     }
 
-    onCreate(payload)
+    onCreate(toPayload(form))
   }
 
   return (
@@ -308,7 +328,7 @@ export function PlanEditorDrawer({
                 Đơn vị chu kỳ <span className="text-red-500">*</span>
                 <select
                   className={inputClassName}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isEditMode}
                   onChange={(event) => updateField('periodType', event.target.value as SubscriptionPlanPeriod)}
                   value={form.periodType}
                 >
@@ -320,6 +340,12 @@ export function PlanEditorDrawer({
                 </select>
               </label>
             </div>
+
+            {isEditMode ? (
+              <p className="-mt-3 text-xs font-medium text-slate-500">
+                Đơn vị chu kỳ không thể đổi sau khi tạo gói — tạo gói mới nếu cần đổi.
+              </p>
+            ) : null}
 
             {isPrefilled ? (
               <p className="-mt-3 text-xs font-medium text-indigo-600">
