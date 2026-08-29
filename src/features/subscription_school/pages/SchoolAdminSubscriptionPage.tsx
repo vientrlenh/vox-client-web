@@ -22,6 +22,7 @@ import {
   usePreviewRenewalMutation,
 } from '../api/usePaymentLinkMutations'
 import { useCancelMySubscriptionMutation } from '../api/useCancelMySubscriptionMutation'
+import { useCancelOrderMutation } from '../api/useCancelOrderMutation'
 import { myOrdersQueryKeys, useMyOrdersQuery } from '../api/useMyOrdersQuery'
 import { useMyDebtEventsQuery } from '../api/useMyDebtEventsQuery'
 import {
@@ -98,6 +99,7 @@ export function SchoolAdminSubscriptionPage() {
   const createRenewalOrderMutation = useCreateRenewalOrderMutation()
   const createTopUpOrderMutation = useCreateTopUpOrderMutation()
   const cancelMutation = useCancelMySubscriptionMutation()
+  const cancelOrderMutation = useCancelOrderMutation()
   const allocateClassTestQuotaMutation = useAllocateClassTestQuotaMutation()
   const allocatePracticeQuotaMutation = useAllocatePracticeQuotaMutation()
 
@@ -203,6 +205,25 @@ export function SchoolAdminSubscriptionPage() {
       setToast({ text: 'Đã ghi nhận yêu cầu không gia hạn gói', tone: 'success' })
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể hủy gói.', tone: 'error' })
+    }
+  }
+
+  async function handleCancelOrder(orderId: string) {
+    const confirmed = await confirm({
+      confirmLabel: 'Hủy đơn',
+      message: 'Đơn hàng sẽ chuyển sang trạng thái đã hủy và không thể khôi phục. Bạn có thể đặt đơn mới ngay sau đó.',
+      title: 'Hủy đơn hàng',
+    })
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await cancelOrderMutation.mutateAsync(orderId)
+      setToast({ text: 'Đã hủy đơn hàng', tone: 'success' })
+    } catch (error) {
+      setToast({ text: getErrorMessage(error) ?? 'Không thể hủy đơn hàng.', tone: 'error' })
     }
   }
 
@@ -369,6 +390,7 @@ export function SchoolAdminSubscriptionPage() {
 
       {tab === 'invoices' ? (
         <InvoicesTable
+          cancellingOrderId={cancelOrderMutation.isPending ? (cancelOrderMutation.variables ?? null) : null}
           errorMessage={getErrorMessage(ordersQuery.error)}
           footer={
             <Pagination
@@ -381,6 +403,7 @@ export function SchoolAdminSubscriptionPage() {
           }
           isError={ordersQuery.isError}
           isLoading={ordersQuery.isLoading}
+          onCancelOrder={(orderId) => void handleCancelOrder(orderId)}
           onRetry={() => void ordersQuery.refetch()}
           orders={ordersQuery.data?.content ?? []}
         />

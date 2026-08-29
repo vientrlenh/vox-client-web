@@ -1,15 +1,17 @@
 import { useState, type ReactNode } from 'react'
-import { ExternalLink, Inbox, ReceiptText } from 'lucide-react'
+import { Ban, ExternalLink, Inbox, ReceiptText } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { formatDateTime, formatVnd, getOrderStatusDisplay, type Order, type OrderType } from '../types'
 import { InvoiceDetailDialog } from './InvoiceDetailDialog'
 
 type InvoicesTableProps = {
+  cancellingOrderId?: string | null
   errorMessage?: string
   footer?: ReactNode
   orders: Order[]
   isError: boolean
   isLoading: boolean
+  onCancelOrder: (orderId: string) => void
   onRetry: () => void
 }
 
@@ -25,7 +27,16 @@ function findPendingCheckoutUrl(order: Order) {
   return order.payments.find((payment) => payment.status === 'PENDING')?.checkoutUrl ?? null
 }
 
-export function InvoicesTable({ errorMessage, footer, orders, isError, isLoading, onRetry }: InvoicesTableProps) {
+export function InvoicesTable({
+  cancellingOrderId,
+  errorMessage,
+  footer,
+  orders,
+  isError,
+  isLoading,
+  onCancelOrder,
+  onRetry,
+}: InvoicesTableProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
   return (
@@ -97,19 +108,33 @@ export function InvoicesTable({ errorMessage, footer, orders, isError, isLoading
                         <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
                       </td>
                       <td className="px-4 py-4 text-right">
-                        {pendingCheckoutUrl ? (
-                          <a
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50"
-                            href={pendingCheckoutUrl}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            <ExternalLink aria-hidden="true" className="size-3.5" />
-                            Tiếp tục thanh toán
-                          </a>
-                        ) : (
-                          <span className="text-xs text-slate-400">—</span>
-                        )}
+                        <div className="flex flex-col items-end gap-1.5">
+                          {pendingCheckoutUrl ? (
+                            <a
+                              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50"
+                              href={pendingCheckoutUrl}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              <ExternalLink aria-hidden="true" className="size-3.5" />
+                              Tiếp tục thanh toán
+                            </a>
+                          ) : null}
+                          {order.status === 'PENDING' ? (
+                            <button
+                              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={cancellingOrderId === order.id}
+                              onClick={() => onCancelOrder(order.id)}
+                              type="button"
+                            >
+                              <Ban aria-hidden="true" className="size-3.5" />
+                              {cancellingOrderId === order.id ? 'Đang hủy...' : 'Hủy đơn'}
+                            </button>
+                          ) : null}
+                          {!pendingCheckoutUrl && order.status !== 'PENDING' ? (
+                            <span className="text-xs text-slate-400">—</span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-4 py-4 text-right">
                         <button
@@ -131,7 +156,12 @@ export function InvoicesTable({ errorMessage, footer, orders, isError, isLoading
 
       {footer}
 
-      <InvoiceDetailDialog onClose={() => setSelectedOrder(null)} order={selectedOrder} />
+      <InvoiceDetailDialog
+        isCancelling={selectedOrder ? cancellingOrderId === selectedOrder.id : false}
+        onCancel={(orderId) => onCancelOrder(orderId)}
+        onClose={() => setSelectedOrder(null)}
+        order={selectedOrder}
+      />
     </div>
   )
 }

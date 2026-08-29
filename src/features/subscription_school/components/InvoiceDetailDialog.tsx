@@ -1,4 +1,4 @@
-import { ExternalLink, Receipt, X } from 'lucide-react'
+import { Ban, ExternalLink, Receipt, X } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import { formatDate, formatDateTime, formatVnd, getOrderStatusDisplay, type Order, type OrderType } from '../types'
 
@@ -9,11 +9,13 @@ const SOURCE_LABELS: Record<OrderType, string> = {
 }
 
 type InvoiceDetailDialogProps = {
+  isCancelling?: boolean
+  onCancel: (orderId: string) => void
   order: Order | null
   onClose: () => void
 }
 
-export function InvoiceDetailDialog({ order, onClose }: InvoiceDetailDialogProps) {
+export function InvoiceDetailDialog({ isCancelling, onCancel, order, onClose }: InvoiceDetailDialogProps) {
   if (!order) {
     return null
   }
@@ -91,6 +93,17 @@ export function InvoiceDetailDialog({ order, onClose }: InvoiceDetailDialogProps
         </div>
 
         <div className="mt-5.5 flex gap-3">
+          {order.status === 'PENDING' ? (
+            <button
+              className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white text-sm font-black text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isCancelling}
+              onClick={() => onCancel(order.id)}
+              type="button"
+            >
+              <Ban aria-hidden="true" className="size-4.5" />
+              {isCancelling ? 'Đang hủy...' : 'Hủy đơn'}
+            </button>
+          ) : null}
           {pendingCheckoutUrl ? (
             <a
               className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 text-sm font-black text-white transition hover:bg-indigo-700"
@@ -101,7 +114,8 @@ export function InvoiceDetailDialog({ order, onClose }: InvoiceDetailDialogProps
               <ExternalLink aria-hidden="true" className="size-4.5" />
               Tiếp tục thanh toán
             </a>
-          ) : (
+          ) : null}
+          {order.status !== 'PENDING' ? (
             <button
               className="h-12 flex-1 rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50"
               onClick={onClose}
@@ -109,7 +123,7 @@ export function InvoiceDetailDialog({ order, onClose }: InvoiceDetailDialogProps
             >
               Đóng
             </button>
-          )}
+          ) : null}
         </div>
       </section>
     </div>
