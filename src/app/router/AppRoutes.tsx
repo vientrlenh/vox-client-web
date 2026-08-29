@@ -752,15 +752,45 @@ const SystemAdminSchoolSubscriptionsPage = lazy(() =>
   })),
 );
 
-const SystemAdminSubscriptionPaymentResultPage = lazy(() =>
+const MySubscriptionPage = lazy(() =>
   import("@/features/subscription_school").then((module) => ({
-    default: module.PaymentResultPage,
+    default: module.MySubscriptionPage,
   })),
 );
 
-const SchoolAdminSubscriptionPage = lazy(() =>
+const SubscriptionPlansPage = lazy(() =>
   import("@/features/subscription_school").then((module) => ({
-    default: module.SchoolAdminSubscriptionPage,
+    default: module.SubscriptionPlansPage,
+  })),
+);
+
+const MyBalancePage = lazy(() =>
+  import("@/features/balance_school").then((module) => ({
+    default: module.MyBalancePage,
+  })),
+);
+
+const BalanceStatementPage = lazy(() =>
+  import("@/features/balance_school").then((module) => ({
+    default: module.BalanceStatementPage,
+  })),
+);
+
+const BalanceDebtEventsPage = lazy(() =>
+  import("@/features/balance_school").then((module) => ({
+    default: module.DebtEventsPage,
+  })),
+);
+
+const SchoolAdminOrdersPage = lazy(() =>
+  import("@/features/order_school").then((module) => ({
+    default: module.SchoolAdminOrdersPage,
+  })),
+);
+
+const SchoolAdminOrderDetailPage = lazy(() =>
+  import("@/features/order_school").then((module) => ({
+    default: module.OrderDetailPage,
   })),
 );
 
@@ -973,10 +1003,6 @@ export function AppRoutes() {
               path="system-admin/subscription/schools"
               element={<SystemAdminSchoolSubscriptionsPage />}
             />
-            <Route
-              path="system-admin/subscription/payment-result"
-              element={<SystemAdminSubscriptionPaymentResultPage backTo="/system-admin/subscription/plans" />}
-            />
           </Route>
         </Route>
         <Route element={<RequireRole role="SCHOOL_ADMIN" />}>
@@ -1179,13 +1205,55 @@ export function AppRoutes() {
               path="school-admin/scoring-rules"
               element={<SchoolAdminAllScoringRulesPage />}
             />
+            {/*
+              Đường cũ /school-admin/subscription vẫn còn nhiều nơi trỏ tới (bookmark, link cũ), nên
+              giữ lại dưới dạng chuyển hướng thay vì để catch-all ném người dùng về trang chủ.
+              Đích là "Gói của tôi": trường chưa có gói thì chính thẻ ở đó mời đi đăng ký, không cần
+              một nhánh chuyển hướng có điều kiện (vốn phải đợi query xong mới quyết được, và nháy màn hình).
+            */}
             <Route
               path="school-admin/subscription"
-              element={<SchoolAdminSubscriptionPage />}
+              element={<Navigate replace to="/school-admin/subscription/mine" />}
+            />
+            <Route
+              path="school-admin/subscription/mine"
+              element={<MySubscriptionPage />}
+            />
+            <Route
+              path="school-admin/subscription/plans"
+              element={<SubscriptionPlansPage />}
             />
             <Route
               path="school-admin/subscription/payment-result"
               element={<SchoolAdminSubscriptionPaymentResultPage />}
+            />
+            {/*
+              Cùng khuôn với /school-admin/subscription: đường gốc chuyển hướng sang tab đầu tiên
+              thay vì để catch-all ném người dùng về trang chủ.
+            */}
+            <Route
+              path="school-admin/balance"
+              element={<Navigate replace to="/school-admin/balance/mine" />}
+            />
+            <Route
+              path="school-admin/balance/mine"
+              element={<MyBalancePage />}
+            />
+            <Route
+              path="school-admin/balance/statement"
+              element={<BalanceStatementPage />}
+            />
+            <Route
+              path="school-admin/balance/debt"
+              element={<BalanceDebtEventsPage />}
+            />
+            <Route
+              path="school-admin/orders"
+              element={<SchoolAdminOrdersPage />}
+            />
+            <Route
+              path="school-admin/orders/:orderId"
+              element={<SchoolAdminOrderDetailPage />}
             />
           </Route>
         </Route>

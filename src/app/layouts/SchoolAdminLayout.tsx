@@ -10,9 +10,12 @@ import {
   LogOut,
   Menu,
   MonitorPlay,
+  Package,
   PenLine,
+  Receipt,
   ShieldCheck,
   UserRound,
+  Wallet,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -34,15 +37,70 @@ type NavigationGroup = {
   }>
 }
 
+// Mục điều hướng ĐỘC LẬP, không nằm trong nhóm nào -- giống thanh điều hướng của System Admin.
+// Gói dịch vụ và Đơn hàng đứng riêng vì chúng là chuyện TIỀN: trước đây cả hai bị xếp chung nhóm
+// "Hệ thống" với Quản lý import, khiến người phụ trách tài chính của trường phải tìm mục chi tiêu
+// bên trong một nhóm mang tên vận hành.
 const navigationItems = [
   {
     icon: Home,
     label: 'Tổng quan',
     to: '/school-admin/dashboard',
   },
+  {
+    icon: Receipt,
+    label: 'Đơn hàng',
+    to: '/school-admin/orders',
+  },
+  {
+    icon: FileSpreadsheet,
+    label: 'Quản lý import',
+    to: '/school-admin/imports',
+  },
 ]
 
 const navigationGroups: NavigationGroup[] = [
+  {
+    // Cùng hình dạng với nhóm "Gói dịch vụ" bên System Admin: một nhóm, hai trang con có route
+    // riêng — thay cho hai tab state bên trong một trang. Nhờ vậy mỗi tab có URL để quay lại,
+    // để bookmark, và để link thẳng tới từ chỗ khác.
+    icon: Package,
+    label: 'Gói dịch vụ',
+    items: [
+      {
+        label: 'Gói của tôi',
+        to: '/school-admin/subscription/mine',
+      },
+      {
+        label: 'Tất cả các gói',
+        to: '/school-admin/subscription/plans',
+      },
+    ],
+  },
+  {
+    // Nhóm RIÊNG, không nhét vào "Gói dịch vụ": ví tự nạp và hạn mức kèm gói là hai túi tiền khác
+    // nhau — ví chỉ bị trừ KHI hạn mức của loại tương ứng đã cạn. Gộp chung một nhóm là gợi ý sai
+    // ngay từ thanh điều hướng rằng chúng là một.
+    //
+    // Nhật ký nợ đặt ở đây chứ không phải nơi nào khác vì nợ là mặt trái của chính cái ví: số dư âm
+    // CHÍNH LÀ khoản nợ. Trước đó nó không có lối vào nào trong giao diện trường.
+    icon: Wallet,
+    label: 'Tài chính',
+    items: [
+      {
+        label: 'Tổng quan ví',
+        to: '/school-admin/balance/mine',
+      },
+      {
+        label: 'Sao kê',
+        to: '/school-admin/balance/statement',
+      },
+      {
+        label: 'Nhật ký nợ',
+        to: '/school-admin/balance/debt',
+      },
+    ],
+  },
   {
     icon: BookOpen,
     label: 'Trường học',
@@ -148,20 +206,6 @@ const navigationGroups: NavigationGroup[] = [
       {
         label: 'Duyệt câu hỏi',
         to: '/school-admin/questions/review',
-      },
-    ],
-  },
-  {
-    icon: FileSpreadsheet,
-    label: 'Hệ thống',
-    items: [
-      {
-        label: 'Quản lý import',
-        to: '/school-admin/imports',
-      },
-      {
-        label: 'Gói dịch vụ',
-        to: '/school-admin/subscription',
       },
     ],
   },

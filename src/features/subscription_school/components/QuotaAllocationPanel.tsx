@@ -3,7 +3,7 @@ import { RotateCcw, Scale, Search, Shuffle, Users } from 'lucide-react'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { UsageProgressBar } from '@/shared/ui/UsageProgressBar'
 import {
-  formatUsd,
+  formatVnd,
   type AllocateQuotaPayload,
   type QuotaUserAllocation,
   type QuotaUserAllocationSummary,
@@ -20,7 +20,7 @@ type QuotaAllocationPanelProps = {
 }
 
 function buildEditsFromAllocations(allocations: QuotaUserAllocation[]) {
-  return Object.fromEntries(allocations.map((allocation) => [allocation.userId, allocation.allocatedQuantity]))
+  return Object.fromEntries(allocations.map((allocation) => [allocation.userId, allocation.allocatedAmountVnd]))
 }
 
 export function QuotaAllocationPanel({
@@ -54,13 +54,13 @@ export function QuotaAllocationPanel({
   }, [allocations, search])
 
   const pool = summary?.pool
-  const poolTotalUsd = pool?.totalAllocated ?? 0
+  const poolTotalVnd = pool?.totalAllocatedAmountVnd ?? 0
   const editedTotalUsd = allocations.reduce((sum, allocation) => sum + (edits[allocation.userId] ?? 0), 0)
-  const overAllocated = editedTotalUsd > poolTotalUsd
+  const overAllocated = editedTotalUsd > poolTotalVnd
 
   function maxAllowedFor(userId: string) {
     const otherUsersTotal = editedTotalUsd - (edits[userId] ?? 0)
-    return Math.max(0, poolTotalUsd - otherUsersTotal)
+    return Math.max(0, poolTotalVnd - otherUsersTotal)
   }
 
   function updateAmount(userId: string, amount: number) {
@@ -69,7 +69,7 @@ export function QuotaAllocationPanel({
         (sum, allocation) => (allocation.userId === userId ? sum : sum + (current[allocation.userId] ?? 0)),
         0,
       )
-      const maxAllowed = Math.max(0, poolTotalUsd - otherUsersTotal)
+      const maxAllowed = Math.max(0, poolTotalVnd - otherUsersTotal)
       return { ...current, [userId]: Math.min(Math.max(0, amount), maxAllowed) }
     })
   }
@@ -129,10 +129,10 @@ export function QuotaAllocationPanel({
           </span>
           <span className="text-sm font-bold text-slate-900">Hạn mức của trường</span>
         </div>
-        <UsageProgressBar total={poolTotalUsd} used={editedTotalUsd} />
+        <UsageProgressBar total={poolTotalVnd} used={editedTotalUsd} />
         {overAllocated ? (
           <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-700">
-            Tổng hạn mức phân bổ đang vượt quá hạn mức của trường ({formatUsd(pool?.totalAllocated)}).
+            Tổng hạn mức phân bổ đang vượt quá hạn mức của trường ({formatVnd(pool?.totalAllocatedAmountVnd)}).
           </p>
         ) : null}
       </div>
@@ -204,8 +204,8 @@ export function QuotaAllocationPanel({
                   return (
                     <tr className="border-b border-slate-100" key={allocation.userId}>
                       <td className="px-6 py-3.5 text-sm font-bold text-slate-900">{allocation.fullName ?? '-'}</td>
-                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatUsd(allocation.usedQuantity)}</td>
-                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatUsd(allocation.allocatedQuantity)}</td>
+                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatVnd(allocation.usedAmountVnd)}</td>
+                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatVnd(allocation.allocatedAmountVnd)}</td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           <input
@@ -217,7 +217,7 @@ export function QuotaAllocationPanel({
                             type="number"
                             value={edits[allocation.userId] ?? 0}
                           />
-                          <span className="text-xs text-slate-400">/ {formatUsd(rowMax)}</span>
+                          <span className="text-xs text-slate-400">/ {formatVnd(rowMax)}</span>
                         </div>
                       </td>
                     </tr>

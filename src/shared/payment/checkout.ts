@@ -1,40 +1,42 @@
 import type { PaymentLink } from './types'
 
 /**
- * invoiceId của hóa đơn vừa được tạo link, lưu lại ngay trước khi rời trang sang cổng thanh toán.
+ * orderId của đơn vừa được phát phiên thanh toán, lưu ngay trước khi rời trang sang cổng.
  *
- * Phải tự lưu chứ không đọc lại được từ URL quay về: trang kết quả thanh toán cần invoiceId để đối
- * chiếu với danh sách hóa đơn tải từ BE, trong khi SePay redirect về success_url/error_url/cancel_url
- * trần không kèm tham số nào, còn PayOS chỉ gắn orderCode — mã riêng của PayOS, chỉ duy nhất trong
- * phạm vi cổng đó nên không tra ngược ra hóa đơn khi hệ thống có nhiều cổng.
+ * Phải tự lưu chứ không đọc lại được từ URL quay về: SePay redirect về success_url/error_url/
+ * cancel_url TRẦN, không kèm tham số nào, còn PayOS chỉ gắn orderCode — mã riêng của PayOS, không
+ * tra ngược ra đơn của mình khi hệ thống có nhiều cổng.
+ *
+ * Cách bền hơn là BE gắn thẳng ?orderId= vào ba URL đó — chúng được dựng theo từng phiên và nằm
+ * TRONG chữ ký nên không sửa được từ ngoài. Khi nào có, xoá hẳn phần lưu tạm này.
  *
  * sessionStorage chứ không phải state trong bộ nhớ: cả hai cổng đều điều hướng full-page ra khỏi
  * ứng dụng, nên mọi state React đều mất trước khi người dùng quay lại.
  */
-const PENDING_INVOICE_STORAGE_KEY = 'vox.payment.pendingInvoiceId'
+const PENDING_ORDER_STORAGE_KEY = 'vox.payment.pendingOrderId'
 
-export function rememberPendingInvoice(invoiceId: string) {
+export function rememberPendingOrder(orderId: string) {
   try {
-    sessionStorage.setItem(PENDING_INVOICE_STORAGE_KEY, invoiceId)
+    sessionStorage.setItem(PENDING_ORDER_STORAGE_KEY, orderId)
   } catch {
-    // Trình duyệt có thể chặn sessionStorage (Safari private mode). Mất khả năng đối soát chủ động
-    // ở trang kết quả là chấp nhận được: webhook và job đối soát định kỳ phía BE vẫn chốt hóa đơn.
+    // Trình duyệt có thể chặn sessionStorage (Safari private mode). Mất khả năng quay lại đúng đơn
+    // là chấp nhận được: trang Đơn hàng vẫn liệt kê đơn đó, và webhook/job đối soát phía BE vẫn chốt.
   }
 }
 
-export function readPendingInvoice() {
+export function readPendingOrder() {
   try {
-    return sessionStorage.getItem(PENDING_INVOICE_STORAGE_KEY)
+    return sessionStorage.getItem(PENDING_ORDER_STORAGE_KEY)
   } catch {
     return null
   }
 }
 
-export function clearPendingInvoice() {
+export function clearPendingOrder() {
   try {
-    sessionStorage.removeItem(PENDING_INVOICE_STORAGE_KEY)
+    sessionStorage.removeItem(PENDING_ORDER_STORAGE_KEY)
   } catch {
-    // Xem ghi chú ở rememberPendingInvoice.
+    // Xem ghi chú ở rememberPendingOrder.
   }
 }
 
@@ -43,31 +45,43 @@ export function clearPendingInvoice() {
  * theo tên cổng — đây là điểm mấu chốt để thêm cổng mới không phải sửa FE.
  */
 export function goToCheckout(link: PaymentLink) {
-  // Lưu trước khi điều hướng: sau lệnh submit/gán href thì không còn cơ hội chạy code nào nữa.
-  rememberPendingInvoice(link.invoiceId)
-
-  if (link.action === 'REDIRECT') {
-    window.location.href = link.actionUrl
-    return
+  // QR hiện NGAY TRONG trang, không đi đâu cả -- gọi hàm này với một link QR là không làm gì, và
+  // người gọi phải tự dựng khối mã (xem PayosQrPanel). Trả về false để chỗ gọi biết mà rẽ nhánh
+  // thay vì tưởng đã điều hướng xong.
+  if (link.action === 'QR') {
+    return false
   }
 
-  submitCheckoutForm(link)
+  // Lưu trước khi điều hướng: sau lệnh submit/gán href thì không còn cơ hội chạy code nào nữa.
+  rememberPendingOrder(link.orderId)
+
+  if (link.action === 'REDIRECT' && link.checkoutUrl) {
+    window.location.href = link.checkoutUrl
+    return true
+  }
+
+  if (link.action === 'FORM_POST' && link.checkoutUrl) {
+    submitCheckoutForm(link.checkoutUrl, link.fields)
+    return true
+  }
+
+  return false
 }
 
 /**
  * SePay không tạo link riêng cho từng đơn: URL checkout là cố định, đơn hàng được mô tả bằng bộ
  * field kèm chữ ký HMAC nên phải POST chứ không GET được.
  */
-function submitCheckoutForm(link: PaymentLink) {
+function submitCheckoutForm(actionUrl: string, fields: Record<string, string> | null) {
   const form = document.createElement('form')
   form.method = 'POST'
-  form.action = link.actionUrl
+  form.action = actionUrl
   form.style.display = 'none'
 
   // Object.entries giữ nguyên thứ tự chèn với key dạng chuỗi, và JSON.parse cũng dựng object theo
   // đúng thứ tự xuất hiện trong response — nên thứ tự mà BE đã ký được giữ nguyên tới đây. Tuyệt
   // đối không sort hay dựng lại object ở giữa đường, xem ghi chú ở PaymentLink.fields.
-  for (const [name, value] of Object.entries(link.fields ?? {})) {
+  for (const [name, value] of Object.entries(fields ?? {})) {
     const input = document.createElement('input')
     input.type = 'hidden'
     input.name = name

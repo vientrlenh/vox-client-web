@@ -12,6 +12,7 @@ import {
   useUpdatePlanMutation,
   useUpdatePlanReplacementMutation,
 } from '../api/usePlanMutations'
+import { useSchoolSubscriptionsByPlanQuery } from '../api/useSchoolSubscriptionsQuery'
 import { useSubscriptionPlansQuery } from '../api/useSubscriptionPlansQuery'
 import { ArchivePlanDialog } from '../components/ArchivePlanDialog'
 import { PlanCatalogTable } from '../components/PlanCatalogTable'
@@ -59,6 +60,28 @@ export function SubscriptionPlanCatalogPage() {
   const [archiveTarget, setArchiveTarget] = useState<SubscriptionPlan | null>(null)
 
   const plansQuery = useSubscriptionPlansQuery(page, pageSize)
+
+  // Số trường ĐANG dùng gói sắp ngừng bán. Chỉ để lấy totalElements nên xin đúng 1 dòng -- đây là
+  // con số quyết định gói thay thế có bắt buộc hay không, và trước đây nó bị truyền cứng bằng 0 nên
+  // cảnh báo trong ArchivePlanDialog không bao giờ hiện và ô chọn không bao giờ bắt buộc.
+  //
+  // Lọc ACTIVE chứ không đếm mọi kỳ: kỳ đã hết hạn hoặc đã hủy thì không còn lần gia hạn nào để mà
+  // cần gói thay thế.
+  const archiveTargetSchoolsQuery = useSchoolSubscriptionsByPlanQuery(
+    archiveTarget?.id,
+    { keyword: '', status: 'ACTIVE' },
+    DEFAULT_PAGE,
+    1,
+  )
+
+  // null = CHƯA BIẾT, khác hẳn 0 = biết chắc không trường nào dùng. ArchivePlanDialog chặn nút lưu
+  // trữ khi chưa biết, thay vì để mặc định rơi vào nhánh "không cần gói thay thế".
+  //
+  // isPlaceholderData: hook này giữ lại data của KHÓA TRƯỚC trong lúc khóa mới đang tải, nên mở hộp
+  // thoại cho gói B mà tin thẳng vào data thì thấy con số của gói A.
+  const archiveTargetSchoolCount = archiveTargetSchoolsQuery.isPlaceholderData
+    ? null
+    : archiveTargetSchoolsQuery.data?.totalElements ?? null
   const createMutation = useCreatePlanMutation()
   const updateMutation = useUpdatePlanMutation()
   const publishMutation = usePublishPlanMutation()
@@ -322,7 +345,7 @@ export function SubscriptionPlanCatalogPage() {
       ) : null}
 
       <ArchivePlanDialog
-        activeSchoolCount={0}
+        activeSchoolCount={archiveTargetSchoolCount}
         isOpen={Boolean(archiveTarget)}
         isSubmitting={archiveMutation.isPending}
         onClose={() => setArchiveTarget(null)}

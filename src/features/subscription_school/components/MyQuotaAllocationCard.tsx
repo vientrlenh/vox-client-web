@@ -1,9 +1,9 @@
 import type { LucideIcon } from 'lucide-react'
-import { UsageProgressBar } from '@/shared/ui/UsageProgressBar'
+import { USAGE_WARNING_PCT, UsageProgressBar, usagePercent } from '@/shared/ui/UsageProgressBar'
 
 export type MyQuotaAllocation = {
-  allocatedQuantity: number
-  usedQuantity: number
+  allocatedAmountVnd: number
+  usedAmountVnd: number
 }
 
 type MyQuotaAllocationCardProps = {
@@ -15,13 +15,12 @@ type MyQuotaAllocationCardProps = {
   allocation: MyQuotaAllocation | null | undefined
 }
 
-// Thẻ hiển thị hạn mức CÁ NHÂN của chính người dùng — khác UsageBarsGrid (luôn hiện cả 3 loại
-// hạn mức của TRƯỜNG). Cùng phong cách trực quan (thanh tiến trình, màu theo % dùng) để nhất quán.
+// Thẻ hiển thị hạn mức CÁ NHÂN của chính người dùng — khác ô hạn mức trên MyPlanCard, vốn hiện ví
+// của TRƯỜNG. Cùng phong cách trực quan (thanh tiến trình, màu theo % dùng) để nhất quán.
 export function MyQuotaAllocationCard({ icon: Icon, isLoading, label, allocation }: MyQuotaAllocationCardProps) {
-  const total = allocation?.allocatedQuantity ?? 0
-  const used = allocation?.usedQuantity ?? 0
-  const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
-  const warn = pct >= 80
+  const total = allocation?.allocatedAmountVnd ?? 0
+  const used = allocation?.usedAmountVnd ?? 0
+  const warn = usagePercent(used, total) >= USAGE_WARNING_PCT
 
   return (
     <div className={`rounded-2xl border bg-white p-5 ${warn ? 'border-amber-200' : 'border-slate-200'}`}>
