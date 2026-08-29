@@ -8,7 +8,7 @@ async function allocateClassTestQuota(
 ): Promise<MutationResult<QuotaUserAllocationSummary>> {
   const schoolId = requireSchoolId()
   const response = await apiClient.put<MutationResult<QuotaUserAllocationSummary>>(
-    `/v1/schools/${schoolId}/teachers/class-test-quota`,
+    `/v1/subscriptions/schools/${schoolId}/teachers/exam-quota`,
     payload,
   )
   return response.data
@@ -19,7 +19,7 @@ async function allocatePracticeQuota(
 ): Promise<MutationResult<QuotaUserAllocationSummary>> {
   const schoolId = requireSchoolId()
   const response = await apiClient.put<MutationResult<QuotaUserAllocationSummary>>(
-    `/v1/schools/${schoolId}/students/practice-quota`,
+    `/v1/subscriptions/schools/${schoolId}/students/practice-quota`,
     payload,
   )
   return response.data

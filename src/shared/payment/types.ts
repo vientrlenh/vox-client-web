@@ -6,24 +6,27 @@ export type PaymentMethod = 'PAYOS' | 'SEPAY'
  * Cách mở trang thanh toán, do BE quyết định thay vì FE suy ra từ tên cổng. Nhờ vậy thêm một cổng
  * mới không phải sửa FE — trước đây FE buộc phải biết "nếu là SePay thì submit form".
  *
- * 'NONE': hóa đơn đã chốt PAID ngay (amountDue = 0 sau khi bù trừ ngày chưa dùng lúc đổi gói), không
- * có gì để điều hướng sang cổng — xem CreatePaymentLinkForRenewalUseCase ở BE.
+ * 'NONE': đơn đã chốt PAID ngay lúc tạo link (vd amountDue = 0 sau khi bù đủ 100% giá gói mới lúc
+ * nâng cấp), không có gì để điều hướng sang cổng — xem CreatePaymentCheckoutUrlUseCase ở BE.
  */
 export type CheckoutAction = 'FORM_POST' | 'NONE' | 'REDIRECT'
 
+// Khớp PaymentCheckoutResponse ở BE (POST /api/v1/payments/checkout-url). KHÔNG còn invoiceId:
+// hóa đơn chỉ phát sau khi tiền về, lúc phát link chưa có hóa đơn nào tồn tại -- FE đối soát kết
+// quả thanh toán bằng orderId, xem PaymentResultPage.
 export type PaymentLink = {
+  orderId: string
+  paymentId: string
+  providerOrderRef: string | null
+  provider: PaymentMethod
   action: CheckoutAction
-  actionUrl: string
+  checkoutUrl: string
   // Các field ẩn phải POST khi action là FORM_POST, rỗng khi là REDIRECT.
   //
   // THỨ TỰ KEY LÀ MỘT PHẦN CỦA HỢP ĐỒNG, không phải chi tiết trình bày: SePay ký HMAC trên chuỗi
   // ghép các cặp key=value theo đúng thứ tự BE đã dựng. Sắp xếp lại hay dựng lại object ở giữa
   // đường là mọi giao dịch bị từ chối vì sai chữ ký.
   fields: Record<string, string> | null
-  invoiceId: string
-  // null với cổng không có khái niệm này (SePay PG định danh đơn bằng order_invoice_number).
-  paymentLinkId: string | null
-  providerOrderRef: string | null
 }
 
 export const PAYMENT_METHODS: PaymentMethod[] = ['PAYOS', 'SEPAY']

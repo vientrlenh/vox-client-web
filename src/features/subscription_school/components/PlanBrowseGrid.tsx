@@ -1,21 +1,15 @@
-import { CheckCircle2, ClipboardList, FileCheck2, Headphones, Star } from 'lucide-react'
+import { CheckCircle2, Star } from 'lucide-react'
 import {
   formatMinutes,
-  formatUsd,
+  formatPlanPeriod,
   formatVnd,
+  QUOTA_ICONS,
   QUOTA_LABELS,
   QUOTA_TYPES,
   type MySubscription,
-  type QuotaType,
   type RequestType,
   type SubscriptionPlan,
 } from '../types'
-
-const QUOTA_ICONS: Record<QuotaType, typeof FileCheck2> = {
-  CLASS_TEST: ClipboardList,
-  GRADING: FileCheck2,
-  PRACTICE: Headphones,
-}
 
 type PlanBrowseGridProps = {
   currentSubscription: MySubscription | null
@@ -51,10 +45,10 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
         if (isCurrent) {
           ctaLabel = 'Gói hiện tại'
           disabled = true
-        } else if (activePlan && plan.pricePerYear > activePlan.pricePerYear) {
+        } else if (activePlan && plan.priceVnd > activePlan.priceVnd) {
           ctaLabel = 'Nâng cấp'
           requestType = 'UPGRADE'
-        } else if (activePlan && plan.pricePerYear < activePlan.pricePerYear) {
+        } else if (activePlan && plan.priceVnd < activePlan.priceVnd) {
           ctaLabel = 'Không thể chuyển xuống gói thấp hơn'
           disabled = true
         }
@@ -65,7 +59,7 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
               'relative rounded-2xl border p-6',
               isCurrent
                 ? 'border-emerald-300 bg-emerald-50/60 shadow-lg shadow-emerald-100'
-                : plan.popular
+                : plan.isMostPopular
                   ? 'border-indigo-300 bg-white shadow-lg shadow-indigo-100'
                   : 'border-slate-200 bg-white',
             ].join(' ')}
@@ -76,7 +70,7 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
                 <CheckCircle2 aria-hidden="true" className="size-3.5" />
                 Đang sử dụng
               </span>
-            ) : plan.popular ? (
+            ) : plan.isMostPopular ? (
               <span className="absolute -top-3 left-6 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1 text-xs font-extrabold text-white">
                 <Star aria-hidden="true" className="size-3.5" />
                 Phổ biến nhất
@@ -87,8 +81,8 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
             <p className="mt-1 min-h-9.5 text-[12.5px] leading-5 text-slate-500">{plan.tagline ?? ''}</p>
 
             <div className="mt-3.5 flex items-baseline gap-1.5">
-              <span className="text-[26px] font-extrabold text-slate-900">{formatVnd(plan.pricePerYear)}</span>
-              <span className="text-sm text-slate-500">/ {plan.validityDays} ngày</span>
+              <span className="text-[26px] font-extrabold text-slate-900">{formatVnd(plan.priceVnd)}</span>
+              <span className="text-sm text-slate-500">/ {formatPlanPeriod(plan.periodType, plan.periodCount)}</span>
             </div>
 
             <div className="mt-4.5 grid gap-3 border-t border-slate-200 pt-4.5">
@@ -101,7 +95,7 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
                     <Icon aria-hidden="true" className="size-4.5 text-indigo-600" />
                     <span className="flex-1 text-[13px] text-slate-600">{QUOTA_LABELS[quotaType]}</span>
                     <span className="text-sm font-extrabold text-slate-900">
-                      {formatUsd(quota?.includedQuantity)}
+                      {formatVnd(quota?.includedAmountVnd)}
                     </span>
                   </div>
                 )
@@ -121,7 +115,7 @@ export function PlanBrowseGrid({ currentSubscription, isLoading, onSelect, plans
                   ? 'cursor-not-allowed border border-emerald-300 bg-emerald-100 text-emerald-700'
                   : disabled
                     ? 'cursor-not-allowed border border-dashed border-slate-300 bg-slate-50 text-slate-400'
-                    : plan.popular
+                    : plan.isMostPopular
                       ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                       : 'border-1.5 border-indigo-600 bg-white text-indigo-700 hover:bg-indigo-50',
               ].join(' ')}

@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
 
 export type MyPracticeQuotaAllocation = {
-  allocatedQuantity: number
-  usedQuantity: number
+  allocatedAmountVnd: number
+  usedAmountVnd: number
 }
 
 export const myPracticeQuotaAllocationQueryKeys = {
@@ -13,13 +13,13 @@ export const myPracticeQuotaAllocationQueryKeys = {
 const MY_PRACTICE_QUOTA_ALLOCATION_QUERY = `
   query MyPracticeQuotaAllocation {
     myPracticeQuotaAllocation {
-      allocatedQuantity
-      usedQuantity
+      allocatedAmountVnd
+      usedAmountVnd
     }
   }
 `
 
-// null = học sinh không có hạn mức PRACTICE cá nhân riêng, chỉ pool của trường áp dụng.
+// null = học sinh không có hạn mức PRACTICE cá nhân riêng, chỉ ví của trường áp dụng.
 export async function fetchMyPracticeQuotaAllocation(): Promise<MyPracticeQuotaAllocation | null> {
   const data = await graphQLRequest<{ myPracticeQuotaAllocation: MyPracticeQuotaAllocation | null }>(
     MY_PRACTICE_QUOTA_ALLOCATION_QUERY,

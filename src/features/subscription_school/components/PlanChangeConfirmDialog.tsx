@@ -2,7 +2,7 @@ import { ArrowRight, Sparkles } from 'lucide-react'
 import { PaymentMethodField } from '@/shared/payment/PaymentMethodField'
 import {
   formatMinutes,
-  formatUsd,
+  formatPlanPeriod,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -31,8 +31,7 @@ export function PlanChangeConfirmDialog({
     return null
   }
 
-  const { currentPlan, renewalPlan, unusedCreditAmount, amountDue } = preview
-  const hasCredit = unusedCreditAmount > 0
+  const { currentPlan, renewalPlan, amountDue } = preview
   const isFree = amountDue === 0
   const currentQuotaByType = new Map(currentPlan.quotas.map((quota) => [quota.quotaType, quota]))
   const renewalQuotaByType = new Map(renewalPlan.quotas.map((quota) => [quota.quotaType, quota]))
@@ -66,8 +65,8 @@ export function PlanChangeConfirmDialog({
 
           <div className="grid gap-2.5 border-t border-slate-100 pt-3.5">
             {QUOTA_TYPES.map((quotaType) => {
-              const before = currentQuotaByType.get(quotaType)?.includedQuantity
-              const after = renewalQuotaByType.get(quotaType)?.includedQuantity
+              const before = currentQuotaByType.get(quotaType)?.includedAmountVnd
+              const after = renewalQuotaByType.get(quotaType)?.includedAmountVnd
               const improved = (after ?? 0) > (before ?? 0)
               return (
                 <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[13px]" key={quotaType}>
@@ -79,7 +78,7 @@ export function PlanChangeConfirmDialog({
                       improved ? 'text-emerald-600' : 'text-slate-900',
                     ].join(' ')}
                   >
-                    {formatUsd(before)} → {formatUsd(after)}
+                    {formatVnd(before)} → {formatVnd(after)}
                   </span>
                 </div>
               )
@@ -98,15 +97,9 @@ export function PlanChangeConfirmDialog({
             <div className="flex items-baseline justify-between">
               <span className="text-[13px] font-bold text-slate-500">Giá gói mới</span>
               <span className="text-sm font-bold text-slate-700">
-                {formatVnd(renewalPlan.pricePerYear)} / {renewalPlan.validityDays} ngày
+                {formatVnd(renewalPlan.priceVnd)} / {formatPlanPeriod(renewalPlan.periodType, renewalPlan.periodCount)}
               </span>
             </div>
-            {hasCredit ? (
-              <div className="mt-1.5 flex items-baseline justify-between">
-                <span className="text-[13px] font-bold text-slate-500">Bù ngày chưa dùng của gói cũ</span>
-                <span className="text-sm font-bold text-emerald-600">-{formatVnd(unusedCreditAmount)}</span>
-              </div>
-            ) : null}
             <div className="mt-1.5 flex items-baseline justify-between">
               <span className="text-[13px] font-bold text-slate-500">Còn phải trả</span>
               <span className="text-lg font-extrabold text-indigo-600">{formatVnd(amountDue)}</span>

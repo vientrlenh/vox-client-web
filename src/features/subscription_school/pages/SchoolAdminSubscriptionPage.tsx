@@ -11,21 +11,18 @@ import {
   PAYMENT_METHOD_OPTIONS,
   type PaymentMethod,
 } from '@/shared/payment/types'
-import { useQuotaPricingQuery } from '@/features/subscription_system/api/useQuotaPricingQuery'
 import { useMySubscriptionQuery } from '../api/useMySubscriptionQuery'
 import { useMySubscriptionUsageQuery } from '../api/useMySubscriptionUsageQuery'
 import { useSubscriptionPlansQuery } from '../api/useSubscriptionPlansQuery'
+import { useCreateSubscriptionOrderMutation } from '../api/useSubscriptionOrderMutations'
+import { useCreatePaymentCheckoutMutation } from '../api/usePaymentCheckoutMutation'
 import {
-  useCreatePaymentLinkForSubscriptionRequestMutation,
-  useSubmitSubscriptionRequestMutation,
-} from '../api/useSubscriptionRequestMutations'
-import {
-  useCreatePaymentLinkForRenewalMutation,
-  useCreatePaymentLinkForTokenPurchaseMutation,
+  useCreateRenewalOrderMutation,
+  useCreateTopUpOrderMutation,
   usePreviewRenewalMutation,
 } from '../api/usePaymentLinkMutations'
 import { useCancelMySubscriptionMutation } from '../api/useCancelMySubscriptionMutation'
-import { useInvoicesQuery } from '../api/useInvoicesQuery'
+import { myOrdersQueryKeys, useMyOrdersQuery } from '../api/useMyOrdersQuery'
 import { useMyDebtEventsQuery } from '../api/useMyDebtEventsQuery'
 import {
   useClassTestQuotaAllocationsQuery,
@@ -52,12 +49,15 @@ import {
   type SubscriptionPlan,
   type TokenTopUpState,
 } from '../types'
+import { useQueryClient } from '@tanstack/react-query'
+import { mySubscriptionQueryKeys } from '../api/useMySubscriptionQuery'
+import { mySubscriptionUsageQueryKeys } from '../api/useMySubscriptionUsageQuery'
 
 type SchoolSubscriptionTab = 'plan' | 'browse' | 'quota' | 'invoices' | 'debt'
 type QuotaAllocationTab = 'teachers' | 'students'
 
 const DEFAULT_PAGE = 1
-const EMPTY_TOKEN_STATE: TokenTopUpState = { CLASS_TEST: 0, GRADING: 0, PRACTICE: 0 }
+const EMPTY_TOKEN_STATE: TokenTopUpState = { EXAM: 0, PRACTICE: 0 }
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
@@ -67,6 +67,7 @@ function getErrorMessage(error: unknown) {
 }
 
 export function SchoolAdminSubscriptionPage() {
+  const queryClient = useQueryClient()
   const [tab, setTab] = useState<SchoolSubscriptionTab>('plan')
   const [quotaTab, setQuotaTab] = useState<QuotaAllocationTab>('teachers')
   const [toast, setToast] = useState<{ text: string; tone: 'error' | 'success' } | null>(null)
@@ -85,28 +86,44 @@ export function SchoolAdminSubscriptionPage() {
 
   const mySubscriptionQuery = useMySubscriptionQuery()
   const usageQuery = useMySubscriptionUsageQuery()
-  const quotaPricingQuery = useQuotaPricingQuery()
   const plansQuery = useSubscriptionPlansQuery(DEFAULT_PAGE, 50)
-  const invoicesQuery = useInvoicesQuery(invoicesPage, 10)
+  const ordersQuery = useMyOrdersQuery(invoicesPage, 10)
   const debtEventsQuery = useMyDebtEventsQuery(debtEventsPage, 10)
   const classTestQuotaQuery = useClassTestQuotaAllocationsQuery()
   const practiceQuotaQuery = usePracticeQuotaAllocationsQuery()
 
-  const submitRequestMutation = useSubmitSubscriptionRequestMutation()
-  const requestPaymentLinkMutation = useCreatePaymentLinkForSubscriptionRequestMutation()
+  const createSubscriptionOrderMutation = useCreateSubscriptionOrderMutation()
+  const createCheckoutMutation = useCreatePaymentCheckoutMutation()
   const previewRenewalMutation = usePreviewRenewalMutation()
-  const renewPaymentLinkMutation = useCreatePaymentLinkForRenewalMutation()
-  const tokenPaymentLinkMutation = useCreatePaymentLinkForTokenPurchaseMutation()
+  const createRenewalOrderMutation = useCreateRenewalOrderMutation()
+  const createTopUpOrderMutation = useCreateTopUpOrderMutation()
   const cancelMutation = useCancelMySubscriptionMutation()
   const allocateClassTestQuotaMutation = useAllocateClassTestQuotaMutation()
   const allocatePracticeQuotaMutation = useAllocatePracticeQuotaMutation()
 
   const subscription = mySubscriptionQuery.data ?? null
   const activePlans = (plansQuery.data?.content ?? []).filter((plan) => plan.status === 'ACTIVE')
-  const isRegisteringOrPaying = submitRequestMutation.isPending || requestPaymentLinkMutation.isPending
+  const isRegisteringOrPaying = createSubscriptionOrderMutation.isPending || createCheckoutMutation.isPending
 
-  function updateTokenQuantity(quotaType: (typeof QUOTA_TYPES)[number], amountUsd: number) {
-    setTokenState((current) => ({ ...current, [quotaType]: amountUsd }))
+  function updateTokenAmount(quotaType: (typeof QUOTA_TYPES)[number], amountVnd: number) {
+    setTokenState((current) => ({ ...current, [quotaType]: amountVnd }))
+  }
+
+  // Bước 2 DÙNG CHUNG cho mọi luồng đặt đơn: mở phiên thanh toán cho orderId vừa tạo. action=NONE
+  // nghĩa là đơn đã chốt PAID ngay lúc tạo link (vd bù đủ 100% giá gói mới lúc nâng cấp) -- không có
+  // gì để điều hướng sang cổng, chỉ cần làm mới dữ liệu và báo thành công tại chỗ.
+  async function checkoutOrder(orderId: string, method: PaymentMethod) {
+    const result = await createCheckoutMutation.mutateAsync({ orderId, provider: method })
+
+    if (result.data.action === 'NONE') {
+      setToast({ text: 'Đã xử lý thành công, không cần thanh toán thêm.', tone: 'success' })
+      void queryClient.invalidateQueries({ queryKey: mySubscriptionQueryKeys.all })
+      void queryClient.invalidateQueries({ queryKey: mySubscriptionUsageQueryKeys.all })
+      void queryClient.invalidateQueries({ queryKey: myOrdersQueryKeys.all })
+      return
+    }
+
+    goToCheckout(result.data)
   }
 
   async function handleRenew() {
@@ -115,17 +132,17 @@ export function SchoolAdminSubscriptionPage() {
     }
 
     try {
-      const preview = await previewRenewalMutation.mutateAsync(subscription.id)
+      const preview = await previewRenewalMutation.mutateAsync()
 
       // Gói đã đổi thì hộp thoại so sánh gói lo luôn việc chọn cổng — hỏi ở đây nữa là hỏi hai lần.
-      if (preview.data.planChanged) {
-        setRenewalPreview(preview.data)
+      if (preview.planChanged) {
+        setRenewalPreview(preview)
         return
       }
 
       const { confirmed, selection } = await confirmWithSelection({
         confirmLabel: 'Tiếp tục thanh toán',
-        message: `Gia hạn gói ${preview.data.renewalPlan.name} với giá ${formatVnd(preview.data.renewalPlan.pricePerYear)}. Gói được gia hạn tự động ngay sau khi thanh toán thành công.`,
+        message: `Gia hạn gói ${preview.renewalPlan.name} với giá ${formatVnd(preview.amountDue)}. Gói được gia hạn tự động ngay sau khi thanh toán thành công.`,
         selectLabel: 'Cổng thanh toán',
         selectOptions: PAYMENT_METHOD_OPTIONS,
         selectPlaceholder: 'Chọn cổng thanh toán',
@@ -142,11 +159,8 @@ export function SchoolAdminSubscriptionPage() {
       }
 
       setPaymentMethod(selection)
-      const result = await renewPaymentLinkMutation.mutateAsync({
-        paymentMethod: selection,
-        subscriptionId: subscription.id,
-      })
-      goToCheckout(result.data)
+      const orderResult = await createRenewalOrderMutation.mutateAsync({ acceptedPlanId: preview.renewalPlan.id })
+      await checkoutOrder(orderResult.data, selection)
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán gia hạn.', tone: 'error' })
     }
@@ -158,22 +172,11 @@ export function SchoolAdminSubscriptionPage() {
     }
 
     try {
-      const result = await renewPaymentLinkMutation.mutateAsync({
+      const orderResult = await createRenewalOrderMutation.mutateAsync({
         acceptedPlanId: renewalPreview.renewalPlan.id,
-        paymentMethod,
-        subscriptionId: subscription.id,
       })
-
-      // Bù trừ ngày chưa dùng đã chi trả đủ 100% giá gói mới -- BE chốt PAID ngay, không có cổng nào
-      // để điều hướng sang (xem CreatePaymentLinkForRenewalUseCase).
-      if (result.data.action === 'NONE') {
-        setToast({ text: 'Đã bù đủ 100% — gia hạn miễn phí thành công.', tone: 'success' })
-        setRenewalPreview(null)
-        void mySubscriptionQuery.refetch()
-        return
-      }
-
-      goToCheckout(result.data)
+      await checkoutOrder(orderResult.data, paymentMethod)
+      setRenewalPreview(null)
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán gia hạn.', tone: 'error' })
       setRenewalPreview(null)
@@ -187,7 +190,7 @@ export function SchoolAdminSubscriptionPage() {
 
     const confirmed = await confirm({
       confirmLabel: 'Hủy gói',
-      message: 'Gói dịch vụ hiện tại sẽ bị hủy ngay lập tức. Hành động này không thể hoàn tác.',
+      message: 'Trường sẽ không tự động gia hạn khi hết kỳ hiện tại. Gói vẫn dùng bình thường tới hết hạn.',
       title: 'Hủy gói đăng ký',
     })
 
@@ -196,8 +199,8 @@ export function SchoolAdminSubscriptionPage() {
     }
 
     try {
-      await cancelMutation.mutateAsync(subscription.id)
-      setToast({ text: 'Đã hủy gói dịch vụ', tone: 'success' })
+      await cancelMutation.mutateAsync()
+      setToast({ text: 'Đã ghi nhận yêu cầu không gia hạn gói', tone: 'success' })
     } catch (error) {
       setToast({ text: getErrorMessage(error) ?? 'Không thể hủy gói.', tone: 'error' })
     }
@@ -213,46 +216,31 @@ export function SchoolAdminSubscriptionPage() {
     }
 
     try {
-      const submitResult = await submitRequestMutation.mutateAsync({
-        currentPlanId: subscription?.planId ?? null,
-        requestedPlanId: pendingSelection.plan.id,
-        requestType: pendingSelection.requestType,
+      const orderResult = await createSubscriptionOrderMutation.mutateAsync({
+        subscriptionPlanId: pendingSelection.plan.id,
       })
-      const linkResult = await requestPaymentLinkMutation.mutateAsync({
-        paymentMethod,
-        requestId: submitResult.data.id,
-      })
-      goToCheckout(linkResult.data)
+      await checkoutOrder(orderResult.data, paymentMethod)
+      setPendingSelection(null)
     } catch (error) {
-      setToast({ text: getErrorMessage(error) ?? 'Không thể tạo yêu cầu / link thanh toán.', tone: 'error' })
+      setToast({ text: getErrorMessage(error) ?? 'Không thể tạo đơn / link thanh toán.', tone: 'error' })
       setPendingSelection(null)
     }
   }
 
   async function handleBuyTokens() {
-    if (!subscription) {
-      return
-    }
+    const creditAmountVnd = QUOTA_TYPES.reduce((sum, quotaType) => sum + (tokenState[quotaType] || 0), 0)
 
-    const items = QUOTA_TYPES.filter((quotaType) => tokenState[quotaType] > 0).map((quotaType) => ({
-      quantity: tokenState[quotaType],
-      quotaType,
-    }))
-
-    if (items.length === 0) {
-      setToast({ text: 'Chọn số tiền cần mua thêm', tone: 'error' })
+    if (creditAmountVnd <= 0) {
+      setToast({ text: 'Chọn số tiền cần nạp thêm', tone: 'error' })
       return
     }
 
     try {
-      const result = await tokenPaymentLinkMutation.mutateAsync({
-        items,
-        paymentMethod,
-        subscriptionId: subscription.id,
-      })
-      goToCheckout(result.data)
+      const orderResult = await createTopUpOrderMutation.mutateAsync({ creditAmountVnd })
+      await checkoutOrder(orderResult.data, paymentMethod)
+      setTokenState(EMPTY_TOKEN_STATE)
     } catch (error) {
-      setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán mua token.', tone: 'error' })
+      setToast({ text: getErrorMessage(error) ?? 'Không thể tạo link thanh toán nạp thêm.', tone: 'error' })
     }
   }
 
@@ -281,7 +269,7 @@ export function SchoolAdminSubscriptionPage() {
           Gói dịch vụ của trường
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-          Xem gói hiện tại, hạn mức còn lại theo 3 tiêu chí, đăng ký hoặc nâng cấp gói mới.
+          Xem gói hiện tại, hạn mức còn lại theo từng tiêu chí, đăng ký hoặc nâng cấp gói mới.
         </p>
       </div>
 
@@ -302,7 +290,7 @@ export function SchoolAdminSubscriptionPage() {
           <MyPlanCard
             isCancelling={cancelMutation.isPending}
             isLoading={mySubscriptionQuery.isLoading}
-            isRenewing={previewRenewalMutation.isPending || renewPaymentLinkMutation.isPending}
+            isRenewing={previewRenewalMutation.isPending || createRenewalOrderMutation.isPending || createCheckoutMutation.isPending}
             onCancel={() => void handleCancel()}
             onGoBrowse={() => setTab('browse')}
             onRenew={() => void handleRenew()}
@@ -330,14 +318,13 @@ export function SchoolAdminSubscriptionPage() {
 
           {subscription?.status === 'ACTIVE' && subscription.plan ? (
             <TokenTopUpPanel
-              isSubmitting={tokenPaymentLinkMutation.isPending}
-              onChange={updateTokenQuantity}
+              isSubmitting={createTopUpOrderMutation.isPending || createCheckoutMutation.isPending}
+              onChange={updateTokenAmount}
               onPaymentMethodChange={setPaymentMethod}
               onSubmit={() => void handleBuyTokens()}
               paymentMethod={paymentMethod}
-              plan={subscription.plan}
+              planName={subscription.plan.name}
               state={tokenState}
-              usdToVndRate={quotaPricingQuery.data?.usdToVndRate}
             />
           ) : null}
         </div>
@@ -382,20 +369,20 @@ export function SchoolAdminSubscriptionPage() {
 
       {tab === 'invoices' ? (
         <InvoicesTable
-          errorMessage={getErrorMessage(invoicesQuery.error)}
+          errorMessage={getErrorMessage(ordersQuery.error)}
           footer={
             <Pagination
               currentPage={invoicesPage}
               itemName="hóa đơn"
               onPageChange={setInvoicesPage}
-              totalElements={invoicesQuery.data?.totalElements ?? 0}
-              totalPages={invoicesQuery.data?.totalPages ?? 0}
+              totalElements={ordersQuery.data?.totalElements ?? 0}
+              totalPages={ordersQuery.data?.totalPages ?? 0}
             />
           }
-          invoices={invoicesQuery.data?.content ?? []}
-          isError={invoicesQuery.isError}
-          isLoading={invoicesQuery.isLoading}
-          onRetry={() => void invoicesQuery.refetch()}
+          isError={ordersQuery.isError}
+          isLoading={ordersQuery.isLoading}
+          onRetry={() => void ordersQuery.refetch()}
+          orders={ordersQuery.data?.content ?? []}
         />
       ) : null}
 
@@ -429,7 +416,7 @@ export function SchoolAdminSubscriptionPage() {
       />
 
       <PlanChangeConfirmDialog
-        isSubmitting={renewPaymentLinkMutation.isPending}
+        isSubmitting={createRenewalOrderMutation.isPending || createCheckoutMutation.isPending}
         onCancel={() => setRenewalPreview(null)}
         onConfirm={() => void handleConfirmPlanChange()}
         onPaymentMethodChange={setPaymentMethod}

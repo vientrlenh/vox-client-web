@@ -1,54 +1,50 @@
-import { ClipboardList, FileCheck2, Headphones, type LucideIcon } from 'lucide-react'
+import { FileCheck2, Headphones, type LucideIcon } from 'lucide-react'
 
-export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
+export type QuotaType = 'EXAM' | 'PRACTICE'
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUSPENDED'
+export type SubscriptionPlanStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
+export type SubscriptionPlanPeriod = 'DAY' | 'MONTH' | 'YEAR'
 export type RequestType = 'REGISTRATION' | 'UPGRADE'
-export type InvoiceStatus = 'PAID' | 'PENDING' | 'FAILED' | 'CANCELLED'
+export type OrderStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED'
+export type OrderType = 'SUBSCRIPTION_REQUEST' | 'SUBSCRIPTION_UPGRADE' | 'TOPUP'
+export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED'
 export type SchoolDebtEventType = 'LOCKED' | 'CAP_EXCEEDED' | 'CLEARED'
 
-export const QUOTA_TYPES: QuotaType[] = ['GRADING', 'CLASS_TEST', 'PRACTICE']
+export const QUOTA_TYPES: QuotaType[] = ['EXAM', 'PRACTICE']
 
 export const QUOTA_LABELS: Record<QuotaType, string> = {
-  CLASS_TEST: 'Bài kiểm tra trên lớp',
-  GRADING: 'Bài Kiểm Tra Tập Trung',
+  EXAM: 'Chấm thi (thi tập trung & kiểm tra trên lớp)',
   PRACTICE: 'Lượt ôn luyện cá nhân',
 }
 
 export const QUOTA_ICONS: Record<QuotaType, LucideIcon> = {
-  CLASS_TEST: ClipboardList,
-  GRADING: FileCheck2,
+  EXAM: FileCheck2,
   PRACTICE: Headphones,
-}
-
-// includedQuantity / totalAllocated / usedQuantity đều tính bằng USD chi phí AI ước
-// tính (xem AI_USAGE_QUOTA_USD_MIGRATION.md) — hiển thị thẳng, không quy đổi đơn vị.
-export function formatUsd(value?: number | null) {
-  const amount = Number(value) || 0
-  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(amount)}`
 }
 
 export type PlanQuota = {
   id: string
   quotaType: QuotaType
-  includedQuantity: number
-  tokenUnitPrice: number
+  // Định mức bao gồm trong giá gói, quy ra VND -- xem SubscriptionPlanQuota ở BE. Không còn
+  // tokenUnitPrice: đơn giá "VND cho mỗi $1" trước đây tính sai lệch với tỷ giá thật.
+  includedAmountVnd: number
 }
 
 export type SubscriptionPlan = {
   id: string
   name: string
   tagline: string | null
-  pricePerYear: number
-  validityDays: number
+  priceVnd: number
+  // Chu kỳ gói = periodType x periodCount (vd MONTH x 12), thay cho validityDays cũ.
+  periodType: SubscriptionPlanPeriod
+  periodCount: number
   maxTimePerAttemptMin: number | null
-  popular: boolean
-  status: 'ACTIVE' | 'ARCHIVED'
+  status: SubscriptionPlanStatus
   replacedByPlanId: string | null
-  // Margin dịch vụ của gói (vd 0.20 = 20%) -- kết hợp với quotaPricing.usdToVndRate (số SỐNG) để
-  // tính giá quota hiện tại, KHÔNG dùng quotas[].tokenUnitPrice (đóng băng lúc tạo gói) cho màn
-  // "mua thêm" -- xem TokenTopUpPanel.
-  serviceFeeRatio: number
   quotas: PlanQuota[]
+  // Gói đang có nhiều trường dùng nhất toàn hệ thống -- đến từ SubscriptionPlanListItem.isMostPopular
+  // ở tầng query, gộp vào đây cho tiện dùng trong UI danh sách gói.
+  isMostPopular?: boolean
 }
 
 export type SubscriptionPlanPage = {
@@ -60,20 +56,21 @@ export type SubscriptionPlanPage = {
 }
 
 export type RenewalPreview = {
+  // true = gói gia hạn khác gói đang dùng (trường bị chuyển sang gói thay thế vì gói cũ đã ARCHIVED).
   planChanged: boolean
   currentPlan: SubscriptionPlan
   renewalPlan: SubscriptionPlan
-  // Bù giá trị NGÀY CHƯA DÙNG của gói cũ, chỉ > 0 khi planChanged (bị ép đổi gói giữa chu kỳ do
-  // System Admin archive gói đang dùng) -- xem RenewalProrationService ở BE. amountDue = số tiền
-  // thật phải trả sau khi trừ bù (= renewalPlan.pricePerYear khi planChanged là false).
-  unusedCreditAmount: number
+  // Kỳ mới bắt đầu chạy khi nào -- ngay bây giờ nếu không còn kỳ nào hiệu lực, hoặc ngày hết hạn
+  // của kỳ hiện tại. KHÔNG có bù trừ ngày chưa dùng: kỳ mới nối tiếp kỳ đang chạy, không đè lên.
+  startsAt: string
+  // Giá gói gia hạn, CHƯA gồm phí dịch vụ -- phí cộng vào lúc đặt đơn.
   amountDue: number
 }
 
 export type MySubscription = {
   id: string
   schoolId: string
-  planId: string
+  subscriptionPlanId: string
   startDate: string | null
   endDate: string | null
   status: SubscriptionStatus
@@ -88,41 +85,63 @@ export type MySubscription = {
 
 export type SubscriptionQuota = {
   id: string
-  subscriptionId: string
+  schoolSubscriptionId: string
   quotaType: QuotaType
-  totalAllocated: number
-  usedQuantity: number
+  totalAllocatedAmountVnd: number
+  usedAmountVnd: number
 }
 
-export type InvoiceQuotaItem = {
-  quotaType: QuotaType
-  amount: number
-}
-
-export type Invoice = {
+export type OrderItem = {
   id: string
+  orderId: string
+  type: string | null
+  itemId: string
+  unitPriceVnd: number | null
+  amountVnd: number | null
+  quantity: number | null
+}
+
+export type OrderInvoice = {
   invoiceNumber: string
-  // Chỉ có giá trị sau khi thanh toán thành công — null với hóa đơn còn PENDING hoặc đã
-  // CANCELLED/FAILED mà chưa từng chốt.
-  subscriptionId: string | null
-  sourceType: 'SUBSCRIPTION' | 'SUBSCRIPTION_REQUEST' | 'TOKEN_PURCHASE'
-  sourceId: string
-  issueDate: string | null
-  amount: number
-  status: InvoiceStatus
-  paymentLinkId: string | null
+  issueDate: string
+}
+
+export type Payment = {
+  id: string
+  orderId: string
+  amountVnd: number
+  method: string | null
+  provider: string | null
+  status: PaymentStatus
+  providerOrderRef: string | null
+  // Chỉ có ở lần thử còn PENDING -- phiên của lần thử đã chốt thì bên cổng đã đóng.
   checkoutUrl: string | null
   paidAt: string | null
-  // Plan đã áp dụng cho hóa đơn (SUBSCRIPTION/SUBSCRIPTION_REQUEST) -- null nếu chưa resolve được
-  // hoặc hóa đơn loại TOKEN_PURCHASE.
-  resolvedPlanId: string | null
-  // Hạn mức USD từng loại quota gắn với hóa đơn -- rỗng nếu hóa đơn cũ trước khi có field này hoặc
-  // chưa resolve được plan (vd còn PENDING).
-  quotaItems: InvoiceQuotaItem[]
+  createdAt: string | null
 }
 
-export type InvoicePage = {
-  content: Invoice[]
+export type Order = {
+  id: string
+  schoolId: string | null
+  type: OrderType
+  description: string | null
+  subtotalAmountVnd: number | null
+  totalAmountVnd: number | null
+  chargedFeeVnd: number | null
+  discountAmountVnd: number | null
+  status: OrderStatus
+  createdAt: string | null
+  updatedAt: string | null
+  expiresAt: string | null
+  items: OrderItem[] | null
+  // NULL khi đơn chưa thu được tiền -- chỉ đơn SUCCESS mới được phát hóa đơn.
+  invoice: OrderInvoice | null
+  // Mới nhất trước, rỗng khi trường chưa bấm thanh toán lần nào.
+  payments: Payment[]
+}
+
+export type OrderPage = {
+  content: Order[]
   page: number
   size: number
   totalElements: number
@@ -132,14 +151,15 @@ export type InvoicePage = {
 // Sổ audit "nguyên nhân nợ hạn mức AI" của chính trường mình -- xem ViewSchoolDebtEventsUseCase.
 export type SchoolDebtEvent = {
   id: string
+  schoolId: string
   subscriptionId: string
   eventType: SchoolDebtEventType
   quotaType: QuotaType
   triggerExamSessionId: string | null
-  triggerAmountUsd: number | null
-  totalAllocatedUsd: number
-  usedQuantityUsd: number
-  overageUsd: number
+  triggerAmountVnd: number | null
+  totalAllocatedVnd: number
+  usedAmountVnd: number
+  overageVnd: number
   occurredAt: string | null
 }
 
@@ -156,6 +176,9 @@ export type SchoolDebtEventPage = {
 // ràng buộc chữ ký không được phép mỗi nơi tự hiểu một kiểu.
 export type { PaymentLink, PaymentMethod } from '@/shared/payment/types'
 
+// Số tiền VND người dùng muốn nạp thêm cho từng ví hạn mức -- chỉ là tiện ích chia nhỏ lúc nhập
+// liệu, lúc đặt đơn cả hai được CỘNG LẠI thành một khoản creditAmountVnd duy nhất nạp vào
+// SchoolBalance chung của trường (BE không có khái niệm nạp riêng theo từng loại quota).
 export type TokenTopUpState = Record<QuotaType, number>
 
 export type DistributionMode = 'AUTO' | 'MANUAL'
@@ -164,18 +187,26 @@ export type QuotaUserAllocation = {
   userId: string
   fullName: string | null
   quotaType: QuotaType
-  allocatedQuantity: number
-  usedQuantity: number
+  allocatedAmountVnd: number
+  usedAmountVnd: number
+}
+
+export type QuotaUserAllocationPool = {
+  id: string
+  schoolSubscriptionId: string
+  quotaType: QuotaType
+  totalAllocatedAmountVnd: number
+  usedAmountVnd: number
 }
 
 export type QuotaUserAllocationSummary = {
-  pool: SubscriptionQuota
+  pool: QuotaUserAllocationPool
   allocations: QuotaUserAllocation[]
 }
 
 export type UserQuotaAmount = {
   userId: string
-  amount: number
+  amountVnd: number
 }
 
 export type AllocateQuotaPayload = {
@@ -241,6 +272,16 @@ export function formatMinutes(minutes?: number | null) {
   return `${Math.round(minutes)} phút`
 }
 
+const PERIOD_LABELS: Record<SubscriptionPlanPeriod, string> = {
+  DAY: 'ngày',
+  MONTH: 'tháng',
+  YEAR: 'năm',
+}
+
+export function formatPlanPeriod(periodType: SubscriptionPlanPeriod, periodCount: number) {
+  return `${periodCount} ${PERIOD_LABELS[periodType]}`
+}
+
 const VN_TIMEZONE_OFFSET_MS = 7 * 60 * 60 * 1000
 
 export function daysUntil(value?: string | null) {
@@ -276,8 +317,8 @@ export function getSubscriptionStatusDisplay(
   }
 
   if (status === 'ACTIVE') {
-    // Đã bấm Hủy nhưng gói không cắt ngay — dùng bình thường tới hết endDate (kiểu Claude), chỉ là
-    // sẽ không tự gia hạn nữa.
+    // Đã bấm Hủy nhưng gói không cắt ngay — dùng bình thường tới hết endDate, chỉ là sẽ không tự
+    // gia hạn nữa.
     if (cancelledAt) {
       return { label: 'Sẽ hết hạn (đã hủy)', tone: 'neutral' as const }
     }
@@ -298,9 +339,9 @@ export function getSubscriptionStatusDisplay(
   return { label: 'Đã hủy', tone: 'neutral' as const }
 }
 
-export function getInvoiceStatusDisplay(status: InvoiceStatus) {
-  if (status === 'PAID') {
-    return { label: 'Đã thanh toán', tone: 'success' as const }
+export function getOrderStatusDisplay(status: OrderStatus) {
+  if (status === 'SUCCESS') {
+    return { label: 'Thành công', tone: 'success' as const }
   }
 
   if (status === 'PENDING') {
@@ -309,6 +350,10 @@ export function getInvoiceStatusDisplay(status: InvoiceStatus) {
 
   if (status === 'CANCELLED') {
     return { label: 'Đã hủy', tone: 'neutral' as const }
+  }
+
+  if (status === 'EXPIRED') {
+    return { label: 'Đã hết hạn', tone: 'neutral' as const }
   }
 
   return { label: 'Thất bại', tone: 'danger' as const }
@@ -326,16 +371,16 @@ export function getDebtEventDisplay(eventType: SchoolDebtEventType) {
   return { label: 'Đã hết nợ', tone: 'success' as const }
 }
 
-// overageUsd = usedQuantityUsd - totalAllocatedUsd (xem SchoolDebtNotificationService.logDebtEvent) --
-// dương nghĩa là đang vượt hạn mức, âm nghĩa là đã hết nợ và còn dư bấy nhiêu USD hạn mức.
-export function getOverageDisplay(overageUsd: number) {
-  if (overageUsd > 0) {
-    return { label: `Vượt ${formatUsd(overageUsd)}`, tone: 'danger' as const }
+// overageVnd = usedAmountVnd - totalAllocatedVnd (xem SchoolDebtNotificationService.logDebtEvent) --
+// dương nghĩa là đang vượt hạn mức, âm nghĩa là đã hết nợ và còn dư bấy nhiêu VND hạn mức.
+export function getOverageDisplay(overageVnd: number) {
+  if (overageVnd > 0) {
+    return { label: `Vượt ${formatVnd(overageVnd)}`, tone: 'danger' as const }
   }
 
-  if (overageUsd < 0) {
-    return { label: `Còn dư ${formatUsd(Math.abs(overageUsd))}`, tone: 'success' as const }
+  if (overageVnd < 0) {
+    return { label: `Còn dư ${formatVnd(Math.abs(overageVnd))}`, tone: 'success' as const }
   }
 
-  return { label: formatUsd(0), tone: 'neutral' as const }
+  return { label: formatVnd(0), tone: 'neutral' as const }
 }

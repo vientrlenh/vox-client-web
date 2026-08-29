@@ -2,7 +2,6 @@ import { CreditCard } from 'lucide-react'
 import { PaymentMethodField } from '@/shared/payment/PaymentMethodField'
 import { PAYMENT_METHOD_LABELS } from '@/shared/payment/types'
 import {
-  formatUsd,
   formatVnd,
   QUOTA_LABELS,
   QUOTA_TYPES,
@@ -57,7 +56,7 @@ export function PaymentConfirmDialog({
         <div className="mt-5 rounded-2xl border border-slate-200 p-4.5">
           <div className="flex items-baseline justify-between">
             <span className="text-[15px] font-extrabold text-blue-950">Gói {plan.name}</span>
-            <span className="text-xl font-extrabold text-indigo-600">{formatVnd(plan.pricePerYear)}</span>
+            <span className="text-xl font-extrabold text-indigo-600">{formatVnd(plan.priceVnd)}</span>
           </div>
           <div className="mt-3.5 grid gap-2.5 border-t border-slate-100 pt-3.5">
             {QUOTA_TYPES.map((quotaType) => {
@@ -66,7 +65,7 @@ export function PaymentConfirmDialog({
                 <div className="flex justify-between text-[13px]" key={quotaType}>
                   <span className="text-slate-500">{QUOTA_LABELS[quotaType]}</span>
                   <span className="font-bold text-slate-900">
-                    {formatUsd(quota?.includedQuantity)}
+                    {formatVnd(quota?.includedAmountVnd)}
                   </span>
                 </div>
               )

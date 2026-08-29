@@ -12,10 +12,12 @@ export const quotaAllocationQueryKeys = {
   practice: ['quota-allocation', 'practice'] as const,
 }
 
+// Không có fullName ở QuotaUserAllocationSummaryResponse (BE) -- ví hạn mức chỉ biết userId, chưa
+// join sang hồ sơ người dùng. fullName luôn null cho tới khi có API riêng bổ sung tên hiển thị.
 async function fetchClassTestQuotaAllocations(): Promise<QuotaUserAllocationSummary> {
   const schoolId = requireSchoolId()
   const response = await apiClient.get<ApiResponse<QuotaUserAllocationSummary>>(
-    `/v1/schools/${schoolId}/teachers/class-test-quota`,
+    `/v1/subscriptions/schools/${schoolId}/teachers/exam-quota`,
   )
   return response.data.data
 }
@@ -23,7 +25,7 @@ async function fetchClassTestQuotaAllocations(): Promise<QuotaUserAllocationSumm
 async function fetchPracticeQuotaAllocations(): Promise<QuotaUserAllocationSummary> {
   const schoolId = requireSchoolId()
   const response = await apiClient.get<ApiResponse<QuotaUserAllocationSummary>>(
-    `/v1/schools/${schoolId}/students/practice-quota`,
+    `/v1/subscriptions/schools/${schoolId}/students/practice-quota`,
   )
   return response.data.data
 }

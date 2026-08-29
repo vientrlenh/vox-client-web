@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
 
 export type ExamTokenEstimate = {
-  estimatedCostUsd: number
+  estimatedCostVnd: number
 }
 
 export const examTokenEstimateQueryKeys = {
@@ -12,7 +12,7 @@ export const examTokenEstimateQueryKeys = {
 const EXAM_TOKEN_ESTIMATE_QUERY = `
   query ExamTokenEstimate($examId: ID!) {
     examTokenEstimate(examId: $examId) {
-      estimatedCostUsd
+      estimatedCostVnd
     }
   }
 `
@@ -48,13 +48,13 @@ export function useExamTokenEstimateQuery(examId: string | undefined) {
  * client chỉ áp một tỉ lệ.
  */
 export function scaleEstimateByMaxAttempt(
-  estimatedCostUsd: number | undefined,
+  estimatedCostVnd: number | undefined,
   savedMaxAttempt: number | null | undefined,
   nextMaxAttempt: number,
 ): number | undefined {
-  if (estimatedCostUsd == null) {
+  if (estimatedCostVnd == null) {
     return undefined
   }
   const saved = savedMaxAttempt && savedMaxAttempt > 0 ? savedMaxAttempt : 1
-  return (estimatedCostUsd / saved) * nextMaxAttempt
+  return (estimatedCostVnd / saved) * nextMaxAttempt
 }

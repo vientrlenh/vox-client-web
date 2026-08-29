@@ -15,9 +15,9 @@ export function TeacherQuotaUsagePage() {
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <MyQuotaAllocationCard
           allocation={myClassTestQuotaAllocationQuery.data}
-          icon={QUOTA_ICONS.CLASS_TEST}
+          icon={QUOTA_ICONS.EXAM}
           isLoading={myClassTestQuotaAllocationQuery.isLoading}
-          label={QUOTA_LABELS.CLASS_TEST}
+          label={QUOTA_LABELS.EXAM}
         />
       </div>
     </section>

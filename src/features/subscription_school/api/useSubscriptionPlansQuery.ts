@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
-import type { SubscriptionPlanPage } from '../types'
+import type { SubscriptionPlan, SubscriptionPlanPage } from '../types'
 
 export const subscriptionPlanQueryKeys = {
   all: ['school-visible-plans'] as const,
@@ -11,19 +11,22 @@ const SUBSCRIPTION_PLANS_QUERY = `
   query SubscriptionPlans($page: Int, $size: Int) {
     subscriptionPlans(page: $page, size: $size) {
       content {
-        id
-        name
-        tagline
-        pricePerYear
-        validityDays
-        maxTimePerAttemptMin
-        popular
-        status
-        quotas {
+        isMostPopular
+        subscription {
           id
-          quotaType
-          includedQuantity
-          tokenUnitPrice
+          name
+          tagline
+          priceVnd
+          periodType
+          periodCount
+          maxTimePerAttemptMin
+          status
+          replacedByPlanId
+          quotas {
+            id
+            quotaType
+            includedAmountVnd
+          }
         }
       }
       page
@@ -34,14 +37,33 @@ const SUBSCRIPTION_PLANS_QUERY = `
   }
 `
 
+type SubscriptionPlanListItemDto = {
+  isMostPopular: boolean
+  subscription: SubscriptionPlan
+}
+
+type SubscriptionPlanPageDto = {
+  content: SubscriptionPlanListItemDto[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
 async function fetchSubscriptionPlans(page: number, size: number): Promise<SubscriptionPlanPage> {
-  const data = await graphQLRequest<{ subscriptionPlans: SubscriptionPlanPage }>(SUBSCRIPTION_PLANS_QUERY, {
+  const data = await graphQLRequest<{ subscriptionPlans: SubscriptionPlanPageDto }>(SUBSCRIPTION_PLANS_QUERY, {
     page,
     size,
   })
 
   const response = data.subscriptionPlans
-  return response
+  return {
+    ...response,
+    // BE bọc mỗi gói trong một dòng danh sách (SubscriptionPlanListItem) vì "phổ biến nhất" là kết
+    // quả so sánh giữa các gói trong danh sách, không phải thuộc tính của riêng một gói -- gộp phẳng
+    // lại thành SubscriptionPlan[] kèm isMostPopular cho tiện dùng ở UI.
+    content: response.content.map((item) => ({ ...item.subscription, isMostPopular: item.isMostPopular })),
+  }
 }
 
 export function useSubscriptionPlansQuery(page: number, size: number) {

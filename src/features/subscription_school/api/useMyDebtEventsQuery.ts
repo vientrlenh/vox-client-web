@@ -12,14 +12,15 @@ const MY_DEBT_EVENTS_QUERY = `
     schoolDebtEvents(schoolId: $schoolId, page: $page, size: $size) {
       content {
         id
+        schoolId
         subscriptionId
         eventType
         quotaType
         triggerExamSessionId
-        triggerAmountUsd
-        totalAllocatedUsd
-        usedQuantityUsd
-        overageUsd
+        triggerAmountVnd
+        totalAllocatedVnd
+        usedAmountVnd
+        overageVnd
         occurredAt
       }
       page
