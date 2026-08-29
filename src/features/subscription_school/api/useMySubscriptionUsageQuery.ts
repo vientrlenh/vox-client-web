@@ -10,10 +10,10 @@ const MY_SUBSCRIPTION_USAGE_QUERY = `
   query MySubscriptionUsage($schoolId: ID!) {
     subscriptionUsage(schoolId: $schoolId) {
       id
-      subscriptionId
+      schoolSubscriptionId
       quotaType
-      totalAllocated
-      usedQuantity
+      totalAllocatedAmountVnd
+      usedAmountVnd
     }
   }
 `

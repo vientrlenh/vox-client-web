@@ -1,5 +1,5 @@
-function formatUsd(value: number) {
-  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(value)}`
+function formatVnd(value: number) {
+  return `${new Intl.NumberFormat('vi-VN').format(Math.round(value))} ₫`
 }
 
 function getUsageBarColor(pct: number) {
@@ -18,10 +18,10 @@ type UsageProgressBarProps = {
   used: number
 }
 
-// Thanh hiển thị mức dùng hạn mức kiểu Claude: % là số chính (to, đậm), số USD đã
+// Thanh hiển thị mức dùng hạn mức kiểu Claude: % là số chính (to, đậm), số VND đã
 // dùng/tổng chỉ là dòng phụ nhỏ bên dưới. Dùng chung cho mọi nơi hiển thị hạn mức
-// subscription (school admin, giáo viên/học sinh, system admin) để không copy-paste
-// lại cùng 1 khối markup progress bar ở nhiều feature.
+// subscription (school admin, giáo viên/học sinh) để không copy-paste lại cùng 1 khối
+// markup progress bar ở nhiều feature.
 export function UsageProgressBar({ isLoading, total, used }: UsageProgressBarProps) {
   if (isLoading) {
     return <p className="mt-3 text-sm font-semibold text-slate-400">Đang tải...</p>
@@ -41,7 +41,7 @@ export function UsageProgressBar({ isLoading, total, used }: UsageProgressBarPro
         <div className="h-full rounded-full" style={{ backgroundColor: color, width: `${pct}%` }} />
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        {formatUsd(used)} / {formatUsd(total)} đã dùng
+        {formatVnd(used)} / {formatVnd(total)} đã dùng
       </p>
     </div>
   )

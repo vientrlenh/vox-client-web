@@ -1,26 +1,32 @@
 import { useState, type ReactNode } from 'react'
 import { ExternalLink, Inbox, ReceiptText } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { formatDateTime, formatVnd, getInvoiceStatusDisplay, type Invoice } from '../types'
+import { formatDateTime, formatVnd, getOrderStatusDisplay, type Order, type OrderType } from '../types'
 import { InvoiceDetailDialog } from './InvoiceDetailDialog'
 
 type InvoicesTableProps = {
   errorMessage?: string
   footer?: ReactNode
-  invoices: Invoice[]
+  orders: Order[]
   isError: boolean
   isLoading: boolean
   onRetry: () => void
 }
 
-const SOURCE_LABELS: Record<Invoice['sourceType'], string> = {
-  SUBSCRIPTION: 'Gia hạn gói',
-  SUBSCRIPTION_REQUEST: 'Đăng ký / Nâng cấp gói',
-  TOKEN_PURCHASE: 'Mua token',
+const SOURCE_LABELS: Record<OrderType, string> = {
+  SUBSCRIPTION_REQUEST: 'Đăng ký gói',
+  SUBSCRIPTION_UPGRADE: 'Nâng cấp gói',
+  TOPUP: 'Nạp thêm số dư',
 }
 
-export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoading, onRetry }: InvoicesTableProps) {
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+// Lần thử thanh toán còn sống của một đơn -- payments trả về mới nhất trước, và tối đa một dòng
+// PENDING tại một thời điểm (xem Payment ở BE).
+function findPendingCheckoutUrl(order: Order) {
+  return order.payments.find((payment) => payment.status === 'PENDING')?.checkoutUrl ?? null
+}
+
+export function InvoicesTable({ errorMessage, footer, orders, isError, isLoading, onRetry }: InvoicesTableProps) {
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -61,7 +67,7 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
               </tr>
             ) : null}
 
-            {!isLoading && !isError && invoices.length === 0 ? (
+            {!isLoading && !isError && orders.length === 0 ? (
               <tr>
                 <td className="px-6 py-14 text-center" colSpan={7}>
                   <Inbox aria-hidden="true" className="mx-auto size-9 text-slate-300" />
@@ -71,23 +77,30 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
             ) : null}
 
             {!isLoading && !isError
-              ? invoices.map((invoice) => {
-                  const statusDisplay = getInvoiceStatusDisplay(invoice.status)
+              ? orders.map((order) => {
+                  const statusDisplay = getOrderStatusDisplay(order.status)
+                  const pendingCheckoutUrl = order.status === 'PENDING' ? findPendingCheckoutUrl(order) : null
 
                   return (
-                    <tr className="border-b border-slate-100" key={invoice.id}>
-                      <td className="px-6 py-4 font-mono text-sm font-bold text-slate-900">{invoice.invoiceNumber}</td>
-                      <td className="px-4 py-4 text-sm text-slate-600">{formatDateTime(invoice.paidAt)}</td>
-                      <td className="px-4 py-4 text-sm font-bold text-indigo-700">{SOURCE_LABELS[invoice.sourceType]}</td>
-                      <td className="px-4 py-4 text-sm font-extrabold text-slate-900">{formatVnd(invoice.amount)}</td>
+                    <tr className="border-b border-slate-100" key={order.id}>
+                      <td className="px-6 py-4 font-mono text-sm font-bold text-slate-900">
+                        {order.invoice?.invoiceNumber ?? '—'}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {formatDateTime(order.invoice?.issueDate ?? order.createdAt)}
+                      </td>
+                      <td className="px-4 py-4 text-sm font-bold text-indigo-700">{SOURCE_LABELS[order.type]}</td>
+                      <td className="px-4 py-4 text-sm font-extrabold text-slate-900">
+                        {formatVnd(order.totalAmountVnd)}
+                      </td>
                       <td className="px-4 py-4">
                         <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
                       </td>
                       <td className="px-4 py-4 text-right">
-                        {invoice.status === 'PENDING' && invoice.checkoutUrl ? (
+                        {pendingCheckoutUrl ? (
                           <a
                             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50"
-                            href={invoice.checkoutUrl}
+                            href={pendingCheckoutUrl}
                             rel="noreferrer"
                             target="_blank"
                           >
@@ -101,7 +114,7 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
                       <td className="px-4 py-4 text-right">
                         <button
                           className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50"
-                          onClick={() => setSelectedInvoice(invoice)}
+                          onClick={() => setSelectedOrder(order)}
                           type="button"
                         >
                           <ReceiptText aria-hidden="true" className="size-3.5" />
@@ -118,7 +131,7 @@ export function InvoicesTable({ errorMessage, footer, invoices, isError, isLoadi
 
       {footer}
 
-      <InvoiceDetailDialog invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
+      <InvoiceDetailDialog onClose={() => setSelectedOrder(null)} order={selectedOrder} />
     </div>
   )
 }

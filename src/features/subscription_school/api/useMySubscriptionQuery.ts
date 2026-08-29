@@ -11,7 +11,7 @@ const MY_SUBSCRIPTION_QUERY = `
     schoolSubscription(schoolId: $schoolId) {
       id
       schoolId
-      planId
+      subscriptionPlanId
       startDate
       endDate
       status
@@ -23,17 +23,16 @@ const MY_SUBSCRIPTION_QUERY = `
         id
         name
         tagline
-        pricePerYear
-        validityDays
+        priceVnd
+        periodType
+        periodCount
         maxTimePerAttemptMin
-        popular
         status
-        serviceFeeRatio
+        replacedByPlanId
         quotas {
           id
           quotaType
-          includedQuantity
-          tokenUnitPrice
+          includedAmountVnd
         }
       }
     }

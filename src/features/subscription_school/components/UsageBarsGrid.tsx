@@ -10,11 +10,11 @@ export function UsageBarsGrid({ isLoading, usage }: UsageBarsGridProps) {
   const usageByType = new Map(usage.map((item) => [item.quotaType, item]))
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {QUOTA_TYPES.map((quotaType) => {
         const item = usageByType.get(quotaType)
-        const total = item?.totalAllocated ?? 0
-        const used = item?.usedQuantity ?? 0
+        const total = item?.totalAllocatedAmountVnd ?? 0
+        const used = item?.usedAmountVnd ?? 0
         const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
         const warn = pct >= 80
         const Icon = QUOTA_ICONS[quotaType]

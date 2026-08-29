@@ -3,7 +3,7 @@ import { Inbox } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import {
   formatDateTime,
-  formatUsd,
+  formatVnd,
   getDebtEventDisplay,
   getOverageDisplay,
   QUOTA_LABELS,
@@ -29,8 +29,8 @@ export function DebtEventsTable({ errorMessage, events, footer, isError, isLoadi
               <th className="px-6 py-3.5">Thời điểm</th>
               <th className="px-4 py-3.5">Hạn mức</th>
               <th className="px-4 py-3.5">Sự kiện</th>
-              <th className="px-4 py-3.5">Kích hoạt (USD)</th>
-              <th className="px-4 py-3.5">Đã dùng / Hạn mức (USD)</th>
+              <th className="px-4 py-3.5">Kích hoạt (VNĐ)</th>
+              <th className="px-4 py-3.5">Đã dùng / Hạn mức (VNĐ)</th>
               <th className="px-4 py-3.5">Chênh lệch</th>
             </tr>
           </thead>
@@ -70,7 +70,7 @@ export function DebtEventsTable({ errorMessage, events, footer, isError, isLoadi
             {!isLoading && !isError
               ? events.map((event) => {
                   const eventDisplay = getDebtEventDisplay(event.eventType)
-                  const overageDisplay = getOverageDisplay(event.overageUsd)
+                  const overageDisplay = getOverageDisplay(event.overageVnd)
 
                   return (
                     <tr className="border-b border-slate-100" key={event.id}>
@@ -80,10 +80,10 @@ export function DebtEventsTable({ errorMessage, events, footer, isError, isLoadi
                         <StatusBadge label={eventDisplay.label} tone={eventDisplay.tone} />
                       </td>
                       <td className="px-4 py-4 text-sm font-semibold text-slate-900">
-                        {event.triggerAmountUsd === null ? '-' : formatUsd(event.triggerAmountUsd)}
+                        {event.triggerAmountVnd === null ? '-' : formatVnd(event.triggerAmountVnd)}
                       </td>
                       <td className="px-4 py-4 text-sm font-semibold text-slate-900">
-                        {formatUsd(event.usedQuantityUsd)} / {formatUsd(event.totalAllocatedUsd)}
+                        {formatVnd(event.usedAmountVnd)} / {formatVnd(event.totalAllocatedVnd)}
                       </td>
                       <td className="px-4 py-4">
                         <StatusBadge label={overageDisplay.label} tone={overageDisplay.tone} />

@@ -3,22 +3,22 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { CircleCheck, CircleX, Clock, Loader2 } from 'lucide-react'
 import { useAppSelector } from '@/app/store/hooks'
-import { clearPendingInvoice, readPendingInvoice } from '@/shared/payment/checkout'
-import { invoiceQueryKeys, useInvoicesQuery } from '../api/useInvoicesQuery'
+import { clearPendingOrder, readPendingOrder } from '@/shared/payment/checkout'
+import { myOrdersQueryKeys, useMyOrdersQuery } from '../api/useMyOrdersQuery'
 import { mySubscriptionQueryKeys } from '../api/useMySubscriptionQuery'
 import { mySubscriptionUsageQueryKeys } from '../api/useMySubscriptionUsageQuery'
-import type { InvoiceStatus } from '../types'
+import type { OrderStatus } from '../types'
 
 type Outcome = 'cancelled' | 'checking' | 'failed' | 'pending' | 'success'
 
-function outcomeFromInvoiceStatus(status: InvoiceStatus): Outcome {
-  if (status === 'PAID') {
+function outcomeFromOrderStatus(status: OrderStatus): Outcome {
+  if (status === 'SUCCESS') {
     return 'success'
   }
   if (status === 'CANCELLED') {
     return 'cancelled'
   }
-  if (status === 'FAILED') {
+  if (status === 'FAILED' || status === 'EXPIRED') {
     return 'failed'
   }
   return 'pending'
@@ -32,8 +32,8 @@ const PATH_OUTCOMES: Record<string, Outcome> = {
   '/payment/success': 'success',
 }
 
-// Dùng làm outcome hiển thị tức thời (và fallback khi không lưu được invoiceId lúc rời trang, hoặc
-// không tải được danh sách hóa đơn để đối soát) — đoán tạm từ đường dẫn/query param. Kém tin cậy hơn
+// Dùng làm outcome hiển thị tức thời (và fallback khi không lưu được orderId lúc rời trang, hoặc
+// không tải được lịch sử đơn để đối soát) — đoán tạm từ đường dẫn/query param. Kém tin cậy hơn
 // trạng thái thật từ BE vì đây chỉ là thứ cổng thanh toán nói trên URL, chưa qua xác thực nào; trạng
 // thái thật (chốt bởi webhook hoặc job đối soát định kỳ phía BE) sẽ ghi đè ngay khi poll thấy được.
 function resolveOutcomeFromUrl(pathname: string, searchParams: URLSearchParams): Outcome {
@@ -73,7 +73,7 @@ const OUTCOME_DISPLAY: Record<Outcome, { icon: typeof CircleCheck; iconClass: st
   cancelled: {
     icon: CircleX,
     iconClass: 'bg-red-50 text-red-600',
-    message: 'Bạn đã hủy giao dịch trên cổng thanh toán. Gói / token chưa được kích hoạt hoặc cộng thêm.',
+    message: 'Bạn đã hủy giao dịch trên cổng thanh toán. Gói / số dư chưa được kích hoạt hoặc cộng thêm.',
     title: 'Đã hủy thanh toán',
   },
   checking: {
@@ -85,7 +85,7 @@ const OUTCOME_DISPLAY: Record<Outcome, { icon: typeof CircleCheck; iconClass: st
   failed: {
     icon: CircleX,
     iconClass: 'bg-red-50 text-red-600',
-    message: 'Giao dịch không thành công. Gói / token chưa được kích hoạt hoặc cộng thêm. Vui lòng thử lại.',
+    message: 'Giao dịch không thành công. Gói / số dư chưa được kích hoạt hoặc cộng thêm. Vui lòng thử lại.',
     title: 'Thanh toán thất bại',
   },
   pending: {
@@ -98,7 +98,7 @@ const OUTCOME_DISPLAY: Record<Outcome, { icon: typeof CircleCheck; iconClass: st
   success: {
     icon: CircleCheck,
     iconClass: 'bg-emerald-50 text-emerald-600',
-    message: 'Thanh toán thành công. Gói / token của trường sẽ được kích hoạt hoặc cộng thêm trong giây lát.',
+    message: 'Thanh toán thành công. Gói / số dư của trường sẽ được kích hoạt hoặc cộng thêm trong giây lát.',
     title: 'Thanh toán thành công',
   },
 }
@@ -113,10 +113,10 @@ type PaymentResultPageProps = {
 const SYSTEM_ADMIN_BACK_TO = '/system-admin/subscription'
 const SCHOOL_ADMIN_BACK_TO = '/school-admin/subscription'
 
-// Không còn endpoint đối soát chủ động một-lần phía BE (webhook và PendingInvoiceReconciler tự chốt
-// hóa đơn ở phía sau) — poll ngắn hạn danh sách hóa đơn gần nhất thay vào đó, để vẫn bắt kịp lúc BE
-// chốt xong mà không cần trang này tự gây ra một lần "chốt" nào.
-const RECENT_INVOICES_PAGE_SIZE = 5
+// Không có endpoint đối soát chủ động một-lần phía BE (webhook và PendingOrderReconciler tự chốt
+// đơn ở phía sau) — poll ngắn hạn lịch sử đơn gần nhất thay vào đó, để vẫn bắt kịp lúc BE chốt xong
+// mà không cần trang này tự gây ra một lần "chốt" nào.
+const RECENT_ORDERS_PAGE_SIZE = 5
 const POLL_INTERVAL_MS = 3000
 
 export function PaymentResultPage({ backTo }: PaymentResultPageProps) {
@@ -126,47 +126,47 @@ export function PaymentResultPage({ backTo }: PaymentResultPageProps) {
   const queryClient = useQueryClient()
   const user = useAppSelector((state) => state.auth.user)
 
-  // Đọc một lần lúc mount: goToCheckout() đã lưu invoiceId vào sessionStorage ngay trước khi rời
+  // Đọc một lần lúc mount: goToCheckout() đã lưu orderId vào sessionStorage ngay trước khi rời
   // trang. Poll liên tục theo chu kỳ cố định trong suốt vòng đời trang này (tối đa AUTO_REDIRECT_SECONDS
   // nhờ effect tự điều hướng đi bên dưới) thay vì tự tắt sớm — vài lần gọi thừa sau khi đã có kết quả
   // là chấp nhận được, đổi lại tránh phải suy luận thời điểm "dừng" bằng state phái sinh.
-  const [pendingInvoiceId] = useState(() => readPendingInvoice())
+  const [pendingOrderId] = useState(() => readPendingOrder())
   const [secondsLeft, setSecondsLeft] = useState(AUTO_REDIRECT_SECONDS)
 
-  const invoicesQuery = useInvoicesQuery(1, RECENT_INVOICES_PAGE_SIZE, {
-    enabled: Boolean(pendingInvoiceId),
+  const ordersQuery = useMyOrdersQuery(1, RECENT_ORDERS_PAGE_SIZE, {
+    enabled: Boolean(pendingOrderId),
     refetchInterval: POLL_INTERVAL_MS,
   })
 
-  const matchedInvoice = pendingInvoiceId
-    ? invoicesQuery.data?.content.find((invoice) => invoice.id === pendingInvoiceId)
+  const matchedOrder = pendingOrderId
+    ? ordersQuery.data?.content.find((order) => order.id === pendingOrderId)
     : undefined
 
-  const outcome: Outcome = matchedInvoice
-    ? outcomeFromInvoiceStatus(matchedInvoice.status)
-    : pendingInvoiceId && !invoicesQuery.isError
+  const outcome: Outcome = matchedOrder
+    ? outcomeFromOrderStatus(matchedOrder.status)
+    : pendingOrderId && !ordersQuery.isError
       ? 'checking'
       : resolveOutcomeFromUrl(pathname, searchParams)
 
   const resolvedBackTo =
     backTo ?? (user?.roles.includes('SYSTEM_ADMIN') ? SYSTEM_ADMIN_BACK_TO : SCHOOL_ADMIN_BACK_TO)
 
-  // Xóa invoiceId đã ghi nhớ ngay khi biết chắc kết quả (không còn PENDING): giữ lại thì lần thanh
-  // toán sau vào trang này sẽ đối chiếu nhầm hóa đơn cũ. Không đụng React state ở đây nên không kích
+  // Xóa orderId đã ghi nhớ ngay khi biết chắc kết quả (không còn PENDING): giữ lại thì lần thanh
+  // toán sau vào trang này sẽ đối chiếu nhầm đơn cũ. Không đụng React state ở đây nên không kích
   // hoạt render lại — chỉ dọn sessionStorage.
   useEffect(() => {
-    if (pendingInvoiceId && matchedInvoice && matchedInvoice.status !== 'PENDING') {
-      clearPendingInvoice()
+    if (pendingOrderId && matchedOrder && matchedOrder.status !== 'PENDING') {
+      clearPendingOrder()
     }
-    // Chỉ theo dõi status (giá trị nguyên thủy): matchedInvoice là object mới mỗi lần poll dù nội
+    // Chỉ theo dõi status (giá trị nguyên thủy): matchedOrder là object mới mỗi lần poll dù nội
     // dung không đổi, đưa cả object vào deps sẽ khiến effect chạy lại mỗi 3s vô ích.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchedInvoice?.status, pendingInvoiceId])
+  }, [matchedOrder?.status, pendingOrderId])
 
   useEffect(() => {
     void queryClient.invalidateQueries({ queryKey: mySubscriptionQueryKeys.all })
     void queryClient.invalidateQueries({ queryKey: mySubscriptionUsageQueryKeys.all })
-    void queryClient.invalidateQueries({ queryKey: invoiceQueryKeys.all })
+    void queryClient.invalidateQueries({ queryKey: myOrdersQueryKeys.all })
   }, [queryClient])
 
   // Nếu người dùng cứ đứng yên ở đây (vd kết quả vẫn "pending" chờ job đối soát định kỳ phía BE),

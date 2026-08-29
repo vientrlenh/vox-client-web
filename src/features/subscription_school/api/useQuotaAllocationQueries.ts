@@ -18,6 +18,9 @@ export const quotaAllocationQueryKeys = {
 //
 // Và hạn mức của giáo viên nay là `exam-quota`, KHÔNG còn là `class-test-quota`: backend đã gộp
 // bài kiểm tra lớp vào cùng ví EXAM (AllocateClassTestQuotaCommand -> AllocateExamQuotaCommand).
+//
+// Không có fullName ở QuotaUserAllocationSummaryResponse (BE) -- ví hạn mức chỉ biết userId, chưa
+// join sang hồ sơ người dùng. fullName luôn null cho tới khi có API riêng bổ sung tên hiển thị.
 async function fetchClassTestQuotaAllocations(): Promise<QuotaUserAllocationSummary> {
   const schoolId = requireSchoolId()
   const response = await apiClient.get<ApiResponse<QuotaUserAllocationSummary>>(

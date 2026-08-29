@@ -1,40 +1,40 @@
 import type { PaymentLink } from './types'
 
 /**
- * invoiceId của hóa đơn vừa được tạo link, lưu lại ngay trước khi rời trang sang cổng thanh toán.
+ * orderId của đơn vừa được tạo link, lưu lại ngay trước khi rời trang sang cổng thanh toán.
  *
- * Phải tự lưu chứ không đọc lại được từ URL quay về: trang kết quả thanh toán cần invoiceId để đối
- * chiếu với danh sách hóa đơn tải từ BE, trong khi SePay redirect về success_url/error_url/cancel_url
- * trần không kèm tham số nào, còn PayOS chỉ gắn orderCode — mã riêng của PayOS, chỉ duy nhất trong
- * phạm vi cổng đó nên không tra ngược ra hóa đơn khi hệ thống có nhiều cổng.
+ * Phải tự lưu chứ không đọc lại được từ URL quay về: trang kết quả thanh toán cần orderId để đối
+ * chiếu với lịch sử đơn (myOrders) tải từ BE, trong khi SePay redirect về success_url/error_url/
+ * cancel_url trần không kèm tham số nào, còn PayOS chỉ gắn orderCode — mã riêng của PayOS, chỉ duy
+ * nhất trong phạm vi cổng đó nên không tra ngược ra đơn khi hệ thống có nhiều cổng.
  *
  * sessionStorage chứ không phải state trong bộ nhớ: cả hai cổng đều điều hướng full-page ra khỏi
  * ứng dụng, nên mọi state React đều mất trước khi người dùng quay lại.
  */
-const PENDING_INVOICE_STORAGE_KEY = 'vox.payment.pendingInvoiceId'
+const PENDING_ORDER_STORAGE_KEY = 'vox.payment.pendingOrderId'
 
-export function rememberPendingInvoice(invoiceId: string) {
+export function rememberPendingOrder(orderId: string) {
   try {
-    sessionStorage.setItem(PENDING_INVOICE_STORAGE_KEY, invoiceId)
+    sessionStorage.setItem(PENDING_ORDER_STORAGE_KEY, orderId)
   } catch {
     // Trình duyệt có thể chặn sessionStorage (Safari private mode). Mất khả năng đối soát chủ động
-    // ở trang kết quả là chấp nhận được: webhook và job đối soát định kỳ phía BE vẫn chốt hóa đơn.
+    // ở trang kết quả là chấp nhận được: webhook và job đối soát định kỳ phía BE vẫn chốt đơn.
   }
 }
 
-export function readPendingInvoice() {
+export function readPendingOrder() {
   try {
-    return sessionStorage.getItem(PENDING_INVOICE_STORAGE_KEY)
+    return sessionStorage.getItem(PENDING_ORDER_STORAGE_KEY)
   } catch {
     return null
   }
 }
 
-export function clearPendingInvoice() {
+export function clearPendingOrder() {
   try {
-    sessionStorage.removeItem(PENDING_INVOICE_STORAGE_KEY)
+    sessionStorage.removeItem(PENDING_ORDER_STORAGE_KEY)
   } catch {
-    // Xem ghi chú ở rememberPendingInvoice.
+    // Xem ghi chú ở rememberPendingOrder.
   }
 }
 
@@ -44,10 +44,10 @@ export function clearPendingInvoice() {
  */
 export function goToCheckout(link: PaymentLink) {
   // Lưu trước khi điều hướng: sau lệnh submit/gán href thì không còn cơ hội chạy code nào nữa.
-  rememberPendingInvoice(link.invoiceId)
+  rememberPendingOrder(link.orderId)
 
   if (link.action === 'REDIRECT') {
-    window.location.href = link.actionUrl
+    window.location.href = link.checkoutUrl
     return
   }
 
@@ -61,7 +61,7 @@ export function goToCheckout(link: PaymentLink) {
 function submitCheckoutForm(link: PaymentLink) {
   const form = document.createElement('form')
   form.method = 'POST'
-  form.action = link.actionUrl
+  form.action = link.checkoutUrl
   form.style.display = 'none'
 
   // Object.entries giữ nguyên thứ tự chèn với key dạng chuỗi, và JSON.parse cũng dựng object theo

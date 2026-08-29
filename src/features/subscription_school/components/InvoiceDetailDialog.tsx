@@ -1,32 +1,26 @@
 import { ExternalLink, Receipt, X } from 'lucide-react'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import {
-  formatDate,
-  formatDateTime,
-  formatUsd,
-  formatVnd,
-  getInvoiceStatusDisplay,
-  QUOTA_LABELS,
-  type Invoice,
-} from '../types'
+import { formatDate, formatDateTime, formatVnd, getOrderStatusDisplay, type Order, type OrderType } from '../types'
 
-const SOURCE_LABELS: Record<Invoice['sourceType'], string> = {
-  SUBSCRIPTION: 'Gia hạn gói',
-  SUBSCRIPTION_REQUEST: 'Đăng ký / Nâng cấp gói',
-  TOKEN_PURCHASE: 'Mua token',
+const SOURCE_LABELS: Record<OrderType, string> = {
+  SUBSCRIPTION_REQUEST: 'Đăng ký gói',
+  SUBSCRIPTION_UPGRADE: 'Nâng cấp gói',
+  TOPUP: 'Nạp thêm số dư',
 }
 
 type InvoiceDetailDialogProps = {
-  invoice: Invoice | null
+  order: Order | null
   onClose: () => void
 }
 
-export function InvoiceDetailDialog({ invoice, onClose }: InvoiceDetailDialogProps) {
-  if (!invoice) {
+export function InvoiceDetailDialog({ order, onClose }: InvoiceDetailDialogProps) {
+  if (!order) {
     return null
   }
 
-  const statusDisplay = getInvoiceStatusDisplay(invoice.status)
+  const statusDisplay = getOrderStatusDisplay(order.status)
+  const pendingCheckoutUrl =
+    order.status === 'PENDING' ? order.payments.find((payment) => payment.status === 'PENDING')?.checkoutUrl : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
@@ -51,7 +45,7 @@ export function InvoiceDetailDialog({ invoice, onClose }: InvoiceDetailDialogPro
         </div>
 
         <h2 className="mt-4 font-mono text-lg font-black text-blue-950" id="invoice-detail-title">
-          {invoice.invoiceNumber}
+          {order.invoice?.invoiceNumber ?? 'Chưa có hóa đơn'}
         </h2>
         <div className="mt-2">
           <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
@@ -60,39 +54,47 @@ export function InvoiceDetailDialog({ invoice, onClose }: InvoiceDetailDialogPro
         <div className="mt-5 grid gap-3.5 rounded-2xl border border-slate-200 p-4.5 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-slate-500">Loại</span>
-            <span className="font-bold text-indigo-700">{SOURCE_LABELS[invoice.sourceType]}</span>
+            <span className="font-bold text-indigo-700">{SOURCE_LABELS[order.type]}</span>
+          </div>
+          {order.subtotalAmountVnd != null ? (
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3.5">
+              <span className="text-slate-500">Tạm tính</span>
+              <span className="font-bold text-slate-900">{formatVnd(order.subtotalAmountVnd)}</span>
+            </div>
+          ) : null}
+          {order.chargedFeeVnd ? (
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3.5">
+              <span className="text-slate-500">Phí dịch vụ</span>
+              <span className="font-bold text-slate-900">+{formatVnd(order.chargedFeeVnd)}</span>
+            </div>
+          ) : null}
+          {order.discountAmountVnd ? (
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3.5">
+              <span className="text-slate-500">Giảm trừ</span>
+              <span className="font-bold text-emerald-600">-{formatVnd(order.discountAmountVnd)}</span>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between border-t border-slate-100 pt-3.5">
+            <span className="text-slate-500">Tổng tiền</span>
+            <span className="text-lg font-extrabold text-slate-900">{formatVnd(order.totalAmountVnd)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-slate-100 pt-3.5">
-            <span className="text-slate-500">Số tiền</span>
-            <span className="text-lg font-extrabold text-slate-900">{formatVnd(invoice.amount)}</span>
+            <span className="text-slate-500">Ngày tạo đơn</span>
+            <span className="font-bold text-slate-900">{formatDate(order.createdAt)}</span>
           </div>
-          <div className="flex items-center justify-between border-t border-slate-100 pt-3.5">
-            <span className="text-slate-500">Ngày tạo</span>
-            <span className="font-bold text-slate-900">{formatDate(invoice.issueDate)}</span>
-          </div>
-          <div className="flex items-center justify-between border-t border-slate-100 pt-3.5">
-            <span className="text-slate-500">Ngày thanh toán</span>
-            <span className="font-bold text-slate-900">{formatDateTime(invoice.paidAt)}</span>
-          </div>
+          {order.invoice ? (
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3.5">
+              <span className="text-slate-500">Ngày phát hành hóa đơn</span>
+              <span className="font-bold text-slate-900">{formatDateTime(order.invoice.issueDate)}</span>
+            </div>
+          ) : null}
         </div>
 
-        {invoice.quotaItems.length > 0 ? (
-          <div className="mt-5 grid gap-2.5 rounded-2xl border border-slate-200 p-4.5 text-sm">
-            <p className="font-bold text-slate-700">Hạn mức</p>
-            {invoice.quotaItems.map((item) => (
-              <div className="flex items-center justify-between" key={item.quotaType}>
-                <span className="text-slate-500">{QUOTA_LABELS[item.quotaType]}</span>
-                <span className="font-bold text-slate-900">{formatUsd(item.amount)}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
         <div className="mt-5.5 flex gap-3">
-          {invoice.status === 'PENDING' && invoice.checkoutUrl ? (
+          {pendingCheckoutUrl ? (
             <a
               className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 text-sm font-black text-white transition hover:bg-indigo-700"
-              href={invoice.checkoutUrl}
+              href={pendingCheckoutUrl}
               rel="noreferrer"
               target="_blank"
             >
