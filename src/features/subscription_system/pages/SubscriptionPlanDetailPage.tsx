@@ -10,6 +10,7 @@ import {
   useSuspendSubscriptionMutation,
   useUnsuspendSubscriptionMutation,
 } from '../api/useSchoolSubscriptionMutations'
+import { useSchoolsWithOngoingExamQuery } from '../api/useSchoolsWithOngoingExamQuery'
 import { useSchoolSubscriptionsByPlanQuery } from '../api/useSchoolSubscriptionsQuery'
 import { useSubscriptionPlanQuery } from '../api/useSubscriptionPlansQuery'
 import { PlanEditorDrawer } from '../components/PlanEditorDrawer'
@@ -39,8 +40,8 @@ const STATUS_OPTIONS: Array<{ label: string; value: '' | SchoolSubscriptionStatu
 ]
 
 const QUOTA_HINTS: Record<QuotaType, string> = {
-  EXAM: 'ví EXAM',
-  PRACTICE: 'ví PRACTICE',
+  EXAM: 'Hạn mức kiểm tra',
+  PRACTICE: 'Hạn mức luyện tập cá nhân',
 }
 
 type StatProps = {
@@ -71,6 +72,7 @@ export function SubscriptionPlanDetailPage() {
 
   const planQuery = useSubscriptionPlanQuery(planId)
   const schoolsQuery = useSchoolSubscriptionsByPlanQuery(planId, { keyword, status }, page, PAGE_SIZE)
+  const ongoingExamQuery = useSchoolsWithOngoingExamQuery()
   const updateMutation = useUpdatePlanMutation()
   const suspendMutation = useSuspendSubscriptionMutation()
   const unsuspendMutation = useUnsuspendSubscriptionMutation()
@@ -78,6 +80,12 @@ export function SubscriptionPlanDetailPage() {
   const plan = planQuery.data ?? null
   const subscriptions = useMemo(() => schoolsQuery.data?.content ?? [], [schoolsQuery.data])
   const totalElements = schoolsQuery.data?.totalElements ?? 0
+
+  // Lỗi hoặc chưa tải xong -> tập rỗng, tức KHÔNG chặn nút nào. BE vẫn là chốt cuối.
+  const schoolsWithOngoingExam = useMemo(
+    () => new Set(ongoingExamQuery.data ?? []),
+    [ongoingExamQuery.data],
+  )
 
   const quotaByType = useMemo(() => {
     const map = new Map<QuotaType, number>()
@@ -267,6 +275,7 @@ export function SubscriptionPlanDetailPage() {
             handleUnsuspend(subscription.id, subscription.school?.name ?? subscription.schoolId)
           }
           showPlanColumn={false}
+          suspendBlockedSchoolIds={schoolsWithOngoingExam}
         />
         <SubscriptionPagination
           isDisabled={schoolsQuery.isFetching}
