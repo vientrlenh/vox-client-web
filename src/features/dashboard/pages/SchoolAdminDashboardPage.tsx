@@ -7,13 +7,10 @@ import {
   CalendarClock,
   CalendarDays,
   CheckCircle2,
-  ClipboardList,
   Coins,
-  FileCheck2,
   FileQuestion,
   Flag,
   Gavel,
-  Headphones,
   Hourglass,
   Info,
   Loader,
@@ -30,14 +27,18 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { useAppSelector } from '@/app/store/hooks'
-import { daysUntil } from '@/features/subscription_school/types'
+import { daysUntil, QUOTA_ICONS, QUOTA_LABELS, QUOTA_TYPES, type QuotaType } from '@/features/subscription_school/types'
 import { DateRangeFilter, type DateRangeValue } from '@/shared/ui/DateRangeFilter'
 import { useExamStatusRangeQuery } from '../api/useExamStatusRangeQuery'
 import { useNearestCentralizedExamQuery, type NearestCentralizedExam } from '../api/useNearestCentralizedExamQuery'
 import { useQuestionBankStatsQuery, type QuestionBankStats } from '../api/useQuestionBankStatsQuery'
 import { useSchoolAdminDashboardQuery, type SchoolAdminDashboard } from '../api/useSchoolAdminDashboardQuery'
-import type { QuotaType, TokenQuotaUsage } from '../api/useTokenUsageBreakdownQuery'
-import { useTokenUsageTimeseriesQuery, type TokenUsageTimeseries, type TokenUsageTimeseriesPoint } from '../api/useTokenUsageTimeseriesQuery'
+import {
+  useTokenUsageTimeseriesQuery,
+  type TokenUsageQuotaPeriod,
+  type TokenUsageTimeseries,
+  type TokenUsageTimeseriesPoint,
+} from '../api/useTokenUsageTimeseriesQuery'
 
 const EXAM_STATUS = [
   { color: '#94A3B8', icon: <SquarePen aria-hidden="true" className="size-4.5" />, key: 'draft' as const, label: 'Bản nháp' },
@@ -57,8 +58,8 @@ const APPEAL_STATUS = [
 
 const fmt = (n: number) => n.toLocaleString('vi-VN')
 
-function formatUsd(value: number) {
-  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(value)}`
+function formatVnd(value: number) {
+  return `${fmt(value)} ₫`
 }
 
 function Kpi({
@@ -332,20 +333,6 @@ function ExamStatusCard({
   )
 }
 
-const QUOTA_TYPES: QuotaType[] = ['GRADING', 'CLASS_TEST', 'PRACTICE']
-
-const QUOTA_LABELS: Record<QuotaType, string> = {
-  CLASS_TEST: 'Bài kiểm tra trên lớp',
-  GRADING: 'Bài thi cần chấm',
-  PRACTICE: 'Lượt ôn luyện cá nhân',
-}
-
-const QUOTA_ICONS: Record<QuotaType, typeof Coins> = {
-  CLASS_TEST: ClipboardList,
-  GRADING: FileCheck2,
-  PRACTICE: Headphones,
-}
-
 function usageLevel(pct: number) {
   return pct >= 90 ? 'crit' : pct >= 75 ? 'warn' : 'ok'
 }
@@ -355,20 +342,20 @@ function TokenNoSubscriptionCard() {
     <div className="rounded-2xl border border-slate-200 bg-white p-5.5">
       <div className="mb-5">
         <h3 className="text-base font-extrabold tracking-tight text-slate-900">Sử dụng hạn mức AI</h3>
-        <p className="mt-0.5 text-[13px] text-slate-500">Hạn mức AI (USD) của gói hiện tại</p>
+        <p className="mt-0.5 text-[13px] text-slate-500">Hạn mức AI (VND) của gói hiện tại</p>
       </div>
       <div className="flex items-center gap-2.5 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3.5 text-[13.5px] font-semibold text-orange-800">
         <Info aria-hidden="true" className="size-5 text-orange-600" />
-        <span>Chưa có gói đăng ký đang hoạt động — hạn mức AI bằng $0.</span>
+        <span>Chưa có gói đăng ký đang hoạt động — hạn mức AI bằng 0 ₫.</span>
       </div>
     </div>
   )
 }
 
 /** Panel chi tiết theo từng loại hạn mức — cùng dữ liệu & cách tính với "Mức sử dụng" ở trang gói dịch vụ. */
-function TokenQuotaPanel({ quotaType, usage }: { quotaType: QuotaType; usage: TokenQuotaUsage | undefined }) {
-  const total = usage?.totalAllocated ?? 0
-  const used = usage?.usedQuantity ?? 0
+function TokenQuotaPanel({ quotaType, usage }: { quotaType: QuotaType; usage: TokenUsageQuotaPeriod | undefined }) {
+  const total = usage?.totalAllocatedAmountVnd ?? 0
+  const used = usage?.usedAmountVnd ?? 0
   const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
   const level = usageLevel(pct)
   const fillClass = level === 'crit' ? 'bg-linear-to-r from-red-500 to-red-400' : level === 'warn' ? 'bg-linear-to-r from-amber-500 to-amber-400' : 'bg-linear-to-r from-indigo-600 to-cyan-500'
@@ -384,14 +371,14 @@ function TokenQuotaPanel({ quotaType, usage }: { quotaType: QuotaType; usage: To
         <span className="text-[13.5px] font-bold text-slate-900">{QUOTA_LABELS[quotaType]}</span>
       </div>
       <div className="flex items-baseline gap-1.5">
-        <span className="text-3xl font-extrabold tracking-tight text-slate-900 tabular-nums">{formatUsd(used)}</span>
-        <span className="text-sm font-semibold text-slate-500">/ {formatUsd(total)}</span>
+        <span className="text-3xl font-extrabold tracking-tight text-slate-900 tabular-nums">{formatVnd(used)}</span>
+        <span className="text-sm font-semibold text-slate-500">/ {formatVnd(total)}</span>
       </div>
       <div className="mt-3.5 h-2.5 overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${pct}%` }} />
       </div>
       <div className="mt-2.5 flex items-center justify-between">
-        <span className="text-[12.5px] text-slate-500">Còn lại {formatUsd(Math.max(0, total - used))}</span>
+        <span className="text-[12.5px] text-slate-500">Còn lại {formatVnd(Math.max(0, total - used))}</span>
         <span className={`text-[12.5px] font-extrabold ${level === 'crit' ? 'text-red-600' : level === 'warn' ? 'text-amber-600' : 'text-indigo-600'}`}>
           {pct}%
         </span>
@@ -406,8 +393,7 @@ function TokenQuotaPanel({ quotaType, usage }: { quotaType: QuotaType; usage: To
 }
 
 const QUOTA_COLORS: Record<QuotaType, string> = {
-  CLASS_TEST: '#8B5CF6',
-  GRADING: '#4F46E5',
+  EXAM: '#4F46E5',
   PRACTICE: '#06B6D4',
 }
 
@@ -479,7 +465,7 @@ function TokenUsageTimeseriesSection({
       <div className="mb-4.5 flex flex-wrap items-start gap-3.5">
         <div>
           <h3 className="text-base font-extrabold tracking-tight text-slate-900">Chi phí AI theo thời gian</h3>
-          <p className="mt-0.5 text-[13px] text-slate-500">Chi phí AI (USD) tiêu hao mỗi ngày, theo 3 nghiệp vụ dùng AI chấm/luyện</p>
+          <p className="mt-0.5 text-[13px] text-slate-500">Chi phí AI (VND) tiêu hao mỗi ngày, theo 2 nghiệp vụ dùng AI chấm/luyện</p>
         </div>
         <div className="ml-auto flex gap-0.5 rounded-[10px] bg-slate-100 p-0.5">
           {(Object.keys(TOKEN_WINDOW_DAYS) as TokenUsageWindow[]).map((w) => (
@@ -508,7 +494,7 @@ function TokenUsageTimeseriesSection({
       <div className={isFetching ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
         <div className="text-[13px] font-semibold text-slate-500">Tổng chi phí đã dùng ({days} ngày)</div>
         <div className="mt-1 text-4xl font-extrabold tracking-tight text-slate-900 tabular-nums">
-          {formatUsd(data?.totalUsed ?? 0)}
+          {formatVnd(data?.totalUsed ?? 0)}
         </div>
 
         <div className="mt-3.5 flex flex-wrap gap-4">
@@ -896,7 +882,7 @@ export function SchoolAdminDashboardPage() {
         <div>
           <h1 className="mt-2.5 text-3xl font-extrabold tracking-tight text-slate-900">Tổng quan trường</h1>
           <p className="mt-1.5 max-w-160 text-[15px] text-slate-500">
-            Toàn cảnh hoạt động của trường — phòng thi, khiếu nại, chi phí AI (USD) và chi tiêu của trường
+            Toàn cảnh hoạt động của trường — phòng thi, khiếu nại, chi phí AI (VND) và chi tiêu của trường
             {user?.email ? ` · ${user.email}` : ''}.
           </p>
         </div>
@@ -924,7 +910,7 @@ export function SchoolAdminDashboardPage() {
         <Kpi
           icon={<Coins aria-hidden="true" className="size-5.5" />}
           label="Tổng số hạn mức đã sử dụng"
-          sub={<span className="font-semibold text-slate-600">{formatUsd(data.tokenUsed)} / {formatUsd(data.tokenAllocated)}</span>}
+          sub={<span className="font-semibold text-slate-600">{formatVnd(data.tokenUsed)} / {formatVnd(data.tokenAllocated)}</span>}
           tint={{ bg: 'bg-orange-50', fg: 'text-orange-700' }}
           unit="%"
           value={tokenPct}
