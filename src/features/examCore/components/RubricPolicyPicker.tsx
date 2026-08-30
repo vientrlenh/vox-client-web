@@ -200,7 +200,7 @@ export function RubricPolicyPicker({ languageId, onChange, scope }: RubricPolicy
                 >
                   <span>
                     <span className="block text-indigo-700">
-                      {getAssessmentPolicyScopeLabel(policy)} · {policy.targetFrameworkBand?.label ?? '—'}
+                      Phạm vi: {getAssessmentPolicyScopeLabel(policy)} · {policy.targetFrameworkBand?.label ?? '—'}
                     </span>
                     Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt{' '}
                     {policy.passingScore ?? '-'}

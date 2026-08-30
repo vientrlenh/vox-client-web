@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   BookOpen,
   ChevronDown,
@@ -26,6 +26,10 @@ import { clearAuthTokens } from '@/features/auth/session/authSession'
 import { NotificationBell, unregisterPushDevice } from '@/features/notifications'
 import { useProfileQuery } from '@/features/profile'
 import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
+import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
+import { SUBSCRIPTION_PLANS_PATH } from '@/features/subscription_school/routes'
+import { hasActiveSubscriptionPeriod } from '@/features/examCore/utils/subscriptionWindow'
+import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 
 type NavigationGroup = {
   icon: typeof Home
@@ -389,12 +393,44 @@ function SchoolAdminSidebar({
 export function SchoolAdminLayout() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const user = useAppSelector((state) => state.auth.user)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const adminEmail = user?.email ?? 'unknown'
   const adminInitials = getEmailInitials(adminEmail)
   const { data: profile } = useProfileQuery()
+  const subscriptionQuery = useMySubscriptionQuery()
+  const { confirm, dialog: noSubscriptionDialog } = useConfirmationDialog()
+  // Chỉ hỏi MỘT LẦN mỗi lần vào khu vực school-admin (login mới hoặc F5) -- không hỏi lại khi
+  // chuyển tab bên trong vì layout này không bị unmount giữa các trang /school-admin/*.
+  const noSubscriptionPromptedRef = useRef(false)
+
+  useEffect(() => {
+    if (noSubscriptionPromptedRef.current || !subscriptionQuery.isSuccess) {
+      return
+    }
+    if (hasActiveSubscriptionPeriod(subscriptionQuery.data)) {
+      return
+    }
+    // Đang ở ngay trang gói dịch vụ rồi thì khỏi hỏi lại -- họ đã ở đúng chỗ cần tới.
+    if (location.pathname.startsWith('/school-admin/subscription')) {
+      return
+    }
+    noSubscriptionPromptedRef.current = true
+    void confirm({
+      cancelLabel: 'Bỏ qua',
+      confirmLabel: 'Đồng ý',
+      message:
+        'Trường chưa đăng ký gói dịch vụ nào -- cần có gói để tạo kỳ thi, bài kiểm tra và dùng các tính năng khác.',
+      title: 'Trường chưa có gói dịch vụ',
+    }).then((confirmed) => {
+      if (confirmed) {
+        navigate(SUBSCRIPTION_PLANS_PATH)
+      }
+    })
+  }, [confirm, location.pathname, navigate, subscriptionQuery.data, subscriptionQuery.isSuccess])
+
   const reviewQuestionsQuery = useQuestionsQuery('school', 'review', 1, 1, {
     keyword: '',
     questionBankId: '',
@@ -536,6 +572,8 @@ export function SchoolAdminLayout() {
       <main className="min-h-[calc(100vh-76px)] px-4 py-6 sm:px-6 lg:px-8">
         <Outlet />
       </main>
+
+      {noSubscriptionDialog}
     </div>
   )
 }

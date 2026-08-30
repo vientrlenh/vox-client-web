@@ -3,6 +3,12 @@ import { graphQLRequest } from '@/shared/api'
 
 export type ExamTokenEstimate = {
   estimatedCostVnd: number
+  /** Hạn mức trường còn lại + số dư ví tự nạp. null = trường chưa có subscription active/chưa cấu hình ví EXAM. */
+  remainingExamVnd: number | null
+  /** Trần cá nhân giáo viên (chỉ CLASS_TEST), KHÔNG cộng ví. null = không áp dụng. */
+  remainingMyClassTestVnd: number | null
+  wouldExceedExam: boolean
+  wouldExceedMyClassTest: boolean
 }
 
 export const examTokenEstimateQueryKeys = {
@@ -13,6 +19,10 @@ const EXAM_TOKEN_ESTIMATE_QUERY = `
   query ExamTokenEstimate($examId: ID!) {
     examTokenEstimate(examId: $examId) {
       estimatedCostVnd
+      remainingExamVnd
+      remainingMyClassTestVnd
+      wouldExceedExam
+      wouldExceedMyClassTest
     }
   }
 `

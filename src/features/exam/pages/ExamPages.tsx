@@ -56,7 +56,10 @@ import {
   NO_ACTIVE_SUBSCRIPTION_MESSAGE,
 } from '@/features/examCore/utils/subscriptionWindow'
 import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
+import { classifyExamQuotaStatus } from '@/features/examCore/utils/tokenQuota'
+import { useExamTokenEstimateQuery } from '@/features/examCore/api/useExamTokenEstimateQuery'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
+import { useMySubscriptionUsageQuery } from '@/features/subscription_school/api/useMySubscriptionUsageQuery'
 import {
   useCreateExamPaperMutation,
   useUpdateExamPaperStatusMutation,
@@ -541,6 +544,8 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const papers = exam?.papers ?? []
   const attachedBlueprint = exam?.blueprint ?? null
   const subscriptionQuery = useMySubscriptionQuery()
+  const examTokenEstimateQuery = useExamTokenEstimateQuery(examId)
+  const subscriptionUsageQuery = useMySubscriptionUsageQuery()
   const currentUser = useAppSelector((state) => state.auth.user)
   // `examMyRole` là String ở GraphQL; giá trị hợp lệ đúng bằng ExamMemberRole (null nếu không phải thành viên).
   const myRole = bundleQuery.data?.myRole as ExamMemberRole | null | undefined
@@ -696,13 +701,49 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const selectedCopyPaper = copyFromPaperId ? papers.find((paper) => paper.id === copyFromPaperId) : null
   const copyQuotaWarning = buildTimeQuotaWarning('Mã đề sao chép', selectedCopyPaper?.timeDurationSeconds, maxTimePerAttemptMin)
 
+  const examQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'EXAM')
+  const quotaStatus = classifyExamQuotaStatus({
+    estimatedCostVnd: examTokenEstimateQuery.data?.estimatedCostVnd,
+    examQuota,
+    // remainingExamVnd của BE đã cộng số dư ví tự nạp -- xem classifyExamQuotaStatus.
+    remainingExamWithWalletVnd: examTokenEstimateQuery.data?.remainingExamVnd,
+    // Kỳ thi tập trung không có trần hạn mức cá nhân giáo viên -- BE chỉ tính phần đó khi
+    // exam.kind === CLASS_TEST (xem ClassTestTokenQuotaGuardService.estimateTokenQuota).
+    personalAllocation: null,
+  })
+
+  // Vượt hạn mức trường nhưng ví tự nạp đủ bù thì KHÔNG khoá nút -- chỉ hỏi xác nhận trước khi
+  // dùng tiền ví (xem handleScheduleExam). Chỉ khoá cứng khi vượt cả ví ('blocked').
+  const scheduleTargetExamId = exam.id
+  async function handleScheduleExam() {
+    if (quotaStatus.kind === 'needsWallet') {
+      const useWallet = await confirm({
+        cancelLabel: 'Không',
+        confirmLabel: 'Đồng ý, dùng ví',
+        message: `${quotaStatus.message}\n\nBạn có muốn dùng số dư ví của trường để bù phần vượt này và tiếp tục lên lịch không?`,
+        title: 'Dùng ví để lên lịch kỳ thi?',
+      })
+      if (!useWallet) {
+        return
+      }
+    }
+    await handleStatusAction(scheduleTargetExamId, 'SCHEDULE')
+  }
+
   // Nút SCHEDULE giờ luôn hiện khi kỳ thi còn DRAFT (trước đây nó lặng lẽ biến mất) — thà disable kèm
   // lý do còn hơn để người dùng không biết mình đang thiếu gì.
+  //
+  // scheduleReadiness không soi hạn mức token — BE chặn SCHEDULE riêng ở
+  // UpdateExamStatusUseCase.validatePlanLimits (PlanLimitExceededException). Chỉ khoá nút ở mức
+  // 'blocked' (vượt cả ví); mức 'needsWallet' vẫn cho bấm, xen thêm bước xác nhận dùng ví.
+  const scheduleDisabledReason =
+    scheduleReadiness.blockingReason ??
+    (quotaStatus.kind === 'blocked' ? 'Vượt hạn mức token của trường — xem cảnh báo phía trên' : null)
   const primaryStatusAction =
     exam.status === 'DRAFT'
       ? {
           action: 'SCHEDULE' as const,
-          disabledReason: scheduleReadiness.blockingReason,
+          disabledReason: scheduleDisabledReason,
           icon: <Calendar aria-hidden="true" className="size-4.5" />,
           label: 'Lên lịch kỳ thi',
         }
@@ -726,11 +767,11 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
           onClick: () => selectTab(currentStep.tab),
           title: currentStep.label,
         }
-      : exam.status === 'DRAFT' && scheduleReadiness.ready
+      : exam.status === 'DRAFT' && scheduleReadiness.ready && quotaStatus.kind !== 'blocked'
         ? {
             ctaLabel: 'Lên lịch',
             description: 'Ca thi, thí sinh và mã đề đã đủ — bấm lên lịch để chốt kỳ thi.',
-            onClick: () => void handleStatusAction(exam.id, 'SCHEDULE'),
+            onClick: () => void handleScheduleExam(),
             title: 'Sẵn sàng lên lịch',
           }
         : null
@@ -778,7 +819,11 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
                   <button
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={Boolean(primaryStatusAction.disabledReason)}
-                    onClick={() => void handleStatusAction(exam.id, primaryStatusAction.action)}
+                    onClick={() =>
+                      void (primaryStatusAction.action === 'SCHEDULE'
+                        ? handleScheduleExam()
+                        : handleStatusAction(exam.id, primaryStatusAction.action))
+                    }
                     title={primaryStatusAction.disabledReason ?? undefined}
                     type="button"
                   >
@@ -805,6 +850,14 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
         statusTone={statusDisplay.tone}
         title={exam.name}
       />
+
+      {(exam.status === 'DRAFT' || exam.status === 'SCHEDULED') && quotaStatus.kind !== 'ok' ? (
+        <WarningBanner
+          className="mt-4"
+          message={quotaStatus.message}
+          tone={quotaStatus.kind === 'blocked' ? 'danger' : 'warning'}
+        />
+      ) : null}
 
       {authority.canManageStatus && exam.status === 'DRAFT' && scheduleReadiness.blockingReason ? (
         <div className="mt-3.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-700">

@@ -71,8 +71,8 @@ import {
   NO_ACTIVE_SUBSCRIPTION_MESSAGE,
 } from '@/features/examCore/utils/subscriptionWindow'
 import { buildTimeQuotaWarning, getQuestionAttemptSeconds } from '@/features/examCore/utils/timeQuota'
-import { scaleEstimateByMaxAttempt, useExamTokenEstimateQuery } from '@/features/classTest/api/useExamTokenEstimateQuery'
-import { buildClassTestQuotaWarning } from '@/features/classTest/utils/classTestTokenQuota'
+import { scaleEstimateByMaxAttempt, useExamTokenEstimateQuery } from '@/features/examCore/api/useExamTokenEstimateQuery'
+import { buildExamQuotaWarning, classifyExamQuotaStatus } from '@/features/examCore/utils/tokenQuota'
 import {
   getClassTestScheduleReadiness,
   getClassTestWorkflowSteps,
@@ -1598,6 +1598,20 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     ) {
       return
     }
+    // Vượt hạn mức trường nhưng ví tự nạp đủ bù -- BE vẫn cho lên lịch (tự trừ OVERAGE_CHARGE vào
+    // ví khi chấm xong), nhưng đó là tiền thật của trường nên phải hỏi trước khi tiếp tục.
+    if (
+      action === 'SCHEDULE' &&
+      quotaStatus.kind === 'needsWallet' &&
+      !(await confirm({
+        cancelLabel: 'Không',
+        confirmLabel: 'Đồng ý, dùng ví',
+        message: `${quotaStatus.message}\n\nBạn có muốn dùng số dư ví của trường để bù phần vượt này và tiếp tục lên lịch không?`,
+        title: 'Dùng ví để lên lịch bài kiểm tra?',
+      }))
+    ) {
+      return
+    }
     try {
       await updateStatusMutation.mutateAsync({ examId: exam.id, payload: { action } })
       await invalidate()
@@ -1630,21 +1644,21 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   // MỘT ví chứ không phải hai: ví CLASS_TEST đã bị bỏ, cả kỳ thi tập trung lẫn bài kiểm tra trên lớp
   // đều trừ vào EXAM (xem QuotaType ở subscription.graphqls).
   const examQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'EXAM')
-  const currentQuotaWarning = buildClassTestQuotaWarning({
+  const quotaStatus = classifyExamQuotaStatus({
     estimatedCostVnd: examTokenEstimateQuery.data?.estimatedCostVnd,
-    examName: exam.name,
     examQuota,
+    // remainingExamVnd của BE đã cộng số dư ví tự nạp -- xem classifyExamQuotaStatus.
+    remainingExamWithWalletVnd: examTokenEstimateQuery.data?.remainingExamVnd,
     personalAllocation: myExamQuotaAllocationQuery.data,
   })
   // Ước lượng "nếu lưu với số lượt đang gõ": chi phí tuyến tính theo maxAttempt nên chỉ cần nhân tỉ
   // lệ con số BE đã trả về — đúng bằng cái BE sẽ tính, không phải gọi lại server mỗi lần gõ phím.
-  const editQuotaWarning = buildClassTestQuotaWarning({
+  const editQuotaWarning = buildExamQuotaWarning({
     estimatedCostVnd: scaleEstimateByMaxAttempt(
       examTokenEstimateQuery.data?.estimatedCostVnd,
       exam.maxAttempt,
       Number(editMaxAttempt) || 1,
     ),
-    examName: exam.name,
     examQuota,
     personalAllocation: myExamQuotaAllocationQuery.data,
   })
@@ -1664,11 +1678,18 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
    * và cũng không biết mình đang thiếu gì. Thà disable kèm lý do, đúng khuôn kỳ thi tập trung
    * (ExamPages.tsx).
    */
+  // scheduleReadiness không soi hạn mức token — BE chặn SCHEDULE riêng ở
+  // UpdateExamStatusUseCase.validatePlanLimits (PlanLimitExceededException). Chỉ khoá nút ở mức
+  // 'blocked' (vượt cả ví hoặc vượt trần cá nhân); mức 'needsWallet' vẫn cho bấm, xen thêm bước
+  // xác nhận dùng ví trong handlePrimaryStatusAction.
+  const scheduleDisabledReason =
+    scheduleReadiness.blockingReason ??
+    (quotaStatus.kind === 'blocked' ? 'Vượt hạn mức token của trường hoặc cá nhân — xem cảnh báo phía trên' : null)
   const primaryStatusAction =
     exam.status === 'DRAFT'
       ? {
           action: 'SCHEDULE' as const,
-          disabledReason: scheduleReadiness.blockingReason,
+          disabledReason: scheduleDisabledReason,
           icon: <Calendar aria-hidden="true" className="size-4.5" />,
           label: 'Lên lịch bài kiểm tra',
         }
@@ -1709,7 +1730,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           onClick: () => selectTab(currentStep.tab),
           title: currentStep.label,
         }
-      : canManage && exam.status === 'DRAFT' && scheduleReadiness.ready
+      : canManage && exam.status === 'DRAFT' && scheduleReadiness.ready && quotaStatus.kind !== 'blocked'
         ? {
             ctaLabel: 'Lên lịch',
             description: 'Phòng thi, giám khảo và danh sách học sinh đã đủ — bấm lên lịch để chốt ca thi.',
@@ -1829,8 +1850,12 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
         title={exam.name}
       />
 
-      {(exam.status === 'DRAFT' || exam.status === 'SCHEDULED') && currentQuotaWarning ? (
-        <WarningBanner className="mt-4" message={currentQuotaWarning} />
+      {(exam.status === 'DRAFT' || exam.status === 'SCHEDULED') && quotaStatus.kind !== 'ok' ? (
+        <WarningBanner
+          className="mt-4"
+          message={quotaStatus.message}
+          tone={quotaStatus.kind === 'blocked' ? 'danger' : 'warning'}
+        />
       ) : null}
 
       {/* Không gói trong `canManage`: nhà trường không bấm được nút nào nhưng vẫn cần biết bài đang kẹt ở đâu. */}
@@ -2378,7 +2403,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
           examKind={exam.kind}
           locked={isExamLockedForEditing(exam.status)}
           papers={exam.papers}
-          quotaWarning={exam.status === 'SCHEDULED' ? currentQuotaWarning : null}
+          quotaWarning={exam.status === 'SCHEDULED' && quotaStatus.kind !== 'ok' ? quotaStatus.message : null}
         />
       ) : null}
 

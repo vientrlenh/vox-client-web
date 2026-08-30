@@ -83,9 +83,9 @@ export function AssessmentPolicyTable({
           <tr>
             <th className="px-4 py-3">Ngôn ngữ</th>
             <th className="px-4 py-3">Phạm vi</th>
-            <th className="px-4 py-3">Framework Version</th>
-            <th className="px-4 py-3">Rubric Version</th>
-            <th className="px-4 py-3">Target Band</th>
+            <th className="px-4 py-3">Khung năng lực</th>
+            <th className="px-4 py-3">Thang đánh giá</th>
+            <th className="px-4 py-3">Bậc mục tiêu</th>
             <th className="px-4 py-3">Điểm đạt</th>
             <th className="px-4 py-3">Độ nghiêm ngặt</th>
             <th className="px-4 py-3">Hiệu lực</th>
