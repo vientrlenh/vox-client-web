@@ -6,17 +6,13 @@ import { quotaAllocationQueryKeys } from './useQuotaAllocationQueries'
 
 /**
  * Đặt trần phân phối cho một loại hạn mức.
- *
- * <p>Đường dẫn theo TRƯỜNG, không theo kỳ đăng ký: chính sách sống xuyên qua mọi lần gia hạn, còn
- * bản ghi hạn mức thì được dựng lại mỗi kỳ.
- *
  * <p>Gửi TỶ LỆ (0..1), không gửi phần trăm -- 0.8 chứ không phải 80. Giao diện nhận phần trăm cho dễ
  * nhập rồi chia 100 ở đúng một chỗ, ngay trước khi gọi.
  */
 async function setQuotaPolicy(input: { distributableRatio: number; quotaType: QuotaType }): Promise<number> {
   const schoolId = requireSchoolId()
   const response = await apiClient.put<MutationResult<number>>(
-    `/v1/schools/${schoolId}/quota-policies/${input.quotaType}`,
+    `/v1/subscriptions/schools/${schoolId}/quota-policies/${input.quotaType}`,
     { distributableRatio: input.distributableRatio },
   )
   return response.data.data

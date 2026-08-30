@@ -3,25 +3,10 @@ import { apiClient, requireSchoolId } from '@/shared/api'
 import type { AllocateQuotaPayload, MutationResult } from '../types'
 import { quotaAllocationQueryKeys } from './useQuotaAllocationQueries'
 
-/**
- * Đường GHI vẫn ở REST -- đọc GraphQL, ghi REST theo quy ước chung. Chỉ đường ĐỌC chuyển sang
- * GraphQL (xem useQuotaAllocationQueries).
- *
- * <p>Đường dẫn là `exam-quota`, KHÔNG phải `class-test-quota`. Bản trước gọi nhầm sang một đường
- * không tồn tại: V2 gộp CLASS_TEST vào EXAM và đổi tên cả hai endpoint, nhưng client không được sửa
- * theo, nên mọi lần chia hạn mức cho giáo viên đều trả 404 -- cả đọc lẫn ghi.
- *
- * <p>Phản hồi trả về bản tóm tắt KHÔNG phân trang của backend; client không dựng gì từ nó mà chỉ làm
- * mới lại truy vấn đã phân trang, nên ở đây không mô hình hoá kiểu của nó.
- */
+
 async function allocateExamQuota(payload: AllocateQuotaPayload): Promise<MutationResult<unknown>> {
   const schoolId = requireSchoolId()
   const response = await apiClient.put<MutationResult<unknown>>(
-    // PHẢI có tiền tố `/v1/subscriptions`: SubscriptionController khai
-    // @RequestMapping("/api/v1/subscriptions") và apiClient đã có baseURL `/api`, nên đường đầy đủ
-    // là /api/v1/subscriptions/schools/{id}/teachers/exam-quota. Bỏ đoạn `subscriptions` thì Spring
-    // không khớp route nào và trả 500 NoResourceFoundException chứ không phải 404 -- nhìn từ FE
-    // giống hệt lỗi server, rất tốn công truy.
     `/v1/subscriptions/schools/${schoolId}/teachers/exam-quota`,
     payload,
   )
@@ -31,7 +16,6 @@ async function allocateExamQuota(payload: AllocateQuotaPayload): Promise<Mutatio
 async function allocatePracticeQuota(payload: AllocateQuotaPayload): Promise<MutationResult<unknown>> {
   const schoolId = requireSchoolId()
   const response = await apiClient.put<MutationResult<unknown>>(
-    // Tiền tố `/v1/subscriptions` -- xem chú thích ở allocateExamQuota bên trên.
     `/v1/subscriptions/schools/${schoolId}/students/practice-quota`,
     payload,
   )
