@@ -19,19 +19,24 @@ function bodyOf(callIndex = 0) {
   }
 }
 
+/**
+ * Trang đầu là 1 chứ không phải 0: GraphQL 1-based, và adapter phía BE trừ 1 trước khi giao cho
+ * Spring Data. Để `page: 0` ở đây thì test vẫn xanh vì transport bị mock, nhưng lại chốt vào bộ
+ * test đúng cái giá trị làm server thật nổ ở `PageRequest.of(-1, size)`.
+ */
 describe('grading GraphQL queries', () => {
   beforeEach(() => {
     mockedPost.mockReset()
   })
 
   it('fetches assignments, dropping empty filters', async () => {
-    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+    const page = { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
     mockedPost.mockResolvedValue({ data: { data: { gradingAssignments: page } } })
 
     await expect(
       fetchGradingAssignments({
         examId: 'e1',
-        page: 0,
+        page: 1,
         roundType: 'SPOT_CHECK',
         search: '',
         size: 20,
@@ -43,7 +48,7 @@ describe('grading GraphQL queries', () => {
     expect(body.query).toContain('gradingAssignments(')
     expect(body.variables).toMatchObject({
       examId: 'e1',
-      page: 0,
+      page: 1,
       roundType: 'SPOT_CHECK',
       size: 20,
       status: 'ASSIGNED',
@@ -55,13 +60,13 @@ describe('grading GraphQL queries', () => {
   })
 
   it('sends the boolean filters only when they are switched on', async () => {
-    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+    const page = { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
     mockedPost.mockResolvedValue({ data: { data: { gradingAssignments: page } } })
 
     await fetchGradingAssignments({
       hasOpenAppeal: false,
       overdueOnly: true,
-      page: 0,
+      page: 1,
       size: 20,
       unassignedOnly: false,
     })
@@ -99,9 +104,9 @@ describe('grading GraphQL queries', () => {
    * trống thì BE hiểu là kỳ thi tập trung.
    */
   it('passes the exam kind through to both the board and the stat cards', async () => {
-    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+    const page = { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
     mockedPost.mockResolvedValue({ data: { data: { gradingAssignments: page } } })
-    await fetchGradingAssignments({ kind: 'CLASS_TEST', page: 0, size: 20 })
+    await fetchGradingAssignments({ kind: 'CLASS_TEST', page: 1, size: 20 })
     expect(bodyOf().variables.kind).toBe('CLASS_TEST')
 
     mockedPost.mockResolvedValue({ data: { data: { gradingStats: {} } } })
@@ -111,26 +116,26 @@ describe('grading GraphQL queries', () => {
 
   /** Số lượt thi là thứ duy nhất phân biệt hai dòng của cùng một em trên bảng. */
   it('asks for the attempt fields on every grading list', async () => {
-    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+    const page = { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
     mockedPost.mockResolvedValue({ data: { data: { gradingAssignments: page } } })
-    await fetchGradingAssignments({ page: 0, size: 20 })
+    await fetchGradingAssignments({ page: 1, size: 20 })
 
     expect(bodyOf().query).toContain('attemptNo')
     expect(bodyOf().query).toContain('attemptCount')
   })
 
   it('fetches my grading tasks without any student field (anonymous)', async () => {
-    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+    const page = { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
     mockedPost.mockResolvedValue({ data: { data: { myGradingTasks: page } } })
 
-    await fetchMyGradingTasks({ page: 0, roundType: 'APPEAL', size: 20, status: 'ASSIGNED' })
+    await fetchMyGradingTasks({ page: 1, roundType: 'APPEAL', size: 20, status: 'ASSIGNED' })
 
     const body = bodyOf()
     expect(body.query).toContain('myGradingTasks(')
     // Giáo viên chấm ẩn danh — read model không được kéo tên/ID học sinh.
     expect(body.query).not.toContain('studentName')
     expect(body.variables).toMatchObject({
-      page: 0,
+      page: 1,
       roundType: 'APPEAL',
       size: 20,
       status: 'ASSIGNED',
@@ -138,14 +143,14 @@ describe('grading GraphQL queries', () => {
   })
 
   it('narrows my grading tasks by exam, and drops the filter when cleared', async () => {
-    const page = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+    const page = { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
     mockedPost.mockResolvedValue({ data: { data: { myGradingTasks: page } } })
 
-    await fetchMyGradingTasks({ examId: 'ex-1', page: 0, size: 20 })
+    await fetchMyGradingTasks({ examId: 'ex-1', page: 1, size: 20 })
     expect(bodyOf().variables.examId).toBe('ex-1')
 
     // Chuỗi rỗng là "tất cả kỳ thi" — gửi xuống server thì thành lọc theo id rỗng.
-    await fetchMyGradingTasks({ examId: '', page: 0, size: 20 })
+    await fetchMyGradingTasks({ examId: '', page: 1, size: 20 })
     expect(bodyOf(1).variables.examId).toBeUndefined()
   })
 

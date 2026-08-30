@@ -10,8 +10,13 @@ function bodyOf(callIndex = 0) {
   }
 }
 
-const emptyPage = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+const emptyPage = { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
 
+/**
+ * Trang đầu là 1 chứ không phải 0: GraphQL 1-based, và adapter phía BE trừ 1 trước khi giao cho
+ * Spring Data. Để `page: 0` ở đây thì test vẫn xanh vì transport bị mock, nhưng lại chốt vào bộ
+ * test đúng cái giá trị làm server thật nổ ở `PageRequest.of(-1, size)`.
+ */
 describe('class test grading GraphQL queries', () => {
   beforeEach(() => {
     mockedPost.mockReset()
@@ -21,12 +26,12 @@ describe('class test grading GraphQL queries', () => {
     mockedPost.mockResolvedValue({ data: { data: { myClassTestGradingTasks: emptyPage } } })
 
     await expect(
-      fetchClassTestGradingTasks({ examId: 'e1', page: 0, size: 20 }),
+      fetchClassTestGradingTasks({ examId: 'e1', page: 1, size: 20 }),
     ).resolves.toEqual(emptyPage)
 
     const body = bodyOf()
     expect(body.query).toContain('myClassTestGradingTasks(')
-    expect(body.variables).toMatchObject({ examId: 'e1', page: 0, size: 20 })
+    expect(body.variables).toMatchObject({ examId: 'e1', page: 1, size: 20 })
   })
 
   /**
@@ -36,7 +41,7 @@ describe('class test grading GraphQL queries', () => {
   it('asks for the student identity that only class tests expose', async () => {
     mockedPost.mockResolvedValue({ data: { data: { myClassTestGradingTasks: emptyPage } } })
 
-    await fetchClassTestGradingTasks({ examId: 'e1', page: 0, size: 20 })
+    await fetchClassTestGradingTasks({ examId: 'e1', page: 1, size: 20 })
 
     expect(bodyOf().query).toContain('studentName')
     expect(bodyOf().query).toContain('className')
@@ -47,7 +52,7 @@ describe('class test grading GraphQL queries', () => {
 
     await fetchClassTestGradingTasks({
       examId: 'e1',
-      page: 0,
+      page: 1,
       roundType: '',
       size: 20,
       status: '',

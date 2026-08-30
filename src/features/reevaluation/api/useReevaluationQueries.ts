@@ -168,7 +168,8 @@ export async function fetchAppealReviewers(appealId: string | null, keyword?: st
   return data.appealReviewers
 }
 
-// Phân trang 0-based ở server, UI 1-based: -1 khi query, +1 ở `select`.
+// GraphQL 1-based, UI cũng 1-based: gửi thẳng `page`, đọc thẳng `response.page`. Chỗ trừ 1 nằm ở
+// adapter phía BE (`PageRequest.of(page - 1, size)`), nên cộng/trừ thêm ở đây là lệch đúng một trang.
 export function useAppealsQuery(
   page: number,
   size: number,

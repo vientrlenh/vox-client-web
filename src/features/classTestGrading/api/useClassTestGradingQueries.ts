@@ -202,7 +202,7 @@ export async function fetchClassTestGradingStats(examId: string) {
   return data.classTestGradingStats
 }
 
-/** BE phân trang 0-based, UI 1-based — quy đổi ở đúng một chỗ, như feature `grading`. */
+/** GraphQL 1-based, UI cũng 1-based — gửi thẳng `page`, không quy đổi, như feature `grading`. */
 export function useClassTestGradingTasksQuery(
   examId: string,
   page: number,

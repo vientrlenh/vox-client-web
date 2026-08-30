@@ -1,87 +1,64 @@
-import { useMemo, useState } from 'react'
-import { RotateCcw, Scale, Search, Shuffle, Users } from 'lucide-react'
+import { useState } from 'react'
+import { Percent, Search, Shuffle } from 'lucide-react'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { UsageProgressBar } from '@/shared/ui/UsageProgressBar'
-import {
-  formatVnd,
-  type AllocateQuotaPayload,
-  type QuotaUserAllocation,
-  type QuotaUserAllocationSummary,
-} from '../types'
+import { AllocateQuotaDialog } from './AllocateQuotaDialog'
+import { SetQuotaCapDialog } from './SetQuotaCapDialog'
+import { formatVnd, type AllocateQuotaPayload, type QuotaUserAllocation, type QuotaUserAllocationPage } from '../types'
 
 type QuotaAllocationPanelProps = {
   errorMessage?: string
   isError: boolean
+  isFetching: boolean
   isLoading: boolean
   isSubmitting: boolean
+  onPageChange: (page: number) => void
+  onSearchChange: (search: string) => void
+  onSetCap: (percent: number) => void
   onSubmit: (payload: AllocateQuotaPayload) => void
-  summary: QuotaUserAllocationSummary | undefined
+  page: number
+  search: string
+  summary: QuotaUserAllocationPage | undefined
   userLabel: string
-}
-
-function buildEditsFromAllocations(allocations: QuotaUserAllocation[]) {
-  return Object.fromEntries(allocations.map((allocation) => [allocation.userId, allocation.allocatedAmountVnd]))
 }
 
 export function QuotaAllocationPanel({
   errorMessage,
   isError,
+  isFetching,
   isLoading,
   isSubmitting,
+  onPageChange,
+  onSearchChange,
+  onSetCap,
   onSubmit,
+  page,
+  search,
   summary,
   userLabel,
 }: QuotaAllocationPanelProps) {
-  const [edits, setEdits] = useState<Record<string, number>>({})
-  const [search, setSearch] = useState('')
-  const [syncedSummary, setSyncedSummary] = useState(summary)
+  const [editing, setEditing] = useState<QuotaUserAllocation | null>(null)
+  const [isEditingCap, setEditingCap] = useState(false)
   const { confirm, dialog: confirmDialog } = useConfirmationDialog()
 
-  if (summary !== syncedSummary) {
-    setSyncedSummary(summary)
-    setEdits(buildEditsFromAllocations(summary?.allocations ?? []))
-  }
+  const allocations = summary?.content ?? []
+  const poolTotalVnd = summary?.pool?.totalAllocatedAmountVnd ?? 0
+  const distributedVnd = summary?.distributedAmountVnd ?? 0
+  const totalPages = summary?.totalPages ?? 0
 
-  const allocations = useMemo(() => summary?.allocations ?? [], [summary])
-  const originalEdits = useMemo(() => buildEditsFromAllocations(allocations), [allocations])
-  const isDirty = allocations.some((allocation) => (edits[allocation.userId] ?? 0) !== (originalEdits[allocation.userId] ?? 0))
-  const filteredAllocations = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term) {
-      return allocations
-    }
-    return allocations.filter((allocation) => (allocation.fullName ?? '').toLowerCase().includes(term))
-  }, [allocations, search])
-
-  const pool = summary?.pool
-  const poolTotalVnd = pool?.totalAllocatedAmountVnd ?? 0
-  const editedTotalUsd = allocations.reduce((sum, allocation) => sum + (edits[allocation.userId] ?? 0), 0)
-  const overAllocated = editedTotalUsd > poolTotalVnd
-
-  function maxAllowedFor(userId: string) {
-    const otherUsersTotal = editedTotalUsd - (edits[userId] ?? 0)
-    return Math.max(0, poolTotalVnd - otherUsersTotal)
-  }
-
-  function updateAmount(userId: string, amount: number) {
-    setEdits((current) => {
-      const otherUsersTotal = allocations.reduce(
-        (sum, allocation) => (allocation.userId === userId ? sum : sum + (current[allocation.userId] ?? 0)),
-        0,
-      )
-      const maxAllowed = Math.max(0, poolTotalVnd - otherUsersTotal)
-      return { ...current, [userId]: Math.min(Math.max(0, amount), maxAllowed) }
-    })
-  }
-
-  function handleReset() {
-    setEdits(Object.fromEntries(allocations.map((allocation) => [allocation.userId, 0])))
-  }
+  // Trần phân phối: phần ví trường CHO PHÉP chia ra. Phần còn lại là dự phòng, để dành cấp thêm
+  // giữa kỳ. Lấy con số đã tính sẵn từ backend chứ không nhân lại -- đó là con số dùng để từ chối.
+  const capPercent = Math.round((summary?.distributableRatio ?? 1) * 100)
+  const distributableVnd = summary?.distributableAmountVnd ?? poolTotalVnd
+  const remainingVnd = Math.max(0, distributableVnd - distributedVnd)
+  // Hạ trần xuống dưới mức ĐÃ chia là hợp lệ -- phần đã chia là chuyện đã rồi. Hiện phần vượt để
+  // quản trị viên biết cần thu bớt của ai, thay vì từ chối và để họ mắc kẹt không siết lại được.
+  const overCapVnd = Math.max(0, distributedVnd - distributableVnd)
 
   async function handleAutoSplit() {
     const confirmed = await confirm({
       confirmLabel: 'Chia đều',
-      message: `Toàn bộ hạn mức của trường sẽ được chia đều lại cho tất cả ${userLabel}, ghi đè mọi phân bổ hiện tại (kể cả thay đổi chưa lưu). Bạn có chắc chắn muốn tiếp tục?`,
+      message: `Toàn bộ hạn mức của trường sẽ được chia đều lại cho tất cả ${userLabel}, ghi đè mọi phân bổ hiện tại. Bạn có chắc chắn muốn tiếp tục?`,
       title: 'Xác nhận chia đều tự động',
     })
 
@@ -92,24 +69,14 @@ export function QuotaAllocationPanel({
     onSubmit({ allocations: [], mode: 'AUTO' })
   }
 
-  async function handleManualSave() {
-    const confirmed = await confirm({
-      confirmLabel: 'Lưu phân bổ',
-      message: `Xác nhận lưu hạn mức đã chỉnh sửa cho ${allocations.length} ${userLabel}?`,
-      title: 'Xác nhận phân bổ hạn mức',
-    })
-
-    if (!confirmed) {
+  function handleSaveOne(amountVnd: number) {
+    if (!editing) {
       return
     }
-
-    onSubmit({
-      allocations: allocations.map((allocation) => ({
-        amount: edits[allocation.userId] ?? 0,
-        userId: allocation.userId,
-      })),
-      mode: 'MANUAL',
-    })
+    // Gửi ĐÚNG một người. Backend tự cộng thêm phần của những người không có trong yêu cầu khi kiểm
+    // tổng, nên phân bổ từng phần là hợp lệ -- xem computeManualAmounts.
+    onSubmit({ allocations: [{ amount: amountVnd, userId: editing.userId }], mode: 'MANUAL' })
+    setEditing(null)
   }
 
   if (isLoading) {
@@ -121,113 +88,188 @@ export function QuotaAllocationPanel({
   }
 
   return (
-    <div className="grid gap-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-[10px] bg-indigo-50 text-indigo-600">
-            <Scale aria-hidden="true" className="size-4.5" />
-          </span>
-          <span className="text-sm font-bold text-slate-900">Hạn mức của trường</span>
-        </div>
-        <UsageProgressBar total={poolTotalVnd} used={editedTotalUsd} />
-        {overAllocated ? (
-          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-700">
-            Tổng hạn mức phân bổ đang vượt quá hạn mức của trường ({formatVnd(pool?.totalAllocatedAmountVnd)}).
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-[11.5px] font-semibold text-slate-500">Ví hạn mức của trường</p>
+          <p className="mt-1 text-[17px] font-extrabold tracking-tight text-blue-950 tabular-nums">
+            {formatVnd(poolTotalVnd)}
           </p>
-        ) : null}
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-[11.5px] font-semibold text-slate-500">Đã chia cho {userLabel}</p>
+          <p className="mt-1 text-[17px] font-extrabold tracking-tight text-indigo-700 tabular-nums">
+            {formatVnd(distributedVnd)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-[11.5px] font-semibold text-slate-500">Còn chia được</p>
+          <p className="mt-1 text-[17px] font-extrabold tracking-tight text-emerald-700 tabular-nums">
+            {formatVnd(remainingVnd)}
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            className="h-10 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={`Tìm ${userLabel} theo tên...`}
-            type="text"
-            value={search}
-          />
+      {/* Thước đo theo phần ĐƯỢC PHÉP chia, không theo cả ví: chia hết phần cho phép là đã đầy. */}
+      <UsageProgressBar total={distributableVnd} used={distributedVnd} />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Percent aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+          <p className="text-[12.5px] leading-relaxed text-slate-600">
+            Trần phân phối: <strong className="font-bold text-blue-950">{capPercent}%</strong> ví hạn mức
+            {capPercent < 100 ? (
+              <>
+                {' '}— giữ lại <strong className="font-bold text-blue-950">{formatVnd(poolTotalVnd - distributableVnd)}</strong> làm dự phòng
+              </>
+            ) : null}
+          </p>
         </div>
         <button
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isSubmitting || !isDirty}
-          onClick={handleReset}
+          className="shrink-0 text-[13px] font-semibold text-indigo-600 transition hover:text-indigo-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          onClick={() => setEditingCap(true)}
           type="button"
         >
-          <RotateCcw aria-hidden="true" className="size-4" />
-          Đặt lại
+          Đổi trần
         </button>
+      </div>
+
+      {overCapVnd > 0 ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+          <strong className="font-bold">Đã chia vượt trần {formatVnd(overCapVnd)}.</strong> Phần đã chia vẫn giữ
+          nguyên — hạ trần không thu hồi hạn mức của ai. Nhưng mọi lần chia tiếp theo sẽ bị từ chối cho tới khi tổng
+          đã chia về dưới trần.
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="inline-flex h-11 min-w-64 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 transition focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
+          <Search aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+          <span className="sr-only">Tìm theo tên</span>
+          <input
+            className="min-w-0 flex-1 bg-transparent text-sm text-blue-950 outline-none"
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder={`Tìm ${userLabel} theo tên`}
+            value={search}
+          />
+        </label>
         <button
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isSubmitting || allocations.length === 0}
+          className="inline-flex h-11 items-center gap-2 rounded-lg border border-indigo-200 bg-white px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={isSubmitting}
           onClick={() => void handleAutoSplit()}
           type="button"
         >
           <Shuffle aria-hidden="true" className="size-4" />
           Chia đều tự động
         </button>
-        <button
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isSubmitting || allocations.length === 0}
-          onClick={() => void handleManualSave()}
-          type="button"
-        >
-          Lưu phân bổ
-        </button>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-slate-200">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-left">
+          <table className="w-full min-w-160 table-fixed border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-black text-blue-950">
-                <th className="px-6 py-3.5">Họ tên</th>
-                <th className="px-4 py-3.5">Đã sử dụng</th>
-                <th className="px-4 py-3.5">Hạn mức hiện tại</th>
-                <th className="px-4 py-3.5">Hạn mức mới (USD)</th>
+              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500">
+                <th className="px-5 py-3" scope="col">Họ tên</th>
+                <th className="w-44 px-4 py-3 text-right" scope="col">Hạn mức được cấp</th>
+                <th className="w-40 px-4 py-3 text-right" scope="col">Đã dùng</th>
+                <th className="w-28 px-5 py-3 text-right" scope="col">Hành động</th>
               </tr>
             </thead>
             <tbody>
-              {filteredAllocations.length === 0 ? (
+              {allocations.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-14 text-center" colSpan={4}>
-                    <Users aria-hidden="true" className="mx-auto size-9 text-slate-300" />
-                    <p className="mt-2 text-sm font-semibold text-slate-500">
-                      {allocations.length === 0 ? `Trường chưa có ${userLabel} phù hợp` : 'Không tìm thấy kết quả'}
-                    </p>
+                  <td className="px-5 py-8 text-center text-sm text-slate-500" colSpan={4}>
+                    {search.trim() ? `Không tìm thấy ${userLabel} nào khớp từ khoá.` : `Trường chưa có ${userLabel} nào.`}
                   </td>
                 </tr>
               ) : (
-                filteredAllocations.map((allocation) => {
-                  const rowMax = maxAllowedFor(allocation.userId)
-
-                  return (
-                    <tr className="border-b border-slate-100" key={allocation.userId}>
-                      <td className="px-6 py-3.5 text-sm font-bold text-slate-900">{allocation.fullName ?? '-'}</td>
-                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatVnd(allocation.usedAmountVnd)}</td>
-                      <td className="px-4 py-3.5 text-sm text-slate-600">{formatVnd(allocation.allocatedAmountVnd)}</td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <input
-                            className="h-9 w-28 rounded-lg border border-slate-200 px-2.5 text-right text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                            max={rowMax}
-                            min={0}
-                            onChange={(event) => updateAmount(allocation.userId, Number(event.target.value) || 0)}
-                            step="0.01"
-                            type="number"
-                            value={edits[allocation.userId] ?? 0}
-                          />
-                          <span className="text-xs text-slate-400">/ {formatVnd(rowMax)}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
+                allocations.map((allocation) => (
+                  <tr className="border-b border-slate-100 last:border-b-0" key={allocation.userId}>
+                    <td className="px-5 py-3.5">
+                      <div className="truncate text-[13.5px] font-semibold text-blue-950">
+                        {allocation.user?.fullName?.trim() || (
+                          <span className="italic text-slate-400">Tài khoản đã bị xoá</span>
+                        )}
+                      </div>
+                      {allocation.user?.email ? (
+                        <div className="mt-0.5 truncate text-[11.5px] text-slate-400">{allocation.user.email}</div>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-[13.5px] font-bold text-blue-950 tabular-nums">
+                      {formatVnd(allocation.allocatedAmountVnd)}
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-[13px] text-slate-600 tabular-nums">
+                      {formatVnd(allocation.usedAmountVnd)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        className="text-[13px] font-semibold text-indigo-600 transition hover:text-indigo-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        onClick={() => setEditing(allocation)}
+                        type="button"
+                      >
+                        Sửa
+                      </button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 ? (
+          <div className="flex items-center justify-between border-t border-slate-200 bg-white px-5 py-3">
+            <p className="text-xs font-medium text-slate-500">
+              Trang <span className="font-bold text-blue-950 tabular-nums">{page}</span> / {totalPages} ·{' '}
+              <span className="tabular-nums">{summary?.totalElements ?? 0}</span> {userLabel}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={page <= 1 || isFetching}
+                onClick={() => onPageChange(Math.max(1, page - 1))}
+                type="button"
+              >
+                Trước
+              </button>
+              <button
+                className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={page >= totalPages || isFetching}
+                onClick={() => onPageChange(page + 1)}
+                type="button"
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
+
+      {isEditingCap ? (
+        <SetQuotaCapDialog
+          currentPercent={capPercent}
+          distributedVnd={distributedVnd}
+          isSubmitting={isSubmitting}
+          onClose={() => setEditingCap(false)}
+          onSubmit={(percent) => {
+            onSetCap(percent)
+            setEditingCap(false)
+          }}
+          poolTotalVnd={poolTotalVnd}
+          userLabel={userLabel}
+        />
+      ) : null}
+
+      {editing ? (
+        <AllocateQuotaDialog
+          allocation={editing}
+          distributedVnd={distributedVnd}
+          isSubmitting={isSubmitting}
+          onClose={() => setEditing(null)}
+          onSubmit={handleSaveOne}
+          poolTotalVnd={distributableVnd}
+        />
+      ) : null}
 
       {confirmDialog}
     </div>

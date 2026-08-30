@@ -901,7 +901,8 @@ export async function fetchExamPickerOptions(input: FetchExamPickerOptionsInput)
   return data.exams
 }
 
-// Phân trang 0-based ở server, UI 1-based: -1 khi query, +1 ở `select`.
+// GraphQL 1-based, UI cũng 1-based: gửi thẳng `page`, đọc thẳng `response.page`. Chỗ trừ 1 nằm ở
+// adapter phía BE (`PageRequest.of(page - 1, size)`), nên cộng/trừ thêm ở đây là lệch đúng một trang.
 export function useExamPickerOptionsQuery(input: FetchExamPickerOptionsInput) {
   return useQuery({
     // Giữ trang cũ trong lúc nạp trang/từ khoá mới, nếu không danh sách chớp trắng mỗi lần gõ.
