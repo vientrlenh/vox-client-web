@@ -267,7 +267,7 @@ function examSummary(overrides: Record<string, unknown> = {}) {
 function mockExamPage(content: Array<Record<string, unknown>>, totalElements = content.length) {
   mockedRestGet.mockResolvedValue({
     data: {
-      data: { content, page: 0, size: 20, totalElements, totalPages: Math.max(1, Math.ceil(totalElements / 20)) },
+      data: { content, page: 1, size: 20, totalElements, totalPages: Math.max(1, Math.ceil(totalElements / 20)) },
       message: 'ok',
     },
   } as never)
@@ -282,14 +282,14 @@ describe('StudentExamsPageCore', () => {
     mockedRestGet.mockReset()
   })
 
-  it('gọi API kèm kind của từng màn, trang đầu là 0 ở server', async () => {
+  it('gọi API kèm kind của từng màn, trang đầu là 1 ở server', async () => {
     mockExamPage([examSummary()])
 
     renderWithProviders(<StudentExamsPage />)
 
     await waitFor(() =>
       expect(mockedRestGet).toHaveBeenCalledWith('/v1/exams', {
-        params: { kind: 'CENTRALIZED', page: 0, size: 20, status: undefined },
+        params: { kind: 'CENTRALIZED', page: 1, size: 20, status: undefined },
       }),
     )
     expect(await screen.findByText('Kỳ thi cuối kỳ')).toBeInTheDocument()
@@ -302,7 +302,7 @@ describe('StudentExamsPageCore', () => {
 
     await waitFor(() =>
       expect(mockedRestGet).toHaveBeenCalledWith('/v1/exams', {
-        params: { kind: 'CLASS_TEST', page: 0, size: 20, status: undefined },
+        params: { kind: 'CLASS_TEST', page: 1, size: 20, status: undefined },
       }),
     )
   })
@@ -316,12 +316,12 @@ describe('StudentExamsPageCore', () => {
 
     await waitFor(() =>
       expect(mockedRestGet).toHaveBeenCalledWith('/v1/exams', {
-        params: { kind: 'CENTRALIZED', page: 0, size: 20, status: 'completed' },
+        params: { kind: 'CENTRALIZED', page: 1, size: 20, status: 'completed' },
       }),
     )
   })
 
-  it('chuyển trang gửi page 0-based xuống server', async () => {
+  it('chuyển trang gửi page 1-based xuống server', async () => {
     mockExamPage([examSummary()], 45)
     renderWithProviders(<StudentExamsPage />)
     await screen.findByText('Kỳ thi cuối kỳ')
@@ -330,7 +330,7 @@ describe('StudentExamsPageCore', () => {
 
     await waitFor(() =>
       expect(mockedRestGet).toHaveBeenCalledWith('/v1/exams', {
-        params: { kind: 'CENTRALIZED', page: 1, size: 20, status: undefined },
+        params: { kind: 'CENTRALIZED', page: 2, size: 20, status: undefined },
       }),
     )
   })

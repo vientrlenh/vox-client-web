@@ -194,11 +194,13 @@ export type StudentExamFilters = {
 }
 
 export async function fetchMyExams(filters: StudentExamFilters) {
-  // Phân trang 0-based ở server, UI 1-based: -1 khi query, +1 ở `select`.
+  // 1-based như mọi đường khác: gửi thẳng `page`, đọc thẳng `response.page`. `GET /v1/exams` từng
+  // là ngoại lệ 0-based cuối cùng của dự án; nay BE đã đổi (ViewMyExamsUseCase phân trang qua
+  // StudentExamQueryRepository, trừ 1 ở đúng một chỗ) nên không còn gì để quy đổi ở đây.
   const response = await apiClient.get<ApiEnvelope<StudentExamPage>>('/v1/exams', {
     params: {
       kind: filters.kind,
-      page: filters.page - 1,
+      page: filters.page,
       size: filters.size,
       status: filters.status || undefined,
     },
@@ -210,7 +212,6 @@ export function useMyExamsQuery(filters: StudentExamFilters) {
   return useQuery({
     queryFn: () => fetchMyExams(filters),
     queryKey: examResultQueryKeys.myExams(filters),
-    select: (data) => ({ ...data, page: data.page + 1 }),
   })
 }
 
