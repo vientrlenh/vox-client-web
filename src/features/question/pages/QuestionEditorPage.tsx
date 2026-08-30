@@ -460,9 +460,10 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
     user?.email,
   )
 
+  // Trang 1, KHÔNG phải 0 -- backend đếm trang từ 1 rồi tự trừ đi 1 trước khi dựng PageRequest.
   const questionBanksQuery = useQuestionBanksQuery(
     'teacher',
-    0,
+    1,
     50,
     mode === 'create',
     {
@@ -474,7 +475,7 @@ function QuestionEditorPage({ basePath, mode }: QuestionEditorPageProps) {
   const questionTopicsQuery = useQuestionTopicsQuery(
     'teacher',
     selectedBankId,
-    0,
+    1,
     50,
     mode === 'create' && Boolean(selectedBankId),
     { status: 'PUBLISHED' },
