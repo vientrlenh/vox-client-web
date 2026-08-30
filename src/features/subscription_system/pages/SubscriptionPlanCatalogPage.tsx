@@ -7,6 +7,7 @@ import { useFeedbackToast } from '@/shared/ui/useFeedbackToast'
 import {
   useArchivePlanMutation,
   useCreatePlanMutation,
+  useCreateReplacementPlanMutation,
   useDeleteDraftPlanMutation,
   usePublishPlanMutation,
   useUpdatePlanMutation,
@@ -58,6 +59,9 @@ export function SubscriptionPlanCatalogPage() {
   const [editorPlan, setEditorPlan] = useState<SubscriptionPlan | null>(null)
   const [isEditorOpen, setEditorOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<SubscriptionPlan | null>(null)
+  // Gói đang được thay thế khi drawer mở qua "Tạo gói thay thế" -- khác hẳn editorPlan (đó là SỬA một
+  // gói có sẵn). Ở đây editorPlan vẫn null vì drawer đang ở chế độ TẠO, chỉ mượn giá/chu kỳ để prefill.
+  const [replacementSourcePlan, setReplacementSourcePlan] = useState<SubscriptionPlan | null>(null)
 
   const plansQuery = useSubscriptionPlansQuery(page, pageSize)
 
@@ -83,6 +87,7 @@ export function SubscriptionPlanCatalogPage() {
     ? null
     : archiveTargetSchoolsQuery.data?.totalElements ?? null
   const createMutation = useCreatePlanMutation()
+  const createReplacementMutation = useCreateReplacementPlanMutation()
   const updateMutation = useUpdatePlanMutation()
   const publishMutation = usePublishPlanMutation()
   const archiveMutation = useArchivePlanMutation()
@@ -133,16 +138,32 @@ export function SubscriptionPlanCatalogPage() {
 
   function openCreate() {
     setEditorPlan(null)
+    setReplacementSourcePlan(null)
+    setEditorOpen(true)
+  }
+
+  function openCreateReplacement(plan: SubscriptionPlan) {
+    setEditorPlan(null)
+    setReplacementSourcePlan(plan)
     setEditorOpen(true)
   }
 
   function openEdit(plan: SubscriptionPlan) {
     setEditorPlan(plan)
+    setReplacementSourcePlan(null)
     setEditorOpen(true)
   }
 
   async function handleCreate(payload: CreateSubscriptionPlanPayload) {
     try {
+      if (replacementSourcePlan) {
+        const result = await createReplacementMutation.mutateAsync({ id: replacementSourcePlan.id, payload })
+        setEditorOpen(false)
+        setReplacementSourcePlan(null)
+        showSuccess(result.message || 'Tạo gói thay thế thành công. Gói mới đang ở trạng thái nháp, nhớ xuất bản khi sẵn sàng.')
+        return
+      }
+
       const result = await createMutation.mutateAsync(payload)
       setEditorOpen(false)
       showSuccess(result.message || 'Tạo gói thành công. Gói đang ở trạng thái nháp.')
@@ -243,6 +264,7 @@ export function SubscriptionPlanCatalogPage() {
 
   const isMutating =
     createMutation.isPending ||
+    createReplacementMutation.isPending ||
     updateMutation.isPending ||
     publishMutation.isPending ||
     archiveMutation.isPending ||
@@ -310,6 +332,7 @@ export function SubscriptionPlanCatalogPage() {
           isLoading={plansQuery.isLoading}
           items={visibleItems}
           onArchive={setArchiveTarget}
+          onCreateReplacement={openCreateReplacement}
           onDeleteDraft={handleDeleteDraft}
           onEdit={openEdit}
           onOpenDetail={(plan) => navigate(`/system-admin/subscription/plans/${plan.id}`)}
@@ -335,12 +358,18 @@ export function SubscriptionPlanCatalogPage() {
       {isEditorOpen ? (
         <PlanEditorDrawer
           isOpen={isEditorOpen}
-          isSubmitting={createMutation.isPending || updateMutation.isPending}
-          key={editorPlan?.id ?? 'new'}
-          onClose={() => setEditorOpen(false)}
+          isSubmitting={createMutation.isPending || createReplacementMutation.isPending || updateMutation.isPending}
+          key={editorPlan?.id ?? replacementSourcePlan?.id ?? 'new'}
+          onClose={() => {
+            setEditorOpen(false)
+            setReplacementSourcePlan(null)
+          }}
           onCreate={handleCreate}
           onUpdate={handleUpdate}
           plan={editorPlan}
+          prefillPeriodCount={replacementSourcePlan?.periodCount}
+          prefillPeriodType={replacementSourcePlan?.periodType}
+          prefillPriceVnd={replacementSourcePlan?.priceVnd}
         />
       ) : null}
 
