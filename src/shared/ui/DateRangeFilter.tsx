@@ -1,44 +1,9 @@
 import { useState } from 'react'
 import { Calendar } from 'lucide-react'
 
-export type DateRangeValue = {
-  /** yyyy-mm-dd, null nghĩa là không giới hạn mốc này */
-  from: string | null
-  to: string | null
-}
+import { DEFAULT_PRESETS, presetToRange, type DateRangeValue, type Preset } from './dateRangePresets'
 
-type Preset = {
-  key: string
-  label: string
-  /** Số ngày tính lùi từ hôm nay; 'ytd' = từ đầu năm; 'all' = toàn bộ thời gian */
-  days: number | 'ytd' | 'all'
-}
-
-const DEFAULT_PRESETS: Preset[] = [
-  { days: 7, key: '7d', label: '7 ngày qua' },
-  { days: 30, key: '30d', label: '30 ngày qua' },
-  { days: 90, key: '90d', label: '90 ngày qua' },
-  { days: 'ytd', key: 'ytd', label: 'Năm nay' },
-  { days: 'all', key: 'all', label: 'Tất cả' },
-]
-
-function toDateInput(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
-
-function presetToRange(preset: Preset): DateRangeValue {
-  if (preset.days === 'all') {
-    return { from: null, to: null }
-  }
-  const now = new Date()
-  if (preset.days === 'ytd') {
-    return { from: toDateInput(new Date(now.getFullYear(), 0, 1)), to: toDateInput(now) }
-  }
-  const from = new Date(now)
-  from.setDate(from.getDate() - preset.days + 1)
-  return { from: toDateInput(from), to: toDateInput(now) }
-}
+export type { DateRangeValue, Preset } from './dateRangePresets'
 
 /**
  * Bộ lọc khoảng thời gian dùng chung: preset dạng chip (7/30/90 ngày, năm nay, tất cả) kèm tuỳ chọn
