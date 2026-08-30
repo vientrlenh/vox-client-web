@@ -47,14 +47,23 @@ export function PlanCatalogTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[880px] border-collapse text-left">
+      {/*
+        table-fixed + bề rộng chốt cho bốn cột phụ. Để bảng tự chia (auto layout) thì bề rộng mỗi cột
+        do NỘI DUNG DÀI NHẤT quyết định, nên cột Hành động -- 4 nút ở dòng nháp, 2 nút ở dòng đang bán
+        -- giành mất chỗ của cột Gói, thứ duy nhất dùng để nhận ra dòng. Tệ hơn: bề rộng đổi theo từng
+        trang, trang có gói nháp xếp cột lệch hẳn so với trang toàn gói đang bán.
+
+        Chỉ cột Gói bỏ trống bề rộng nên nó nhận toàn bộ phần dư -- tên gói là thứ đáng được giãn ra
+        khi màn hình rộng, còn "12 tháng" hay một cái pill trạng thái thì không.
+      */}
+      <table className="w-full min-w-240 table-fixed border-collapse text-left">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500">
-            <th className="px-6 py-3.5">Gói</th>
-            <th className="px-4 py-3.5">Chu kỳ</th>
-            <th className="px-4 py-3.5 text-right">Giá</th>
-            <th className="px-4 py-3.5">Trạng thái</th>
-            <th className="px-6 py-3.5 text-right">Hành động</th>
+            <th className="px-6 py-3.5" scope="col">Gói</th>
+            <th className="w-28 px-4 py-3.5" scope="col">Chu kỳ</th>
+            <th className="w-40 px-4 py-3.5 text-right" scope="col">Giá</th>
+            <th className="w-32 px-4 py-3.5" scope="col">Trạng thái</th>
+            <th className="w-72 px-6 py-3.5 text-right" scope="col">Hành động</th>
           </tr>
         </thead>
         <tbody>
@@ -73,7 +82,11 @@ export function PlanCatalogTable({
                 <td className="px-6 py-4">
                   <div className="flex flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`text-sm font-bold ${isArchived ? 'text-slate-500' : 'text-blue-950'}`}>
+                      <span
+                        className={`min-w-0 wrap-break-word text-sm font-bold ${
+                          isArchived ? 'text-slate-500' : 'text-blue-950'
+                        }`}
+                      >
                         {plan.name}
                       </span>
                       {isMostPopular ? (
@@ -106,8 +119,17 @@ export function PlanCatalogTable({
                       Chi tiết
                     </button>
 
+                    {/*
+                      Sửa CHỈ mở cho gói nháp. UpdateSubscriptionPlanUseCase khóa sửa mọi gói đã
+                      xuất bản -- gia hạn đọc giá và hạn mức LIVE từ chính gói đó, nên sửa tại chỗ
+                      là âm thầm đổi giá của trường đang dùng. Muốn đổi gói đã bán thì ngừng bán rồi
+                      tạo gói mới kèm gói thay thế.
+                    */}
                     {plan.status === 'DRAFT' ? (
                       <>
+                        <button className={actionClassName} onClick={() => onEdit(plan)} type="button">
+                          Sửa
+                        </button>
                         <button className={actionClassName} onClick={() => onPublish(plan)} type="button">
                           Xuất bản
                         </button>
@@ -122,18 +144,13 @@ export function PlanCatalogTable({
                     ) : null}
 
                     {plan.status === 'ACTIVE' ? (
-                      <>
-                        <button className={actionClassName} onClick={() => onEdit(plan)} type="button">
-                          Sửa
-                        </button>
-                        <button
-                          className="rounded text-[13px] font-bold text-slate-500 transition hover:text-slate-700"
-                          onClick={() => onArchive(plan)}
-                          type="button"
-                        >
-                          Ngừng bán
-                        </button>
-                      </>
+                      <button
+                        className="rounded text-[13px] font-bold text-slate-500 transition hover:text-slate-700"
+                        onClick={() => onArchive(plan)}
+                        type="button"
+                      >
+                        Ngừng bán
+                      </button>
                     ) : null}
 
                     {isArchived ? (

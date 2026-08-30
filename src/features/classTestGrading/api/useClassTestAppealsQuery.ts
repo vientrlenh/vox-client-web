@@ -73,7 +73,7 @@ export async function fetchClassTestAppeals(input: FetchClassTestAppealsInput) {
   return data.classTestAppeals
 }
 
-/** Phân trang 0-based ở server, UI 1-based — cùng quy ước với các feature khác. */
+/** GraphQL 1-based, UI cũng 1-based — gửi thẳng `page`, không quy đổi, như các feature khác. */
 export function useClassTestAppealsQuery(
   examId: string,
   page: number,

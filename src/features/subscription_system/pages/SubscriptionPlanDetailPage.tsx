@@ -190,7 +190,8 @@ export function SubscriptionPlanDetailPage() {
           </p>
         </div>
 
-        {plan.status === 'ACTIVE' ? (
+        {/* Chỉ gói nháp mới sửa được -- xem PlanCatalogTable, cùng một luật của BE. */}
+        {plan.status === 'DRAFT' ? (
           <button
             className="inline-flex h-11 items-center gap-2 rounded-full bg-indigo-50 px-6 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100"
             onClick={() => setEditorOpen(true)}

@@ -15,7 +15,7 @@ function subscription(overrides: Partial<MySubscription> = {}): MySubscription {
     endDate: '2026-12-31',
     id: 'sub-1',
     plan: null,
-    planId: 'plan-1',
+    subscriptionPlanId: 'plan-1',
     pricePaidSnapshot: 0,
     schoolId: 'school-1',
     startDate: '2026-01-01',

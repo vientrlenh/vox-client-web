@@ -1,176 +1,98 @@
-import { ClipboardList, FileCheck2, Headphones, type LucideIcon } from 'lucide-react'
+// Hóa đơn, đơn hàng và số dư ví trường KHÔNG còn ở đây -- chúng là miền riêng, tách sang thư mục
+// của chúng. Thuê bao chỉ biết tới gói, kỳ và hạn mức.
 
-export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
-export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUSPENDED'
-export type RequestType = 'REGISTRATION' | 'UPGRADE'
-export type InvoiceStatus = 'PAID' | 'PENDING' | 'FAILED' | 'CANCELLED'
-export type SchoolDebtEventType = 'LOCKED' | 'CAP_EXCEEDED' | 'CLEARED'
+// Mô hình gói, kỳ thuê bao và hạn mức sống ở ./model -- re-export để mọi nơi đang import từ
+// '../types' không phải đổi đường dẫn, và để KHÔNG tồn tại hai định nghĩa song song cho cùng một
+// thứ (MySubscription rò tới tận exam, examCore và classTest qua examCore/utils/subscriptionWindow).
+export type {
+  MySubscription,
+  PlanQuota,
+  QuotaType,
+  SubscriptionPlan,
+  SubscriptionPlanPeriod,
+  SubscriptionQuotaRecord,
+  SubscriptionStatus,
+} from './model'
+export { QUOTA_ICONS, QUOTA_LABELS, QUOTA_SHORT_LABELS, QUOTA_TYPES, formatPeriod } from './model'
 
-export const QUOTA_TYPES: QuotaType[] = ['GRADING', 'CLASS_TEST', 'PRACTICE']
+import type { SubscriptionPlan, SubscriptionQuotaRecord, SubscriptionStatus } from './model'
 
-export const QUOTA_LABELS: Record<QuotaType, string> = {
-  CLASS_TEST: 'Bài kiểm tra trên lớp',
-  GRADING: 'Bài Kiểm Tra Tập Trung',
-  PRACTICE: 'Lượt ôn luyện cá nhân',
-}
-
-export const QUOTA_ICONS: Record<QuotaType, LucideIcon> = {
-  CLASS_TEST: ClipboardList,
-  GRADING: FileCheck2,
-  PRACTICE: Headphones,
-}
-
-// includedQuantity / totalAllocated / usedQuantity đều tính bằng USD chi phí AI ước
-// tính (xem AI_USAGE_QUOTA_USD_MIGRATION.md) — hiển thị thẳng, không quy đổi đơn vị.
-export function formatUsd(value?: number | null) {
-  const amount = Number(value) || 0
-  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(amount)}`
-}
-
-export type PlanQuota = {
-  id: string
-  quotaType: QuotaType
-  includedQuantity: number
-  tokenUnitPrice: number
-}
-
-export type SubscriptionPlan = {
-  id: string
-  name: string
-  tagline: string | null
-  pricePerYear: number
-  validityDays: number
-  maxTimePerAttemptMin: number | null
-  popular: boolean
-  status: 'ACTIVE' | 'ARCHIVED'
-  replacedByPlanId: string | null
-  // Margin dịch vụ của gói (vd 0.20 = 20%) -- kết hợp với quotaPricing.usdToVndRate (số SỐNG) để
-  // tính giá quota hiện tại, KHÔNG dùng quotas[].tokenUnitPrice (đóng băng lúc tạo gói) cho màn
-  // "mua thêm" -- xem TokenTopUpPanel.
-  serviceFeeRatio: number
-  quotas: PlanQuota[]
+export type SubscriptionPlanListItem = {
+  subscription: SubscriptionPlan
+  /** Gói nhiều trường dùng nhất TOÀN hệ thống -- không phải nhiều nhất trong trang hiện tại. */
+  isMostPopular: boolean
 }
 
 export type SubscriptionPlanPage = {
-  content: SubscriptionPlan[]
+  content: SubscriptionPlanListItem[]
   page: number
   size: number
   totalElements: number
   totalPages: number
 }
 
+/**
+ * Xem trước lần gia hạn -- khớp SchoolSubscriptionRenewalPreview ở schema.
+ *
+ * KHÔNG còn unusedCreditAmount: bù trừ ngày chưa dùng giờ chỉ xảy ra khi NÂNG CẤP (cắt ngang kỳ),
+ * còn gia hạn thì nối tiếp kỳ cũ nên không có ngày nào bị mất để mà bù. Thêm startsAt vì kỳ mới có
+ * thể bắt đầu ở tương lai.
+ */
 export type RenewalPreview = {
+  /** true = gói đang dùng đã bị lưu trữ và trường bị chuyển sang gói thay thế. Phải làm nổi bật. */
   planChanged: boolean
   currentPlan: SubscriptionPlan
+  /** id của gói này chính là acceptedPlanId phải gửi lên khi đặt đơn gia hạn. */
   renewalPlan: SubscriptionPlan
-  // Bù giá trị NGÀY CHƯA DÙNG của gói cũ, chỉ > 0 khi planChanged (bị ép đổi gói giữa chu kỳ do
-  // System Admin archive gói đang dùng) -- xem RenewalProrationService ở BE. amountDue = số tiền
-  // thật phải trả sau khi trừ bù (= renewalPlan.pricePerYear khi planChanged là false).
-  unusedCreditAmount: number
+  startsAt: string
   amountDue: number
 }
-
-export type MySubscription = {
-  id: string
-  schoolId: string
-  planId: string
-  startDate: string | null
-  endDate: string | null
-  status: SubscriptionStatus
-  pricePaidSnapshot: number
-  cancelledAt: string | null
-  // System Admin cưỡng chế đình chỉ (mất quyền dùng NGAY, khác cancelledAt chỉ tắt gia hạn) — cả 2 null
-  // khi không bị đình chỉ.
-  suspendedAt: string | null
-  suspendedReason: string | null
-  plan: SubscriptionPlan | null
-}
-
-export type SubscriptionQuota = {
-  id: string
-  subscriptionId: string
-  quotaType: QuotaType
-  totalAllocated: number
-  usedQuantity: number
-}
-
-export type InvoiceQuotaItem = {
-  quotaType: QuotaType
-  amount: number
-}
-
-export type Invoice = {
-  id: string
-  invoiceNumber: string
-  // Chỉ có giá trị sau khi thanh toán thành công — null với hóa đơn còn PENDING hoặc đã
-  // CANCELLED/FAILED mà chưa từng chốt.
-  subscriptionId: string | null
-  sourceType: 'SUBSCRIPTION' | 'SUBSCRIPTION_REQUEST' | 'TOKEN_PURCHASE'
-  sourceId: string
-  issueDate: string | null
-  amount: number
-  status: InvoiceStatus
-  paymentLinkId: string | null
-  checkoutUrl: string | null
-  paidAt: string | null
-  // Plan đã áp dụng cho hóa đơn (SUBSCRIPTION/SUBSCRIPTION_REQUEST) -- null nếu chưa resolve được
-  // hoặc hóa đơn loại TOKEN_PURCHASE.
-  resolvedPlanId: string | null
-  // Hạn mức USD từng loại quota gắn với hóa đơn -- rỗng nếu hóa đơn cũ trước khi có field này hoặc
-  // chưa resolve được plan (vd còn PENDING).
-  quotaItems: InvoiceQuotaItem[]
-}
-
-export type InvoicePage = {
-  content: Invoice[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
-}
-
-// Sổ audit "nguyên nhân nợ hạn mức AI" của chính trường mình -- xem ViewSchoolDebtEventsUseCase.
-export type SchoolDebtEvent = {
-  id: string
-  subscriptionId: string
-  eventType: SchoolDebtEventType
-  quotaType: QuotaType
-  triggerExamSessionId: string | null
-  triggerAmountUsd: number | null
-  totalAllocatedUsd: number
-  usedQuantityUsd: number
-  overageUsd: number
-  occurredAt: string | null
-}
-
-export type SchoolDebtEventPage = {
-  content: SchoolDebtEvent[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
-}
-
 // Hình dạng của link thanh toán do @/shared/payment định nghĩa vì cả subscription_school và
 // subscription_system đều dùng chung, và vì cách mở trang thanh toán (redirect hay POST form) có
 // ràng buộc chữ ký không được phép mỗi nơi tự hiểu một kiểu.
 export type { PaymentLink, PaymentMethod } from '@/shared/payment/types'
 
-export type TokenTopUpState = Record<QuotaType, number>
-
 export type DistributionMode = 'AUTO' | 'MANUAL'
 
+/**
+ * Một người trong màn chia hạn mức.
+ *
+ * `user` do backend nối vào qua data loader `userById`. Bản trước khai một trường `fullName` phẳng
+ * mà API chưa bao giờ trả về, nên cột "Họ tên" luôn hiện dấu gạch -- kiểu khai ở client không kiểm
+ * được với schema thật, nên lỗi kiểu này chỉ lộ ra khi có người mở màn hình.
+ *
+ * null khi tài khoản đã bị xoá nhưng dòng phân bổ còn lại.
+ */
 export type QuotaUserAllocation = {
   userId: string
-  fullName: string | null
-  quotaType: QuotaType
-  allocatedQuantity: number
-  usedQuantity: number
+  allocatedAmountVnd: number
+  usedAmountVnd: number
+  user: { id: string; fullName: string | null; email: string | null } | null
 }
 
-export type QuotaUserAllocationSummary = {
-  pool: SubscriptionQuota
-  allocations: QuotaUserAllocation[]
+/**
+ * MỘT TRANG của màn chia hạn mức.
+ *
+ * `distributedAmountVnd` là tổng trên TOÀN BỘ tập, do backend tính. Đừng cộng cột `allocatedAmountVnd`
+ * của `content` để thay thế: đó chỉ là một trang, nên con số sẽ sai ngay từ trang thứ hai.
+ */
+export type QuotaUserAllocationPage = {
+  pool: SubscriptionQuotaRecord
+  distributedAmountVnd: number
+  /** Trần phân phối của trường cho loại hạn mức này, 0..1. Mặc định 1 = chia được toàn bộ ví. */
+  distributableRatio: number
+  /**
+   * Phần ví được phép chia = pool x distributableRatio, do backend tính.
+   *
+   * Đừng nhân lại ở client: đây chính là con số backend dùng để từ chối, nên một phép nhân thứ hai
+   * là một cơ hội để hai bên lệch nhau vài phần triệu đồng rồi báo lỗi ở chỗ không ai hiểu nổi.
+   */
+  distributableAmountVnd: number
+  content: QuotaUserAllocation[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
 }
 
 export type UserQuotaAmount = {
@@ -298,44 +220,3 @@ export function getSubscriptionStatusDisplay(
   return { label: 'Đã hủy', tone: 'neutral' as const }
 }
 
-export function getInvoiceStatusDisplay(status: InvoiceStatus) {
-  if (status === 'PAID') {
-    return { label: 'Đã thanh toán', tone: 'success' as const }
-  }
-
-  if (status === 'PENDING') {
-    return { label: 'Chờ thanh toán', tone: 'warning' as const }
-  }
-
-  if (status === 'CANCELLED') {
-    return { label: 'Đã hủy', tone: 'neutral' as const }
-  }
-
-  return { label: 'Thất bại', tone: 'danger' as const }
-}
-
-export function getDebtEventDisplay(eventType: SchoolDebtEventType) {
-  if (eventType === 'LOCKED') {
-    return { label: 'Khóa do nợ', tone: 'danger' as const }
-  }
-
-  if (eventType === 'CAP_EXCEEDED') {
-    return { label: 'Vượt trần cảnh báo', tone: 'warning' as const }
-  }
-
-  return { label: 'Đã hết nợ', tone: 'success' as const }
-}
-
-// overageUsd = usedQuantityUsd - totalAllocatedUsd (xem SchoolDebtNotificationService.logDebtEvent) --
-// dương nghĩa là đang vượt hạn mức, âm nghĩa là đã hết nợ và còn dư bấy nhiêu USD hạn mức.
-export function getOverageDisplay(overageUsd: number) {
-  if (overageUsd > 0) {
-    return { label: `Vượt ${formatUsd(overageUsd)}`, tone: 'danger' as const }
-  }
-
-  if (overageUsd < 0) {
-    return { label: `Còn dư ${formatUsd(Math.abs(overageUsd))}`, tone: 'success' as const }
-  }
-
-  return { label: formatUsd(0), tone: 'neutral' as const }
-}

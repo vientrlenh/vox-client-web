@@ -80,7 +80,7 @@ import {
 } from '@/features/classTest/utils/classTestWorkflow'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useMySubscriptionUsageQuery } from '@/features/subscription_school/api/useMySubscriptionUsageQuery'
-import { useMyClassTestQuotaAllocationQuery } from '@/features/subscription_school/api/useMyClassTestQuotaAllocationQuery'
+import { useMyExamQuotaAllocationQuery } from '@/features/subscription_school/api/useMyExamQuotaAllocationQuery'
 import {
   formatDate,
   formatDateTime,
@@ -1153,7 +1153,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const subscription = subscriptionQuery.data
   const detailSubscriptionBounds = getSubscriptionWindowBounds(subscription)
   const subscriptionUsageQuery = useMySubscriptionUsageQuery()
-  const myClassTestQuotaAllocationQuery = useMyClassTestQuotaAllocationQuery()
+  const myExamQuotaAllocationQuery = useMyExamQuotaAllocationQuery()
   // Ước lượng chi phí do BE tính (không nhân lại ở FE) — một cái theo số lượt đã lưu, một cái theo
   // số đang gõ trong modal sửa. Cái thứ hai chỉ chạy khi modal mở, và số lượt đã được debounce.
   const examTokenEstimateQuery = useExamTokenEstimateQuery(examId)
@@ -1627,27 +1627,26 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
   const statusDisplay = getClassTestStatusDisplay(exam.status)
   // Cảnh báo chủ động trước khi BE chặn (ClassTestTokenQuotaGuardService) — không thay cho việc
   // BE thật sự chặn, chỉ để giáo viên biết trước thay vì bấm xong mới ăn lỗi.
-  const gradingQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'GRADING')
-  const classTestQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'CLASS_TEST')
+  // MỘT ví chứ không phải hai: ví CLASS_TEST đã bị bỏ, cả kỳ thi tập trung lẫn bài kiểm tra trên lớp
+  // đều trừ vào EXAM (xem QuotaType ở subscription.graphqls).
+  const examQuota = subscriptionUsageQuery.data?.find((quota) => quota.quotaType === 'EXAM')
   const currentQuotaWarning = buildClassTestQuotaWarning({
-    classTestQuota,
-    estimatedCostUsd: examTokenEstimateQuery.data?.estimatedCostUsd,
+    estimatedCostVnd: examTokenEstimateQuery.data?.estimatedCostVnd,
     examName: exam.name,
-    gradingQuota,
-    personalAllocation: myClassTestQuotaAllocationQuery.data,
+    examQuota,
+    personalAllocation: myExamQuotaAllocationQuery.data,
   })
   // Ước lượng "nếu lưu với số lượt đang gõ": chi phí tuyến tính theo maxAttempt nên chỉ cần nhân tỉ
   // lệ con số BE đã trả về — đúng bằng cái BE sẽ tính, không phải gọi lại server mỗi lần gõ phím.
   const editQuotaWarning = buildClassTestQuotaWarning({
-    classTestQuota,
-    estimatedCostUsd: scaleEstimateByMaxAttempt(
-      examTokenEstimateQuery.data?.estimatedCostUsd,
+    estimatedCostVnd: scaleEstimateByMaxAttempt(
+      examTokenEstimateQuery.data?.estimatedCostVnd,
       exam.maxAttempt,
       Number(editMaxAttempt) || 1,
     ),
     examName: exam.name,
-    gradingQuota,
-    personalAllocation: myClassTestQuotaAllocationQuery.data,
+    examQuota,
+    personalAllocation: myExamQuotaAllocationQuery.data,
   })
   const { completedCount, currentStep, steps } = workflow
   const scheduleReadiness = getClassTestScheduleReadiness(schedulesQuery.data, candidatesQuery.data)

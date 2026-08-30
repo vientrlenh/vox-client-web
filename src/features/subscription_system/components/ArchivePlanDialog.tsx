@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Archive, X } from 'lucide-react'
+import { AlertTriangle, Archive, Loader2, X } from 'lucide-react'
 import { formatPeriod, formatVnd, type SubscriptionPlan } from '../types'
 
 type SelectOption = {
@@ -8,7 +8,14 @@ type SelectOption = {
 }
 
 type ArchivePlanDialogProps = {
-  activeSchoolCount: number
+  /**
+   * Số trường đang dùng gói, hoặc null khi CHƯA BIẾT (đang tải, hoặc truy vấn hỏng).
+   *
+   * Phân biệt null với 0 là điểm chính: cả hai đều "không có con số dương", nhưng 0 nghĩa là đã hỏi
+   * và biết chắc không trường nào dùng, còn null nghĩa là chưa hỏi xong. Gộp chúng lại thành 0 là
+   * đúng cái lỗi cũ ở đây -- ngừng bán một gói cả chục trường đang dùng mà không cảnh báo gì.
+   */
+  activeSchoolCount: number | null
   isOpen: boolean
   isSubmitting: boolean
   onClose: () => void
@@ -32,7 +39,8 @@ export function ArchivePlanDialog({
     return null
   }
 
-  const replacementRequired = activeSchoolCount > 0
+  const isCountKnown = activeSchoolCount !== null
+  const replacementRequired = isCountKnown && activeSchoolCount > 0
 
   function handleClose() {
     setSelection('')
@@ -81,7 +89,12 @@ export function ArchivePlanDialog({
         </div>
 
         <div className="px-6 pt-5">
-          {replacementRequired ? (
+          {!isCountKnown ? (
+            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3 text-xs font-semibold text-slate-600">
+              <Loader2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin" />
+              <span>Đang kiểm tra xem có trường nào đang dùng gói này...</span>
+            </div>
+          ) : replacementRequired ? (
             <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs font-semibold text-amber-800">
               <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
               <span>
@@ -125,7 +138,7 @@ export function ArchivePlanDialog({
           </button>
           <button
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting || (replacementRequired && !selection)}
+            disabled={isSubmitting || !isCountKnown || (replacementRequired && !selection)}
             onClick={handleConfirm}
             type="button"
           >
