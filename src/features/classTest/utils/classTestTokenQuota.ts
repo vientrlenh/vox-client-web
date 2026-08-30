@@ -1,7 +1,7 @@
-import { QUOTA_LABELS, formatVnd, type SubscriptionQuota } from '@/features/subscription_school/types'
-import type { MyClassTestQuotaAllocation } from '@/features/subscription_school/api/useMyClassTestQuotaAllocationQuery'
+import { QUOTA_LABELS, formatVnd, type SubscriptionQuotaRecord } from '@/features/subscription_school/types'
+import type { MyExamQuotaAllocation } from '@/features/subscription_school/api/useMyExamQuotaAllocationQuery'
 
-function remainingOf(quota: SubscriptionQuota | undefined): number {
+function remainingOf(quota: SubscriptionQuotaRecord | undefined): number {
   // Không có row = BE coi như "không tìm thấy hạn mức" và chặn luôn (PlanLimitExceededException),
   // nên phía FE cũng phải coi như hết sạch (0), không phải "không giới hạn".
   if (!quota) {
@@ -21,15 +21,17 @@ export type ClassTestQuotaWarningInput = {
   examName: string
   /** Do BE tính — xem useExamTokenEstimateQuery. FE KHÔNG tự nhân lại công thức nữa. */
   estimatedCostVnd: number | undefined
-  // Bài kiểm tra trên lớp trừ vào cùng một ví EXAM với thi tập trung -- KHÔNG có ví CLASS_TEST
-  // riêng, xem QuotaType ở BE (từng có, đã gỡ vì bị trừ trùng cùng một khoản chi hai lần).
-  examQuota: SubscriptionQuota | undefined
-  personalAllocation: MyClassTestQuotaAllocation | null | undefined
+  /**
+   * Ví hạn mức thi của trường. MỘT ví chứ không phải hai: GRADING và CLASS_TEST cũ đã gộp thành
+   * EXAM, backend trừ cả kỳ thi tập trung lẫn bài kiểm tra trên lớp vào đây.
+   */
+  examQuota: SubscriptionQuotaRecord | undefined
+  personalAllocation: MyExamQuotaAllocation | null | undefined
 }
 
-// Soi ước lượng chi phí VND của BE trước cả hai hạn mức mà BE sẽ chặn khi thật sự publish/sửa/thêm
-// học sinh. Đây chỉ là cảnh báo sớm phía client — BE vẫn là nơi chặn thật. Con số ước lượng lấy thẳng
-// từ query examTokenEstimate thay vì nhân lại ở đây: thời lượng bài thi đã gồm thời lượng phát
+// Soi ước lượng chi phí của BE trước cả hai hạn mức mà BE sẽ chặn khi thật sự publish/sửa/thêm học
+// sinh. Đây chỉ là cảnh báo sớm phía client — BE vẫn là nơi chặn thật. Con số ước lượng lấy thẳng từ
+// query examTokenEstimate thay vì nhân lại ở đây: thời lượng bài thi đã gồm thời lượng phát
 // AUDIO/VIDEO còn chi phí thì không, nên tự nhân là ra số khác hẳn cái BE dùng để chặn.
 export function buildClassTestQuotaWarning({
   examName,

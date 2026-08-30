@@ -55,11 +55,11 @@ export function QuotaAllocationPanel({
 
   const pool = summary?.pool
   const poolTotalVnd = pool?.totalAllocatedAmountVnd ?? 0
-  const editedTotalVnd = allocations.reduce((sum, allocation) => sum + (edits[allocation.userId] ?? 0), 0)
-  const overAllocated = editedTotalVnd > poolTotalVnd
+  const editedTotalUsd = allocations.reduce((sum, allocation) => sum + (edits[allocation.userId] ?? 0), 0)
+  const overAllocated = editedTotalUsd > poolTotalVnd
 
   function maxAllowedFor(userId: string) {
-    const otherUsersTotal = editedTotalVnd - (edits[userId] ?? 0)
+    const otherUsersTotal = editedTotalUsd - (edits[userId] ?? 0)
     return Math.max(0, poolTotalVnd - otherUsersTotal)
   }
 
@@ -105,7 +105,7 @@ export function QuotaAllocationPanel({
 
     onSubmit({
       allocations: allocations.map((allocation) => ({
-        amountVnd: edits[allocation.userId] ?? 0,
+        amount: edits[allocation.userId] ?? 0,
         userId: allocation.userId,
       })),
       mode: 'MANUAL',
@@ -129,7 +129,7 @@ export function QuotaAllocationPanel({
           </span>
           <span className="text-sm font-bold text-slate-900">Hạn mức của trường</span>
         </div>
-        <UsageProgressBar total={poolTotalVnd} used={editedTotalVnd} />
+        <UsageProgressBar total={poolTotalVnd} used={editedTotalUsd} />
         {overAllocated ? (
           <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-700">
             Tổng hạn mức phân bổ đang vượt quá hạn mức của trường ({formatVnd(pool?.totalAllocatedAmountVnd)}).
@@ -184,7 +184,7 @@ export function QuotaAllocationPanel({
                 <th className="px-6 py-3.5">Họ tên</th>
                 <th className="px-4 py-3.5">Đã sử dụng</th>
                 <th className="px-4 py-3.5">Hạn mức hiện tại</th>
-                <th className="px-4 py-3.5">Hạn mức mới (VNĐ)</th>
+                <th className="px-4 py-3.5">Hạn mức mới (USD)</th>
               </tr>
             </thead>
             <tbody>
@@ -209,11 +209,11 @@ export function QuotaAllocationPanel({
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           <input
-                            className="h-9 w-32 rounded-lg border border-slate-200 px-2.5 text-right text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                            className="h-9 w-28 rounded-lg border border-slate-200 px-2.5 text-right text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             max={rowMax}
                             min={0}
                             onChange={(event) => updateAmount(allocation.userId, Number(event.target.value) || 0)}
-                            step={1000}
+                            step="0.01"
                             type="number"
                             value={edits[allocation.userId] ?? 0}
                           />

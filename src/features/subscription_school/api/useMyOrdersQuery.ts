@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
-import type { OrderPage } from '../types'
+// OrderPage nằm ở miền order_school, KHÔNG phải subscription_school: main đã tách đơn hàng
+// (orders/order_items/payment_records) ra khỏi miền gói đăng ký. File này còn trỏ vào `../types` cũ.
+import type { OrderPage } from '@/features/order_school/types'
 
 export const myOrdersQueryKeys = {
   all: ['my-orders'] as const,

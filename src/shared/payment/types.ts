@@ -1,27 +1,45 @@
-// Danh sách cổng khớp với PaymentMethodRequest.VALID_METHODS phía BE. MANUAL cố tình không có ở
-// đây: đó là hóa đơn đối soát tay, không cổng nào tạo được link thanh toán cho nó.
+// Danh sách cổng khớp PaymentProvider phía BE.
 export type PaymentMethod = 'PAYOS' | 'SEPAY'
 
 /**
  * Cách mở trang thanh toán, do BE quyết định thay vì FE suy ra từ tên cổng. Nhờ vậy thêm một cổng
  * mới không phải sửa FE — trước đây FE buộc phải biết "nếu là SePay thì submit form".
- *
- * 'NONE': đơn đã chốt PAID ngay lúc tạo link (vd amountDue = 0 sau khi bù đủ 100% giá gói mới lúc
- * nâng cấp), không có gì để điều hướng sang cổng — xem CreatePaymentCheckoutUrlUseCase ở BE.
  */
-export type CheckoutAction = 'FORM_POST' | 'NONE' | 'REDIRECT'
+export type CheckoutAction = 'FORM_POST' | 'NONE' | 'QR' | 'REDIRECT'
 
-// Khớp PaymentCheckoutResponse ở BE (POST /api/v1/payments/checkout-url). KHÔNG còn invoiceId:
-// hóa đơn chỉ phát sau khi tiền về, lúc phát link chưa có hóa đơn nào tồn tại -- FE đối soát kết
-// quả thanh toán bằng orderId, xem PaymentResultPage.
+/**
+ * Thông tin để trường TỰ chuyển khoản khi app ngân hàng không quét được mã.
+ *
+ * transferContent là trường nguy hiểm nhất: cổng dùng nó để khớp tiền với đơn, gõ sai thì tiền về
+ * mà đơn vẫn treo và phải đối soát tay. Giao diện phải cho copy chứ đừng bắt gõ lại.
+ */
+export type BankTransferDetails = {
+  bankBin: string | null
+  accountNumber: string | null
+  accountName: string | null
+  amountVnd: number | null
+  transferContent: string | null
+}
+
+/**
+ * Một LẦN THỬ thanh toán cho một ĐƠN.
+ *
+ * Khác hẳn model cũ, nơi link gắn với HÓA ĐƠN: hóa đơn giờ chỉ được phát SAU khi tiền về, nên lúc mở
+ * trang thanh toán nó chưa tồn tại. Điểm tra ngược là orderId + providerOrderRef.
+ */
 export type PaymentLink = {
   orderId: string
   paymentId: string
-  providerOrderRef: string | null
+  /** Mã mình gửi sang cổng, cũng là thứ cổng gửi lại ở callback. */
+  providerOrderRef: string
   provider: PaymentMethod
   action: CheckoutAction
-  checkoutUrl: string
-  // Các field ẩn phải POST khi action là FORM_POST, rỗng khi là REDIRECT.
+  checkoutUrl: string | null
+  /** Chuỗi VietQR để tự vẽ mã. Chỉ có khi action là QR. */
+  qrCode: string | null
+  /** Thông tin chuyển khoản tay đi kèm mã QR. Chỉ có khi action là QR. */
+  transfer: BankTransferDetails | null
+  // Các field ẩn phải POST khi action là FORM_POST, null khi là REDIRECT.
   //
   // THỨ TỰ KEY LÀ MỘT PHẦN CỦA HỢP ĐỒNG, không phải chi tiết trình bày: SePay ký HMAC trên chuỗi
   // ghép các cặp key=value theo đúng thứ tự BE đã dựng. Sắp xếp lại hay dựng lại object ở giữa
@@ -37,17 +55,11 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 }
 
 export const PAYMENT_METHOD_DESCRIPTIONS: Record<PaymentMethod, string> = {
-  PAYOS: 'Quét mã VietQR hoặc chuyển khoản qua ứng dụng ngân hàng.',
-  SEPAY: 'Chuyển khoản ngân hàng, thẻ nội địa hoặc thẻ quốc tế.',
+  PAYOS: 'Hiện mã QR ngay tại đây, không rời trang.',
+  SEPAY: 'Chuyển sang trang của SePay rồi quay lại.',
 }
 
 export const DEFAULT_PAYMENT_METHOD: PaymentMethod = 'PAYOS'
-
-// Dùng cho confirmWithSelection() ở các luồng chỉ có một nút bấm, không có dialog riêng.
-export const PAYMENT_METHOD_OPTIONS = PAYMENT_METHODS.map((method) => ({
-  label: PAYMENT_METHOD_LABELS[method],
-  value: method as string,
-}))
 
 export function isPaymentMethod(value: string): value is PaymentMethod {
   return (PAYMENT_METHODS as string[]).includes(value)

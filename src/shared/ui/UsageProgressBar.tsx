@@ -1,15 +1,44 @@
-function formatVnd(value: number) {
-  return `${new Intl.NumberFormat('vi-VN').format(Math.round(value))} ₫`
+export type UsageTone = 'critical' | 'ok' | 'warning'
+
+// Ngưỡng đổi màu sống ở ĐÂY và chỉ ở đây. Cùng một con số phải ra cùng một màu ở mọi chỗ hiển thị
+// hạn mức -- thanh dùng chung này, ô hạn mức lớn trên MyPlanCard, thẻ hạn mức cá nhân của giáo
+// viên/học sinh. Chép ngưỡng sang nơi khác là mở đường cho 88% hiện hổ phách ở màn này và xanh ở
+// màn kia.
+export const USAGE_WARNING_PCT = 75
+export const USAGE_CRITICAL_PCT = 90
+
+export function getUsageTone(pct: number): UsageTone {
+  if (pct >= USAGE_CRITICAL_PCT) {
+    return 'critical'
+  }
+  if (pct >= USAGE_WARNING_PCT) {
+    return 'warning'
+  }
+  return 'ok'
 }
 
-function getUsageBarColor(pct: number) {
-  if (pct >= 90) {
-    return '#ef4444'
+const TONE_COLORS: Record<UsageTone, string> = {
+  critical: '#ef4444',
+  ok: '#4f46e5',
+  warning: '#f59e0b',
+}
+
+export function getUsageBarColor(pct: number) {
+  return TONE_COLORS[getUsageTone(pct)]
+}
+
+export function usagePercent(used?: number | null, total?: number | null) {
+  const totalAmount = Number(total) || 0
+  if (totalAmount <= 0) {
+    return 0
   }
-  if (pct >= 75) {
-    return '#f59e0b'
-  }
-  return '#4f46e5'
+
+  return Math.min(100, Math.round(((Number(used) || 0) / totalAmount) * 100))
+}
+
+// Hạn mức đo bằng VND (includedAmountVnd / usedAmountVnd ở backend), không phải USD như bản trước.
+function formatVnd(value: number) {
+  return `${new Intl.NumberFormat('vi-VN').format(Math.round(Number(value) || 0))} ₫`
 }
 
 type UsageProgressBarProps = {
@@ -18,16 +47,15 @@ type UsageProgressBarProps = {
   used: number
 }
 
-// Thanh hiển thị mức dùng hạn mức kiểu Claude: % là số chính (to, đậm), số VND đã
-// dùng/tổng chỉ là dòng phụ nhỏ bên dưới. Dùng chung cho mọi nơi hiển thị hạn mức
-// subscription (school admin, giáo viên/học sinh) để không copy-paste lại cùng 1 khối
-// markup progress bar ở nhiều feature.
+// Thanh hiển thị mức dùng hạn mức: % là số chính (to, đậm), số tiền đã dùng/tổng chỉ là dòng phụ
+// nhỏ bên dưới. Dùng chung cho mọi nơi hiển thị hạn mức subscription (school admin, giáo viên/học
+// sinh, system admin) để không copy-paste lại cùng 1 khối markup progress bar ở nhiều feature.
 export function UsageProgressBar({ isLoading, total, used }: UsageProgressBarProps) {
   if (isLoading) {
     return <p className="mt-3 text-sm font-semibold text-slate-400">Đang tải...</p>
   }
 
-  const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
+  const pct = usagePercent(used, total)
   const color = getUsageBarColor(pct)
 
   return (

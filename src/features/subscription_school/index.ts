@@ -1,4 +1,6 @@
-export { SchoolAdminSubscriptionPage } from './pages/SchoolAdminSubscriptionPage'
+export { MySubscriptionPage } from './pages/MySubscriptionPage'
+export { SubscriptionPlansPage } from './pages/SubscriptionPlansPage'
 export { PaymentResultPage } from './pages/PaymentResultPage'
 export { TeacherQuotaUsagePage } from './pages/TeacherQuotaUsagePage'
 export { StudentQuotaUsagePage } from './pages/StudentQuotaUsagePage'
+export { MY_SUBSCRIPTION_PATH, SUBSCRIPTION_PLANS_PATH } from './routes'
