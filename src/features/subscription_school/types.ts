@@ -15,7 +15,7 @@ export type {
 } from './model'
 export { QUOTA_ICONS, QUOTA_LABELS, QUOTA_SHORT_LABELS, QUOTA_TYPES, formatPeriod } from './model'
 
-import type { QuotaType, SubscriptionPlan, SubscriptionQuotaRecord, SubscriptionStatus } from './model'
+import type { SubscriptionPlan, SubscriptionQuotaRecord, SubscriptionStatus } from './model'
 
 export type SubscriptionPlanListItem = {
   subscription: SubscriptionPlan
@@ -54,18 +54,45 @@ export type { PaymentLink, PaymentMethod } from '@/shared/payment/types'
 
 export type DistributionMode = 'AUTO' | 'MANUAL'
 
+/**
+ * Một người trong màn chia hạn mức.
+ *
+ * `user` do backend nối vào qua data loader `userById`. Bản trước khai một trường `fullName` phẳng
+ * mà API chưa bao giờ trả về, nên cột "Họ tên" luôn hiện dấu gạch -- kiểu khai ở client không kiểm
+ * được với schema thật, nên lỗi kiểu này chỉ lộ ra khi có người mở màn hình.
+ *
+ * null khi tài khoản đã bị xoá nhưng dòng phân bổ còn lại.
+ */
 export type QuotaUserAllocation = {
-  id: string
   userId: string
-  fullName: string | null
-  quotaType: QuotaType
   allocatedAmountVnd: number
   usedAmountVnd: number
+  user: { id: string; fullName: string | null; email: string | null } | null
 }
 
-export type QuotaUserAllocationSummary = {
+/**
+ * MỘT TRANG của màn chia hạn mức.
+ *
+ * `distributedAmountVnd` là tổng trên TOÀN BỘ tập, do backend tính. Đừng cộng cột `allocatedAmountVnd`
+ * của `content` để thay thế: đó chỉ là một trang, nên con số sẽ sai ngay từ trang thứ hai.
+ */
+export type QuotaUserAllocationPage = {
   pool: SubscriptionQuotaRecord
-  allocations: QuotaUserAllocation[]
+  distributedAmountVnd: number
+  /** Trần phân phối của trường cho loại hạn mức này, 0..1. Mặc định 1 = chia được toàn bộ ví. */
+  distributableRatio: number
+  /**
+   * Phần ví được phép chia = pool x distributableRatio, do backend tính.
+   *
+   * Đừng nhân lại ở client: đây chính là con số backend dùng để từ chối, nên một phép nhân thứ hai
+   * là một cơ hội để hai bên lệch nhau vài phần triệu đồng rồi báo lỗi ở chỗ không ai hiểu nổi.
+   */
+  distributableAmountVnd: number
+  content: QuotaUserAllocation[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
 }
 
 export type UserQuotaAmount = {

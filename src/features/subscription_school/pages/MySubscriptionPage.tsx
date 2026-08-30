@@ -10,19 +10,22 @@ import { useMySubscriptionUsageQuery } from '../api/useMySubscriptionUsageQuery'
 import { useRenewalPreviewQuery } from '../api/useRenewalPreviewQuery'
 import { useCancelMySubscriptionMutation } from '../api/useCancelMySubscriptionMutation'
 import {
-  useClassTestQuotaAllocationsQuery,
+  useExamQuotaAllocationsQuery,
   usePracticeQuotaAllocationsQuery,
 } from '../api/useQuotaAllocationQueries'
 import {
-  useAllocateClassTestQuotaMutation,
+  useAllocateExamQuotaMutation,
   useAllocatePracticeQuotaMutation,
 } from '../api/useQuotaAllocationMutations'
+import { useSetQuotaPolicyMutation } from '../api/useQuotaPolicyMutation'
 import { MyPlanCard } from '../components/MyPlanCard'
 import { PlanRenewalDialog } from '../components/PlanRenewalDialog'
 import { QuotaAllocationPanel } from '../components/QuotaAllocationPanel'
 import { SUBSCRIPTION_PLANS_PATH } from '../routes'
 
 type QuotaAllocationTab = 'teachers' | 'students'
+
+const ALLOCATION_PAGE_SIZE = 20
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
@@ -38,19 +41,37 @@ export function MySubscriptionPage() {
 
   const [quotaTab, setQuotaTab] = useState<QuotaAllocationTab>('teachers')
   const [isRenewalOpen, setRenewalOpen] = useState(false)
+  // Trang và từ khoá tách riêng cho hai tab: đổi tab mà giữ nguyên trang 4 của tab kia là hiện một
+  // bảng rỗng trông như không có dữ liệu.
+  const [examPage, setExamPage] = useState(1)
+  const [examSearch, setExamSearch] = useState('')
+  const [practicePage, setPracticePage] = useState(1)
+  const [practiceSearch, setPracticeSearch] = useState('')
 
   const mySubscriptionQuery = useMySubscriptionQuery()
   const usageQuery = useMySubscriptionUsageQuery()
   const renewalPreviewQuery = useRenewalPreviewQuery(isRenewalOpen)
-  const classTestQuotaQuery = useClassTestQuotaAllocationsQuery()
-  const practiceQuotaQuery = usePracticeQuotaAllocationsQuery()
+  const examQuotaQuery = useExamQuotaAllocationsQuery(examPage, ALLOCATION_PAGE_SIZE, examSearch)
+  const practiceQuotaQuery = usePracticeQuotaAllocationsQuery(practicePage, ALLOCATION_PAGE_SIZE, practiceSearch)
 
   const placeRenewalOrder = usePlaceRenewalOrderMutation()
   const cancelMutation = useCancelMySubscriptionMutation()
-  const allocateClassTestQuotaMutation = useAllocateClassTestQuotaMutation()
+  const allocateExamQuotaMutation = useAllocateExamQuotaMutation()
   const allocatePracticeQuotaMutation = useAllocatePracticeQuotaMutation()
+  const setQuotaPolicyMutation = useSetQuotaPolicyMutation()
 
   const subscription = mySubscriptionQuery.data ?? null
+
+  async function handleSetCap(quotaType: 'EXAM' | 'PRACTICE', percent: number) {
+    try {
+      // Giao diện nhận PHẦN TRĂM cho dễ nhập; API nhận TỶ LỆ. Chia 100 ở đúng một chỗ, ngay trước
+      // khi gọi, để không có hai đơn vị cùng trôi nổi trong state.
+      await setQuotaPolicyMutation.mutateAsync({ distributableRatio: percent / 100, quotaType })
+      showSuccess('Đã cập nhật trần phân phối hạn mức.')
+    } catch (error) {
+      showError(getErrorMessage(error) ?? 'Không cập nhật được trần phân phối.')
+    }
+  }
 
   async function handleConfirmRenewal(acceptedPlanId: string) {
     try {
@@ -82,11 +103,11 @@ export function MySubscriptionPage() {
     }
   }
 
-  async function handleAllocateClassTestQuota(
-    payload: Parameters<typeof allocateClassTestQuotaMutation.mutateAsync>[0],
+  async function handleAllocateExamQuota(
+    payload: Parameters<typeof allocateExamQuotaMutation.mutateAsync>[0],
   ) {
     try {
-      await allocateClassTestQuotaMutation.mutateAsync(payload)
+      await allocateExamQuotaMutation.mutateAsync(payload)
       showSuccess('Đã cập nhật phân bổ hạn mức kiểm tra')
     } catch (error) {
       showError(getErrorMessage(error) ?? 'Không thể phân bổ hạn mức kiểm tra.')
@@ -146,7 +167,7 @@ export function MySubscriptionPage() {
           <div>
             <h2 className="text-[17px] font-bold text-blue-950">Phân bổ hạn mức</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Chia ví của trường thành trần chi cho từng người. Không có tên ở đây nghĩa là không bị chặn riêng, chỉ ví
+              Chia hạn mức của trường thành trần chi cho từng người. Không có tên ở đây nghĩa là không bị chặn riêng, chỉ hạn mức
               của trường áp dụng.
             </p>
           </div>
@@ -162,23 +183,41 @@ export function MySubscriptionPage() {
 
           {quotaTab === 'teachers' ? (
             <QuotaAllocationPanel
-              errorMessage={getErrorMessage(classTestQuotaQuery.error)}
-              isError={classTestQuotaQuery.isError}
-              isLoading={classTestQuotaQuery.isLoading}
-              isSubmitting={allocateClassTestQuotaMutation.isPending}
+              errorMessage={getErrorMessage(examQuotaQuery.error)}
+              isError={examQuotaQuery.isError}
+              isFetching={examQuotaQuery.isFetching}
+              isLoading={examQuotaQuery.isLoading}
+              isSubmitting={allocateExamQuotaMutation.isPending || setQuotaPolicyMutation.isPending}
               key="teachers"
-              onSubmit={(payload) => void handleAllocateClassTestQuota(payload)}
-              summary={classTestQuotaQuery.data}
+              onPageChange={setExamPage}
+              onSearchChange={(value) => {
+                setExamSearch(value)
+                setExamPage(1)
+              }}
+              onSetCap={(percent) => void handleSetCap('EXAM', percent)}
+              onSubmit={(payload) => void handleAllocateExamQuota(payload)}
+              page={examPage}
+              search={examSearch}
+              summary={examQuotaQuery.data}
               userLabel="giáo viên"
             />
           ) : (
             <QuotaAllocationPanel
               errorMessage={getErrorMessage(practiceQuotaQuery.error)}
               isError={practiceQuotaQuery.isError}
+              isFetching={practiceQuotaQuery.isFetching}
               isLoading={practiceQuotaQuery.isLoading}
-              isSubmitting={allocatePracticeQuotaMutation.isPending}
+              isSubmitting={allocatePracticeQuotaMutation.isPending || setQuotaPolicyMutation.isPending}
               key="students"
+              onPageChange={setPracticePage}
+              onSearchChange={(value) => {
+                setPracticeSearch(value)
+                setPracticePage(1)
+              }}
+              onSetCap={(percent) => void handleSetCap('PRACTICE', percent)}
               onSubmit={(payload) => void handleAllocatePracticeQuota(payload)}
+              page={practicePage}
+              search={practiceSearch}
               summary={practiceQuotaQuery.data}
               userLabel="học sinh"
             />
