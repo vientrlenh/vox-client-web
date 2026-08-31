@@ -1,3 +1,6 @@
+import { ArrowLeft } from 'lucide-react'
+import { Link } from 'react-router'
+import logoImage from '@/assets/images/logo-v2.png'
 import { SiteFooter } from '@/shared/ui/SiteFooter'
 
 /**
@@ -64,6 +67,34 @@ const TOC = [
 export function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-white">
+      {/* Trang này KHÔNG nằm trong layout có điều hướng (xem AppRoutes: route công khai, ngoài
+          guard đăng nhập), nên trước đây vào từ link Google Play là cụt đường -- không có cách
+          nào quay lại trang chủ ngoài nút Back của trình duyệt, mà mở từ app thì không có nút đó.
+
+          Dính (sticky) vì trang dài mười mục: để thanh trôi lên mất thì cuối trang lại cụt đường
+          y như cũ. Các mục đã có sẵn scroll-mt-24 nên nhảy mục lục không bị thanh che.
+
+          KHÔNG dùng LandingHeader: nó viết cho nền tối của hero (chữ trắng, nút trong suốt) và
+          kèm cả menu sản phẩm -- đặt lên nền trắng ở đây thì chữ mất hút, còn menu thì thừa. */}
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+          <Link
+            aria-label="Vox - về trang chủ"
+            className="inline-flex h-9 w-24 shrink-0 items-center overflow-hidden drop-shadow-[0_1px_2px_rgba(15,23,42,0.30)]"
+            to="/"
+          >
+            <img alt="Vox" className="h-full w-full object-cover object-center" src={logoImage} />
+          </Link>
+          <Link
+            className="inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
+            to="/"
+          >
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Về trang chủ
+          </Link>
+        </div>
+      </div>
+
       <header className="border-b border-slate-200 bg-slate-50">
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-black text-slate-950 sm:text-4xl">

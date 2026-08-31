@@ -225,7 +225,7 @@ export function RubricPolicySelectField({
             >
               <span>
                 <span className="block text-indigo-700">
-                  {getAssessmentPolicyScopeLabel(policy)} · {policy.targetFrameworkBand?.label ?? '—'}
+                  Phạm vi: {getAssessmentPolicyScopeLabel(policy)} · {policy.targetFrameworkBand?.label ?? '—'}
                 </span>
                 Phiên bản {policy.version} · {getAssessmentPolicyStrictnessLabel(policy.strictness)} · Điểm đạt{' '}
                 {policy.passingScore ?? '-'}

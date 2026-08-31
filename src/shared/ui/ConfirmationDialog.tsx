@@ -69,7 +69,9 @@ export function ConfirmationDialog({
               <h2 className="text-lg font-black text-blue-950" id="confirmation-dialog-title">
                 {title}
               </h2>
-              <p className="mt-1 text-sm font-medium leading-6 text-slate-600">{message}</p>
+              {/* `whitespace-pre-line`: dialog nào cần liệt kê danh sách (vd: bỏ nhiều thí sinh khỏi
+                  ca thi) thì xuống dòng trong message mới hiện ra đúng thay vì dồn thành một khối. */}
+              <p className="mt-1 text-sm font-medium leading-6 whitespace-pre-line text-slate-600">{message}</p>
             </div>
           </div>
           <button

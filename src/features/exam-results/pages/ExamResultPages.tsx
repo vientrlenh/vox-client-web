@@ -21,7 +21,12 @@ import { useAppSelector } from '@/app/store/hooks'
 import { ExamRecordingPlayer } from '@/features/exam-recordings'
 import { useForceEndExamSessionMutation } from '@/features/examCore/api/mutations'
 import { examQueryKeys, useExamCandidatesQuery, useExamQuery } from '@/features/examCore/api/queries'
-import { formatDateTime, getCandidateName, type ExamAttemptSummaryDto } from '@/features/examCore/types'
+import {
+  formatDateTime,
+  getCandidateName,
+  isExamResultsFinalized,
+  type ExamAttemptSummaryDto,
+} from '@/features/examCore/types'
 import { Pagination } from '@/shared/components/Pagination'
 import {
   buildValidityRulesForDisplay,
@@ -186,12 +191,11 @@ function ResultBand({
  * Trạng thái phiên cho phép xoá: chấm lỗi, bị gián đoạn, hoặc đã chấm xong.
  *
  * Loại trừ IN_PROGRESS / SUBMITTED / GRADING / EXPIRED — đó là phiên đang thi, đang chờ chấm
- * hoặc đang chấm dở. Xoá lúc đó là cắt ngang một luồng còn đang ghi dữ liệu, mà
- * DeleteExamSessionUseCase xoá VĨNH VIỄN cả câu trả lời, lượt nói, điểm, phúc khảo và bản ghi
- * hình — không hoàn tác được.
+ * hoặc đang chấm dở. Xoá lúc đó là cắt ngang một luồng còn đang ghi dữ liệu. DELETED cũng không
+ * nằm trong danh sách: xoá rồi thì không xoá lại.
  *
- * Đây là chốt GIAO DIỆN. Backend chưa có ràng buộc tương ứng, nên gọi thẳng API vẫn xoá được
- * phiên ở trạng thái khác; muốn chặn thật thì phải thêm ở DeleteExamSessionUseCase.
+ * Đây chỉ là chốt giao diện; chốt thật nằm ở `DeleteExamSessionUseCase` (quyền, kỳ thi đã chốt sổ,
+ * và bắt buộc có lý do).
  */
 const DELETABLE_ATTEMPT_STATUSES = new Set(['GRADING_FAILED', 'INTERRUPTED', 'GRADED'])
 
@@ -202,6 +206,7 @@ function canDeleteAttempt(status?: string | null): boolean {
 function AttemptRows({
   attempts,
   canDelete,
+  deleteBlockedReason,
   detailBasePath,
   navigate,
   officialAttempt,
@@ -210,6 +215,8 @@ function AttemptRows({
 }: {
   attempts: ExamAttemptSummaryDto[]
   canDelete: boolean
+  /** Có giá trị = còn hiện nút xoá nhưng khoá lại, kèm tooltip nói rõ vì sao. */
+  deleteBlockedReason?: string
   detailBasePath: string
   navigate: ReturnType<typeof useNavigate>
   officialAttempt?: ExamAttemptSummaryDto | null
@@ -253,6 +260,13 @@ function AttemptRows({
             </div>
             <span>
               <StatusBadge label={attemptStatus.label} tone={attemptStatus.tone} />
+              {/* Lượt đã xoá chỉ quản trị trường / chủ tịch hội đồng mới nhận được từ backend —
+                  hiện luôn lý do để trả lời được câu "điểm của em đi đâu". */}
+              {attempt.status === 'DELETED' && attempt.deletedReason ? (
+                <p className="mt-1 text-xs text-slate-500" title={attempt.deletedReason}>
+                  {attempt.deletedReason}
+                </p>
+              ) : null}
             </span>
             <div>
               <p className={`text-sm font-bold ${getResultScoreTextClass(attempt.totalScore, attempt.scoringScaleMin, attempt.scoringScaleMax)}`}>
@@ -288,9 +302,11 @@ function AttemptRows({
               <span>
                 {canDeleteAttempt(attempt.status) ? (
                   <button
-                    aria-label="Xóa phiên thi này"
-                    className="inline-flex size-8.5 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:bg-rose-50"
+                    aria-label="Xóa bài thi này"
+                    className="inline-flex size-8.5 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-transparent"
+                    disabled={Boolean(deleteBlockedReason)}
                     onClick={() => onDeleteSession(attempt.sessionId)}
+                    title={deleteBlockedReason}
                     type="button"
                   >
                     <Trash2 aria-hidden="true" className="size-3.5" />
@@ -329,20 +345,29 @@ function ExamResultsListPage({
   const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data])
   const rows = useMemo(() => candidates.map((candidate) => ({ candidate })), [candidates])
   const deleteSessionMutation = useDeleteExamSessionMutation()
-  const { confirm, dialog: deleteDialog } = useConfirmationDialog()
+  const { confirmWithReason, dialog: deleteDialog } = useConfirmationDialog()
   const canDeleteSessions = userRole === 'SCHOOL_ADMIN' || (userRole === 'TEACHER' && examQuery.data?.kind === 'CLASS_TEST')
+  // Kỳ thi đã đóng hoặc đã công bố kết quả thì backend từ chối xoá (Exam.isResultsFinalized) —
+  // khoá nút kèm lý do thay vì để bấm rồi ăn lỗi.
+  const deleteBlockedReason = isExamResultsFinalized(examQuery.data?.status)
+    ? 'Kỳ thi đã đóng hoặc đã công bố kết quả — không thể xóa bài thi'
+    : undefined
 
   async function handleDeleteSession(sessionId: string) {
-    if (
-      !(await confirm({
-        message:
-          'Xóa phiên thi này sẽ xóa vĩnh viễn toàn bộ dữ liệu liên quan. Không thể hoàn tác. Bạn có chắc chắn?',
-      }))
-    ) {
+    const result = await confirmWithReason({
+      confirmLabel: 'Xóa bài thi',
+      message:
+        'Bài thi sẽ được gỡ khỏi bảng kết quả, hàng đợi chấm và phúc khảo. Dữ liệu bài làm vẫn được giữ lại, quản trị trường và chủ tịch hội đồng vẫn xem lại được kèm lý do bên dưới.',
+      reasonLabel: 'Lý do xóa bài thi',
+      reasonPlaceholder: 'Ví dụ: vào phòng thi lỗi, phải cho thi lại...',
+      requireReason: true,
+      title: 'Xác nhận xóa bài thi',
+    })
+    if (!result.confirmed) {
       return
     }
 
-    await deleteSessionMutation.mutateAsync(sessionId)
+    await deleteSessionMutation.mutateAsync({ reason: result.reason, sessionId })
     await queryClient.invalidateQueries({ queryKey: examResultQueryKeys.all })
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.candidates(examId) })
   }
@@ -524,6 +549,7 @@ function ExamResultsListPage({
                       <AttemptRows
                         attempts={attempts}
                         canDelete={canDeleteSessions}
+                        deleteBlockedReason={deleteBlockedReason}
                         detailBasePath={detailBasePath}
                         navigate={navigate}
                         officialAttempt={candidate.officialAttempt}

@@ -280,14 +280,23 @@ export function useExamItemEvaluationQuery(answerId: string | null) {
   })
 }
 
-export async function deleteExamSession(sessionId: string) {
-  const response = await apiClient.delete<ApiEnvelope<null>>(`/v1/exam-sessions/${sessionId}`)
+/**
+ * Xóa MỀM bài thi: backend giữ nguyên dữ liệu bài làm, chỉ đánh dấu `DELETED` kèm lý do.
+ *
+ * <p>Lý do đi trong body chứ không phải query param — đó là văn bản tự do giáo viên nhập, đưa lên
+ * URL là đẩy thẳng vào access log. Axios gửi body cho DELETE qua `{ data }`.
+ */
+export async function deleteExamSession(sessionId: string, reason: string) {
+  const response = await apiClient.delete<ApiEnvelope<null>>(`/v1/exam-sessions/${sessionId}`, {
+    data: { reason },
+  })
   return response.data.message
 }
 
 export function useDeleteExamSessionMutation() {
   return useMutation({
-    mutationFn: (sessionId: string) => deleteExamSession(sessionId),
+    mutationFn: ({ reason, sessionId }: { reason: string; sessionId: string }) =>
+      deleteExamSession(sessionId, reason),
   })
 }
 

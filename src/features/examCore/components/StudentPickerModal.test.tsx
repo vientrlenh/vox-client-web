@@ -49,7 +49,10 @@ describe('StudentPickerModal', () => {
     expect(bodies()[0].query).not.toContain('schoolStudentsBySchool')
   })
 
-  it('loại người đã là thí sinh khỏi danh sách chọn', async () => {
+  // Loại ở BE chứ không lọc lại sau khi nhận trang: lọc ở client thì `content` ngắn đi trong khi
+  // `totalElements`/`totalPages` vẫn đếm cả người bị bỏ — nhập xong một lớp là picker hiện trang
+  // trống kèm số đếm khác 0.
+  it('nhờ backend loại người đã là thí sinh, không tự lọc lại trang đã nhận', async () => {
     renderWithProviders(
       <StudentPickerModal
         examId="exam-1"
@@ -61,7 +64,8 @@ describe('StudentPickerModal', () => {
     )
 
     await screen.findByText('Tran Thi Binh')
-    expect(screen.queryByText('Nguyen Van An')).not.toBeInTheDocument()
+    expect(bodies()[0].query).toContain('excludeUserIds')
+    expect(bodies()[0].variables).toMatchObject({ excludeUserIds: ['user-1'] })
   })
 
   it('trả về userId khi chọn', async () => {

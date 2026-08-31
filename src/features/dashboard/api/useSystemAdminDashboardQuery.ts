@@ -6,6 +6,11 @@ export type SystemAdminDashboard = {
   activeSchools: number
   inactiveSchools: number
   pendingRegistrations: number
+  /**
+   * Đơn chờ lâu nhất đã nằm trong hàng đợi bao nhiêu ngày. null = KHÔNG còn đơn nào chờ, khác hẳn 0
+   * ("có đơn, vừa nộp hôm nay") — ở đây 0 mới là trạng thái tốt nhất.
+   */
+  oldestPendingRegistrationDays: number | null
   registrationsLast30Days: number
   registrationsLast90Days: number
   schoolAdminCount: number
@@ -24,6 +29,7 @@ const SYSTEM_ADMIN_DASHBOARD = `
       activeSchools
       inactiveSchools
       pendingRegistrations
+      oldestPendingRegistrationDays
       registrationsLast30Days
       registrationsLast90Days
       schoolAdminCount

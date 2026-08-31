@@ -56,7 +56,9 @@ export function QuestionTopicImportPage({ basePath }: ScopeImportPageProps) {
     searchParams.get('questionBankId') ?? '',
   )
 
-  const questionBanksQuery = useQuestionBanksQuery('teacher', 0, 100, true, {
+  // Trang 1, KHÔNG phải 0: backend đếm trang từ 1 và tự trừ đi 1 trước khi dựng PageRequest.
+  // Truyền 0 là ra PageRequest.of(-1, size) và Spring Data ném lỗi -- dropdown rỗng lặng lẽ.
+  const questionBanksQuery = useQuestionBanksQuery('teacher', 1, 100, true, {
     ownerType: isSystemAdmin ? 'SYSTEM' : 'SCHOOL',
   })
 

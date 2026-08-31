@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest, requireSchoolId } from '@/shared/api'
+import type { QuotaType } from '@/features/subscription_school/types'
 
-export type QuotaType = 'GRADING' | 'CLASS_TEST' | 'PRACTICE'
+export type { QuotaType }
 
 export type TokenQuotaUsage = {
   id: string
   quotaType: QuotaType
-  totalAllocated: number
-  usedQuantity: number
+  totalAllocatedAmountVnd: number
+  usedAmountVnd: number
 }
 
 /**
@@ -19,8 +20,8 @@ const TOKEN_USAGE_BREAKDOWN_QUERY = `
     subscriptionUsage(schoolId: $schoolId) {
       id
       quotaType
-      totalAllocated
-      usedQuantity
+      totalAllocatedAmountVnd
+      usedAmountVnd
     }
   }
 `

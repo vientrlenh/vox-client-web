@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Search, UserPlus, X } from 'lucide-react'
+import { toVnSearchKey } from '@/shared/lib/vnSearchKey'
 import { getCandidateName, getScheduleLabel, type ExamCandidateDto, type ExamScheduleDto } from '../../types'
 
 type AddStudentToRoomModalProps = {
@@ -49,14 +50,15 @@ export function AddStudentToRoomModal({
   )
 
   const visible = useMemo(() => {
-    const term = keyword.trim().toLowerCase()
+    // So khớp sau khi bỏ dấu: gõ "nguyen van an" phải ra "Nguyễn Văn An" — xem `toVnSearchKey`.
+    const term = toVnSearchKey(keyword)
     if (!term) {
       return pool
     }
     return pool.filter(
       (candidate) =>
-        getCandidateName(candidate).toLowerCase().includes(term) ||
-        (candidate.student?.email ?? '').toLowerCase().includes(term),
+        toVnSearchKey(getCandidateName(candidate)).includes(term) ||
+        toVnSearchKey(candidate.student?.email ?? '').includes(term),
     )
   }, [keyword, pool])
 

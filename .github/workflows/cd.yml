@@ -1,0 +1,144 @@
+name: CD
+
+# Build SPA -> đẩy lên S3 -> xoá cache CloudFront.
+#
+# Chạy khi có push vào nhánh mặc định, hoặc bấm tay (workflow_dispatch) để deploy lại đúng
+# commit đang chọn mà không cần push rỗng.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Hai lần deploy chồng nhau sẽ đua nhau ghi vào cùng một bucket: lần chậm hơn có thể ghi đè
+# index.html của lần mới hơn, để lại một trang trỏ vào bundle đã bị --delete xoá mất. Xếp hàng,
+# không huỷ lần đang chạy (huỷ giữa chừng là bucket ở trạng thái nửa vời).
+concurrency:
+  group: cd-s3
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy to S3
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-southeast-1
+      S3_BUCKET: voxenta-spa-voxenta-net
+      # Để ở Secrets chứ không phải Variables. Hệ quả cần biết: GitHub che giá trị này trong log
+      # thành ***, nên khi job hỏng sẽ không đọc được distribution id trong output.
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      # Đặt SAU pnpm: `cache: pnpm` cần lệnh pnpm đã có mặt để dò store.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `.env.production.local` bị .gitignore nuốt (mẫu `*.local`), nên trên runner nó KHÔNG tồn
+      # tại. Không dựng lại thì Vite không thấy biến nào: `appConfig.apiBaseUrl` rơi về `/api`
+      # tương đối và `streamApiUrl` thành chuỗi rỗng -- bản build vẫn xanh, vẫn deploy được, chỉ
+      # là gọi API sai chỗ. Hỏng kiểu đó chỉ lộ ra khi mở web lên.
+      # Mọi giá trị dưới đây đều KHÔNG bí mật: Vite nhúng thẳng chúng vào bundle, ai mở web cũng
+      # đọc được. Nên viết cứng tại đây thay vì rải ra GitHub Variables -- đỡ một chỗ phải nhớ đồng
+      # bộ, và đổi endpoint thì thấy ngay trong diff. Riêng khoá Firebase để ở Secrets theo ý chủ
+      # repo, dù nó cũng nằm trong bundle như phần còn lại.
+      #
+      # Đổi tên miền (api/stream) thì sửa ngay khối này -- KHÔNG có nơi nào khác giữ bản sao.
+      - name: Write production env
+        run: |
+          # Chặn sớm, TRƯỚC bước build: quên nạp secret mà để build chạy xong mới phát hiện thì
+          # deploy vẫn xanh, chỉ đăng nhập Firebase là chết -- lỗi chỉ lộ khi mở web lên.
+          #
+          # Dùng `if`, KHÔNG dùng `[ -z "$X" ] && echo ... && exit 1`: GitHub chạy step bằng
+          # `bash -e`, mà một AND-list đứng độc lập trả về khác 0 (đúng lúc biến ĐỦ) sẽ làm cả
+          # step chết -- tức là hỏng đúng ở trường hợp lẽ ra phải chạy tiếp.
+          if [ -z "${VITE_FIREBASE_API_KEY}" ]; then
+            echo "Thiếu secret VITE_FIREBASE_API_KEY -- đăng nhập Firebase sẽ hỏng" >&2
+            exit 1
+          fi
+          cat > .env.production.local <<EOF
+          VITE_API_BASE_URL=https://api.voxenta.net/api
+          VITE_GRAPHQL_ENDPOINT=https://api.voxenta.net/graphql
+          VITE_STREAM_API_URL=https://stream.voxenta.net
+          VITE_STREAM_WS_URL=wss://stream.voxenta.net
+          VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
+          VITE_FIREBASE_AUTH_DOMAIN=vox-storage-32df6.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID=vox-storage-32df6
+          VITE_FIREBASE_STORAGE_BUCKET=vox-storage-32df6.firebasestorage.app
+          VITE_FIREBASE_MESSAGING_SENDER_ID=528219130695
+          VITE_FIREBASE_APP_ID=1:528219130695:web:d889171d5a569572ba9a62
+          VITE_FIREBASE_MEASUREMENT_ID=G-LH3TR03TG2
+          EOF
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+
+      # `pnpm build` = `tsc -b && vite build`: lỗi kiểu chặn deploy ngay tại đây.
+      - name: Build
+        run: pnpm build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # Hai lượt, vì hai loại tệp có vòng đời khác hẳn nhau:
+      #
+      #   assets/  tên đã mang hash nội dung (index-D8lQmzl0.js). Nội dung đổi thì TÊN đổi, nên
+      #            cache vĩnh viễn được -- người dùng quay lại không tải lại vài trăm KB.
+      #   phần còn lại  index.html, favicon, manifest... tên CỐ ĐỊNH. Cache lâu là trình duyệt giữ
+      #            lại index.html cũ trỏ vào bundle vừa bị --delete xoá -> trang trắng.
+      #
+      # Đẩy assets TRƯỚC index.html: giữa hai lượt, index.html cũ vẫn trỏ bundle cũ (chưa bị xoá
+      # vì lượt 1 chỉ --delete trong assets/ của bản mới). Làm ngược lại thì có một khoảng người
+      # dùng nhận index.html mới trỏ vào bundle chưa lên.
+      - name: Sync hashed assets to S3
+        run: |
+          aws s3 sync dist/assets/ "s3://${S3_BUCKET}/assets/" \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --only-show-errors
+
+      - name: Sync index.html and static root files to S3
+        run: |
+          aws s3 sync dist/ "s3://${S3_BUCKET}/" \
+            --delete \
+            --exclude "assets/*" \
+            --cache-control "no-cache" \
+            --only-show-errors
+
+      - name: Invalidate CloudFront
+        run: |
+          id=$(aws cloudfront create-invalidation \
+            --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" \
+            --paths "/*" \
+            --query "Invalidation.Id" --output text)
+          echo "Invalidation: ${id}"
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" \
+            --id "${id}"
+
+      # Đối chiếu bundle mà index.html TRÊN S3 đang trỏ tới với bản vừa build. Lệch nhau nghĩa là
+      # có lần deploy khác chen vào giữa, hoặc một lượt sync im lặng không lên -- job xanh mà web
+      # hỏng là kiểu thất bại tệ nhất.
+      - name: Verify deployed bundle
+        run: |
+          local_bundle=$(grep -o 'assets/index-[A-Za-z0-9_-]*\.js' dist/index.html | head -1)
+          aws s3 cp "s3://${S3_BUCKET}/index.html" /tmp/deployed.html --only-show-errors
+          remote_bundle=$(grep -o 'assets/index-[A-Za-z0-9_-]*\.js' /tmp/deployed.html | head -1)
+          echo "local  = ${local_bundle}"
+          echo "S3     = ${remote_bundle}"
+          [ -n "$local_bundle" ] && [ "$local_bundle" = "$remote_bundle" ]

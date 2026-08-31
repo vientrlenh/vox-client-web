@@ -127,14 +127,17 @@ export function QuestionImportPage({ basePath }: QuestionImportPageProps) {
   const [error, setError] = useState<string | null>(null)
 
   const isSystemAdmin = user?.roles?.includes('SYSTEM_ADMIN') ?? false
-  const questionBanksQuery = useQuestionBanksQuery('teacher', 0, 100, true, {
+  // Trang 1, KHÔNG phải 0: backend đếm trang từ 1 và tự trừ đi 1 trước khi dựng PageRequest.
+  // Truyền 0 là ra PageRequest.of(-1, size) và Spring Data ném "Page index must not be less than
+  // zero" -- query hỏng, dropdown rỗng mà không có thông báo lỗi nào trên màn hình.
+  const questionBanksQuery = useQuestionBanksQuery('teacher', 1, 100, true, {
     ownerType: isSystemAdmin ? 'SYSTEM' : 'SCHOOL',
     status: 'PUBLISHED',
   })
   const questionTopicsQuery = useQuestionTopicsQuery(
     'teacher',
     questionBankId,
-    0,
+    1,
     100,
     Boolean(questionBankId),
     { status: 'PUBLISHED' },

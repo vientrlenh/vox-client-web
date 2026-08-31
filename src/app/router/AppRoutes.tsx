@@ -48,6 +48,18 @@ const SystemAdminDashboardPage = lazy(() =>
   })),
 );
 
+const SystemAdminGradingFailuresPage = lazy(() =>
+  import("@/features/dashboard").then((module) => ({
+    default: module.SystemAdminGradingFailuresPage,
+  })),
+);
+
+const SystemAdminSchoolsAtRiskPage = lazy(() =>
+  import("@/features/dashboard").then((module) => ({
+    default: module.SystemAdminSchoolsAtRiskPage,
+  })),
+);
+
 const SchoolAdminDashboardPage = lazy(() =>
   import("@/features/dashboard").then((module) => ({
     default: module.SchoolAdminDashboardPage,
@@ -868,6 +880,17 @@ export function AppRoutes() {
             <Route
               path="system-admin/dashboard"
               element={<SystemAdminDashboardPage />}
+            />
+            {/* Khoảng thời gian đi qua query string (?from=&to=) chứ không có bộ chọn riêng:
+                con số trên thẻ tổng quan và danh sách này phải luôn nói cùng một cửa sổ. */}
+            <Route
+              path="system-admin/grading-failures"
+              element={<SystemAdminGradingFailuresPage />}
+            />
+            {/* MỘT trang, bốn bộ lọc — nhóm đi qua ?bucket= chứ không phải bốn route riêng. */}
+            <Route
+              path="system-admin/schools/attention"
+              element={<SystemAdminSchoolsAtRiskPage />}
             />
             <Route
               path="system-admin/registrations"

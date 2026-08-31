@@ -114,10 +114,12 @@ export function QuestionPicker({
   const filterActive = hasSlotFilter && applySlotFilter
   const topicQuery = useQuestionTopicQuery(filterActive ? initialQuestionTopicId : null)
 
-  const bankOptionsQuery = useQuestionBanksQuery(scope, 0, 100)
+  // Trang 1, KHÔNG phải 0: backend đếm trang từ 1 và tự trừ đi 1 trước khi dựng PageRequest.
+  // Truyền 0 là ra PageRequest.of(-1, size) và Spring Data ném lỗi -- dropdown rỗng lặng lẽ.
+  const bankOptionsQuery = useQuestionBanksQuery(scope, 1, 100)
   // Chủ đề nạp theo NGÂN HÀNG ĐANG CHỌN, không nạp trước tất cả: danh sách chủ đề của mọi ngân
   // hàng gộp lại vừa dài vừa có mã trùng nhau giữa các ngân hàng, chọn nhầm là chuyện sớm muộn.
-  const topicOptionsQuery = useQuestionTopicsQuery(scope, bankId, 0, 100, Boolean(bankId))
+  const topicOptionsQuery = useQuestionTopicsQuery(scope, bankId, 1, 100, Boolean(bankId))
 
   // Tiêu chí của ô blueprint (initialQuestionTopicId) VẪN THẮNG khi còn hiệu lực -- nó là ràng
   // buộc của đề, còn hai ô dưới chỉ là bộ lọc để tìm cho nhanh. Bỏ lọc ô rồi thì hai ô này mới

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest, requireSchoolId } from '@/shared/api'
-import type { QuotaType, TokenQuotaUsage } from './useTokenUsageBreakdownQuery'
+import type { QuotaType } from '@/features/subscription_school/types'
 
 export type TokenUsageGranularity = 'DAY' | 'WEEK' | 'MONTH'
 
@@ -10,11 +10,18 @@ export type TokenUsageTimeseriesPoint = {
   tokensConsumed: number
 }
 
+export type TokenUsageQuotaPeriod = {
+  id: string
+  quotaType: QuotaType
+  totalAllocatedAmountVnd: number
+  usedAmountVnd: number
+}
+
 export type TokenUsageTimeseries = {
   granularity: TokenUsageGranularity
   totalUsed: number
   points: TokenUsageTimeseriesPoint[]
-  currentPeriod: TokenQuotaUsage[]
+  currentPeriod: TokenUsageQuotaPeriod[]
 }
 
 const TOKEN_USAGE_TIMESERIES_QUERY = `
@@ -30,8 +37,8 @@ const TOKEN_USAGE_TIMESERIES_QUERY = `
       currentPeriod {
         id
         quotaType
-        totalAllocated
-        usedQuantity
+        totalAllocatedAmountVnd
+        usedAmountVnd
       }
     }
   }

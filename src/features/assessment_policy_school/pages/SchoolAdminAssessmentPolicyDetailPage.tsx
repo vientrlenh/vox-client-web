@@ -217,9 +217,9 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
   const hasScope = Boolean(policy.school || policy.gradeLevel || policy.schoolGrade || policy.schoolClass);
 
   const tabs: { id: TabId; icon: LucideIcon; title: string }[] = [
-    { id: 'framework', icon: BookMarked, title: 'Framework Version' },
-    { id: 'target', icon: Target, title: 'Target Band' },
-    { id: 'rubric', icon: ClipboardList, title: 'Rubric Version' },
+    { id: 'framework', icon: BookMarked, title: 'Khung năng lực' },
+    { id: 'target', icon: Target, title: 'Bậc mục tiêu' },
+    { id: 'rubric', icon: ClipboardList, title: 'Thang đánh giá' },
   ];
 
   return (

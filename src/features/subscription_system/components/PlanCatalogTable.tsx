@@ -1,4 +1,5 @@
-import { ArrowRight, Star } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, Ban, CopyPlus, Eye, Pencil, Star, Trash2, UploadCloud } from 'lucide-react'
+import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import type { SubscriptionPlan, SubscriptionPlanListItem } from '../types'
 import { formatPeriod, formatVnd, getPlanStatusDisplay } from '../types'
@@ -7,6 +8,7 @@ type PlanCatalogTableProps = {
   isLoading: boolean
   items: SubscriptionPlanListItem[]
   onArchive: (plan: SubscriptionPlan) => void
+  onCreateReplacement: (plan: SubscriptionPlan) => void
   onDeleteDraft: (plan: SubscriptionPlan) => void
   onEdit: (plan: SubscriptionPlan) => void
   onOpenDetail: (plan: SubscriptionPlan) => void
@@ -14,9 +16,6 @@ type PlanCatalogTableProps = {
   onUpdateReplacement: (plan: SubscriptionPlan) => void
   planNameById: Map<string, string>
 }
-
-const actionClassName =
-  'rounded text-[13px] font-bold text-indigo-600 transition hover:text-indigo-800 disabled:cursor-not-allowed disabled:text-slate-300'
 
 /**
  * Bảng chứ không phải lưới thẻ: thẻ dùng để BÁN, bảng dùng để QUẢN LÝ. Ở đây cần soi cùng lúc trạng
@@ -30,6 +29,7 @@ export function PlanCatalogTable({
   isLoading,
   items,
   onArchive,
+  onCreateReplacement,
   onDeleteDraft,
   onEdit,
   onOpenDetail,
@@ -45,13 +45,50 @@ export function PlanCatalogTable({
     return <p className="px-6 py-10 text-center text-sm font-bold text-slate-500">Chưa có gói dịch vụ nào.</p>
   }
 
+  /**
+   * Sửa CHỈ mở cho gói nháp. UpdateSubscriptionPlanUseCase khóa sửa mọi gói đã xuất bản -- gia hạn
+   * đọc giá và hạn mức LIVE từ chính gói đó, nên sửa tại chỗ là âm thầm đổi giá của trường đang dùng.
+   * Muốn đổi gói đã bán thì ngừng bán rồi tạo gói mới kèm gói thay thế.
+   */
+  function actionsFor(plan: SubscriptionPlan): ActionMenuItem[] {
+    const menuItems: ActionMenuItem[] = [
+      { icon: Eye, id: 'detail', label: 'Chi tiết', onSelect: () => onOpenDetail(plan) },
+    ]
+
+    if (plan.status === 'DRAFT') {
+      menuItems.push(
+        { icon: Pencil, id: 'edit', label: 'Sửa', onSelect: () => onEdit(plan) },
+        { icon: UploadCloud, id: 'publish', label: 'Xuất bản', onSelect: () => onPublish(plan), tone: 'primary' },
+        { icon: Trash2, id: 'delete-draft', label: 'Xóa', onSelect: () => onDeleteDraft(plan), tone: 'danger' },
+      )
+    }
+
+    if (plan.status === 'ACTIVE') {
+      menuItems.push(
+        { icon: CopyPlus, id: 'create-replacement', label: 'Tạo gói thay thế', onSelect: () => onCreateReplacement(plan) },
+        { icon: Ban, id: 'archive', label: 'Ngừng bán', onSelect: () => onArchive(plan), tone: 'warning' },
+      )
+    }
+
+    if (plan.status === 'ARCHIVED') {
+      menuItems.push({
+        icon: ArrowLeftRight,
+        id: 'update-replacement',
+        label: 'Đổi gói thay thế',
+        onSelect: () => onUpdateReplacement(plan),
+      })
+    }
+
+    return menuItems
+  }
+
   return (
     <div className="overflow-x-auto">
       {/*
         table-fixed + bề rộng chốt cho bốn cột phụ. Để bảng tự chia (auto layout) thì bề rộng mỗi cột
-        do NỘI DUNG DÀI NHẤT quyết định, nên cột Hành động -- 4 nút ở dòng nháp, 2 nút ở dòng đang bán
-        -- giành mất chỗ của cột Gói, thứ duy nhất dùng để nhận ra dòng. Tệ hơn: bề rộng đổi theo từng
-        trang, trang có gói nháp xếp cột lệch hẳn so với trang toàn gói đang bán.
+        do NỘI DUNG DÀI NHẤT quyết định -- cột Gói, thứ duy nhất dùng để nhận ra dòng, sẽ bị co lại
+        tùy nội dung các cột khác. Hành động giờ chỉ còn một nút "..." (ActionMenuButton) nên bề rộng
+        cố định nhỏ, không đổi theo số thao tác khả dụng của từng trạng thái gói.
 
         Chỉ cột Gói bỏ trống bề rộng nên nó nhận toàn bộ phần dư -- tên gói là thứ đáng được giãn ra
         khi màn hình rộng, còn "12 tháng" hay một cái pill trạng thái thì không.
@@ -63,7 +100,7 @@ export function PlanCatalogTable({
             <th className="w-28 px-4 py-3.5" scope="col">Chu kỳ</th>
             <th className="w-40 px-4 py-3.5 text-right" scope="col">Giá</th>
             <th className="w-32 px-4 py-3.5" scope="col">Trạng thái</th>
-            <th className="w-72 px-6 py-3.5 text-right" scope="col">Hành động</th>
+            <th className="w-16 px-6 py-3.5 text-right" scope="col">Hành động</th>
           </tr>
         </thead>
         <tbody>
@@ -114,50 +151,8 @@ export function PlanCatalogTable({
                   <StatusBadge label={status.label} tone={status.tone} />
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex flex-wrap items-center justify-end gap-3.5">
-                    <button className={actionClassName} onClick={() => onOpenDetail(plan)} type="button">
-                      Chi tiết
-                    </button>
-
-                    {/*
-                      Sửa CHỈ mở cho gói nháp. UpdateSubscriptionPlanUseCase khóa sửa mọi gói đã
-                      xuất bản -- gia hạn đọc giá và hạn mức LIVE từ chính gói đó, nên sửa tại chỗ
-                      là âm thầm đổi giá của trường đang dùng. Muốn đổi gói đã bán thì ngừng bán rồi
-                      tạo gói mới kèm gói thay thế.
-                    */}
-                    {plan.status === 'DRAFT' ? (
-                      <>
-                        <button className={actionClassName} onClick={() => onEdit(plan)} type="button">
-                          Sửa
-                        </button>
-                        <button className={actionClassName} onClick={() => onPublish(plan)} type="button">
-                          Xuất bản
-                        </button>
-                        <button
-                          className="rounded text-[13px] font-bold text-red-600 transition hover:text-red-700"
-                          onClick={() => onDeleteDraft(plan)}
-                          type="button"
-                        >
-                          Xóa
-                        </button>
-                      </>
-                    ) : null}
-
-                    {plan.status === 'ACTIVE' ? (
-                      <button
-                        className="rounded text-[13px] font-bold text-slate-500 transition hover:text-slate-700"
-                        onClick={() => onArchive(plan)}
-                        type="button"
-                      >
-                        Ngừng bán
-                      </button>
-                    ) : null}
-
-                    {isArchived ? (
-                      <button className={actionClassName} onClick={() => onUpdateReplacement(plan)} type="button">
-                        Đổi gói thay thế
-                      </button>
-                    ) : null}
+                  <div className="flex justify-end">
+                    <ActionMenuButton ariaLabel={`Mở thao tác cho gói ${plan.name}`} items={actionsFor(plan)} />
                   </div>
                 </td>
               </tr>

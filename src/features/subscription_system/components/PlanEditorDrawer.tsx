@@ -280,7 +280,7 @@ export function PlanEditorDrawer({
               Giá (VND) <span className="text-red-500">*</span>
               <input
                 className={inputClassName}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isPrefilled}
                 inputMode="decimal"
                 onChange={(event) => updateField('priceVnd', sanitizeNumericInput(event.target.value))}
                 placeholder="24,000,000"
@@ -296,7 +296,7 @@ export function PlanEditorDrawer({
                 Số chu kỳ <span className="text-red-500">*</span>
                 <input
                   className={inputClassName}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isPrefilled}
                   min={1}
                   onChange={(event) => updateField('periodCount', event.target.value)}
                   placeholder="1"
@@ -308,7 +308,7 @@ export function PlanEditorDrawer({
                 Đơn vị chu kỳ <span className="text-red-500">*</span>
                 <select
                   className={inputClassName}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isPrefilled}
                   onChange={(event) => updateField('periodType', event.target.value as SubscriptionPlanPeriod)}
                   value={form.periodType}
                 >
@@ -323,8 +323,9 @@ export function PlanEditorDrawer({
 
             {isPrefilled ? (
               <p className="-mt-3 text-xs font-medium text-indigo-600">
-                Giá và chu kỳ đã điền sẵn theo gói bạn chọn — có thể sửa lại nếu muốn khác. Gói mới ở trạng thái
-                nháp; bạn cần tự xuất bản khi sẵn sàng.
+                Giá và chu kỳ khóa theo đúng gói bạn đang thay — trường không bị đổi giá khi gia hạn. Có thể sửa
+                tên, mô tả, thời lượng tối đa, và tăng hạn mức. Gói mới ở trạng thái nháp; xuất bản sẽ bị chặn
+                nếu hạn mức hoặc thời lượng thấp hơn gói cũ, và bạn cần tự xuất bản khi sẵn sàng.
               </p>
             ) : null}
 

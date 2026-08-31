@@ -434,6 +434,8 @@ export type ExamScheduleOtpDto = {
 }
 
 export type ExamAttemptSummaryDto = {
+  /** Lý do lượt thi bị xóa, đi cùng `status === 'DELETED'`. */
+  deletedReason?: string | null
   flagged: boolean
   flagReason?: string | null
   resultStatus?: string | null
@@ -721,6 +723,17 @@ export function isExamLockedForEditing(status?: ExamStatus | string | null): boo
   return status === 'IN_PROGRESS' || status === 'CLOSED' || status === 'RESULTS_PUBLISHED' || status === 'CANCELLED'
 }
 
+/**
+ * Kỳ thi đã chốt sổ: không xóa bài thi được nữa (backend chặn bằng `Exam.isResultsFinalized`).
+ *
+ * <p>Hẹp hơn `isExamLockedForEditing` và cố ý: kỳ thi ĐANG diễn ra vẫn phải xóa được bài — gỡ một
+ * lượt hỏng ngay giữa buổi thi chính là việc tính năng này sinh ra để làm. Kỳ đã hủy cũng cho xóa
+ * để dọn dữ liệu rác.
+ */
+export function isExamResultsFinalized(status?: ExamStatus | string | null): boolean {
+  return status === 'CLOSED' || status === 'RESULTS_PUBLISHED'
+}
+
 export function getMemberRoleDisplay(role?: ExamMemberRole | null) {
   switch (role) {
     case 'CHAIR':
@@ -785,12 +798,21 @@ export function getAssessmentPolicyStrictnessLabel(strictness?: AssessmentPolicy
 // assessment_policy_school/components/AssessmentPolicyTable.tsx, để phân biệt các Assessment
 // Policy dùng chung 1 Rubric Version nhưng khác phạm vi (vd. CENTRALIZE theo Khối vs CLASS_TEST
 // neo vào 1 Lớp cụ thể) khi chúng hiện cạnh nhau trong danh sách "chọn một".
+// Trường có thể đã đặt tên khối/niên khóa/lớp bao gồm sẵn tiền tố (vd. "Khối 10" thay vì "10", vì
+// form tạo khối trước đây gợi ý placeholder như vậy) -- bỏ tiền tố lặp thay vì nối thô, tránh hiện
+// "Khối Khối 10".
+function withScopePrefix(prefix: string, name: string | null | undefined): string {
+  const trimmed = (name ?? '').trim()
+  const alreadyPrefixed = trimmed.toLowerCase().startsWith(prefix.toLowerCase())
+  return alreadyPrefixed ? trimmed : `${prefix} ${trimmed}`
+}
+
 export function getAssessmentPolicyScopeLabel(
   policy: Pick<AssessmentPolicyDto, 'gradeLevel' | 'schoolGrade' | 'schoolClass'>,
 ): string {
-  if (policy.schoolClass) return `Lớp ${policy.schoolClass.name || policy.schoolClass.code}`
-  if (policy.schoolGrade) return `Niên khóa ${policy.schoolGrade.name || policy.schoolGrade.code}`
-  if (policy.gradeLevel) return `Khối ${policy.gradeLevel.name || policy.gradeLevel.code}`
+  if (policy.schoolClass) return withScopePrefix('Lớp', policy.schoolClass.name || policy.schoolClass.code)
+  if (policy.schoolGrade) return withScopePrefix('Niên khóa', policy.schoolGrade.name || policy.schoolGrade.code)
+  if (policy.gradeLevel) return withScopePrefix('Khối', policy.gradeLevel.name || policy.gradeLevel.code)
   return 'Toàn trường'
 }
 
