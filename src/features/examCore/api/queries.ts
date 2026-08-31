@@ -246,6 +246,7 @@ const EXAM_CANDIDATE_FIELDS = `
     rubricResultBandCode
     rubricResultBandName
     resultStatus
+    deletedReason
   }
   officialAttempt {
     sessionId

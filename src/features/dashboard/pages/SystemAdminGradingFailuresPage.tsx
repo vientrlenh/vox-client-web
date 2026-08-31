@@ -172,7 +172,7 @@ function SessionTable({
               <th className="pb-2.5 pr-4 font-bold">Nộp lúc</th>
               <th className="pb-2.5 pr-4 text-center font-bold">Lần thử</th>
               <th className="pb-2.5 pr-4 font-bold">Xử lý</th>
-              <th className="pb-2.5 font-bold" />
+              <th className="pb-2.5 font-bold">Mã phiên</th>
             </tr>
           </thead>
           <tbody>
@@ -193,15 +193,15 @@ function SessionTable({
                 <td className="py-3.5 pr-4">
                   <StatusBadge handedOff={session.handedOff} retryable={session.retryable} />
                 </td>
-                <td className="py-3.5 text-right">
-                  {/* Màn chi tiết phiên đã có sẵn, kèm cả hai nút Chấm lại và Chuyển người chấm --
-                      không dựng lại ở đây, chỉ dẫn sang. */}
-                  <Link
-                    className="font-bold text-indigo-600 hover:text-indigo-700"
-                    to={`/school-admin/exam-results/${session.sessionId}`}
-                  >
-                    Chi tiết
-                  </Link>
+                {/* KHÔNG dẫn sang màn chấm lại: quyết định chấm lại hay giao người chấm thuộc về
+                    nhà trường, không phải quản trị hệ thống — và chi phí AI của lần chấm lại rơi
+                    vào hạn mức của chính trường đó. Trang này chỉ trả lời "hỏng cái gì, rộng tới
+                    đâu". Thứ quản trị hệ thống cần mang sang log là mã phiên. */}
+                <td
+                  className="py-3.5 font-mono text-[12px] text-slate-400"
+                  title={session.error ?? 'Không có thông điệp lỗi nào được lưu'}
+                >
+                  {session.sessionId.slice(0, 8)}
                 </td>
               </tr>
             ))}
@@ -352,12 +352,17 @@ export function SystemAdminGradingFailuresPage() {
               label="Trường bị ảnh hưởng"
               value={fmt(data.schoolCount)}
             />
+            {/* "Xử lý được" chứ không phải "chấm lại được": việc chấm lại thuộc về nhà trường, và cả
+                hai lối ra (chấm lại bằng AI, giao người chấm) đều bị chặn khi kỳ thi đã công bố
+                điểm — nên phần còn lại không phải "chưa làm", mà là KHÔNG CÒN ĐƯỜNG nào. */}
             <Stat
               hint={
-                blockedCount > 0 ? `${fmt(blockedCount)} kỳ đã công bố điểm` : 'mọi kỳ đều chưa công bố điểm'
+                blockedCount > 0
+                  ? `${fmt(blockedCount)} phiên đã hết đường xử lý`
+                  : 'mọi phiên đều còn đường xử lý'
               }
               icon={<RefreshCw aria-hidden="true" className="size-5" />}
-              label="Chấm lại được"
+              label="Trường xử lý được"
               tone="success"
               value={fmt(data.retryableCount)}
             />
@@ -427,12 +432,13 @@ export function SystemAdminGradingFailuresPage() {
                       <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-100 px-5.5 py-3.5">
                         <Info aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
                         <span className="text-[13px] text-slate-500">
-                          <b className="text-slate-700 tabular-nums">{fmt(group.retryableCount)}</b> phiên chấm lại được
+                          Nhà trường xử lý được <b className="text-slate-700 tabular-nums">{fmt(group.retryableCount)}</b>{' '}
+                          phiên
                           {blocked > 0 ? (
                             <>
-                              {' '}
-                              — <b className="text-slate-700 tabular-nums">{fmt(blocked)}</b> phiên thuộc kỳ đã công bố
-                              điểm nên bị chặn.
+                              . <b className="text-slate-700 tabular-nums">{fmt(blocked)}</b> phiên còn lại thuộc kỳ đã
+                              công bố điểm — cả chấm lại lẫn giao người chấm đều bị chặn, nên chúng không còn đường xử
+                              lý nào.
                             </>
                           ) : (
                             '.'
@@ -460,9 +466,11 @@ export function SystemAdminGradingFailuresPage() {
           <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3">
             <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
             <span className="text-[12.5px] leading-[17px] text-slate-500">
-              Chuyển người chấm <b className="text-slate-700">không</b> gỡ phiên khỏi danh sách này — phiên vẫn ở trạng
-              thái chấm lỗi vì đó là sự thật. Cột <b className="text-slate-700">Xử lý</b> là thứ duy nhất phân biệt phiên
-              đã có người nhận với phiên chưa ai đụng tới.
+              Việc xử lý nằm ở phía nhà trường: họ chấm lại bằng AI hoặc giao cho người chấm, ngay trên màn kết quả kỳ
+              thi của mình — và chi phí AI của lần chấm lại rơi vào hạn mức của chính trường đó. Trang này chỉ trả lời
+              “hỏng cái gì, rộng tới đâu”. Chuyển người chấm <b className="text-slate-700">không</b> gỡ phiên khỏi danh
+              sách, vì phiên vẫn thật sự ở trạng thái chấm lỗi; cột <b className="text-slate-700">Xử lý</b> là thứ duy
+              nhất phân biệt phiên đã có người nhận với phiên chưa ai đụng tới.
             </span>
           </div>
         </>

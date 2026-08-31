@@ -44,6 +44,7 @@ import { ASSIGNABLE_SCHEDULE_STATUSES } from '../utils/scheduleAssignment'
 import { StudentPickerModal } from './StudentPickerModal'
 
 const PAGE_SIZE = 10
+const MAX_NAMES_IN_CONFIRM = 10
 const FLAG_REASON = 'Giám thị đánh dấu bài thi là nghi vấn để chờ xem xét.'
 const UNBLOCK_REASON = 'Giám thị dỡ cấm để học sinh tiếp tục bài thi đang dở.'
 
@@ -76,6 +77,26 @@ function getLatestAttemptByStatuses(
         return rightTime - leftTime
       })[0] ?? null
   )
+}
+
+/**
+ * Liệt kê tên cho hộp thoại xác nhận. Cắt bớt sau `MAX_NAMES_IN_CONFIRM` người: xếp cả khối vào một
+ * ca rồi gỡ ra là chuyện thường, mà dán 200 cái tên vào dialog thì nút "Xác nhận" bị đẩy khỏi màn.
+ */
+function describeCandidateList(candidates: ExamCandidateDto[]) {
+  const names = candidates.slice(0, MAX_NAMES_IN_CONFIRM).map((candidate) => `• ${getCandidateName(candidate)}`)
+  const hidden = candidates.length - names.length
+  return (hidden > 0 ? [...names, `• …và ${hidden} thí sinh khác`] : names).join('\n')
+}
+
+/**
+ * Số lượt thi còn tính là "thí sinh đã vào thi" — bỏ qua lượt đã xoá mềm.
+ *
+ * <p>Khớp với `ExamSessionRepository.findByCandidateId` phía backend (đã loại DELETED), vốn là thứ
+ * `DeleteExamCandidateUseCase` dựa vào để chặn xoá thí sinh.
+ */
+function countLiveAttempts(candidate: ExamCandidateDto) {
+  return (candidate.attempts ?? []).filter((attempt) => attempt.status !== 'DELETED').length
 }
 
 function getCandidateBadge(candidate: ExamCandidateDto) {
@@ -139,6 +160,15 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
   const visibleIds = visibleCandidates.map((candidate) => candidate.id)
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
 
+  // Tập đang tick luôn phải soi lại qua danh sách hiện tại: `selectedIds` giữ nguyên khi đổi
+  // trang/từ khoá (cố ý), nên nó vẫn ôm cả id của người vừa bị xoá khỏi kỳ thi. Gửi id "ma" lên
+  // thì backend từ chối NGUYÊN LƯỢT bằng "Không tìm thấy thí sinh" (BulkAssignExamCandidateSchedule
+  // UseCase đối chiếu số dòng tìm được với số id gửi lên) — hỏng cả những người vẫn hợp lệ.
+  const selectedCandidates = useMemo(
+    () => candidates.filter((candidate) => selectedIds.has(candidate.id)),
+    [candidates, selectedIds],
+  )
+
   // Chỉ hỏi backend khi một modal xếp ca đang mở, và chỉ về đúng những người đang xét.
   const assignableScheduleIds = useMemo(
     () =>
@@ -152,10 +182,10 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
       return [assigningCandidate.studentId]
     }
     if (showBulkAssignModal) {
-      return candidates.filter((candidate) => selectedIds.has(candidate.id)).map((candidate) => candidate.studentId)
+      return selectedCandidates.map((candidate) => candidate.studentId)
     }
     return []
-  }, [assigningCandidate, candidates, selectedIds, showBulkAssignModal])
+  }, [assigningCandidate, selectedCandidates, showBulkAssignModal])
   const busySlotsQuery = useStudentBusySlotsQuery(assignableScheduleIds, studentIdsBeingAssigned)
 
   // Làm mờ chứ không lọc bỏ: người dùng cần biết ca có tồn tại nhưng đang kẹt, và vì sao.
@@ -211,6 +241,9 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
 
   async function invalidateAll() {
     await queryClient.invalidateQueries({ queryKey: examQueryKeys.candidates(examId) })
+    // Xếp/gỡ ca đổi luôn `candidateCount` của ca thi — tab Phân lịch dùng chung cache này, không
+    // làm mới thì nó còn hiện sĩ số cũ cho tới lần tải trang sau.
+    await queryClient.invalidateQueries({ queryKey: examQueryKeys.schedules(examId) })
     await queryClient.invalidateQueries({ queryKey: examResultQueryKeys.all })
   }
 
@@ -281,8 +314,7 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
   }
 
   /** Xếp/gỡ cả nhóm đang tick trong MỘT request — `null` là bỏ khỏi ca. */
-  async function handleBulkAssignSchedule(scheduleId: string | null) {
-    const candidateIds = Array.from(selectedIds)
+  async function submitBulkSchedule(candidateIds: string[], scheduleId: string | null) {
     if (candidateIds.length === 0) {
       return
     }
@@ -299,6 +331,45 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
     } catch (error) {
       setErrorMessage(toApiError(error).message)
     }
+  }
+
+  /**
+   * Gỡ cả nhóm đang tick khỏi ca thi, hỏi lại kèm ĐÍCH DANH từng người trước khi gửi.
+   *
+   * <p>Thanh thao tác chỉ hiện con số, mà tập đang tick cố ý sống sót qua đổi trang và đổi từ khoá —
+   * nên "3 thí sinh" hoàn toàn có thể gồm người đang không nhìn thấy trên màn hình. Gỡ nhầm thì phải
+   * xếp lại ca cho từng người nên liệt kê tên ra trước khi hỏi.
+   *
+   * <p>Chỉ tính người ĐANG có ca: người chưa xếp ca nằm trong tập tick là gửi lên cũng không đổi gì,
+   * đưa tên họ vào danh sách "sắp bị gỡ" chỉ làm người dùng hiểu sai chuyện gì sắp xảy ra.
+   */
+  async function handleBulkUnassignSchedule() {
+    const inSchedule = selectedCandidates.filter((candidate) => candidate.scheduleId)
+    if (inSchedule.length === 0) {
+      setErrorMessage('Những thí sinh đang chọn đều chưa được xếp ca thi nào.')
+      return
+    }
+
+    if (
+      !(await confirm({
+        confirmLabel: 'Bỏ khỏi ca thi',
+        message: [
+          `Bỏ ${inSchedule.length} thí sinh sau đây khỏi ca thi đang xếp?`,
+          '',
+          describeCandidateList(inSchedule),
+          '',
+          'Học sinh sẽ quay lại nhóm chưa xếp ca, mã đề đã phân vẫn giữ nguyên. Có thể xếp lại sau.',
+        ].join('\n'),
+        title: 'Xác nhận bỏ khỏi ca thi',
+      }))
+    ) {
+      return
+    }
+
+    await submitBulkSchedule(
+      inSchedule.map((candidate) => candidate.id),
+      null,
+    )
   }
 
   async function handleUnassignSchedule(candidate: ExamCandidateDto) {
@@ -481,7 +552,13 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
 
     // Thao tác sửa danh sách: backend chặn khi kỳ thi đã bắt đầu (ExamEditingGuard), và xoá thí sinh
     // đã có bài thi cũng bị chặn — nên chỉ mở khi thí sinh chưa từng vào thi.
-    if (canEditRoster && (candidate.attempts?.length ?? 0) === 0) {
+    //
+    // Đếm lượt CÒN SỐNG, không đếm lượt đã xoá mềm: `DeleteExamCandidateUseCase` chặn theo
+    // `findByCandidateId`, mà query đó đã loại DELETED. Quan trọng hơn, đây chính là lối đi sau khi
+    // xoá một bài thi hỏng — gỡ bài rồi thì phải xếp lại ca cho học sinh thi lại. Hồi còn xoá cứng
+    // thì lượt biến mất khỏi `attempts` nên ba thao tác này tự hiện lại; xoá mềm giữ lượt lại nên
+    // phải lọc ở đây, nếu không menu trống trơn đúng lúc cần dùng nhất.
+    if (canEditRoster && countLiveAttempts(candidate) === 0) {
       items.push({
         id: `assign-schedule-${candidate.id}`,
         label: candidate.scheduleId ? 'Đổi ca thi' : 'Xếp ca thi',
@@ -555,9 +632,11 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
           ) : null}
         </div>
 
-        {canEditRoster && selectedIds.size > 0 ? (
+        {canEditRoster && selectedCandidates.length > 0 ? (
           <div className="mt-3.5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5">
-            <span className="text-xs font-semibold text-indigo-800">Đã chọn {selectedIds.size} thí sinh.</span>
+            <span className="text-xs font-semibold text-indigo-800">
+              Đã chọn {selectedCandidates.length} thí sinh.
+            </span>
             <div className="flex flex-wrap gap-2">
               <button
                 className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-4 text-xs font-bold text-white transition hover:bg-indigo-700"
@@ -569,7 +648,7 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
               </button>
               <button
                 className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-red-200 bg-white px-4 text-xs font-bold text-red-600 transition hover:bg-red-50"
-                onClick={() => void handleBulkAssignSchedule(null)}
+                onClick={() => void handleBulkUnassignSchedule()}
                 type="button"
               >
                 Bỏ khỏi ca thi
@@ -677,10 +756,15 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
 
       {showBulkAssignModal ? (
         <AssignScheduleModal
-          candidateName={`${selectedIds.size} thí sinh đã chọn`}
+          candidateName={`${selectedCandidates.length} thí sinh đã chọn`}
           conflictReasonByScheduleId={conflictReasonByScheduleId}
           onClose={() => setShowBulkAssignModal(false)}
-          onSelect={(scheduleId) => void handleBulkAssignSchedule(scheduleId)}
+          onSelect={(scheduleId) =>
+            void submitBulkSchedule(
+              selectedCandidates.map((candidate) => candidate.id),
+              scheduleId,
+            )
+          }
           schedules={schedulesQuery.data ?? []}
         />
       ) : null}

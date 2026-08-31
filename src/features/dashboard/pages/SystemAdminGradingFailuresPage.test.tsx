@@ -212,10 +212,29 @@ describe('SystemAdminGradingFailuresPage', () => {
     expect(screen.getByText(/chưa gom được về cùng chữ ký/)).toBeInTheDocument()
   })
 
-  it('reports how many sessions the published-results rule blocks', async () => {
+  it('reports how many sessions the published-results rule leaves with no remedy', async () => {
     mockGraphQL()
     renderPage()
 
-    expect(await screen.findByText(/phiên chấm lại được/)).toHaveTextContent('94')
+    expect(await screen.findByText(/Nhà trường xử lý được/)).toHaveTextContent('94')
+  })
+
+  /**
+   * Quyết định chấm lại thuộc về nhà trường, không phải quản trị hệ thống — và màn chấm lại nằm sau
+   * `RequireRole role="SCHOOL_ADMIN"`, nên một link sang đó từ đây chỉ dẫn tới màn chặn quyền.
+   */
+  it('offers no remediation action, only the session id to carry into logs', async () => {
+    mockGraphQL()
+    renderPage()
+
+    expect(await screen.findByText('Trần Minh Anh')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Chi tiết' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Chấm lại/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Chuyển người chấm \d/)).not.toBeInTheDocument()
+
+    // Mã phiên rút gọn, kèm thông điệp lỗi thô trong tooltip để đối chiếu với log.
+    const ids = screen.getAllByText('session-')
+    expect(ids).toHaveLength(2)
+    expect(ids[0]).toHaveAttribute('title', 'Upstream AI service timed out after 30000ms')
   })
 })

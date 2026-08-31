@@ -21,7 +21,12 @@ export const graphqlApiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true
+  withCredentials: true,
+  // /graphql hiện KHÔNG nằm trong diện CSRF của BE (chỉ /api/v1/auth/refresh mới có), nên cờ
+  // này chưa cần thiết cho client GraphQL. Đặt cho khớp apiClient: hai client cùng gọi một BE
+  // với cùng cookie, để lệch nhau là lần sau có endpoint GraphQL nào cần CSRF thì hỏng đúng
+  // một chỗ mà không ai nghĩ tới đây. Không có tác dụng phụ khi BE không đòi token.
+  withXSRFToken: true
 })
 
 graphqlApiClient.interceptors.request.use((config) => {

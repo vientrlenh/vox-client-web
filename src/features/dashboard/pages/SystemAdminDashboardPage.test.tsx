@@ -157,6 +157,29 @@ describe('SystemAdminDashboardPage', () => {
     expect(screen.getByText(/Ba nhóm đầu loại trừ nhau/)).toBeInTheDocument()
   })
 
+  /**
+   * Mỗi dòng dẫn sang ĐÚNG nhóm đã sinh ra con số ở dòng đó. Trỏ sang màn "Trường & gói" lọc theo
+   * status sẽ ra một tập khác, vì màn đó lọc theo DÒNG thuê bao còn thẻ này đếm theo TRƯỜNG.
+   */
+  it('links each at-risk row to its own bucket', async () => {
+    mockGraphQL()
+    renderPage()
+
+    expect(await screen.findByText('Trường cần chú ý')).toBeInTheDocument()
+    const expected: [string, string][] = [
+      ['Sắp hết hạn (≤ 30 ngày)', 'EXPIRING_SOON'],
+      ['Đã hết hạn', 'LAPSED'],
+      ['Bị tạm ngưng', 'SUSPENDED'],
+      ['Đang nợ hạn mức', 'IN_DEBT'],
+    ]
+    for (const [label, bucket] of expected) {
+      expect(screen.getByText(label).closest('a')).toHaveAttribute(
+        'href',
+        `/system-admin/schools/attention?bucket=${bucket}`,
+      )
+    }
+  })
+
   it('shows the subscription-based school count over the total, not the manual isActive flag', async () => {
     mockGraphQL()
     renderPage()

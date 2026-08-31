@@ -27,6 +27,7 @@ export function ProctorPickerModal({
     state.page,
     USER_PICKER_PAGE_SIZE,
     state.debouncedKeyword,
+    excludeUserIds,
   )
 
   // Chỉ hỏi về đúng những giáo viên đang hiển thị — trang picker tối đa vài chục người.
@@ -57,7 +58,6 @@ export function ProctorPickerModal({
       countLabel="giáo viên"
       disabledReasonByUserId={disabledReasonByUserId}
       emptyLabel="Không tìm thấy giáo viên phù hợp."
-      excludeUserIds={excludeUserIds}
       loadingLabel="Đang tải danh sách giáo viên…"
       onClose={onClose}
       onSelect={onSelect}

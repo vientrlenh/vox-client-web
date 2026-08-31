@@ -18,7 +18,6 @@ type ExamDirectoryUserPickerProps = {
   // không ẩn: ẩn đi thì người dùng tưởng giáo viên không tồn tại, và số đếm/phân trang sẽ lệch.
   disabledReasonByUserId?: Map<string, string>
   emptyLabel: string
-  excludeUserIds: string[]
   loadingLabel: string
   onClose: () => void
   onSelect: (user: ExamDirectoryUser) => void
@@ -33,7 +32,6 @@ export function ExamDirectoryUserPicker({
   countLabel,
   disabledReasonByUserId,
   emptyLabel,
-  excludeUserIds,
   loadingLabel,
   onClose,
   onSelect,
@@ -44,7 +42,9 @@ export function ExamDirectoryUserPicker({
   usersQuery,
 }: ExamDirectoryUserPickerProps) {
   const { keyword, page, setKeyword, setPage } = state
-  const users = (usersQuery.data?.content ?? []).filter((user) => !excludeUserIds.includes(user.userId))
+  // Loại người đã có là việc của BACKEND (`excludeUserIds` của query danh bạ). Lọc lại ở đây sẽ
+  // làm `content` lệch khỏi `totalElements`/`totalPages` mà trang này đang hiển thị.
+  const users = usersQuery.data?.content ?? []
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
