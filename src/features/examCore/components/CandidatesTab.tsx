@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, FileUp, Lock, Search, UserPlus } from 'lucide-react'
+import { CalendarClock, FileUp, Lock, Search, Trash2, UserPlus } from 'lucide-react'
 import { toApiError } from '@/shared/api'
 import { Pagination } from '@/shared/components/Pagination'
 import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuButton'
@@ -16,6 +16,7 @@ import {
   useAddCandidateMutation,
   useAssignCandidateScheduleMutation,
   useBulkAssignCandidateScheduleMutation,
+  useBulkRemoveExamCandidatesMutation,
   useFlagExamSessionMutation,
   useForceEndExamSessionMutation,
   useImportCandidatesByClassMutation,
@@ -120,6 +121,7 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
   const assignCandidateScheduleMutation = useAssignCandidateScheduleMutation()
   const bulkAssignCandidateScheduleMutation = useBulkAssignCandidateScheduleMutation()
   const removeCandidateMutation = useRemoveExamCandidateMutation()
+  const bulkRemoveCandidatesMutation = useBulkRemoveExamCandidatesMutation()
   const { confirm, confirmWithReason, dialog } = useConfirmationDialog()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -167,6 +169,19 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
   const selectedCandidates = useMemo(
     () => candidates.filter((candidate) => selectedIds.has(candidate.id)),
     [candidates, selectedIds],
+  )
+  // Danh sách này gồm CẢ thí sinh chưa xếp ca (phần lớn là vậy), nên "bỏ khỏi ca thi" chỉ áp dụng
+  // cho phần đang thực sự có ca. Tính ở đây để vừa khoá nút vừa dựng danh sách xác nhận từ cùng
+  // một nguồn — nút nói con số nào thì hộp thoại liệt kê đúng bấy nhiêu người.
+  const selectedInSchedule = useMemo(
+    () => selectedCandidates.filter((candidate) => candidate.scheduleId),
+    [selectedCandidates],
+  )
+  // Cùng luật với thao tác xoá từng người: backend chặn xoá thí sinh đã vào thi
+  // (BulkDeleteExamCandidatesUseCase), và lượt đã xoá mềm thì không tính.
+  const selectedRemovable = useMemo(
+    () => selectedCandidates.filter((candidate) => countLiveAttempts(candidate) === 0),
+    [selectedCandidates],
   )
 
   // Chỉ hỏi backend khi một modal xếp ca đang mở, và chỉ về đúng những người đang xét.
@@ -344,9 +359,9 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
    * đưa tên họ vào danh sách "sắp bị gỡ" chỉ làm người dùng hiểu sai chuyện gì sắp xảy ra.
    */
   async function handleBulkUnassignSchedule() {
-    const inSchedule = selectedCandidates.filter((candidate) => candidate.scheduleId)
-    if (inSchedule.length === 0) {
-      setErrorMessage('Những thí sinh đang chọn đều chưa được xếp ca thi nào.')
+    // Nút đã bị khoá khi không ai có ca, nên nhánh này chỉ còn là lưới an toàn cho trường hợp tập
+    // chọn đổi ngay giữa lúc bấm (danh sách vừa được làm mới).
+    if (selectedInSchedule.length === 0) {
       return
     }
 
@@ -354,9 +369,9 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
       !(await confirm({
         confirmLabel: 'Bỏ khỏi ca thi',
         message: [
-          `Bỏ ${inSchedule.length} thí sinh sau đây khỏi ca thi đang xếp?`,
+          `Bỏ ${selectedInSchedule.length} thí sinh sau đây khỏi ca thi đang xếp?`,
           '',
-          describeCandidateList(inSchedule),
+          describeCandidateList(selectedInSchedule),
           '',
           'Học sinh sẽ quay lại nhóm chưa xếp ca, mã đề đã phân vẫn giữ nguyên. Có thể xếp lại sau.',
         ].join('\n'),
@@ -367,7 +382,7 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
     }
 
     await submitBulkSchedule(
-      inSchedule.map((candidate) => candidate.id),
+      selectedInSchedule.map((candidate) => candidate.id),
       null,
     )
   }
@@ -378,6 +393,45 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
       await assignCandidateScheduleMutation.mutateAsync({ candidateId: candidate.id, examId, scheduleId: null })
       await invalidateAll()
       setMessage(`Đã bỏ ${candidateName} khỏi ca thi.`)
+    } catch (error) {
+      setErrorMessage(toApiError(error).message)
+    }
+  }
+
+  /**
+   * Xóa cả nhóm đang tick khỏi kỳ thi, hỏi lại kèm ĐÍCH DANH từng người.
+   *
+   * <p>Chỉ tính người CHƯA vào thi: backend từ chối nguyên lượt nếu có ai đã có bài thi, nên gửi
+   * kèm họ là làm hỏng cả những người xóa được. Nút đã hiện đúng con số này nên hộp thoại và lượt
+   * gửi đi luôn khớp nhau.
+   */
+  async function handleBulkRemoveCandidates() {
+    if (selectedRemovable.length === 0) {
+      return
+    }
+
+    if (
+      !(await confirm({
+        confirmLabel: 'Xóa khỏi kỳ thi',
+        message: [
+          `Xóa ${selectedRemovable.length} thí sinh sau đây khỏi kỳ thi?`,
+          '',
+          describeCandidateList(selectedRemovable),
+          '',
+          'Học sinh sẽ không còn trong danh sách thí sinh và phải thêm lại nếu muốn dự thi.',
+        ].join('\n'),
+        title: 'Xác nhận xóa thí sinh',
+      }))
+    ) {
+      return
+    }
+
+    const candidateIds = selectedRemovable.map((candidate) => candidate.id)
+    try {
+      await bulkRemoveCandidatesMutation.mutateAsync({ candidateIds, examId })
+      await invalidateAll()
+      setSelectedIds(new Set())
+      setMessage(`Đã xóa ${candidateIds.length} thí sinh khỏi kỳ thi.`)
     } catch (error) {
       setErrorMessage(toApiError(error).message)
     }
@@ -646,12 +700,39 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
                 <CalendarClock aria-hidden="true" className="size-3.5" />
                 Xếp hàng loạt vào ca…
               </button>
+              {/* Danh sách này chủ yếu là thí sinh CHƯA xếp ca, nên nút gỡ ca thường không dùng
+                  được. Nói ra điều đó ngay trên nút — trước đây phải bấm rồi mới nhận được câu
+                  "những thí sinh đang chọn đều chưa được xếp ca thi nào", tức là một ngõ cụt. */}
               <button
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-red-200 bg-white px-4 text-xs font-bold text-red-600 transition hover:bg-red-50"
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-red-200 bg-white px-4 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-white disabled:text-slate-400 disabled:hover:bg-white"
+                disabled={selectedInSchedule.length === 0}
                 onClick={() => void handleBulkUnassignSchedule()}
+                title={
+                  selectedInSchedule.length === 0
+                    ? 'Không có thí sinh nào đang chọn đã được xếp ca thi'
+                    : undefined
+                }
                 type="button"
               >
                 Bỏ khỏi ca thi
+                {selectedInSchedule.length > 0 ? ` (${selectedInSchedule.length})` : null}
+              </button>
+              {/* Xóa hẳn khỏi kỳ thi — khác "bỏ khỏi ca thi" ở chỗ không giữ lại thí sinh. Backend
+                  từ chối nguyên lượt nếu có ai đã vào thi, nên chỉ đếm người còn xóa được. */}
+              <button
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-red-600 px-4 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:hover:bg-slate-200"
+                disabled={selectedRemovable.length === 0}
+                onClick={() => void handleBulkRemoveCandidates()}
+                title={
+                  selectedRemovable.length === 0
+                    ? 'Thí sinh đang chọn đều đã có bài thi nên không thể xóa khỏi kỳ thi'
+                    : undefined
+                }
+                type="button"
+              >
+                <Trash2 aria-hidden="true" className="size-3.5" />
+                Xóa khỏi kỳ thi
+                {selectedRemovable.length > 0 ? ` (${selectedRemovable.length})` : null}
               </button>
             </div>
           </div>

@@ -377,6 +377,24 @@ export function useRemoveExamCandidateMutation() {
   })
 }
 
+/**
+ * Xóa cả nhóm thí sinh khỏi kỳ thi trong MỘT request. Không lặp endpoint xóa từng người: N request
+ * là N transaction rời rạc, hỏng giữa chừng để lại danh sách dở dang mà thao tác này không hoàn tác
+ * được. Backend từ chối cả lượt nếu có ai đã vào thi (`BulkDeleteExamCandidatesUseCase`).
+ *
+ * <p>Danh sách id đi trong body — hàng chục UUID trên query string vừa chạm giới hạn độ dài URL vừa
+ * đổ hết id vào access log. Axios gửi body cho DELETE qua `{ data }`.
+ */
+export function useBulkRemoveExamCandidatesMutation() {
+  return useMutation({
+    mutationFn: async ({ candidateIds, examId }: { candidateIds: string[]; examId: string }) => {
+      await apiClient.delete<ApiResponse<void>>(`/v1/exams/${examId}/candidates`, {
+        data: { candidateIds },
+      })
+    },
+  })
+}
+
 export function useApplyPaperAssignmentsMutation() {
   return useMutation({
     mutationFn: async ({
