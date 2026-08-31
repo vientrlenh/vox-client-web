@@ -56,7 +56,7 @@ import {
   NO_ACTIVE_SUBSCRIPTION_MESSAGE,
 } from '@/features/examCore/utils/subscriptionWindow'
 import { buildTimeQuotaWarning } from '@/features/examCore/utils/timeQuota'
-import { classifyExamQuotaStatus } from '@/features/examCore/utils/tokenQuota'
+import { buildSharedPoolUsageInsight, classifyExamQuotaStatus } from '@/features/examCore/utils/tokenQuota'
 import { useExamTokenEstimateQuery } from '@/features/examCore/api/useExamTokenEstimateQuery'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
 import { useMySubscriptionUsageQuery } from '@/features/subscription_school/api/useMySubscriptionUsageQuery'
@@ -710,6 +710,13 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
     // Kỳ thi tập trung không có trần hạn mức cá nhân giáo viên -- BE chỉ tính phần đó khi
     // exam.kind === CLASS_TEST (xem ClassTestTokenQuotaGuardService.estimateTokenQuota).
     personalAllocation: null,
+    schoolLocked: examTokenEstimateQuery.data?.schoolLocked,
+  })
+  // Cảnh báo hiệu ứng domino lên các giáo viên khác (chỉ có ý nghĩa cho CENTRALIZED -- xem
+  // buildSharedPoolUsageInsight) -- THÔNG TIN thuần, không chặn/ảnh hưởng quotaStatus ở trên.
+  const sharedPoolUsageInsight = buildSharedPoolUsageInsight({
+    sharedPoolUsageRatio: examTokenEstimateQuery.data?.sharedPoolUsageRatio,
+    teachersWithUnusedPersonalAllocationCount: examTokenEstimateQuery.data?.teachersWithUnusedPersonalAllocationCount,
   })
 
   // Vượt hạn mức trường nhưng ví tự nạp đủ bù thì KHÔNG khoá nút -- chỉ hỏi xác nhận trước khi
@@ -857,6 +864,10 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
           message={quotaStatus.message}
           tone={quotaStatus.kind === 'blocked' ? 'danger' : 'warning'}
         />
+      ) : null}
+
+      {(exam.status === 'DRAFT' || exam.status === 'SCHEDULED') && sharedPoolUsageInsight ? (
+        <WarningBanner className="mt-4" message={sharedPoolUsageInsight} tone="info" />
       ) : null}
 
       {authority.canManageStatus && exam.status === 'DRAFT' && scheduleReadiness.blockingReason ? (

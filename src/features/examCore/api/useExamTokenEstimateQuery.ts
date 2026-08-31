@@ -9,6 +9,12 @@ export type ExamTokenEstimate = {
   remainingMyClassTestVnd: number | null
   wouldExceedExam: boolean
   wouldExceedMyClassTest: boolean
+  /** Trường bị khóa do nợ (số dư ví tự nạp âm) -- nguyên nhân khác wouldExceedExam, có thể true dù hạn mức gói vẫn còn dư. */
+  schoolLocked: boolean
+  /** % ước lượng chiếm trong hạn mức GÓI còn lại (không cộng ví). Chỉ có giá trị cho CENTRALIZED, null nếu không áp dụng. */
+  sharedPoolUsageRatio: number | null
+  /** Số giáo viên còn hạn mức cá nhân CHƯA dùng hết cho CLASS_TEST. Cùng điều kiện null với sharedPoolUsageRatio. */
+  teachersWithUnusedPersonalAllocationCount: number | null
 }
 
 export const examTokenEstimateQueryKeys = {
@@ -23,6 +29,9 @@ const EXAM_TOKEN_ESTIMATE_QUERY = `
       remainingMyClassTestVnd
       wouldExceedExam
       wouldExceedMyClassTest
+      schoolLocked
+      sharedPoolUsageRatio
+      teachersWithUnusedPersonalAllocationCount
     }
   }
 `

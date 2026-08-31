@@ -1650,6 +1650,7 @@ function ClassTestDetailPage({ canManage }: ClassTestDetailPageProps) {
     // remainingExamVnd của BE đã cộng số dư ví tự nạp -- xem classifyExamQuotaStatus.
     remainingExamWithWalletVnd: examTokenEstimateQuery.data?.remainingExamVnd,
     personalAllocation: myExamQuotaAllocationQuery.data,
+    schoolLocked: examTokenEstimateQuery.data?.schoolLocked,
   })
   // Ước lượng "nếu lưu với số lượt đang gõ": chi phí tuyến tính theo maxAttempt nên chỉ cần nhân tỉ
   // lệ con số BE đã trả về — đúng bằng cái BE sẽ tính, không phải gọi lại server mỗi lần gõ phím.
