@@ -838,6 +838,12 @@ const PrivacyPolicyPage = lazy(() =>
   })),
 );
 
+const NotificationRedirectPage = lazy(() =>
+  import("@/features/notifications").then((module) => ({
+    default: module.NotificationRedirectPage,
+  })),
+);
+
 export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -852,6 +858,14 @@ export function AppRoutes() {
         <Route path="reset-password" element={<ResetPasswordPage />} />
         <Route path="setup-password" element={<SetupPasswordPage />} />
         <Route element={<RequireAuth/>}>
+          {/* Tram trung chuyen cua thong bao day: backend gan URL nay vao webpush link,
+              trang tu tra payload roi dieu huong tiep. Dat ngoai RoleLayout vi no khong
+              hien giao dien nao, va dat sau RequireAuth de nguoi da het phien duoc dua
+              qua dang nhap roi quay lai dung day. */}
+          <Route
+            path="n/:notificationId"
+            element={<NotificationRedirectPage/>}
+          />
           <Route element={<RoleLayout/>}>
               <Route
                 path="profile"

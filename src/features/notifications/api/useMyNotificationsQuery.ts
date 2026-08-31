@@ -1,6 +1,6 @@
 import { type InfiniteData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { graphQLRequest } from '@/shared/api'
-import type { NotificationCursorPage } from '../types'
+import type { AppNotification, NotificationCursorPage } from '../types'
 
 const NOTIFICATION_FIELDS = `
   id
@@ -32,12 +32,24 @@ const MY_UNREAD_NOTIFICATION_COUNT_QUERY = `
   }
 `
 
+const MY_NOTIFICATION_QUERY = `
+  query MyNotification($id: ID!) {
+    myNotification(id: $id) {
+      ${NOTIFICATION_FIELDS}
+    }
+  }
+`
+
 type MyNotificationsQueryData = {
   myNotifications: NotificationCursorPage
 }
 
 type MyUnreadNotificationCountQueryData = {
   myUnreadNotificationCount: number
+}
+
+type MyNotificationQueryData = {
+  myNotification: AppNotification | null
 }
 
 type FetchMyNotificationsInput = {
@@ -59,6 +71,7 @@ export const notificationQueryKeys = {
   cursor: (limit: number) => [...notificationQueryKeys.cursorRoot(), limit] as const,
   /** Tiền tố dùng để vá cache mọi trang đã tải mà không đụng tới `unreadCount`. */
   cursorRoot: () => [...notificationQueryKeys.all, 'cursor'] as const,
+  detail: (id: string) => [...notificationQueryKeys.all, 'detail', id] as const,
   unreadCount: () => [...notificationQueryKeys.all, 'unread-count'] as const,
 }
 
@@ -83,6 +96,30 @@ export async function fetchMyUnreadNotificationCount() {
   )
 
   return data.myUnreadNotificationCount
+}
+
+export async function fetchMyNotification(id: string) {
+  const data = await graphQLRequest<MyNotificationQueryData>(MY_NOTIFICATION_QUERY, {
+    id,
+  })
+
+  return data.myNotification
+}
+
+/**
+ * Một thông báo lẻ, cho luồng mở từ push khi trang chưa tải danh sách nào.
+ *
+ * <p>`retry: false`: hai lý do thất bại hay gặp nhất ở đây -- id không tồn tại và thông báo
+ * của người khác -- đều không đổi kết quả khi thử lại, mà người dùng thì đang đứng trước
+ * một trang trắng chờ được chuyển tiếp.
+ */
+export function useMyNotificationQuery(id: string | undefined) {
+  return useQuery({
+    enabled: Boolean(id),
+    queryFn: () => fetchMyNotification(id as string),
+    queryKey: notificationQueryKeys.detail(id ?? ''),
+    retry: false,
+  })
 }
 
 export function useMyNotificationsQuery(limit: number = NOTIFICATION_PAGE_SIZE) {

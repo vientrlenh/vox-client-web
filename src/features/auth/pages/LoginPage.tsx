@@ -85,6 +85,26 @@ function getLoginErrorMessage(error: unknown) {
   return 'Đăng nhập thất bại. Vui lòng thử lại.'
 }
 
+/**
+ * Đường dẫn duy nhất được phép nối lại sau khi đăng nhập.
+ *
+ * <p>`RequireAuth` đính kèm `state.from` cho MỌI route bị chặn, nhưng nối lại tất cả thì
+ * nguy hiểm: `RequireRole` xoá phiên khi vai trò không khớp, nên một `from` trỏ vào khu vực
+ * của vai trò khác sẽ đá người dùng ra ngoài ngay sau khi họ vừa đăng nhập xong.
+ *
+ * <p>`/n/{id}` thì an toàn với mọi vai trò -- nó không hiển thị gì, chỉ tra thông báo rồi
+ * tự lui về trang chủ khi vai trò không khớp. Và đây cũng là nơi cần nối lại nhất: người
+ * bấm vào thông báo đẩy sau vài ngày gần như chắc chắn đã hết phiên.
+ */
+const RESUMABLE_PATH = /^\/n\/[\w-]+$/
+
+function readResumePath(state: unknown) {
+  const from = (state as { from?: { pathname?: string } } | null)?.from
+  const pathname = from?.pathname
+
+  return pathname && RESUMABLE_PATH.test(pathname) ? pathname : null
+}
+
 function getPostLoginPath(roles: string[]) {
   if (roles.includes('SYSTEM_ADMIN')) {
     return '/system-admin/dashboard'
@@ -115,6 +135,9 @@ export function LoginPage() {
   const [message, setMessage] = useState<LoginMessage | null>(
     () => (location.state as { message?: LoginMessage } | null)?.message ?? null,
   )
+  // Chốt một lần lúc mount: effect bên dưới xoá `location.state` khi có `message`, và
+  // người dùng nhập sai mật khẩu một lần là đủ để đích quay lại biến mất giữa chừng.
+  const [resumePath] = useState(() => readResumePath(location.state))
 
   useEffect(() => {
     if ((location.state as { message?: LoginMessage } | null)?.message) {
@@ -169,7 +192,7 @@ export function LoginPage() {
         text: 'Đăng nhập thành công.',
         tone: 'success',
       })
-      navigate(postLoginPath, { replace: true })
+      navigate(resumePath ?? postLoginPath, { replace: true })
     } catch (error) {
       clearAuthTokens()
       setMessage({

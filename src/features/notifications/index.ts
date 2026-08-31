@@ -1,4 +1,5 @@
 export { NotificationBell } from './components/NotificationBell'
+export { NotificationRedirectPage } from './pages/NotificationRedirectPage'
 export {
   notificationQueryKeys,
   useMyNotificationsQuery,

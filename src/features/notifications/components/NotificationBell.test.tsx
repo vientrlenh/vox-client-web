@@ -19,7 +19,8 @@ function notification(overrides: Partial<AppNotification> = {}): AppNotification
     eventId: 'event-1',
     eventType: 'ExamAppealApproved',
     id: 'notification-1',
-    payload: '{"eventType":"ExamAppealApproved","appealId":"appeal-1"}',
+    payload:
+      '{"eventType":"ExamAppealApproved","target":"EXAM_APPEAL_DETAIL","appealId":"appeal-1"}',
     readAt: null,
     title: 'Phúc khảo được duyệt',
     userId: 'user-1',

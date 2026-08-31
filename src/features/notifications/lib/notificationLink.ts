@@ -1,5 +1,6 @@
 import type { RoleCode } from '@/features/auth/types'
 import type { AppNotification, NotificationPayload } from '../types'
+import { resolveTargetLink } from './notificationTarget'
 
 export function parseNotificationPayload(
   payload: string | null,
@@ -23,35 +24,14 @@ export function parseNotificationPayload(
 /**
  * Suy ra đường dẫn để mở khi bấm vào một thông báo.
  *
- * <p>Phải lọc theo vai trò: cùng một `assignmentId` chỉ có trang dành cho giáo viên, và
- * một học sinh bấm vào sẽ rơi vào route bị `RequireRole` chặn.
- *
- * <p>`candidateResultId` cố tình không sinh link chi tiết: các route kết quả hiện có
- * (`/student/exams/:sessionId/result`) nhận `sessionId`, không phải id kết quả, nên
- * không có cách nào dựng URL đúng từ payload. Học sinh được đưa về danh sách bài thi cho
- * tới khi backend trả thêm `sessionId` trong payload.
+ * <p>Toàn bộ phần quyết định nằm ở `resolveTargetLink`: hàm này chỉ bóc `payload` từ chuỗi
+ * JSON ra. Trước đây nó tự dò xem payload có khoá nào (`appealId` -> trang phúc khảo,
+ * `assignmentId` -> trang chấm) — cách đó không phân biệt được hai event dùng chung một
+ * khoá nhưng gửi cho hai vai trò khác nhau, và mỗi client lại đoán một kiểu.
  */
 export function resolveNotificationLink(
   notification: AppNotification,
   roles: RoleCode[],
 ): string | null {
-  const payload = parseNotificationPayload(notification.payload)
-
-  if (!payload) {
-    return null
-  }
-
-  if (payload.appealId && roles.includes('STUDENT')) {
-    return `/student/appeals/${payload.appealId}`
-  }
-
-  if (payload.assignmentId && roles.includes('TEACHER')) {
-    return `/teacher/grading/${payload.assignmentId}`
-  }
-
-  if (payload.candidateResultId && roles.includes('STUDENT')) {
-    return '/student/exams'
-  }
-
-  return null
+  return resolveTargetLink(parseNotificationPayload(notification.payload), roles)
 }
