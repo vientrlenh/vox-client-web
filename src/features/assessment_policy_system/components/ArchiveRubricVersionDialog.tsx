@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Archive, X } from 'lucide-react';
 import { ErrorBanner } from '@/shared/ui/ErrorBanner';
+import { publishStatusLabel } from '@/shared/lib/publishStatusLabel';
 import { useSystemAssessmentPoliciesQuery } from '../api/useSystemAssessmentPoliciesQuery';
 import { useArchiveSystemAssessmentPolicyMutation } from '../api/useArchiveSystemAssessmentPolicyMutation';
 import { useArchiveSystemRubricVersionMutation } from '@/features/rubric_system/api/useArchiveSystemRubricVersionMutation';
@@ -162,7 +163,7 @@ export function ArchiveRubricVersionDialog({
                         statusStyles[policy.status] || 'bg-slate-100 text-slate-600'
                       }`}
                     >
-                      {policy.status}
+                      {publishStatusLabel(policy.status)}
                     </span>
                   </div>
                 ))}

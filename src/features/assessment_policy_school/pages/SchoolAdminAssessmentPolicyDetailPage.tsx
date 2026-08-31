@@ -31,6 +31,7 @@ import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPoli
 import { useAppSelector } from '@/app/store/hooks';
 import { formatAssessmentPolicyDate } from '../types';
 import type { UpdateAssessmentPolicyPayload } from '../types';
+import { publishStatusLabel } from '@/shared/lib/publishStatusLabel';
 
 const strictnessLabels: Record<string, string> = {
   LENIENT: 'Lỏng (LENIENT)',
@@ -245,7 +246,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
             <ChevronLeft className="size-5" />
           </button>
           <h1 className="flex items-center gap-2.5 text-2xl font-black text-blue-950 sm:text-3xl">
-            <ClipboardCheck className="size-[26px] text-indigo-600" /> Chi tiết Chính sách Đánh giá
+            <ClipboardCheck className="size-[26px] text-indigo-600" /> Chi Tiết Chính Sách Đánh Giá
           </h1>
         </div>
         {policy.rubricVersion?.rubricId ? (
@@ -270,7 +271,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
                 statusStyles[policy.status] || 'bg-slate-100 text-slate-600'
               }`}
             >
-              {policy.status}
+              {publishStatusLabel(policy.status)}
             </span>
           </InfoField>
           <InfoField label="Phiên bản (version)">{policy.version}</InfoField>
@@ -380,7 +381,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
               <InfoField label="Mã">{policy.frameworkVersion?.code || '—'}</InfoField>
               <InfoField label="Tên">{policy.frameworkVersion?.name || '—'}</InfoField>
               <InfoField label="Version">{policy.frameworkVersion ? `v${policy.frameworkVersion.version}` : '—'}</InfoField>
-              <InfoField label="Trạng thái">{policy.frameworkVersion?.status || '—'}</InfoField>
+              <InfoField label="Trạng thái">{publishStatusLabel(policy.frameworkVersion?.status)}</InfoField>
               <InfoField label="Hiệu lực">
                 {policy.frameworkVersion
                   ? `${formatAssessmentPolicyDate(policy.frameworkVersion.effectiveFrom)} – ${formatAssessmentPolicyDate(policy.frameworkVersion.effectiveTo)}`
@@ -406,7 +407,7 @@ export function SchoolAdminAssessmentPolicyDetailPage() {
                 <InfoField label="Mã">{policy.rubricVersion?.code || '—'}</InfoField>
                 <InfoField label="Tên">{policy.rubricVersion?.name || '—'}</InfoField>
                 <InfoField label="Version">{policy.rubricVersion ? `v${policy.rubricVersion.version}` : '—'}</InfoField>
-                <InfoField label="Trạng thái">{policy.rubricVersion?.status || '—'}</InfoField>
+                <InfoField label="Trạng thái">{publishStatusLabel(policy.rubricVersion?.status)}</InfoField>
                 <InfoField label="Hiệu lực">
                   {policy.rubricVersion
                     ? `${formatAssessmentPolicyDate(policy.rubricVersion.effectiveFrom)} – ${formatAssessmentPolicyDate(policy.rubricVersion.effectiveTo)}`
