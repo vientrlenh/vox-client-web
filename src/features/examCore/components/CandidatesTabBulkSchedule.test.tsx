@@ -89,7 +89,7 @@ describe('CandidatesTab · bỏ khỏi ca thi hàng loạt', () => {
     await screen.findByText('Nguyễn Văn An')
     await user.click(screen.getByLabelText('Chọn Nguyễn Văn An'))
     await user.click(screen.getByLabelText('Chọn Trần Thị Bình'))
-    await user.click(screen.getByRole('button', { name: 'Bỏ khỏi ca thi' }))
+    await user.click(screen.getByRole('button', { name: /^Bỏ khỏi ca thi/ }))
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Xác nhận bỏ khỏi ca thi')
@@ -106,7 +106,7 @@ describe('CandidatesTab · bỏ khỏi ca thi hàng loạt', () => {
 
     await screen.findByText('Nguyễn Văn An')
     await user.click(screen.getByLabelText('Chọn Nguyễn Văn An'))
-    await user.click(screen.getByRole('button', { name: 'Bỏ khỏi ca thi' }))
+    await user.click(screen.getByRole('button', { name: /^Bỏ khỏi ca thi/ }))
     await confirmDialog(user, 'Không')
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -121,7 +121,7 @@ describe('CandidatesTab · bỏ khỏi ca thi hàng loạt', () => {
     // Tick cả người CHƯA xếp ca: họ không được nằm trong lượt gỡ.
     await user.click(screen.getByLabelText('Chọn Nguyễn Văn An'))
     await user.click(screen.getByLabelText('Chọn Lê Văn Cường'))
-    await user.click(screen.getByRole('button', { name: 'Bỏ khỏi ca thi' }))
+    await user.click(screen.getByRole('button', { name: /^Bỏ khỏi ca thi/ }))
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Bỏ 1 thí sinh sau đây khỏi ca thi đang xếp?')
@@ -136,16 +136,128 @@ describe('CandidatesTab · bỏ khỏi ca thi hàng loạt', () => {
     })
   })
 
-  it('tất cả người đang chọn đều chưa xếp ca: báo rõ thay vì gọi API rỗng', async () => {
+  // Danh sách thí sinh phần lớn là người CHƯA xếp ca, nên nút này thường không dùng được. Phải nói
+  // ra ngay trên nút thay vì để bấm rồi mới báo lỗi — đó là một ngõ cụt.
+  it('không ai đang chọn có ca: nút bị khóa kèm lý do, không gọi API', async () => {
     const user = userEvent.setup()
     renderTab()
 
     await screen.findByText('Lê Văn Cường')
     await user.click(screen.getByLabelText('Chọn Lê Văn Cường'))
-    await user.click(screen.getByRole('button', { name: 'Bỏ khỏi ca thi' }))
 
-    expect(await screen.findByText(/đều chưa được xếp ca thi nào/)).toBeInTheDocument()
+    const button = screen.getByRole('button', { name: 'Bỏ khỏi ca thi' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', expect.stringContaining('đã được xếp ca thi'))
+
+    await user.click(button)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(mockedPut).not.toHaveBeenCalled()
+  })
+
+  /** Chọn lẫn lộn: nút phải nói đúng số người thật sự bị ảnh hưởng, không phải tổng số đang tick. */
+  it('nút hiện số thí sinh thật sự đang có ca', async () => {
+    const user = userEvent.setup()
+    renderTab()
+
+    await screen.findByText('Nguyễn Văn An')
+    await user.click(screen.getByLabelText('Chọn Nguyễn Văn An'))
+    await user.click(screen.getByLabelText('Chọn Lê Văn Cường'))
+
+    expect(screen.getByText(/Đã chọn 2 thí sinh/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bỏ khỏi ca thi (1)' })).toBeEnabled()
+  })
+
+  describe('xóa khỏi kỳ thi hàng loạt', () => {
+    it('hỏi lại kèm đích danh rồi gọi endpoint xóa hàng loạt', async () => {
+      const user = userEvent.setup()
+      renderTab()
+
+      await screen.findByText('Nguyễn Văn An')
+      await user.click(screen.getByLabelText('Chọn Nguyễn Văn An'))
+      await user.click(screen.getByLabelText('Chọn Lê Văn Cường'))
+      await user.click(screen.getByRole('button', { name: /^Xóa khỏi kỳ thi/ }))
+
+      const dialog = await screen.findByRole('dialog')
+      expect(dialog).toHaveTextContent('Xóa 2 thí sinh sau đây khỏi kỳ thi?')
+      expect(dialog).toHaveTextContent('Nguyễn Văn An')
+      expect(dialog).toHaveTextContent('Lê Văn Cường')
+      expect(mockedDelete).not.toHaveBeenCalled()
+
+      await confirmDialog(user, 'Xóa khỏi kỳ thi')
+
+      await waitFor(() => expect(mockedDelete).toHaveBeenCalledTimes(1))
+      expect(mockedDelete).toHaveBeenCalledWith('/v1/exams/exam-1/candidates', {
+        data: { candidateIds: ['candidate-1', 'candidate-3'] },
+      })
+    })
+
+    // Backend từ chối NGUYÊN LƯỢT nếu có ai đã vào thi, nên người đã có bài thi phải bị loại khỏi
+    // lượt gửi đi — kèm theo thì kéo hỏng cả những người vẫn xóa được.
+    it('bỏ qua thí sinh đã có bài thi, chỉ gửi người còn xóa được', async () => {
+      const user = userEvent.setup()
+      candidates = [
+        {
+          ...candidateFor(1, 'Nguyễn Văn An', 'schedule-1'),
+          attempts: [{ flagged: false, sessionId: 'session-1', startedAt: null, status: 'GRADED' }],
+        },
+        candidateFor(3, 'Lê Văn Cường', null),
+      ]
+      renderTab()
+
+      await screen.findByText('Nguyễn Văn An')
+      await user.click(screen.getByLabelText('Chọn Nguyễn Văn An'))
+      await user.click(screen.getByLabelText('Chọn Lê Văn Cường'))
+
+      expect(screen.getByRole('button', { name: 'Xóa khỏi kỳ thi (1)' })).toBeEnabled()
+      await user.click(screen.getByRole('button', { name: /^Xóa khỏi kỳ thi/ }))
+
+      const dialog = await screen.findByRole('dialog')
+      expect(dialog).not.toHaveTextContent('Nguyễn Văn An')
+      await confirmDialog(user, 'Xóa khỏi kỳ thi')
+
+      await waitFor(() => expect(mockedDelete).toHaveBeenCalledTimes(1))
+      expect(mockedDelete).toHaveBeenCalledWith('/v1/exams/exam-1/candidates', {
+        data: { candidateIds: ['candidate-3'] },
+      })
+    })
+
+    it('tất cả đang chọn đều đã có bài thi: nút bị khóa kèm lý do', async () => {
+      const user = userEvent.setup()
+      candidates = [
+        {
+          ...candidateFor(1, 'Nguyễn Văn An', 'schedule-1'),
+          attempts: [{ flagged: false, sessionId: 'session-1', startedAt: null, status: 'GRADED' }],
+        },
+      ]
+      renderTab()
+
+      await screen.findByText('Nguyễn Văn An')
+      await user.click(screen.getByLabelText('Chọn Nguyễn Văn An'))
+
+      const button = screen.getByRole('button', { name: 'Xóa khỏi kỳ thi' })
+      expect(button).toBeDisabled()
+      expect(button).toHaveAttribute('title', expect.stringContaining('đã có bài thi'))
+      expect(mockedDelete).not.toHaveBeenCalled()
+    })
+
+    // Lượt đã xóa mềm không tính là "đã vào thi" — khớp với backend (findByCandidateIdIn loại DELETED).
+    it('thí sinh chỉ còn lượt đã xóa vẫn xóa được khỏi kỳ thi', async () => {
+      const user = userEvent.setup()
+      candidates = [
+        {
+          ...candidateFor(1, 'Nguyễn Văn An', 'schedule-1'),
+          attempts: [
+            { deletedReason: 'Vào phòng thi lỗi', flagged: false, sessionId: 's-9', startedAt: null, status: 'DELETED' },
+          ],
+        },
+      ]
+      renderTab()
+
+      await screen.findByText('Nguyễn Văn An')
+      await user.click(screen.getByLabelText('Chọn Nguyễn Văn An'))
+
+      expect(screen.getByRole('button', { name: 'Xóa khỏi kỳ thi (1)' })).toBeEnabled()
+    })
   })
 
   // Backend đối chiếu số dòng tìm được với số id gửi lên và từ chối NGUYÊN LƯỢT nếu lệch, nên một
@@ -164,7 +276,7 @@ describe('CandidatesTab · bỏ khỏi ca thi hàng loạt', () => {
     await confirmDialog(user, 'Xác nhận')
     await waitFor(() => expect(screen.queryByText('Nguyễn Văn An')).not.toBeInTheDocument())
 
-    await user.click(screen.getByRole('button', { name: 'Bỏ khỏi ca thi' }))
+    await user.click(screen.getByRole('button', { name: /^Bỏ khỏi ca thi/ }))
     await confirmDialog(user, 'Bỏ khỏi ca thi')
 
     await waitFor(() => expect(mockedPut).toHaveBeenCalledTimes(1))
