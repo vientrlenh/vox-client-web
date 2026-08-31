@@ -1,13 +1,14 @@
 // src/features/rubrics/components/RubricVersionTable.tsx
 
 import { RefreshCw, LayoutList, ChevronRight } from 'lucide-react';
+import { publishStatusLabel } from '@/shared/lib/publishStatusLabel';
 // Import type RubricVersion của ông vào đây (nếu khác thì ông tự đổi tên nhé)
 import type { RubricVersion } from '../types';
 
 const STATUS_BADGE_CLASSNAMES: Record<string, string> = {
   DRAFT: 'bg-yellow-50 text-yellow-800 ring-yellow-600/20',
   PUBLISHED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  ARCHIVED: 'bg-slate-100 text-slate-600 ring-slate-500/20',
+  ARCHIVED: 'bg-amber-50 text-amber-700 ring-amber-700/10',
 };
 
 type RubricVersionTableProps = {
@@ -85,7 +86,7 @@ export function RubricVersionTable({
                     STATUS_BADGE_CLASSNAMES[v.status] ?? 'bg-slate-100 text-slate-600 ring-slate-500/10'
                   }`}
                 >
-                  {v.status}
+                  {publishStatusLabel(v.status)}
                 </span>
               </td>
               <td className="px-4 py-3 text-slate-600">

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Rocket, X } from 'lucide-react';
 import { ErrorBanner } from '@/shared/ui/ErrorBanner';
+import { publishStatusLabel } from '@/shared/lib/publishStatusLabel';
 import { useSystemAssessmentPoliciesQuery } from '../api/useSystemAssessmentPoliciesQuery';
 import { usePublishSystemAssessmentPoliciesByRubricVersionMutation } from '../api/usePublishSystemAssessmentPoliciesByRubricVersionMutation';
 import { usePublishSystemRubricVersionMutation } from '../api/usePublishSystemRubricVersionMutation';
@@ -152,7 +153,7 @@ export function PublishRubricVersionDialog({
                         statusStyles[policy.status] || 'bg-slate-100 text-slate-600'
                       }`}
                     >
-                      {policy.status}
+                      {publishStatusLabel(policy.status)}
                     </span>
                   </div>
                 ))}

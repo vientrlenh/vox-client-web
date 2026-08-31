@@ -29,7 +29,7 @@ export function useRubricSearchOptionsQuery(schoolId?: string, languageId?: stri
       );
       return data.searchSchoolRubrics.content;
     },
-    enabled: Boolean(schoolId && languageId),
+    enabled: Boolean(schoolId),
   });
 }
 

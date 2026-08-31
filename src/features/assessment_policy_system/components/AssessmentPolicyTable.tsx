@@ -2,6 +2,7 @@
 
 import { Eye, LayoutList, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton';
+import { publishStatusLabel } from '@/shared/lib/publishStatusLabel';
 import { DetailPopoverButton } from './DetailPopoverButton';
 import { formatAssessmentPolicyDate } from '../types';
 import type { AssessmentPolicy } from '../types';
@@ -158,7 +159,7 @@ export function AssessmentPolicyTable({
                     statusStyles[policy.status] || 'bg-slate-100 text-slate-600 ring-slate-500/10'
                   }`}
                 >
-                  {policy.status}
+                  {publishStatusLabel(policy.status)}
                 </span>
               </td>
               <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
