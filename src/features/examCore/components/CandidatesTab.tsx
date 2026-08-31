@@ -7,6 +7,7 @@ import { ActionMenuButton, type ActionMenuItem } from '@/shared/ui/ActionMenuBut
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatCard } from '@/shared/ui/StatCard'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
+import { toVnSearchKey } from '@/shared/lib/vnSearchKey'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { WarningBanner } from '@/shared/ui/WarningBanner'
 import { examResultQueryKeys } from '@/features/exam-results/api/useExamResultQueries'
@@ -117,20 +118,18 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
     [schedulesQuery.data],
   )
   const paperCodeById = useMemo(() => new Map(papers.map((paper) => [paper.id, paper.code])), [papers])
-  const filteredCandidates = useMemo(
-    () =>
-      candidates.filter((candidate) => {
-        const keyword = search.trim().toLowerCase()
-        if (!keyword) {
-          return true
-        }
-        return (
-          getCandidateName(candidate).toLowerCase().includes(keyword) ||
-          (candidate.student?.email ?? '').toLowerCase().includes(keyword)
-        )
-      }),
-    [candidates, search],
-  )
+  const filteredCandidates = useMemo(() => {
+    // So khớp sau khi bỏ dấu: gõ "nguyen van an" phải ra "Nguyễn Văn An" — xem `toVnSearchKey`.
+    const keyword = toVnSearchKey(search)
+    if (!keyword) {
+      return candidates
+    }
+    return candidates.filter(
+      (candidate) =>
+        toVnSearchKey(getCandidateName(candidate)).includes(keyword) ||
+        toVnSearchKey(candidate.student?.email ?? '').includes(keyword),
+    )
+  }, [candidates, search])
   const totalPages = Math.max(1, Math.ceil(filteredCandidates.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
   const visibleCandidates = filteredCandidates.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
@@ -215,10 +214,28 @@ export function CandidatesTab({ canManage, examId, examKind, locked = false, pap
     await queryClient.invalidateQueries({ queryKey: examResultQueryKeys.all })
   }
 
+  /**
+   * Thí sinh vừa thêm nằm CUỐI danh sách (backend xếp theo `assignedAt`), nên với kỳ thi đông
+   * người họ rơi sang trang khác trang đang xem — thêm xong không thấy đâu, tưởng thao tác hỏng
+   * và phải F5. Nhảy thẳng tới trang đang chứa họ, bỏ luôn từ khoá đang lọc nếu từ khoá đó che mất.
+   *
+   * Gọi SAU `invalidateAll()`: lúc đó cache đã là danh sách mới nên chỉ số trang tính ra mới đúng.
+   */
+  function revealCandidate(studentId: string) {
+    const refreshed = queryClient.getQueryData<ExamCandidateDto[]>(examQueryKeys.candidates(examId)) ?? []
+    const index = refreshed.findIndex((candidate) => candidate.studentId === studentId)
+    if (index < 0) {
+      return
+    }
+    setSearch('')
+    setPage(Math.floor(index / PAGE_SIZE) + 1)
+  }
+
   async function handleAddCandidate(student: ExamDirectoryUser) {
     try {
       await addCandidateMutation.mutateAsync({ examId, payload: { studentId: student.userId } })
       await invalidateAll()
+      revealCandidate(student.userId)
       setShowStudentPicker(false)
       setMessage('Đã thêm thí sinh.')
     } catch (error) {
