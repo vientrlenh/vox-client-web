@@ -322,6 +322,10 @@ export function getAttemptStatusDisplay(status?: string | null): { label: string
       return { label: 'Bị gián đoạn', tone: 'warning' }
     case 'EXPIRED':
       return { label: 'Hết giờ', tone: 'neutral' }
+    // Chỉ quản trị trường và chủ tịch hội đồng thấy được lượt này — backend không trả nó về cho
+    // các đường đọc khác (xem ExamCandidateAttemptsQueryRepository).
+    case 'DELETED':
+      return { label: 'Đã xóa', tone: 'danger' }
     default:
       return { label: status ?? 'Chưa có kết quả', tone: 'neutral' }
   }

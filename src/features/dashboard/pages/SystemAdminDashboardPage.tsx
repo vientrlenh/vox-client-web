@@ -382,11 +382,15 @@ function OperationalHealthCard({
   )
 }
 
+/**
+ * `bucket` là cùng bộ khóa mà query `schoolsAtRisk` nhận, nên bấm vào một dòng mở ra đúng nhóm đã
+ * sinh ra con số ở dòng đó — cùng vị từ, cùng mốc, không phải một phép lọc gần giống.
+ */
 const AT_RISK_ROWS = [
-  { color: '#F59E0B', key: 'expiringSoonSchools' as const, label: 'Sắp hết hạn (≤ 30 ngày)', tone: 'border-amber-200 bg-amber-50/40' },
-  { color: '#EF4444', key: 'lapsedSchools' as const, label: 'Đã hết hạn', tone: 'border-red-200 bg-red-50/40' },
-  { color: '#64748B', key: 'suspendedSchools' as const, label: 'Bị tạm ngưng', tone: 'border-slate-200 bg-slate-50/60' },
-  { color: '#EA580C', key: 'schoolsInDebt' as const, label: 'Đang nợ hạn mức', tone: 'border-orange-200 bg-orange-50/40' },
+  { bucket: 'EXPIRING_SOON', color: '#F59E0B', key: 'expiringSoonSchools' as const, label: 'Sắp hết hạn (≤ 30 ngày)', tone: 'border-amber-200 bg-amber-50/40 hover:bg-amber-50' },
+  { bucket: 'LAPSED', color: '#EF4444', key: 'lapsedSchools' as const, label: 'Đã hết hạn', tone: 'border-red-200 bg-red-50/40 hover:bg-red-50' },
+  { bucket: 'SUSPENDED', color: '#64748B', key: 'suspendedSchools' as const, label: 'Bị tạm ngưng', tone: 'border-slate-200 bg-slate-50/60 hover:bg-slate-100' },
+  { bucket: 'IN_DEBT', color: '#EA580C', key: 'schoolsInDebt' as const, label: 'Đang nợ hạn mức', tone: 'border-orange-200 bg-orange-50/40 hover:bg-orange-50' },
 ]
 
 function SchoolsAtRiskCard({
@@ -426,12 +430,16 @@ function SchoolsAtRiskCard({
         <>
           <div className={isFetching ? 'grid gap-2.5 opacity-50 transition-opacity' : 'grid gap-2.5 transition-opacity'}>
             {AT_RISK_ROWS.map((row) => (
-              <div className={`flex items-center gap-3 rounded-[14px] border px-3.5 py-3 ${row.tone}`} key={row.key}>
+              <Link
+                className={`flex items-center gap-3 rounded-[14px] border px-3.5 py-3 transition ${row.tone}`}
+                key={row.key}
+                to={`/system-admin/schools/attention?bucket=${row.bucket}`}
+              >
                 <span className="size-2 shrink-0 rounded-full" style={{ background: row.color }} />
                 <span className="flex-1 text-[13.5px] font-bold text-slate-700">{row.label}</span>
                 <span className="text-[20px] font-extrabold text-slate-900 tabular-nums">{fmt(data[row.key])}</span>
                 <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
-              </div>
+              </Link>
             ))}
           </div>
           {/* Cố ý KHÔNG cộng tổng. BA DÒNG ĐẦU loại trừ nhau (sắp hết hạn là tập con của nhóm còn

@@ -16,13 +16,13 @@ export function StudentPickerModal({ examId, excludeUserIds, onClose, onSelect }
     state.page,
     USER_PICKER_PAGE_SIZE,
     state.debouncedKeyword,
+    excludeUserIds,
   )
 
   return (
     <ExamDirectoryUserPicker
       countLabel="học sinh"
       emptyLabel="Không tìm thấy học sinh phù hợp."
-      excludeUserIds={excludeUserIds}
       loadingLabel="Đang tải danh sách học sinh…"
       onClose={onClose}
       onSelect={onSelect}

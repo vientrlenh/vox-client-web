@@ -434,6 +434,8 @@ export type ExamScheduleOtpDto = {
 }
 
 export type ExamAttemptSummaryDto = {
+  /** Lý do lượt thi bị xóa, đi cùng `status === 'DELETED'`. */
+  deletedReason?: string | null
   flagged: boolean
   flagReason?: string | null
   resultStatus?: string | null
@@ -719,6 +721,17 @@ export function getExamStatusDisplay(status?: ExamStatus | string | null): { ton
  */
 export function isExamLockedForEditing(status?: ExamStatus | string | null): boolean {
   return status === 'IN_PROGRESS' || status === 'CLOSED' || status === 'RESULTS_PUBLISHED' || status === 'CANCELLED'
+}
+
+/**
+ * Kỳ thi đã chốt sổ: không xóa bài thi được nữa (backend chặn bằng `Exam.isResultsFinalized`).
+ *
+ * <p>Hẹp hơn `isExamLockedForEditing` và cố ý: kỳ thi ĐANG diễn ra vẫn phải xóa được bài — gỡ một
+ * lượt hỏng ngay giữa buổi thi chính là việc tính năng này sinh ra để làm. Kỳ đã hủy cũng cho xóa
+ * để dọn dữ liệu rác.
+ */
+export function isExamResultsFinalized(status?: ExamStatus | string | null): boolean {
+  return status === 'CLOSED' || status === 'RESULTS_PUBLISHED'
 }
 
 export function getMemberRoleDisplay(role?: ExamMemberRole | null) {

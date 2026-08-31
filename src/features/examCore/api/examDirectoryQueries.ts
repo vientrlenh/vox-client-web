@@ -38,6 +38,7 @@ export type ExamDirectoryUser = {
 
 type ExamDirectoryVariables = {
   examId: string
+  excludeUserIds?: string[]
   page: number
   search: string | null
   size: number
@@ -92,17 +93,32 @@ const EXAM_DIRECTORY_USER_FIELDS = `
   ${PAGE_FIELDS}
 `
 
+// `excludeUserIds` phải do BACKEND lọc: bỏ người ở client sau khi nhận trang thì `content` ngắn đi
+// trong khi `totalElements`/`totalPages` vẫn đếm cả họ — nhập xong một lớp là picker hiện trang
+// trống kèm số đếm khác 0, và tìm đúng người chưa thêm cũng ra "không tìm thấy".
 const EXAM_DIRECTORY_STUDENTS_QUERY = `
-  query ExamDirectoryStudents($examId: ID!, $search: String, $page: Int!, $size: Int!) {
-    examDirectoryStudents(examId: $examId, search: $search, page: $page, size: $size) {
+  query ExamDirectoryStudents($examId: ID!, $search: String, $page: Int!, $size: Int!, $excludeUserIds: [ID!]) {
+    examDirectoryStudents(
+      examId: $examId
+      search: $search
+      page: $page
+      size: $size
+      excludeUserIds: $excludeUserIds
+    ) {
       ${EXAM_DIRECTORY_USER_FIELDS}
     }
   }
 `
 
 const EXAM_DIRECTORY_PROCTORS_QUERY = `
-  query ExamDirectoryProctors($examId: ID!, $search: String, $page: Int!, $size: Int!) {
-    examDirectoryProctors(examId: $examId, search: $search, page: $page, size: $size) {
+  query ExamDirectoryProctors($examId: ID!, $search: String, $page: Int!, $size: Int!, $excludeUserIds: [ID!]) {
+    examDirectoryProctors(
+      examId: $examId
+      search: $search
+      page: $page
+      size: $size
+      excludeUserIds: $excludeUserIds
+    ) {
       ${EXAM_DIRECTORY_USER_FIELDS}
     }
   }
@@ -113,10 +129,17 @@ export const examDirectoryQueryKeys = {
     [...examQueryKeys.all, 'directory', 'classes', examId, page, size, search] as const,
   grades: (examId: string, page: number, size: number, search: string) =>
     [...examQueryKeys.all, 'directory', 'grades', examId, page, size, search] as const,
-  proctors: (examId: string, page: number, size: number, search: string) =>
-    [...examQueryKeys.all, 'directory', 'proctors', examId, page, size, search] as const,
-  students: (examId: string, page: number, size: number, search: string) =>
-    [...examQueryKeys.all, 'directory', 'students', examId, page, size, search] as const,
+  // `excludeUserIds` nằm trong key: thêm xong một thí sinh là tập loại trừ đổi, picker phải tải
+  // lại chứ không được hiện lại trang cũ còn tên người vừa thêm.
+  proctors: (examId: string, page: number, size: number, search: string, excludeUserIds: string[]) =>
+    [...examQueryKeys.all, 'directory', 'proctors', examId, page, size, search, excludeUserIds] as const,
+  students: (examId: string, page: number, size: number, search: string, excludeUserIds: string[]) =>
+    [...examQueryKeys.all, 'directory', 'students', examId, page, size, search, excludeUserIds] as const,
+}
+
+/** Sắp xếp để key ổn định: thứ tự thí sinh trả về đổi không được coi là một tập loại trừ khác. */
+function stableIds(excludeUserIds: string[]) {
+  return [...excludeUserIds].sort()
 }
 
 async function fetchDirectory<T>(
@@ -128,8 +151,14 @@ async function fetchDirectory<T>(
   return data[field]
 }
 
-function variables(examId: string, page: number, size: number, search: string): ExamDirectoryVariables {
-  return { examId, page, search: search.trim() || null, size }
+function variables(
+  examId: string,
+  page: number,
+  size: number,
+  search: string,
+  excludeUserIds?: string[],
+): ExamDirectoryVariables {
+  return { examId, excludeUserIds, page, search: search.trim() || null, size }
 }
 
 export function useExamDirectoryClassesQuery(examId: string, page: number, size: number, search: string) {
@@ -168,28 +197,42 @@ export function useExamDirectoryGradesQuery(
   })
 }
 
-export function useExamDirectoryStudentsQuery(examId: string, page: number, size: number, search: string) {
+export function useExamDirectoryStudentsQuery(
+  examId: string,
+  page: number,
+  size: number,
+  search: string,
+  excludeUserIds: string[] = [],
+) {
+  const excluded = stableIds(excludeUserIds)
   return useQuery({
     enabled: Boolean(examId),
     queryFn: () =>
       fetchDirectory<ExamDirectoryUser>(
         EXAM_DIRECTORY_STUDENTS_QUERY,
         'examDirectoryStudents',
-        variables(examId, page, size, search),
+        variables(examId, page, size, search, excluded),
       ),
-    queryKey: examDirectoryQueryKeys.students(examId, page, size, search),
+    queryKey: examDirectoryQueryKeys.students(examId, page, size, search, excluded),
   })
 }
 
-export function useExamDirectoryProctorsQuery(examId: string, page: number, size: number, search: string) {
+export function useExamDirectoryProctorsQuery(
+  examId: string,
+  page: number,
+  size: number,
+  search: string,
+  excludeUserIds: string[] = [],
+) {
+  const excluded = stableIds(excludeUserIds)
   return useQuery({
     enabled: Boolean(examId),
     queryFn: () =>
       fetchDirectory<ExamDirectoryUser>(
         EXAM_DIRECTORY_PROCTORS_QUERY,
         'examDirectoryProctors',
-        variables(examId, page, size, search),
+        variables(examId, page, size, search, excluded),
       ),
-    queryKey: examDirectoryQueryKeys.proctors(examId, page, size, search),
+    queryKey: examDirectoryQueryKeys.proctors(examId, page, size, search, excluded),
   })
 }

@@ -54,6 +54,12 @@ const SystemAdminGradingFailuresPage = lazy(() =>
   })),
 );
 
+const SystemAdminSchoolsAtRiskPage = lazy(() =>
+  import("@/features/dashboard").then((module) => ({
+    default: module.SystemAdminSchoolsAtRiskPage,
+  })),
+);
+
 const SchoolAdminDashboardPage = lazy(() =>
   import("@/features/dashboard").then((module) => ({
     default: module.SchoolAdminDashboardPage,
@@ -880,6 +886,11 @@ export function AppRoutes() {
             <Route
               path="system-admin/grading-failures"
               element={<SystemAdminGradingFailuresPage />}
+            />
+            {/* MỘT trang, bốn bộ lọc — nhóm đi qua ?bucket= chứ không phải bốn route riêng. */}
+            <Route
+              path="system-admin/schools/attention"
+              element={<SystemAdminSchoolsAtRiskPage />}
             />
             <Route
               path="system-admin/registrations"

@@ -178,6 +178,64 @@ describe('CandidatesTab', () => {
     expect(trigger).toHaveAttribute('title', expect.stringContaining('không có quyền'))
   })
 
+  // Sau khi xoá mềm bài thi hỏng, thí sinh coi như chưa vào thi: backend cho xoá khỏi kỳ thi trở
+  // lại (DeleteExamCandidateUseCase soi `findByCandidateId`, query đã loại DELETED), và giáo viên
+  // còn phải xếp lại ca cho các em thi lại. Hồi xoá cứng thì lượt biến mất nên menu tự mở lại.
+  it('thí sinh chỉ còn lượt đã xóa: mở lại thao tác xếp ca và xóa khỏi kỳ thi', async () => {
+    const user = userEvent.setup()
+    mockGraphQL(
+      [
+        {
+          ...freshCandidate,
+          attempts: [
+            {
+              deletedReason: 'Vào phòng thi lỗi',
+              flagged: false,
+              sessionId: 'session-9',
+              startedAt: '2026-08-04T01:00:00Z',
+              status: 'DELETED',
+            },
+          ],
+        },
+      ],
+      [schedule],
+    )
+    renderTab()
+
+    await user.click(await screen.findByRole('button', { name: 'Thao tác cho Trần Văn Bình' }))
+
+    expect(await screen.findByRole('menuitem', { name: 'Xếp ca thi' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Xóa khỏi kỳ thi' })).toBeInTheDocument()
+  })
+
+  it('thí sinh còn lượt thi thật: vẫn chặn xóa khỏi kỳ thi', async () => {
+    const user = userEvent.setup()
+    mockGraphQL(
+      [
+        {
+          ...freshCandidate,
+          attempts: [
+            { flagged: false, sessionId: 'session-8', startedAt: '2026-08-04T01:00:00Z', status: 'GRADED' },
+            {
+              deletedReason: 'Vào phòng thi lỗi',
+              flagged: false,
+              sessionId: 'session-9',
+              startedAt: '2026-08-04T01:00:00Z',
+              status: 'DELETED',
+            },
+          ],
+        },
+      ],
+      [schedule],
+    )
+    renderTab()
+
+    await user.click(await screen.findByRole('button', { name: 'Thao tác cho Trần Văn Bình' }))
+
+    expect(screen.queryByRole('menuitem', { name: 'Xóa khỏi kỳ thi' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Xếp ca thi' })).not.toBeInTheDocument()
+  })
+
   // Bàn phím không bật bộ gõ tiếng Việt là mặc định — lọc phân biệt dấu thì giáo viên gõ tên
   // học sinh của chính mình mà báo "không tìm thấy".
   it('ô tìm kiếm: gõ không dấu vẫn ra tên có dấu', async () => {
