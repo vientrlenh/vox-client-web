@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Check, Search, Sparkles, UserMinus, UserPlus, Wand2, X } from 'lucide-react'
 import { Pagination } from '@/shared/components/Pagination'
+import { toVnSearchKey } from '@/shared/lib/vnSearchKey'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
 import {
   formatDateTime,
@@ -62,12 +63,13 @@ export function ScheduleSessionDetail({
   schedule,
   search,
 }: ScheduleSessionDetailProps) {
-  const keyword = search.trim().toLowerCase()
+  // So khớp sau khi bỏ dấu: gõ "nguyen van an" phải ra "Nguyễn Văn An" — xem `toVnSearchKey`.
+  const keyword = toVnSearchKey(search)
   const filtered = candidates.filter(
     (candidate) =>
       !keyword ||
-      getCandidateName(candidate).toLowerCase().includes(keyword) ||
-      (candidate.student?.email ?? '').toLowerCase().includes(keyword),
+      toVnSearchKey(getCandidateName(candidate)).includes(keyword) ||
+      toVnSearchKey(candidate.student?.email ?? '').includes(keyword),
   )
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)

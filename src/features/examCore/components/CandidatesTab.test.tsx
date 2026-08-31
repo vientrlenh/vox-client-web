@@ -177,4 +177,17 @@ describe('CandidatesTab', () => {
     expect(trigger).toBeDisabled()
     expect(trigger).toHaveAttribute('title', expect.stringContaining('không có quyền'))
   })
+
+  // Bàn phím không bật bộ gõ tiếng Việt là mặc định — lọc phân biệt dấu thì giáo viên gõ tên
+  // học sinh của chính mình mà báo "không tìm thấy".
+  it('ô tìm kiếm: gõ không dấu vẫn ra tên có dấu', async () => {
+    const user = userEvent.setup()
+    renderTab()
+
+    await screen.findByText('Nguyễn Văn An')
+    await user.type(screen.getByPlaceholderText('Tìm theo tên hoặc email...'), 'nguyen van an')
+
+    expect(await screen.findByText('Nguyễn Văn An')).toBeInTheDocument()
+    expect(screen.queryByText('Không tìm thấy thí sinh phù hợp.')).not.toBeInTheDocument()
+  })
 })

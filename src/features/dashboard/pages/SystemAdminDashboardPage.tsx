@@ -18,7 +18,8 @@ import {
   UserPlus,
   Wallet,
 } from 'lucide-react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import { shortVnDay as shortDay, vnDayAfterIso, vnDayStartIso } from '@/shared/lib/vnDateRange'
 import { DateRangeFilter } from '@/shared/ui/DateRangeFilter'
 import { presetToRange, type DateRangeValue, type Preset } from '@/shared/ui/dateRangePresets'
 import { usePlatformBusinessHealthQuery, type PlatformBusinessHealth } from '../api/usePlatformBusinessHealthQuery'
@@ -41,50 +42,12 @@ function formatVndCompact(value: number) {
   return fmt(value)
 }
 
-/** yyyy-mm-dd của lịch VN -> ngày/tháng, KHÔNG đi qua `new Date()`: chuỗi đã là ngày lịch VN do BE
- * cắt sẵn, quy đổi lại qua Date sẽ diễn giải nó theo múi giờ trình duyệt và lệch một ngày. */
-function shortDay(day: string) {
-  const [, month, dayOfMonth] = day.split('-')
-  return `${dayOfMonth}/${month}`
-}
-
-/**
- * Việt Nam không có giờ mùa hè nên offset cố định +07:00 là chính xác, và nó khiến chuỗi gửi lên tự
- * mô tả được múi giờ — khác với việc đóng dấu `Z` lên một ngày người dùng chọn theo lịch địa phương,
- * vốn đẩy cả khoảng đi 7 tiếng.
- */
-const VN_UTC_OFFSET = '+07:00'
-
-function vnDayStartIso(date: string | null) {
-  return date ? `${date}T00:00:00${VN_UTC_OFFSET}` : null
-}
-
-/**
- * Mốc cuối của BE là NỬA MỞ `[from, to)`, nên "đến hết ngày X" phải gửi 00:00 của ngày X+1. Gửi
- * 23:59:59 sẽ đánh rơi đúng giây cuối cùng của ngày.
- */
-function vnDayAfterIso(date: string | null) {
-  if (!date) {
-    return null
-  }
-  const startOfDay = new Date(`${date}T00:00:00${VN_UTC_OFFSET}`)
-  startOfDay.setUTCDate(startOfDay.getUTCDate() + 1)
-  return startOfDay.toISOString()
-}
-
 const SYSTEM_ADMIN_PRESETS: Preset[] = [
   { days: 'mtd', key: 'mtd', label: 'Tháng này' },
   { days: 'ytd', key: 'ytd', label: 'Năm nay' },
 ]
 
-function DeltaPill({ current, previous, unit = '%' }: { current: number; previous: number; unit?: string }) {
-  // Không có kỳ trước để so thì KHÔNG vẽ "+0%": đi từ 0 lên một số dương là tăng trưởng tốt nhất có
-  // thể, hiển thị 0% khiến nó trông như đứng yên.
-  if (previous <= 0) {
-    return <span className="text-[12px] font-semibold text-slate-400">chưa có kỳ trước để so</span>
-  }
-  const delta = Math.round(((current - previous) / previous) * 100)
-  const up = delta >= 0
+function TrendPill({ children, up }: { children: React.ReactNode; up: boolean }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-bold tabular-nums ${
@@ -92,11 +55,68 @@ function DeltaPill({ current, previous, unit = '%' }: { current: number; previou
       }`}
     >
       {up ? <TrendingUp aria-hidden="true" className="size-3.5" /> : <TrendingDown aria-hidden="true" className="size-3.5" />}
-      {up ? '+' : ''}
-      {delta}
-      {unit}
+      {children}
     </span>
   )
+}
+
+function NoComparison() {
+  return <span className="text-[12px] font-semibold text-slate-400">chưa có kỳ trước để so</span>
+}
+
+function DeltaPill({ current, previous }: { current: number; previous: number }) {
+  // Không có kỳ trước để so thì KHÔNG vẽ "+0%": đi từ 0 lên một số dương là tăng trưởng tốt nhất có
+  // thể, hiển thị 0% khiến nó trông như đứng yên.
+  if (previous <= 0) {
+    return <NoComparison />
+  }
+  const delta = Math.round(((current - previous) / previous) * 100)
+  return (
+    <TrendPill up={delta >= 0}>
+      {delta >= 0 ? '+' : ''}
+      {delta}%
+    </TrendPill>
+  )
+}
+
+/**
+ * Biên lợi nhuận đã LÀ một tỷ lệ, nên chênh lệch giữa hai kỳ phải đọc bằng ĐIỂM phần trăm: 68% so
+ * với 72% là giảm 4 điểm. Đưa nó qua công thức phần trăm tương đối của `DeltaPill` sẽ in ra "−5,6%",
+ * đúng về số học nhưng không ai điều hành đọc biên theo cách đó.
+ *
+ * `null` ở mỗi đầu nghĩa là kỳ đó chưa thu được đồng nào, tức biên không tồn tại chứ không phải bằng
+ * 0 — và hai đầu thiếu nói hai chuyện khác nhau. Thiếu KỲ NÀY thì thẻ đã in "—" ở chỗ con số rồi,
+ * dán thêm "chưa có kỳ trước để so" vào là đổ lỗi nhầm kỳ; chỉ khi thiếu KỲ TRƯỚC mới nói câu đó.
+ */
+function MarginDeltaPill({ current, previous }: { current: number | null; previous: number | null }) {
+  if (current === null) {
+    return null
+  }
+  if (previous === null) {
+    return <NoComparison />
+  }
+  const delta = Math.round((current - previous) * 10) / 10
+  return (
+    <TrendPill up={delta >= 0}>
+      {delta > 0 ? '+' : ''}
+      {delta.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} điểm
+    </TrendPill>
+  )
+}
+
+/**
+ * `null` = hàng đợi rỗng, `0` = có đơn nhưng vừa nộp hôm nay. Ở chỉ số này 0 lại là trạng thái tốt
+ * nhất, nên gộp hai trường hợp sẽ khiến một hàng đợi sạch và một hàng đợi vừa được nạp đầy in ra
+ * cùng một dòng chữ.
+ */
+function oldestPendingLabel(days: number | null) {
+  if (days === null) {
+    return 'Không còn đơn nào chờ duyệt'
+  }
+  if (days === 0) {
+    return 'Đơn cũ nhất nộp hôm nay'
+  }
+  return `Đơn cũ nhất đã chờ ${fmt(days)} ngày`
 }
 
 function Kpi({
@@ -175,14 +195,61 @@ function CardMessage({ icon, onRetry, text }: { icon: React.ReactNode; onRetry?:
 
 const GRADING_BAR_HEIGHT = 96
 
+function FailedSessionsTile({ count, href }: { count: number; href: string }) {
+  const body = (
+    <>
+      <span
+        className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] ${
+          count > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'
+        }`}
+      >
+        <AlertTriangle aria-hidden="true" className="size-4.5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-bold text-slate-600">Phiên AI chấm lỗi</div>
+        <div className="mt-0.5 text-[12.5px] text-slate-500">
+          {count > 0 ? 'Xem chi tiết theo nguyên nhân' : 'Trong khoảng đã chọn'}
+        </div>
+      </div>
+      <span
+        className={`text-[26px] font-extrabold leading-none tracking-tight tabular-nums ${
+          count > 0 ? 'text-red-600' : 'text-slate-900'
+        }`}
+      >
+        {fmt(count)}
+      </span>
+      {count > 0 ? <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-red-400" /> : null}
+    </>
+  )
+
+  if (count === 0) {
+    return (
+      <div className="flex items-center gap-3.5 rounded-[14px] border border-slate-200 bg-slate-50/60 px-4 py-3.5">
+        {body}
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      className="flex items-center gap-3.5 rounded-[14px] border border-red-200 bg-red-50/60 px-4 py-3.5 transition hover:bg-red-50"
+      to={href}
+    >
+      {body}
+    </Link>
+  )
+}
+
 function OperationalHealthCard({
   data,
+  failuresHref,
   isError,
   isFetching,
   isLoading,
   onRetry,
 }: {
   data: PlatformOperationalHealth | undefined
+  failuresHref: string
   isError: boolean
   isFetching: boolean
   isLoading: boolean
@@ -304,30 +371,9 @@ function OperationalHealthCard({
                 </span>
               </div>
 
-              <div
-                className={`flex items-center gap-3.5 rounded-[14px] border px-4 py-3.5 ${
-                  data.gradingFailed > 0 ? 'border-red-200 bg-red-50/60' : 'border-slate-200 bg-slate-50/60'
-                }`}
-              >
-                <span
-                  className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] ${
-                    data.gradingFailed > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  <AlertTriangle aria-hidden="true" className="size-4.5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-bold text-slate-600">Phiên AI chấm lỗi</div>
-                  <div className="mt-0.5 text-[12.5px] text-slate-500">Trong khoảng đã chọn</div>
-                </div>
-                <span
-                  className={`text-[26px] font-extrabold leading-none tracking-tight tabular-nums ${
-                    data.gradingFailed > 0 ? 'text-red-600' : 'text-slate-900'
-                  }`}
-                >
-                  {fmt(data.gradingFailed)}
-                </span>
-              </div>
+              {/* Bấm được CHỈ KHI có phiên hỏng: 0 phiên thì trang bên kia không có gì để phân
+                  loại, và một link dẫn tới màn hình rỗng đắt hơn là không có link. */}
+              <FailedSessionsTile count={data.gradingFailed} href={failuresHref} />
             </div>
           </div>
         </div>
@@ -388,10 +434,12 @@ function SchoolsAtRiskCard({
               </div>
             ))}
           </div>
-          {/* Cố ý KHÔNG cộng tổng: bốn nhóm này CHỒNG LẤN nhau -- một trường sắp hết hạn vẫn có thể
-              đang nợ hạn mức, nên tổng bốn dòng không phải là số trường cần chú ý. */}
+          {/* Cố ý KHÔNG cộng tổng. BA DÒNG ĐẦU loại trừ nhau (sắp hết hạn là tập con của nhóm còn
+              gói, mà nhóm đó thì không thể vừa hết hạn vừa bị đình chỉ). Chỉ "đang nợ hạn mức" là
+              cắt ngang: nó đếm từ số dư ví chứ không từ trạng thái thuê bao, nên một trường còn gói
+              mà ví âm nằm ở cả dòng đó lẫn nhóm còn gói. */}
           <p className="mt-3 text-[12px] leading-4 text-slate-400">
-            Một trường có thể xuất hiện ở nhiều dòng (vd. vừa sắp hết hạn vừa đang nợ).
+            Ba nhóm đầu loại trừ nhau; đang nợ hạn mức chồng lấn cả ba, nên đừng cộng bốn số lại.
           </p>
         </>
       )}
@@ -588,6 +636,23 @@ export function SystemAdminDashboardPage() {
   const operationalHealth = usePlatformOperationalHealthQuery(dateFrom, dateTo)
   const businessHealth = usePlatformBusinessHealthQuery(dateFrom, dateTo)
 
+  /**
+   * Trang phân loại nhận khoảng qua query string thay vì tự chọn lại: nó phải phân loại ĐÚNG những
+   * phiên tạo ra con số vừa được bấm. Bỏ qua mốc null (preset "tất cả") để bên kia rơi về mặc định
+   * của BE thay vì nhận chuỗi "null".
+   */
+  const failuresHref = useMemo(() => {
+    const params = new URLSearchParams()
+    if (range.from) {
+      params.set('from', range.from)
+    }
+    if (range.to) {
+      params.set('to', range.to)
+    }
+    const query = params.toString()
+    return query ? `/system-admin/grading-failures?${query}` : '/system-admin/grading-failures'
+  }, [range])
+
   function jumpToPending() {
     navigate('/system-admin/registrations')
   }
@@ -628,19 +693,24 @@ export function SystemAdminDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Mẫu số là TỔNG SỐ TRƯỜNG, không phải `activeSchools`: cờ School.isActive do người vận hành
+            bật tay và không nói gì về việc trường còn gói hay không, nên ghép nó với tử số "có gói
+            còn hiệu lực" sẽ ra một phân số hai đơn vị đo khác nhau. */}
         <Kpi
           icon={<Building2 aria-hidden="true" className="size-5.5" />}
           label="Trường đang hoạt động"
           sub={
             business ? (
               <span className="font-semibold text-slate-600">
-                <b className="text-slate-900">{fmt(business.expiringSoonSchools)}</b> sắp hết hạn trong 30 ngày
+                Có gói còn hiệu lực. <b className="text-slate-900">{fmt(data.totalSchools - business.subscribedSchools)}</b> trường
+                không.
               </span>
             ) : (
               <span className="font-semibold text-slate-400">Đang tải...</span>
             )
           }
           tint={{ bg: 'bg-indigo-50', fg: 'text-indigo-700' }}
+          unit={business ? `/ ${fmt(data.totalSchools)}` : undefined}
           value={business ? fmt(business.subscribedSchools) : '—'}
         />
         <Kpi
@@ -665,8 +735,11 @@ export function SystemAdminDashboardPage() {
           label="Biên lợi nhuận gộp"
           sub={
             business ? (
-              <span className="font-semibold text-slate-600">
-                Chi phí AI <b className="text-slate-900">{formatVndCompact(business.aiCostVnd)} ₫</b>
+              <span className="flex flex-wrap items-center gap-2">
+                <MarginDeltaPill current={business.grossMarginPercent} previous={business.previousGrossMarginPercent} />
+                <span className="font-semibold text-slate-600">
+                  Chi phí AI <b className="text-slate-900">{formatVndCompact(business.aiCostVnd)} ₫</b>
+                </span>
               </span>
             ) : (
               <span className="font-semibold text-slate-400">Đang tải...</span>
@@ -688,13 +761,14 @@ export function SystemAdminDashboardPage() {
           icon={<UserPlus aria-hidden="true" className="size-5.5" />}
           label="Đăng ký chờ duyệt"
           onCta={jumpToPending}
-          sub="Cần phê duyệt để kích hoạt trường mới"
+          sub={oldestPendingLabel(data.oldestPendingRegistrationDays)}
           value={fmt(data.pendingRegistrations)}
         />
       </div>
 
       <OperationalHealthCard
         data={operationalHealth.data}
+        failuresHref={failuresHref}
         isError={operationalHealth.isError}
         isFetching={operationalHealth.isFetching}
         isLoading={operationalHealth.isLoading}

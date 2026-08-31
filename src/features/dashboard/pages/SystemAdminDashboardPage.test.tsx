@@ -22,6 +22,7 @@ function createSummary(overrides: Partial<SystemAdminDashboard> = {}): SystemAdm
       { amount: 120_000_000, month: '2026-07' },
       { amount: 412_500_000, month: '2026-08' },
     ],
+    oldestPendingRegistrationDays: 6,
     pendingRegistrations: 12,
     registrationsLast30Days: 46,
     registrationsLast90Days: 106,
@@ -60,6 +61,7 @@ function createBusinessHealth(overrides: Partial<PlatformBusinessHealth> = {}): 
     expiringSoonSchools: 14,
     grossMarginPercent: 68,
     lapsedSchools: 5,
+    previousGrossMarginPercent: 72,
     previousRevenueVnd: 349_200_000,
     revenueVnd: 412_500_000,
     schoolsInDebt: 3,
@@ -151,18 +153,90 @@ describe('SystemAdminDashboardPage', () => {
     expect(screen.getByText('Đã hết hạn')).toBeInTheDocument()
     expect(screen.getByText('Bị tạm ngưng')).toBeInTheDocument()
     expect(screen.getByText('Đang nợ hạn mức')).toBeInTheDocument()
-    // Không có dòng tổng: bốn nhóm chồng lấn nhau nên cộng lại là sai.
-    expect(screen.getByText(/Một trường có thể xuất hiện ở nhiều dòng/)).toBeInTheDocument()
+    // Không có dòng tổng: "đang nợ" cắt ngang ba nhóm kia nên cộng bốn số lại là sai.
+    expect(screen.getByText(/Ba nhóm đầu loại trừ nhau/)).toBeInTheDocument()
   })
 
-  it('shows the subscription-based school count, not the manual isActive flag', async () => {
+  it('shows the subscription-based school count over the total, not the manual isActive flag', async () => {
     mockGraphQL()
     renderPage()
 
     expect(await screen.findByText('Trường đang hoạt động')).toBeInTheDocument()
-    // 96 = subscribedSchools; 90 = activeSchools của cờ isActive cũ, không được dùng nữa.
-    expect(screen.getByText('96')).toBeInTheDocument()
+
+    // 96 trên tổng 98 trường. 90 = activeSchools của cờ isActive cũ, không được dùng làm mẫu số nữa:
+    // cờ đó do người vận hành bật tay và không nói gì về việc trường còn gói hay không.
+    const denominator = screen.getByText('/ 98')
+    expect(denominator.parentElement).toHaveTextContent('96')
     expect(screen.queryByText('90')).not.toBeInTheDocument()
+
+    // Mẫu số phải tự giải thích được: 98 - 96 = 2 trường không còn gói.
+    expect(screen.getByText(/Có gói còn hiệu lực/)).toHaveTextContent('trường không')
+  })
+
+  /**
+   * Biên là một tỷ lệ, nên mức chênh giữa hai kỳ đọc theo ĐIỂM phần trăm. 68% so với 72% là giảm 4
+   * điểm — đưa qua công thức phần trăm tương đối sẽ ra "−5,6%", đúng số học nhưng sai cách đọc.
+   */
+  it('compares gross margin in percentage points, not relative percent', async () => {
+    mockGraphQL()
+    renderPage()
+
+    expect(await screen.findByText('Biên lợi nhuận gộp')).toBeInTheDocument()
+    // Lớp ký tự vì dấu trừ của vi-VN có thể là U+002D hoặc U+2212 tuỳ bản ICU.
+    expect(screen.getByText(/[-−]4 điểm/)).toBeInTheDocument()
+    expect(screen.queryByText(/[-−]5,6/)).not.toBeInTheDocument()
+  })
+
+  /** Kỳ trước chưa thu được đồng nào thì biên kỳ đó không tồn tại — không có mức chênh để vẽ. */
+  it('says there is nothing to compare when the previous window had no revenue', async () => {
+    mockGraphQL({ business: createBusinessHealth({ previousGrossMarginPercent: null }) })
+    renderPage()
+
+    expect(await screen.findByText('Biên lợi nhuận gộp')).toBeInTheDocument()
+    expect(screen.getAllByText('chưa có kỳ trước để so')).toHaveLength(1)
+    expect(screen.queryByText(/điểm/)).not.toBeInTheDocument()
+  })
+
+  /**
+   * Thiếu KỲ NÀY và thiếu KỲ TRƯỚC nói hai chuyện khác nhau. Thẻ đã in "—" ở chỗ con số khi kỳ này
+   * chưa thu được gì, nên dán thêm "chưa có kỳ trước để so" vào là đổ lỗi nhầm kỳ.
+   */
+  it('does not blame the previous window when it is this window that has no revenue', async () => {
+    mockGraphQL({
+      business: createBusinessHealth({ grossMarginPercent: null, revenueVnd: 0 }),
+    })
+    renderPage()
+
+    expect(await screen.findByText('Biên lợi nhuận gộp')).toBeInTheDocument()
+    expect(screen.queryByText('chưa có kỳ trước để so')).not.toBeInTheDocument()
+    expect(screen.queryByText(/điểm/)).not.toBeInTheDocument()
+  })
+
+  it('shows how long the oldest pending registration has waited', async () => {
+    mockGraphQL()
+    renderPage()
+
+    expect(await screen.findByText('Đăng ký chờ duyệt')).toBeInTheDocument()
+    expect(screen.getByText('Đơn cũ nhất đã chờ 6 ngày')).toBeInTheDocument()
+  })
+
+  /**
+   * Hàng đợi rỗng (null) và "có đơn, vừa nộp hôm nay" (0) là hai chuyện ngược nhau, và ở chỉ số này 0
+   * mới là trạng thái tốt nhất. Gộp chúng lại sẽ khiến một hàng đợi sạch và một hàng đợi vừa nạp đầy
+   * in ra cùng một dòng chữ.
+   */
+  it('reports an empty pending queue instead of zero days waited', async () => {
+    mockGraphQL({ summary: createSummary({ oldestPendingRegistrationDays: null, pendingRegistrations: 0 }) })
+    renderPage()
+
+    expect(await screen.findByText('Không còn đơn nào chờ duyệt')).toBeInTheDocument()
+  })
+
+  it('reports a queue filled today separately from an empty one', async () => {
+    mockGraphQL({ summary: createSummary({ oldestPendingRegistrationDays: 0 }) })
+    renderPage()
+
+    expect(await screen.findByText('Đơn cũ nhất nộp hôm nay')).toBeInTheDocument()
   })
 
   /**
