@@ -21,6 +21,17 @@ async function createPlan(payload: CreateSubscriptionPlanPayload): Promise<Mutat
   return response.data
 }
 
+async function createReplacementPlan({
+  id,
+  payload,
+}: {
+  id: string
+  payload: CreateSubscriptionPlanPayload
+}): Promise<MutationResult<string>> {
+  const response = await apiClient.post<ApiResponse<string>>(`/v1/subscriptions/${id}/replacement-plan`, payload)
+  return response.data
+}
+
 async function updatePlan(id: string, payload: UpdateSubscriptionPlanPayload): Promise<string> {
   const data = await graphQLRequest<{ updateSubscriptionPlan: string }>(
     UPDATE_SUBSCRIPTION_PLAN_MUTATION,
@@ -82,6 +93,10 @@ function usePlanMutation<TInput, TOutput>(mutationFn: (input: TInput) => Promise
 
 export function useCreatePlanMutation() {
   return usePlanMutation(createPlan)
+}
+
+export function useCreateReplacementPlanMutation() {
+  return usePlanMutation(createReplacementPlan)
 }
 
 export function useUpdatePlanMutation() {

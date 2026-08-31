@@ -798,12 +798,21 @@ export function getAssessmentPolicyStrictnessLabel(strictness?: AssessmentPolicy
 // assessment_policy_school/components/AssessmentPolicyTable.tsx, để phân biệt các Assessment
 // Policy dùng chung 1 Rubric Version nhưng khác phạm vi (vd. CENTRALIZE theo Khối vs CLASS_TEST
 // neo vào 1 Lớp cụ thể) khi chúng hiện cạnh nhau trong danh sách "chọn một".
+// Trường có thể đã đặt tên khối/niên khóa/lớp bao gồm sẵn tiền tố (vd. "Khối 10" thay vì "10", vì
+// form tạo khối trước đây gợi ý placeholder như vậy) -- bỏ tiền tố lặp thay vì nối thô, tránh hiện
+// "Khối Khối 10".
+function withScopePrefix(prefix: string, name: string | null | undefined): string {
+  const trimmed = (name ?? '').trim()
+  const alreadyPrefixed = trimmed.toLowerCase().startsWith(prefix.toLowerCase())
+  return alreadyPrefixed ? trimmed : `${prefix} ${trimmed}`
+}
+
 export function getAssessmentPolicyScopeLabel(
   policy: Pick<AssessmentPolicyDto, 'gradeLevel' | 'schoolGrade' | 'schoolClass'>,
 ): string {
-  if (policy.schoolClass) return `Lớp ${policy.schoolClass.name || policy.schoolClass.code}`
-  if (policy.schoolGrade) return `Niên khóa ${policy.schoolGrade.name || policy.schoolGrade.code}`
-  if (policy.gradeLevel) return `Khối ${policy.gradeLevel.name || policy.gradeLevel.code}`
+  if (policy.schoolClass) return withScopePrefix('Lớp', policy.schoolClass.name || policy.schoolClass.code)
+  if (policy.schoolGrade) return withScopePrefix('Niên khóa', policy.schoolGrade.name || policy.schoolGrade.code)
+  if (policy.gradeLevel) return withScopePrefix('Khối', policy.gradeLevel.name || policy.gradeLevel.code)
   return 'Toàn trường'
 }
 
