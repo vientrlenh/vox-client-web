@@ -109,7 +109,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<AssessmentPolicy | null>(null);
 
-  const { data: rubrics } = useRubricSearchOptionsQuery(schoolId);
+  const { data: rubrics } = useRubricSearchOptionsQuery(schoolId, undefined, false);
   const { data: rubricVersions } = useRubricVersionOptionsQuery(schoolId, selectedRubricId || undefined);
 
   // Dữ liệu riêng cho nút "Xuất bản" nhanh kế bên Import: chỉ fetch khi đã chọn Phiên bản ở bộ lọc

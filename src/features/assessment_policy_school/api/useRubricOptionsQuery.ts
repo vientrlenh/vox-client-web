@@ -19,7 +19,10 @@ const SEARCH_SCHOOL_RUBRICS_FOR_POLICY = `
   }
 `;
 
-export function useRubricSearchOptionsQuery(schoolId?: string, languageId?: string) {
+// `requireLanguage` mặc định true (dialog tạo Policy: phải chọn Ngôn ngữ trước mới load Rubric,
+// tránh bắn thừa request khi form chưa chọn gì). Trang danh sách/filter truyền false vì đã bỏ
+// filter Ngôn ngữ riêng, Rubric ở đó load ngay không cần điều kiện.
+export function useRubricSearchOptionsQuery(schoolId?: string, languageId?: string, requireLanguage = true) {
   return useQuery({
     queryKey: ['school-assessment-policy-rubric-options', schoolId, languageId],
     queryFn: async () => {
@@ -29,7 +32,7 @@ export function useRubricSearchOptionsQuery(schoolId?: string, languageId?: stri
       );
       return data.searchSchoolRubrics.content;
     },
-    enabled: Boolean(schoolId),
+    enabled: Boolean(schoolId) && (!requireLanguage || Boolean(languageId)),
   });
 }
 
