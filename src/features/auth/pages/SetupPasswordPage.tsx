@@ -13,9 +13,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import cartoonSchoolImage from '@/assets/images/cartoon-school.png'
 import logoImage from '@/assets/images/logo.png'
+import { useAppSelector } from '@/app/store/hooks'
 import type { ApiError } from '@/shared/api'
 import { SiteFooter } from '@/shared/ui/SiteFooter'
 import { useSetUpPasswordMutation } from '../api/useSetUpPasswordMutation'
+import { useLogout } from '../session/useLogout'
 
 type SetupPasswordMessage = {
   text: string
@@ -84,6 +86,12 @@ export function SetupPasswordPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const setUpPasswordMutation = useSetUpPasswordMutation()
+  const logout = useLogout()
+  const isAuthenticated = useAppSelector(
+    (state) => state.auth.status === 'authenticated',
+  )
+  const hasEndedSessionRef = useRef(false)
+  const [didEndSession, setDidEndSession] = useState(false)
   const redirectTimerRef = useRef<number | null>(null)
   const userId = searchParams.get('userId')?.trim() ?? ''
   const token = searchParams.get('token')?.trim() ?? ''
@@ -104,6 +112,32 @@ export function SetupPasswordPage() {
         }
       : null,
   )
+
+  /**
+   * Mở liên kết thiết lập mật khẩu là kết thúc phiên đang đăng nhập trên máy này.
+   *
+   * Liên kết này đến từ email và gần như luôn được mở trên máy của người khác — phòng máy dùng
+   * chung, máy của giáo viên, máy của phụ huynh. Đặt mật khẩu cho tài khoản A trong khi trình
+   * duyệt vẫn đang giữ phiên của B là vừa khó hiểu vừa nguy hiểm: mọi thứ hiển thị sau đó vẫn là
+   * dữ liệu của B.
+   *
+   * Gọi ở đây chứ không phải lúc gửi form: người dùng có thể đóng tab giữa chừng, và phiên cũ
+   * không được phép sống sót qua việc đó. Đây cũng là lý do phải THU HỒI phía server chứ không
+   * chỉ xoá token trong máy — cookie refresh_token vẫn còn hạn 72 giờ.
+   *
+   * Ref chặn lần chạy thứ hai của StrictMode: `/logout` là idempotent nên gọi lại vô hại, nhưng
+   * không có lý do gì để bắn thừa một request.
+   */
+  useEffect(() => {
+    if (!isAuthenticated || hasEndedSessionRef.current) {
+      return
+    }
+
+    hasEndedSessionRef.current = true
+    void logout().then(() => {
+      setDidEndSession(true)
+    })
+  }, [isAuthenticated, logout])
 
   useEffect(() => {
     return () => {
@@ -388,6 +422,18 @@ export function SetupPasswordPage() {
                       )
                     })}
                   </div>
+
+                  {/* Đăng xuất ngầm là kiểu hỏng khó chịu nhất: người dùng quay lại tab cũ và
+                      thấy mình bị văng ra mà không hiểu vì sao. Nói thẳng ra ở đây. */}
+                  {didEndSession ? (
+                    <div
+                      className="mt-5 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-800"
+                      role="status"
+                    >
+                      Phiên đăng nhập trước đó trên máy này đã được đăng xuất để bạn thiết lập
+                      mật khẩu cho đúng tài khoản.
+                    </div>
+                  ) : null}
 
                   {message ? (
                     <div

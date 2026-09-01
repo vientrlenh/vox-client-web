@@ -1,6 +1,9 @@
 import { screen, waitFor } from '@testing-library/react'
 import type { AxiosResponse } from 'axios'
 import userEvent from '@testing-library/user-event'
+import { useLocation } from 'react-router'
+import { setAuthenticatedUser } from '@/app/store/authSlice'
+import { configureAppStore } from '@/app/store/store'
 import { type ApiResponse, apiClient } from '@/shared/api'
 import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -43,10 +46,48 @@ function createLoginResponse(
   }
 }
 
+function LocationProbe() {
+  const location = useLocation()
+
+  return <div data-testid="location">{location.pathname}</div>
+}
+
 describe('LoginPage', () => {
   beforeEach(() => {
     localStorage.clear()
     jest.mocked(apiClient.post).mockReset()
+  })
+
+  /**
+   * Từ khi AuthProvider khôi phục phiên bằng cookie refresh_token, mở lại bookmark /login khi
+   * vẫn đang đăng nhập là đường đi thường gặp -- và cái form đòi mật khẩu ở đó là thứ vô nghĩa
+   * duy nhất người dùng nhìn thấy sau khi phiên đã được khôi phục thành công.
+   */
+  it('sends an already signed-in visitor to their role dashboard', async () => {
+    const store = configureAppStore()
+    store.dispatch(
+      setAuthenticatedUser({
+        email: 'teacher@vox.edu.vn',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        roles: ['TEACHER'],
+        userId: 'user-1',
+      }),
+    )
+
+    renderWithProviders(
+      <>
+        <LoginPage />
+        <LocationProbe />
+      </>,
+      { store },
+    )
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/teacher/dashboard',
+      ),
+    )
+    expect(screen.queryByLabelText(/^mật khẩu$/i)).not.toBeInTheDocument()
   })
 
   it('renders the login form controls', () => {

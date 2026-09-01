@@ -12,11 +12,11 @@ import {
 } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import cartoonSchoolImage from '@/assets/images/cartoon-school.png'
 import logoImage from '@/assets/images/logo.png'
 import { setAuthenticatedUser } from '@/app/store/authSlice'
-import { useAppDispatch } from '@/app/store/hooks'
+import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
 import {
   clearAuthTokens,
   decodeAccessToken,
@@ -24,6 +24,8 @@ import {
   isAccessTokenExpired,
   saveAuthTokens,
 } from '@/features/auth/session/authSession'
+import { publishAuthBroadcast } from '@/features/auth/session/authChannel'
+import { getPostLoginPath } from '@/features/auth/session/postLoginPath'
 import { SiteFooter } from '@/shared/ui/SiteFooter'
 import { type ApiError } from '@/shared/api'
 import { useLoginMutation } from '../api/useLoginMutation'
@@ -105,28 +107,10 @@ function readResumePath(state: unknown) {
   return pathname && RESUMABLE_PATH.test(pathname) ? pathname : null
 }
 
-function getPostLoginPath(roles: string[]) {
-  if (roles.includes('SYSTEM_ADMIN')) {
-    return '/system-admin/dashboard'
-  }
-
-  if (roles.includes('SCHOOL_ADMIN')) {
-    return '/school-admin/dashboard'
-  }
-  if (roles.includes('TEACHER')) {
-    return '/teacher/dashboard'
-  }
-
-  if (roles.includes('STUDENT')) {
-    return '/student/exams'
-  }
-
-  return null
-}
-
 export function LoginPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const authenticatedUser = useAppSelector((state) => state.auth.user)
   const loginMutation = useLoginMutation()
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
@@ -144,6 +128,21 @@ export function LoginPage() {
       navigate(location.pathname, { replace: true, state: null })
     }
   }, [location, navigate])
+
+  // Phiên còn sống thì màn đăng nhập không còn việc gì để làm. Từ khi AuthProvider khôi phục
+  // phiên bằng cookie, đây là đường đi bình thường chứ không phải trường hợp hiếm: người dùng mở
+  // lại bookmark /login và đáng ra phải vào thẳng bảng điều khiển, thay vì nhìn một cái form đòi
+  // mật khẩu mà họ không cần nhập.
+  //
+  // Đặt SAU toàn bộ hook: React đòi số lượng hook không đổi giữa các lần render nên early return
+  // không được chen vào giữa chúng.
+  const authenticatedPath = authenticatedUser
+    ? getPostLoginPath(authenticatedUser.roles)
+    : null
+
+  if (authenticatedPath) {
+    return <Navigate replace to={resumePath ?? authenticatedPath} />
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -188,6 +187,10 @@ export function LoginPage() {
       }
 
       dispatch(setAuthenticatedUser(user))
+      // Tab khác có thể đang mở dưới danh tính của người trước -- máy phòng lab, máy giáo viên.
+      // Không báo thì tab đó vẽ giao diện của người cũ trong khi mọi request nó gửi đi đã mang
+      // token của người vừa đăng nhập ở đây.
+      publishAuthBroadcast({ accessToken: tokens.accessToken, type: 'authenticated' })
       setMessage({
         text: 'Đăng nhập thành công.',
         tone: 'success',

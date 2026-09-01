@@ -49,6 +49,26 @@ const CONNECTION_LABEL: Record<MonitorConnectionState, string> = {
     reconnecting: 'Đang kết nối lại...',
 }
 
+/**
+ * Màu của phù hiệu trạng thái kết nối.
+ *
+ * <p>Trước đây mọi trạng thái dùng chung một viên xám: chữ có khác nhau, nhưng thứ duy nhất bắt mắt
+ * người đang quét qua một lưới đầy ô video thì không. Giám thị nhìn phù hiệu này đúng vào lúc bận
+ * nhất, nên khác biệt phải thấy được mà không cần đọc.
+ *
+ * <p>`error` là trạng thái mới CÓ THỂ tới được -- xem ATTEMPTS_BEFORE_ERROR trong useRoomMonitor.
+ * Nó không có nghĩa là đã bỏ cuộc (vẫn đang thử lại), mà là "đã trượt đủ lâu để đừng tin cái lưới
+ * này nữa".
+ */
+const CONNECTION_TONE: Record<MonitorConnectionState, string> = {
+    closed: 'border-slate-200 bg-white text-slate-600',
+    connected: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    connecting: 'border-amber-200 bg-amber-50 text-amber-700',
+    error: 'border-red-200 bg-red-50 text-red-700',
+    idle: 'border-slate-200 bg-white text-slate-600',
+    reconnecting: 'border-amber-200 bg-amber-50 text-amber-700',
+}
+
 const FILTER_OPTIONS: { label: string; value: StreamFilter }[] = [
     { label: 'Cả hai', value: 'all' },
     { label: 'Camera', value: 'camera' },
@@ -404,7 +424,7 @@ export function MonitoringRoomPage() {
                                 </button>
                             ))}
                         </div>
-                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600">
+                        <span className={`rounded-full border px-3 py-1.5 text-xs font-bold ${CONNECTION_TONE[connectionState]}`}>
                             {CONNECTION_LABEL[connectionState]}
                         </span>
                     </div>

@@ -221,10 +221,11 @@ export function ensurePushDeviceRegistered(userId: string) {
 /**
  * Phải chạy XONG trước khi xoá token đăng nhập, nếu không request rơi vào 401.
  *
- * <p>Backend không có endpoint đăng xuất, và `DeviceSessionRevokedEvent` chỉ phát khi
- * refresh token có bất thường -- nghĩa là đăng xuất bình thường không gỡ thiết bị. Bỏ
- * bước này thì trên máy dùng chung, thông báo điểm thi của người vừa rời đi sẽ hiện lên
- * cho người ngồi xuống sau đó.
+ * <p>POST /v1/auth/logout giờ đã thu hồi phiên và backend tự gỡ thiết bị theo
+ * `DeviceSessionRevokedEvent`, nên bước này KHÔNG còn là đường duy nhất -- nhưng vẫn giữ:
+ * nó dọn cả trạng thái phía client (FID đã lưu, các listener đang gắn) mà server không với
+ * tới được, và nó vẫn chạy đúng khi lời gọi thu hồi thất bại. Bỏ hẳn thì trên máy dùng
+ * chung, thông báo điểm thi của người vừa rời đi có thể hiện lên cho người ngồi xuống sau.
  *
  * <p>Cố tình đọc FID từ localStorage thay vì hỏi lại Firebase: đọc đồng bộ nên không phải
  * chờ nạp SDK ngay giữa đường đăng xuất, và vẫn gỡ được thiết bị đã đăng ký từ phiên

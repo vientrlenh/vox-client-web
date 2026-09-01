@@ -1,18 +1,12 @@
 
 import { useAppDispatch } from "@/app/store/hooks"
 import { clearAuthTokens, decodeAccessToken, isAccessTokenExpired, saveAuthTokens } from "../session/authSession"
+import { publishAuthBroadcast } from "../session/authChannel"
+import { getPostLoginPath } from "../session/postLoginPath"
 import { useNavigate, useSearchParams } from "react-router"
 import { useEffect } from "react"
 import { setAuthenticatedUser } from "@/app/store/authSlice"
 import { PageLoader } from "@/shared/ui/PageLoader"
-
-function getPostLoginPath(roles: string[]) {
-    if (roles.includes('SYSTEM_ADMIN')) return '/system-admin/dashboard'
-    if (roles.includes('SCHOOL_ADMIN')) return '/school-admin/dashboard'
-    if (roles.includes('TEACHER')) return '/teacher/dashboard'
-    if (roles.includes('STUDENT')) return '/student/exams'
-    return null
-}
 
 const ErrorMessage: Record<string, string> = {
     "user_not_found": "Người dùng hiện chưa tồn tại. Vui lòng gửi đơn đăng ký hoặc liên hệ bên nhà trường để được hỗ trợ", 
@@ -50,6 +44,8 @@ export function OAuth2CallbackPage() {
 
             saveAuthTokens({accessToken: token })
             dispatch(setAuthenticatedUser(user))
+            // Cùng lý do như ở LoginPage: tab khác có thể đang mở dưới danh tính người trước.
+            publishAuthBroadcast({ accessToken: token, type: 'authenticated' })
             navigate(postLoginPath, {replace: true})
             return
         }

@@ -186,6 +186,15 @@ function streamsReducer(
  */
 const MAX_ALERTS = 100
 
+/**
+ * Số lần thử lại liên tiếp trước khi phòng tự nhận là đang hỏng thật, thay vì chỉ đang chớp.
+ *
+ * <p>Vẫn thử lại mãi sau mốc này -- một ca thi đang chạy thì không có lúc nào là lúc hợp lý để bỏ
+ * cuộc. Đây thuần tuý là chuyện nói thật với giám thị: bốn lần trượt liên tiếp đã là khoảng 7 giây,
+ * đủ lâu để "Đang kết nối lại..." biến thành một lời trấn an sai.
+ */
+const ATTEMPTS_BEFORE_ERROR = 4
+
 export type AlertView = AlertEvent & { receivedAt: number }
 
 type UseScheduleMonitorParams = {
@@ -263,21 +272,114 @@ export function useScheduleMonitor({ examId, scheduleId }: UseScheduleMonitorPar
         }
 
         closedRef.current = false
-        
+
+        /**
+         * Gỡ hết handler RỒI mới đóng.
+         *
+         * <p>Chỗ này trước đây chỉ gán `socketRef.current = null`, tức là bỏ tham chiếu chứ không bỏ
+         * cái socket: handler vẫn còn treo trên nó. Một socket cũ đang giãy chết vì thế vẫn đẩy được
+         * snapshot vào reducer, và snapshot của nó chỉ chứa những luồng nó từng biết -- đủ để đánh
+         * dấu "đã ngừng" cho những học viên đang sống rất khoẻ trên kết nối vừa lập lại.
+         */
+        function discard(socket: WebSocket | null) {
+            if (!socket) {
+                return
+            }
+            socket.onopen = null
+            socket.onmessage = null
+            socket.onerror = null
+            socket.onclose = null
+            try {
+                socket.close()
+            } catch {
+                // Đóng một socket đã chết không phải là lỗi đáng báo.
+            }
+        }
+
+        /** Trạng thái hiển thị lúc chưa nối được, tách ra để hai chỗ dùng không lệch nhau. */
+        function pendingState(): MonitorConnectionState {
+            if (reconnectRef.current === 0) {
+                return 'connecting'
+            }
+            return reconnectRef.current >= ATTEMPTS_BEFORE_ERROR ? 'error' : 'reconnecting'
+        }
+
+        function scheduleReconnect() {
+            const attempt = (reconnectRef.current += 1)
+            const ceiling = Math.min(30_000, 1000 * 2 ** (attempt - 1))
+            // Nửa cố định + nửa ngẫu nhiên. Khi server khởi động lại, MỌI tab giám thị đều rớt trong
+            // cùng một giây; không có jitter thì tất cả cũng gõ cửa lại đúng cùng một thời điểm, và
+            // đợt nối đồng loạt đó là thứ dễ làm một server vừa sống lại chết thêm lần nữa.
+            const delay = ceiling / 2 + Math.random() * (ceiling / 2)
+
+            setConnectionState(pendingState())
+            timerRef.current = setTimeout(() => {
+                void reconnect()
+            }, delay)
+        }
+
+        /**
+         * Xin token mới TRƯỚC khi nối lại, thay vì bắn `void refetchToken()` rồi nối ngay.
+         *
+         * <p>Lần thử đầu chỉ cách lúc rớt khoảng một giây, nên bản cũ gần như chắc chắn nối lại bằng
+         * đúng cái token vừa bị từ chối. Thường thì không sao -- useMonitorToken tự làm mới mỗi 4
+         * phút nên trong tay đã sẵn token còn hạn -- nhưng đúng trường hợp cần nhất, là socket chết
+         * VÌ token, thì nó lại hỏng: mọi lần thử lại đều mang theo token đã chết cho tới khi một
+         * nhịp làm mới định kỳ tình cờ chen vào.
+         */
+        async function reconnect() {
+            if (closedRef.current) {
+                return
+            }
+            try {
+                const refreshed = await refetchToken()
+                if (refreshed.data) {
+                    tokenRef.current = refreshed.data
+                }
+            } catch {
+                // Giữ token đang có và cứ thử: xin token hỏng thường là vì mạng, mà mạng hỏng thì
+                // socket bên dưới cũng hỏng theo và vòng lặp này tự chạy tiếp.
+            }
+            if (closedRef.current) {
+                return
+            }
+            connect()
+        }
+
         function connect() {
             const activeToken = tokenRef.current
-            if (!activeToken || closedRef.current) return
+            if (!activeToken || closedRef.current) {
+                return
+            }
 
-            setConnectionState(reconnectRef.current === 0 ? 'connecting' : 'reconnecting')
-            const ws = new WebSocket(buildMonitorSocketUrl(scheduleId!, activeToken))
+            // Socket cũ (nếu còn) phải chết hẳn trước khi có socket mới, nếu không hai socket cùng
+            // bơm vào một reducer.
+            discard(socketRef.current)
+
+            let ws: WebSocket
+            try {
+                ws = new WebSocket(buildMonitorSocketUrl(scheduleId!, activeToken))
+            } catch {
+                // Hàm này chạy bên trong một promise (xem reconnect), nên ngoại lệ ở đây sẽ thành
+                // unhandled rejection chứ không dừng lại ở đâu cả.
+                scheduleReconnect()
+                return
+            }
             socketRef.current = ws
+            setConnectionState(pendingState())
 
             ws.onopen = () => {
+                if (socketRef.current !== ws) {
+                    return
+                }
                 reconnectRef.current = 0
                 setConnectionState('connected')
             }
 
             ws.onmessage = (event) => {
+                if (socketRef.current !== ws) {
+                    return
+                }
                 let message: MonitorMessage
                 try {
                     message = JSON.parse(event.data as string) as MonitorMessage
@@ -285,34 +387,43 @@ export function useScheduleMonitor({ examId, scheduleId }: UseScheduleMonitorPar
                     return
                 }
                 switch (message.type) {
-                    case 'snapshot': 
+                    case 'snapshot':
                         dispatch({ type: 'snapshot', streams: message.streams })
                         break
-                    case 'frame': 
+                    case 'frame':
                         dispatch({ type: 'frame', frame: message.frame })
                         break
-                    case 'participant': 
+                    case 'participant':
                         dispatch({ type: 'participant', event: message.event })
                         break
                     case 'alert':
                         pushAlert(message.alert)
                         break
-                    default: 
+                    default:
                         break
                 }
             }
 
-            ws.onerror = () => {
+            // Nối lại nằm ở onclose, và CHỈ ở onclose.
+            //
+            // Trước đây nó nằm ở onerror, chỗ duy nhất được cài -- nên một lần đóng SẠCH (server gửi
+            // close frame, đúng thứ mọi proxy/ingress làm khi hết idle timeout) chỉ bắn close chứ
+            // không bắn error, và phòng giám sát chết lặng lẽ: badge vẫn ghi "Đang kết nối trực
+            // tiếp" trong khi không còn khung hình nào về, rồi mọi ô lần lượt quá ngưỡng và cả phòng
+            // cùng báo mất kết nối -- một báo động giả mà giám thị không phân biệt nổi với thật.
+            //
+            // Đổi hẳn sang onclose thay vì cài thêm: theo spec thì một kết nối hỏng bắn error RỒI
+            // bắn close, nên để cả hai cùng nối lại là đặt hai hẹn giờ và mở hai socket cho cùng một
+            // lần rớt. onclose là tín hiệu bắn đúng một lần cho mọi kiểu đóng, sạch hay không.
+            ws.onclose = () => {
+                if (socketRef.current !== ws) {
+                    return
+                }
                 socketRef.current = null
-                if (closedRef.current) return
-
-                // token expires in the middle of exam session -> request a new token
-                void refetchToken()
-                const attempt = (reconnectRef.current += 1)
-                const delay = Math.min(30_000, 1000 * 2 ** (attempt - 1))
-                setConnectionState('reconnecting')
-                timerRef.current = setTimeout(connect, delay)
-                // if fail to refetch token multiple times -> set error and stop streaming
+                if (closedRef.current) {
+                    return
+                }
+                scheduleReconnect()
             }
         }
         connect()
@@ -321,9 +432,13 @@ export function useScheduleMonitor({ examId, scheduleId }: UseScheduleMonitorPar
             // close ws when leaving the page, do not close converter lazy-gate
             // consume CPU/storage to produce .jpg for no-eye rooms
             closedRef.current = true
-            if (timerRef.current) clearTimeout(timerRef.current)
-            socketRef.current?.close()
+            if (timerRef.current) {
+                clearTimeout(timerRef.current)
+                timerRef.current = null
+            }
+            discard(socketRef.current)
             socketRef.current = null
+            reconnectRef.current = 0
             dispatch({ type: 'reset' })
             setAlerts([])
             setConnectionState('closed')

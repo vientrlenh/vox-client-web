@@ -30,6 +30,10 @@ export type RefreshResponse = {
   refreshToken: string
 }
 
+export type LogoutRequest = {
+  deviceId: string
+}
+
 export type SetUpPasswordRequest = {
   password: string
   token: string

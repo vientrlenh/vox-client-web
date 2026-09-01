@@ -20,10 +20,9 @@ import {
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import logoImage from '@/assets/images/logo.png'
-import { clearAuthState } from '@/app/store/authSlice'
-import { useAppDispatch, useAppSelector } from '@/app/store/hooks'
-import { clearAuthTokens } from '@/features/auth/session/authSession'
-import { NotificationBell, unregisterPushDevice } from '@/features/notifications'
+import { useAppSelector } from '@/app/store/hooks'
+import { useLogout } from '@/features/auth/session/useLogout'
+import { NotificationBell } from '@/features/notifications'
 import { useProfileQuery } from '@/features/profile'
 import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
 import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMySubscriptionQuery'
@@ -391,7 +390,7 @@ function SchoolAdminSidebar({
 }
 
 export function SchoolAdminLayout() {
-  const dispatch = useAppDispatch()
+  const logout = useLogout()
   const navigate = useNavigate()
   const location = useLocation()
   const user = useAppSelector((state) => state.auth.user)
@@ -457,11 +456,7 @@ export function SchoolAdminLayout() {
   async function handleLogout() {
     setIsMobileMenuOpen(false)
     setIsUserMenuOpen(false)
-    // Gỡ thiết bị nhận thông báo TRƯỚC khi xoá token: request cần header
-    // Authorization, và backend không có endpoint đăng xuất nào dọn giúp việc này.
-    await unregisterPushDevice()
-    clearAuthTokens()
-    dispatch(clearAuthState())
+    await logout()
     navigate('/login', { replace: true })
   }
 

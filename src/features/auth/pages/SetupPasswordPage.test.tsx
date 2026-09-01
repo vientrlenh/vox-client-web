@@ -2,6 +2,8 @@ import { act, screen, waitFor } from '@testing-library/react'
 import type { AxiosResponse } from 'axios'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
+import { setAuthenticatedUser } from '@/app/store/authSlice'
+import { configureAppStore } from '@/app/store/store'
 import { type ApiResponse, apiClient } from '@/shared/api'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { SetupPasswordPage } from './SetupPasswordPage'
@@ -10,6 +12,12 @@ jest.mock('@/shared/api', () => ({
   apiClient: {
     post: jest.fn(),
   },
+}))
+
+const mockLogout = jest.fn()
+
+jest.mock('../session/useLogout', () => ({
+  useLogout: () => mockLogout,
 }))
 
 const userId = 'f8635b2c-8770-49a0-9cf7-b6581a1bdc22'
@@ -45,6 +53,7 @@ async function fillPasswordForm(password: string, confirmPassword = password) {
 describe('SetupPasswordPage', () => {
   beforeEach(() => {
     jest.mocked(apiClient.post).mockReset()
+    mockLogout.mockReset().mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -168,5 +177,41 @@ describe('SetupPasswordPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /token không hợp lệ hoặc đã hết hạn/i,
     )
+  })
+
+  /**
+   * Liên kết đến từ email nên thường được mở trên máy của người khác. Đặt mật khẩu cho tài khoản
+   * A trong khi trình duyệt vẫn giữ phiên của B là vừa khó hiểu vừa nguy hiểm.
+   */
+  it('ends the session already signed in on this machine', async () => {
+    const store = configureAppStore()
+    store.dispatch(
+      setAuthenticatedUser({
+        email: 'teacher@vox.edu.vn',
+        exp: Math.floor(Date.now() / 1000) + 900,
+        roles: ['TEACHER'],
+        userId: '6f5b4f6a-2d70-4f18-9a1f-6b2f4c9d1e77',
+      }),
+    )
+
+    renderWithProviders(<SetupPasswordPage />, {
+      route: setupPasswordRoute,
+      store,
+    })
+
+    await waitFor(() => expect(mockLogout).toHaveBeenCalledTimes(1))
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /đã được đăng xuất/i,
+    )
+  })
+
+  it('does not call logout when nobody is signed in', async () => {
+    renderSetupPasswordPage()
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^mật khẩu mới$/i)).toBeInTheDocument(),
+    )
+    expect(mockLogout).not.toHaveBeenCalled()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })

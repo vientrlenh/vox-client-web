@@ -9,10 +9,8 @@ import { PageLoader } from "@/shared/ui/PageLoader";
 import { OAuth2CallbackPage } from "@/features/auth/pages/OAuth2SuccessPage";
 import { RequireAuth } from "./RequireAuth";
 import { RoleLayout } from "../layouts/RoleLayout";
-
-const HomePage = lazy(() =>
-  import("@/features/home").then((module) => ({ default: module.HomePage })),
-);
+import { HomeRoute } from "./HomeRoute";
+import { NotFoundPage } from "./NotFoundPage";
 
 const LoginPage = lazy(() =>
   import("@/features/auth").then((module) => ({ default: module.LoginPage })),
@@ -854,7 +852,7 @@ export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route index element={<HomePage />} />
+        <Route index element={<HomeRoute />} />
         {/* Trang cong khai, KHONG dat sau guard dang nhap: Google Play doi URL chinh
             sach bao mat mo duoc ma khong can tai khoan. */}
         <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
@@ -1251,7 +1249,8 @@ export function AppRoutes() {
             />
             {/*
               Đường cũ /school-admin/subscription vẫn còn nhiều nơi trỏ tới (bookmark, link cũ), nên
-              giữ lại dưới dạng chuyển hướng thay vì để catch-all ném người dùng về trang chủ.
+              giữ lại dưới dạng chuyển hướng thay vì để rơi vào catch-all -- rơi vào đó là ra trang
+              404, tức mất đúng trang người ta đang muốn mở.
               Đích là "Gói của tôi": trường chưa có gói thì chính thẻ ở đó mời đi đăng ký, không cần
               một nhánh chuyển hướng có điều kiện (vốn phải đợi query xong mới quyết được, và nháy màn hình).
             */}
@@ -1273,7 +1272,7 @@ export function AppRoutes() {
             />
             {/*
               Cùng khuôn với /school-admin/subscription: đường gốc chuyển hướng sang tab đầu tiên
-              thay vì để catch-all ném người dùng về trang chủ.
+              thay vì để rơi vào catch-all và ra trang 404.
             */}
             <Route
               path="school-admin/balance"
@@ -1357,7 +1356,7 @@ export function AppRoutes() {
             <Route path="teacher/class-tests" element={<TeacherClassTestsPage />} />
             <Route path="teacher/exam-papers/:paperId/edit" element={<TeacherExamPaperEditPage />} />
             {/* Kỳ thi đã khóa thì tab mã đề trỏ sang đường dẫn không có /edit. Thiếu route này là
-                rơi vào catch-all và bị đá về trang chủ. Trang tự chuyển read-only theo quyền. */}
+                rơi vào catch-all và ra trang 404. Trang tự chuyển read-only theo quyền. */}
             <Route path="teacher/exam-papers/:paperId" element={<TeacherExamPaperEditPage />} />
             <Route path="teacher/exams/:examId" element={<TeacherExamDetailPage />} />
             <Route path="teacher/exams" element={<TeacherExamsPage />} />
@@ -1386,7 +1385,7 @@ export function AppRoutes() {
             <Route path="student/appeals/:appealId" element={<StudentAppealDetailPage />} />
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
   );

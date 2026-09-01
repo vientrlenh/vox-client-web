@@ -272,6 +272,22 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
+  /**
+   * Trước đây mọi đường dẫn lạ bị ném về trang chủ, tức trang giới thiệu công khai -- gõ nhầm một
+   * chữ là màn hình biến thành trang tiếp thị, trông y như vừa bị đăng xuất.
+   */
+  it('shows the not found page for an unknown route', async () => {
+    renderWithProviders(<AppRoutes />, { route: '/khong-co-duong-dan-nay' })
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: /không tìm thấy trang này/i,
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('/khong-co-duong-dan-nay')).toBeInTheDocument()
+  })
+
   it('renders the login route', async () => {
     renderWithProviders(<AppRoutes />, { route: '/login' })
 

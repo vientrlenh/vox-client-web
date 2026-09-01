@@ -4,7 +4,14 @@ import axios from "axios";
 import type { ActiveSchedule, ScheduleStreamRecord } from "../types";
 
 export const streamApiClient = axios.create({
-    baseURL: appConfig.streamApiUrl
+    baseURL: appConfig.streamApiUrl,
+    // Không có timeout thì axios chờ tới khi TCP tự bỏ cuộc, vốn tính bằng phút. Cả hai lời gọi
+    // dưới đây đều bị POLL lại theo nhịp, nên trên một đường truyền chậm chúng không hỏng mà CHỒNG
+    // lên nhau: mỗi nhịp thêm một request treo, không cái nào chịu chết.
+    //
+    // Đặt ở instance này chứ không phải apiClient dùng chung: ở đây chỉ có hai lời đọc JSON nhỏ từ
+    // vox-streaming, không có upload hay truy vấn dài nào để một hạn chung làm hỏng.
+    timeout: 10_000,
 })
 
 streamApiClient.interceptors.response.use(
