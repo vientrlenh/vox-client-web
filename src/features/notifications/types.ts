@@ -32,6 +32,7 @@ export type NotificationCursorPage = {
 export type NotificationTarget =
   | 'ADMIN_GRADING_ASSIGNMENT'
   | 'EXAM_APPEAL_DETAIL'
+  | 'EXAM_HUMAN_GRADING_REQUIRED'
   | 'EXAM_RESULT_DETAIL'
   | 'SCHOOL_BILLING_OVERVIEW'
   | 'SCHOOL_BLUEPRINT_DETAIL'

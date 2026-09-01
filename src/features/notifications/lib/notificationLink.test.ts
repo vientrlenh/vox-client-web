@@ -83,6 +83,51 @@ describe('resolveNotificationLink', () => {
     ).toBe('/school-admin/grading')
   })
 
+  /**
+   * Nhắc chấm tay gửi cho cả chủ tịch hội đồng (giáo viên) lẫn school admin. MỘT target,
+   * hai đường dẫn -- chọn theo vai trò của chính người đang mở.
+   */
+  it('đưa mỗi vai trò tới hàng đợi chấm của riêng họ', () => {
+    const payload = {
+      examId: 'exam-1',
+      examKind: 'CENTRALIZED',
+      target: 'EXAM_HUMAN_GRADING_REQUIRED',
+    }
+
+    expect(link(payload, ['SCHOOL_ADMIN'])).toBe('/school-admin/grading')
+    expect(link(payload, ['TEACHER'])).toBe('/teacher/grading')
+  })
+
+  it('đưa nhắc chấm bài trên lớp về hàng đợi của đúng bài đó', () => {
+    expect(
+      link(
+        {
+          examId: 'exam-1',
+          examKind: 'CLASS_TEST',
+          target: 'EXAM_HUMAN_GRADING_REQUIRED',
+        },
+        ['TEACHER'],
+      ),
+    ).toBe('/teacher/class-tests/exam-1/grading')
+  })
+
+  /** Người mang cả hai vai trò: trang quản trị là góc nhìn bao trùm, nên nó đứng trước. */
+  it('ưu tiên trang quản trị cho người có cả hai vai trò', () => {
+    expect(
+      link(
+        { examId: 'exam-1', examKind: 'CENTRALIZED', target: 'EXAM_HUMAN_GRADING_REQUIRED' },
+        ['TEACHER', 'SCHOOL_ADMIN'],
+      ),
+    ).toBe('/school-admin/grading')
+  })
+
+  /** Học sinh không có vai trò nào trong bảng của target này -- không cho bấm. */
+  it('không cho học sinh bấm vào nhắc chấm tay', () => {
+    expect(
+      link({ examId: 'exam-1', target: 'EXAM_HUMAN_GRADING_REQUIRED' }, ['STUDENT']),
+    ).toBeNull()
+  })
+
   /** `RequireRole` xoá phiên khi vai trò lệch, nên dẫn nhầm không chỉ là ngõ cụt. */
   it('không dẫn người dùng tới route mà vai trò của họ không vào được', () => {
     expect(

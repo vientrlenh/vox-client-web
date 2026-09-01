@@ -68,7 +68,7 @@ export function PlanRenewalDialog({
                 changed ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-indigo-200 bg-indigo-50 text-indigo-700'
               }`}
             >
-              <RefreshCw aria-hidden="true" className="size-[19px]" />
+              <RefreshCw aria-hidden="true" className="size-4.75" />
             </span>
             <div className="min-w-0">
               <h2 className="text-[17px] font-bold text-blue-950" id="plan-renewal-title">
