@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AUTH_TOKEN_STORAGE_KEYS } from '@/shared/api'
@@ -7,6 +8,14 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { AppRoutes } from './AppRoutes'
 
 const mockedGraphqlPost = jest.spyOn(graphqlApiClient, 'post')
+
+/**
+ * Các trang dashboard chỉ hiện nội dung khi query đầu tiên xong. Client mặc định của app retry 1
+ * lần, nên một query không được mock sẽ kéo dài trạng thái loading quá thời gian chờ của test.
+ */
+function createTestQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } })
+}
 
 function createJwt(payload: Record<string, unknown>) {
   const encode = (value: Record<string, unknown>) =>
@@ -73,6 +82,136 @@ function mockLanguageManagementGraphql() {
         },
       },
     },
+  })
+}
+
+/**
+ * Chỉ đủ để trang thoát khỏi nhánh loading/error — bài test này kiểm tra ROUTE và LAYOUT, số liệu
+ * trên dashboard đã có test riêng của từng trang lo.
+ */
+function mockSystemAdminDashboardGraphql() {
+  mockedGraphqlPost.mockImplementation((_path, body) => {
+    const request = body as { query: string }
+
+    if (request.query.includes('platformOperationalHealth')) {
+      return Promise.resolve({
+        data: {
+          data: {
+            platformOperationalHealth: {
+              daily: [],
+              examsInProgress: 0,
+              graded: 0,
+              gradingFailed: 0,
+              gradingQueueDepth: 0,
+              sessionsInProgress: 0,
+              successRatePercent: null,
+            },
+          },
+        },
+      })
+    }
+
+    if (request.query.includes('platformBusinessHealth')) {
+      return Promise.resolve({
+        data: {
+          data: {
+            platformBusinessHealth: {
+              aiCostVnd: 0,
+              expiringSoonSchools: 0,
+              grossMarginPercent: null,
+              lapsedSchools: 0,
+              previousGrossMarginPercent: null,
+              previousRevenueVnd: 0,
+              revenueVnd: 0,
+              schoolsInDebt: 0,
+              subscribedSchools: 0,
+              suspendedSchools: 0,
+            },
+          },
+        },
+      })
+    }
+
+    return Promise.resolve({
+      data: {
+        data: {
+          systemAdminDashboard: {
+            activeFrameworkCount: 0,
+            activeSchools: 0,
+            inactiveSchools: 0,
+            monthlyRevenue: [],
+            oldestPendingRegistrationDays: null,
+            pendingRegistrations: 0,
+            registrationsLast30Days: 0,
+            registrationsLast90Days: 0,
+            schoolAdminCount: 0,
+            studentCount: 0,
+            systemRubricCount: 0,
+            teacherCount: 0,
+            totalRevenue: 0,
+            totalSchools: 0,
+          },
+        },
+      },
+    })
+  })
+}
+
+function mockSchoolAdminDashboardGraphql() {
+  mockedGraphqlPost.mockImplementation((_path, body) => {
+    const request = body as { query: string }
+
+    if (!request.query.includes('schoolAdminDashboard')) {
+      return Promise.resolve({ data: { data: { examStatusCounts: null } } })
+    }
+
+    return Promise.resolve({
+      data: {
+        data: {
+          schoolAdminDashboard: {
+            appealStats: { pending: 0, processing: 0, published: 0, rejected: 0 },
+            examStatusCounts: {
+              cancelled: 0,
+              closed: 0,
+              draft: 0,
+              inProgress: 0,
+              resultsPublished: 0,
+              scheduled: 0,
+              total: 0,
+            },
+            examsAwaitingPublish: [],
+            funding: {
+              balanceVnd: '0',
+              examQuotaRemainingVnd: '12000000',
+              examQuotaTotalVnd: '12000000',
+              locked: false,
+              spendableVnd: '12000000',
+            },
+            monthlySpending: [],
+            oldestPendingAppealDays: null,
+            revenue: 0,
+            subscriptionRenewal: {
+              endDate: '2026-12-31',
+              planName: 'Gói Chuẩn',
+              status: 'ACTIVE',
+            },
+            tokenAllocated: 0,
+            tokenUsed: 0,
+            unscored: {
+              aiFailed: 0,
+              aiFailedNoRetryLeft: 0,
+              aiFailedRetryLeft: 0,
+              assignedInProgress: 0,
+              assignedOverdue: 0,
+              awaitingAssignment: 0,
+              examCount: 0,
+              oldestWaitingDays: null,
+              total: 0,
+            },
+          },
+        },
+      },
+    })
   })
 }
 
@@ -282,8 +421,12 @@ describe('AppRoutes', () => {
 
   it('renders the system admin dashboard inside the system admin layout', async () => {
     saveSystemAdminSession()
+    mockSystemAdminDashboardGraphql()
 
-    renderWithProviders(<AppRoutes />, { route: '/system-admin/dashboard' })
+    renderWithProviders(<AppRoutes />, {
+      queryClient: createTestQueryClient(),
+      route: '/system-admin/dashboard',
+    })
 
     expect(
       await screen.findByRole('heading', {
@@ -291,17 +434,14 @@ describe('AppRoutes', () => {
       }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('navigation', { name: /system admin/i }),
+      screen.getByRole('navigation', { name: /quản trị hệ thống/i }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('searchbox', { name: /tìm kiếm hệ thống/i }),
+      screen.getByRole('button', { name: /mở menu tài khoản/i }),
     ).toBeInTheDocument()
-    expect(screen.getByText('admin@vox.edu.vn')).toBeInTheDocument()
-    expect(screen.getByText('SYSTEM_ADMIN')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /tổng quan/i })).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
+    expect(
+      screen.getByRole('link', { name: /^tổng quan$/i }),
+    ).toHaveAttribute('aria-current', 'page')
   })
 
   it('renders the registrations placeholder and active navigation item', async () => {
@@ -332,10 +472,11 @@ describe('AppRoutes', () => {
       screen.getByRole('navigation', { name: /school admin/i }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('searchbox', { name: /tìm kiếm lớp học/i }),
+      screen.getByRole('searchbox', { name: /tìm kiếm/i }),
     ).toBeInTheDocument()
-    expect(screen.getByText('school-admin@vox.edu.vn')).toBeInTheDocument()
-    expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /mở menu tài khoản/i }),
+    ).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: /quản lý lớp học/i }),
     ).toHaveAttribute('aria-current', 'page')
@@ -355,8 +496,9 @@ describe('AppRoutes', () => {
     expect(
       screen.getByRole('navigation', { name: /school admin/i }),
     ).toBeInTheDocument()
-    expect(screen.getByText('school-admin@vox.edu.vn')).toBeInTheDocument()
-    expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /mở menu tài khoản/i }),
+    ).toBeInTheDocument()
     expect(
       within(screen.getByRole('navigation', { name: /school admin/i })).getByRole(
         'link',
@@ -394,8 +536,9 @@ describe('AppRoutes', () => {
     expect(
       screen.getByRole('navigation', { name: /school admin/i }),
     ).toBeInTheDocument()
-    expect(screen.getByText('school-admin@vox.edu.vn')).toBeInTheDocument()
-    expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /mở menu tài khoản/i }),
+    ).toBeInTheDocument()
     expect(
       within(screen.getByRole('navigation', { name: /school admin/i })).getByRole(
         'link',
@@ -418,8 +561,9 @@ describe('AppRoutes', () => {
     expect(
       screen.getByRole('navigation', { name: /school admin/i }),
     ).toBeInTheDocument()
-    expect(screen.getByText('school-admin@vox.edu.vn')).toBeInTheDocument()
-    expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /mở menu tài khoản/i }),
+    ).toBeInTheDocument()
     expect(
       within(screen.getByRole('navigation', { name: /school admin/i })).getByRole(
         'link',
@@ -430,90 +574,106 @@ describe('AppRoutes', () => {
 
   it('renders the school admin dashboard inside the school admin layout', async () => {
     saveSchoolAdminSession()
+    mockSchoolAdminDashboardGraphql()
 
-    renderWithProviders(<AppRoutes />, { route: '/school-admin/dashboard' })
+    renderWithProviders(<AppRoutes />, {
+      queryClient: createTestQueryClient(),
+      route: '/school-admin/dashboard',
+    })
 
     expect(
       await screen.findByRole('heading', {
-        name: /school admin dashboard/i,
+        name: /tổng quan trường/i,
       }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('navigation', { name: /school admin/i }),
     ).toBeInTheDocument()
-    expect(screen.getByText('school-admin@vox.edu.vn')).toBeInTheDocument()
-    expect(screen.getByText('SCHOOL_ADMIN')).toBeInTheDocument()
-    expect(screen.getByText('Total classes')).toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: /tổng quan/i }),
+      screen.getByRole('button', { name: /mở menu tài khoản/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /^tổng quan$/i }),
     ).toHaveAttribute('aria-current', 'page')
-    expect(
-      screen.getByRole('link', { name: /manage classes/i }),
-    ).toHaveAttribute('href', '/school-admin/classes')
   })
 
   it('opens and closes the mobile system admin drawer', async () => {
     const user = userEvent.setup()
     saveSystemAdminSession()
+    mockSystemAdminDashboardGraphql()
 
-    renderWithProviders(<AppRoutes />, { route: '/system-admin/dashboard' })
+    renderWithProviders(<AppRoutes />, {
+      queryClient: createTestQueryClient(),
+      route: '/system-admin/dashboard',
+    })
 
     await screen.findByRole('heading', {
       name: /tổng quan hệ thống/i,
     })
 
     expect(
-      screen.queryByRole('dialog', { name: /menu system admin/i }),
+      screen.queryByRole('dialog', { name: /menu quản trị hệ thống/i }),
     ).not.toBeInTheDocument()
 
     await user.click(
-      screen.getByRole('button', { name: /mở menu system admin/i }),
+      screen.getByRole('button', { name: /^mở menu quản trị hệ thống$/i }),
     )
-    const drawer = screen.getByRole('dialog', { name: /menu system admin/i })
+    const drawer = screen.getByRole('dialog', {
+      name: /menu quản trị hệ thống/i,
+    })
 
     expect(
-      within(drawer).getByRole('link', { name: /quản lý đơn đăng ký/i }),
+      within(drawer).getByRole('link', { name: /quản lý ngôn ngữ/i }),
     ).toBeInTheDocument()
 
     await user.click(
       within(drawer).getByRole('button', {
-        name: /đóng menu system admin/i,
+        name: /^đóng menu quản trị hệ thống$/i,
       }),
     )
 
     expect(
-      screen.queryByRole('dialog', { name: /menu system admin/i }),
+      screen.queryByRole('dialog', { name: /menu quản trị hệ thống/i }),
     ).not.toBeInTheDocument()
 
     await user.click(
-      screen.getByRole('button', { name: /mở menu system admin/i }),
+      screen.getByRole('button', { name: /^mở menu quản trị hệ thống$/i }),
     )
 
     await user.click(
       screen.getByRole('button', {
-        name: /đóng menu system admin bằng lớp phủ/i,
+        name: /đóng menu quản trị hệ thống bằng lớp phủ/i,
       }),
     )
 
     expect(
-      screen.queryByRole('dialog', { name: /menu system admin/i }),
+      screen.queryByRole('dialog', { name: /menu quản trị hệ thống/i }),
     ).not.toBeInTheDocument()
   })
 
   it('closes the mobile drawer after navigating from a nav item', async () => {
     const user = userEvent.setup()
     saveSystemAdminSession()
+    mockSystemAdminDashboardGraphql()
 
-    renderWithProviders(<AppRoutes />, { route: '/system-admin/dashboard' })
+    renderWithProviders(<AppRoutes />, {
+      queryClient: createTestQueryClient(),
+      route: '/system-admin/dashboard',
+    })
 
     await screen.findByRole('heading', {
       name: /tổng quan hệ thống/i,
     })
     await user.click(
-      screen.getByRole('button', { name: /mở menu system admin/i }),
+      screen.getByRole('button', { name: /^mở menu quản trị hệ thống$/i }),
     )
 
-    const drawer = screen.getByRole('dialog', { name: /menu system admin/i })
+    const drawer = screen.getByRole('dialog', {
+      name: /menu quản trị hệ thống/i,
+    })
+    // "Quản lý đơn đăng ký" nằm trong nhóm "Trường học"; nhóm chỉ tự mở khi route đang thuộc về nó,
+    // nên từ dashboard phải bung nhóm ra trước mới bấm được vào mục con.
+    await user.click(within(drawer).getByRole('button', { name: /trường học/i }))
     await user.click(
       within(drawer).getByRole('link', { name: /quản lý đơn đăng ký/i }),
     )
@@ -522,15 +682,19 @@ describe('AppRoutes', () => {
       await screen.findByRole('heading', { name: /quản lý đơn đăng ký/i }),
     ).toBeInTheDocument()
     expect(
-      screen.queryByRole('dialog', { name: /menu system admin/i }),
+      screen.queryByRole('dialog', { name: /menu quản trị hệ thống/i }),
     ).not.toBeInTheDocument()
   })
 
   it('logs out from the system admin user menu', async () => {
     const user = userEvent.setup()
     saveSystemAdminSession()
+    mockSystemAdminDashboardGraphql()
 
-    renderWithProviders(<AppRoutes />, { route: '/system-admin/dashboard' })
+    renderWithProviders(<AppRoutes />, {
+      queryClient: createTestQueryClient(),
+      route: '/system-admin/dashboard',
+    })
 
     await screen.findByRole('heading', {
       name: /tổng quan hệ thống/i,

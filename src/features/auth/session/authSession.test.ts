@@ -6,6 +6,7 @@ import {
   getClientDevice,
   getAuthTokens,
   getStoredAuthUser,
+  readStoredAuthState,
   saveAuthTokens,
 } from './authSession'
 
@@ -67,7 +68,11 @@ describe('authSession', () => {
     })
   })
 
-  it('clears stored tokens when the access token is expired', () => {
+  /**
+   * Token hết hạn KHÔNG bị xoá: interceptor làm mới token cần nó còn nằm trong storage để đổi lấy
+   * phiên mới. Xoá ở đây là đá người dùng về `/login` mỗi lần access token hết hạn.
+   */
+  it('reports no user but keeps the tokens when the access token is expired', () => {
     jest.spyOn(Date, 'now').mockReturnValue(2_000_000)
     const accessToken = createJwt({
       email: 'admin@vox.edu.vn',
@@ -81,7 +86,8 @@ describe('authSession', () => {
     })
 
     expect(getStoredAuthUser()).toBeNull()
-    expect(getAuthTokens()).toBeNull()
+    expect(readStoredAuthState()).toEqual({ status: 'expired' })
+    expect(getAuthTokens()).toEqual({ accessToken })
   })
 
   it('persists one client device id and returns the WEB platform', () => {
