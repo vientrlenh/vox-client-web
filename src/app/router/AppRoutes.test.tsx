@@ -182,10 +182,12 @@ function mockSchoolAdminDashboardGraphql() {
             examsAwaitingPublish: [],
             funding: {
               balanceVnd: '0',
+              committedToUsersVnd: '0',
               examQuotaRemainingVnd: '12000000',
               examQuotaTotalVnd: '12000000',
               locked: false,
               spendableVnd: '12000000',
+              uncommittedVnd: '12000000',
             },
             monthlySpending: [],
             oldestPendingAppealDays: null,

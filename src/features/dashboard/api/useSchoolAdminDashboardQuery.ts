@@ -29,10 +29,14 @@ export type SchoolAdminDashboard = {
   /** Tiền: chuỗi thập phân nguyên vẹn, không phải number — xem toNumber trong balance_school/model. */
   funding: {
     balanceVnd: string
+    /** Đã hứa cho giáo viên, họ chưa tiêu. Không bao giờ âm. */
+    committedToUsersVnd: string
     examQuotaRemainingVnd: string
     examQuotaTotalVnd: string
     locked: boolean
     spendableVnd: string
+    /** spendable − committedToUsers. ÂM = trường đã hứa nhiều hơn số còn lại, xem dashboard.graphqls. */
+    uncommittedVnd: string
   }
   unscored: {
     aiFailed: number
@@ -94,10 +98,12 @@ const SCHOOL_ADMIN_DASHBOARD = `
       }
       funding {
         balanceVnd
+        committedToUsersVnd
         examQuotaRemainingVnd
         examQuotaTotalVnd
         locked
         spendableVnd
+        uncommittedVnd
       }
       unscored {
         aiFailed

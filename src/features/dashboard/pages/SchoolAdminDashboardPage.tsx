@@ -79,9 +79,18 @@ const LOW_FUNDING_RATIO = 0.15
  * bản này dashboard KHÔNG hiển thị số dư ở bất kỳ đâu — trường phát hiện mình bị khoá khi đã có một
  * phòng đầy học sinh ngồi chờ.
  */
-function FundingBanner({ funding, onTopUp }: { funding: SchoolAdminDashboard['funding']; onTopUp: () => void }) {
+function FundingBanner({
+  funding,
+  onAllocate,
+  onTopUp,
+}: {
+  funding: SchoolAdminDashboard['funding']
+  onAllocate: () => void
+  onTopUp: () => void
+}) {
   const total = toNumber(funding.examQuotaTotalVnd)
   const spendable = toNumber(funding.spendableVnd)
+  const uncommitted = toNumber(funding.uncommittedVnd)
 
   if (funding.locked) {
     return (
@@ -109,31 +118,99 @@ function FundingBanner({ funding, onTopUp }: { funding: SchoolAdminDashboard['fu
   }
 
   // Trường chưa có gói thì total = 0: tỉ lệ vô nghĩa, và hai ô hạn mức ở thẻ chi phí AI đã nói rồi.
-  if (total <= 0 || spendable > total * LOW_FUNDING_RATIO) {
-    return null
+  if (total > 0 && spendable <= total * LOW_FUNDING_RATIO) {
+    return (
+      <div className="flex items-start gap-3.5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4.5" role="alert">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-amber-100 text-amber-700">
+          <AlertTriangle aria-hidden="true" className="size-5.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-extrabold text-amber-800">Hạn mức chấm thi sắp hết</div>
+          <p className="mt-1 text-[13.5px] leading-5 text-amber-700">
+            Còn <b className="tabular-nums">{formatVndWhole(funding.spendableVnd)}</b> trên tổng{' '}
+            <b className="tabular-nums">{formatVndWhole(funding.examQuotaTotalVnd)}</b>. Hết hạn mức là mọi bài chấm tiếp
+            theo trừ thẳng vào ví, và ví âm thì trường bị khóa mở ca thi.
+          </p>
+          <button
+            className="mt-3 inline-flex h-9 items-center rounded-full border border-amber-300 bg-white px-4 text-[13.5px] font-bold text-amber-800 transition hover:bg-amber-100"
+            onClick={onTopUp}
+            type="button"
+          >
+            Mua thêm hạn mức
+          </button>
+        </div>
+      </div>
+    )
   }
 
-  return (
-    <div className="flex items-start gap-3.5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4.5" role="alert">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-amber-100 text-amber-700">
-        <AlertTriangle aria-hidden="true" className="size-5.5" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="text-[15px] font-extrabold text-amber-800">Hạn mức chấm thi sắp hết</div>
-        <p className="mt-1 text-[13.5px] leading-5 text-amber-700">
-          Còn <b className="tabular-nums">{formatVndWhole(funding.spendableVnd)}</b> trên tổng{' '}
-          <b className="tabular-nums">{formatVndWhole(funding.examQuotaTotalVnd)}</b>. Hết hạn mức là mọi bài chấm tiếp
-          theo trừ thẳng vào ví, và ví âm thì trường bị khóa mở ca thi.
-        </p>
-        <button
-          className="mt-3 inline-flex h-9 items-center rounded-full border border-amber-300 bg-white px-4 text-[13.5px] font-bold text-amber-800 transition hover:bg-amber-100"
-          onClick={onTopUp}
-          type="button"
-        >
-          Mua thêm hạn mức
-        </button>
+  /*
+   * Đã hứa cho giáo viên nhiều hơn số tiền còn lại.
+   *
+   * KHÔNG phải lỗi nhập liệu: DistributeQuotaToUsersService chặn tổng phân bổ theo TỔNG ví nhân trần
+   * phân phối, không theo phần CÒN LẠI — nên một trường chia hết hạn mức từ đầu kỳ rồi mở vài kỳ thi
+   * tập trung là tự rơi vào đây mà không ai làm sai bước nào.
+   *
+   * Xếp SAU cảnh báo sắp hết tiền: hết sạch tiền là chuyện gấp hơn chuyện chia sai tỉ lệ. Nhưng phải
+   * có mặt, vì hệ quả không hiện ra ở bất kỳ đâu khác cho tới lúc một giáo viên bấm publish và bị VÍ
+   * TRƯỜNG từ chối, trong khi màn hạn mức cá nhân của họ vẫn đang báo còn chỗ.
+   */
+  if (uncommitted < 0) {
+    return (
+      <div className="flex items-start gap-3.5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4.5" role="alert">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-amber-100 text-amber-700">
+          <Users aria-hidden="true" className="size-5.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-extrabold text-amber-800">
+            Đã chia cho giáo viên nhiều hơn số tiền trường còn lại
+          </div>
+          <p className="mt-1 text-[13.5px] leading-5 text-amber-700">
+            Giáo viên đang giữ <b className="tabular-nums">{formatVndWhole(funding.committedToUsersVnd)}</b> hạn mức chưa
+            dùng, trong khi trường chỉ còn <b className="tabular-nums">{formatVndWhole(funding.spendableVnd)}</b>. Hạn mức
+            cá nhân không giữ tiền riêng — ai chấm trước tiêu trước, và người đến sau sẽ bị từ chối dù màn hạn mức của họ
+            vẫn báo còn chỗ. Mở thêm kỳ thi tập trung sẽ lấy tiếp vào đúng phần đó.
+          </p>
+          <button
+            className="mt-3 inline-flex h-9 items-center rounded-full border border-amber-300 bg-white px-4 text-[13.5px] font-bold text-amber-800 transition hover:bg-amber-100"
+            onClick={onAllocate}
+            type="button"
+          >
+            Chia lại hạn mức
+          </button>
+        </div>
       </div>
-    </div>
+    )
+  }
+
+  return null
+}
+
+/**
+ * Dòng "đã hứa cho giáo viên" dưới thẻ "Còn chấm được".
+ *
+ * Trần chi cá nhân KHÔNG giữ tiền (xem QuotaType phía backend): nó chỉ cho phép một người tiêu tới
+ * đó, tiền vẫn nằm chung một ví. Nên "Còn chấm được" không giảm đi khi trường chia hạn mức — đúng về
+ * tiền, và cố ý, vì con số đó phải khớp với cửa thật sự khoá trường. Nhưng nó bỏ mất câu hỏi mà quản
+ * trị trường đang thật sự hỏi lúc sắp mở một kỳ thi tập trung: trong chỗ đó, bao nhiêu là phần mình
+ * còn được đụng vào.
+ *
+ * Không hiện gì khi trường chưa chia cho ai: một dòng "đã hứa 0 ₫" chỉ làm thẻ dài thêm.
+ */
+function CommittedQuotaLine({ funding, onAllocate }: { funding: SchoolAdminDashboard['funding']; onAllocate: () => void }) {
+  if (toNumber(funding.committedToUsersVnd) <= 0) {
+    return null
+  }
+  const overCommitted = toNumber(funding.uncommittedVnd) < 0
+
+  return (
+    <button
+      className="mt-1 block text-left font-semibold text-slate-600 underline decoration-slate-300 decoration-dotted underline-offset-4 transition hover:text-indigo-700 hover:decoration-indigo-400"
+      onClick={onAllocate}
+      type="button"
+    >
+      Đã hứa cho giáo viên {formatVndWhole(funding.committedToUsersVnd)} · còn tự do{' '}
+      <b className={overCommitted ? 'text-red-700' : 'text-slate-900'}>{formatVndWhole(funding.uncommittedVnd)}</b>
+    </button>
   )
 }
 
@@ -846,7 +923,7 @@ function SpendingChart({ monthlySpending, revenue }: { monthlySpending: SchoolAd
           </div>
           <div>
             <h3 className="text-base font-extrabold tracking-tight text-slate-900">Chi tiêu của trường</h3>
-            <p className="mt-0.5 text-[13px] text-slate-500">Hóa đơn đã thanh toán theo từng tháng — gói dịch vụ & mua thêm token</p>
+            <p className="mt-0.5 text-[13px] text-slate-500">Đơn hàng đã thu được tiền theo từng tháng — gói dịch vụ & mua thêm token</p>
           </div>
         </div>
         <div className="flex gap-5 text-right">
@@ -1048,21 +1125,32 @@ export function SchoolAdminDashboardPage() {
         </div>
       </div>
 
-      <FundingBanner funding={data.funding} onTopUp={() => navigate('/school-admin/balance')} />
+      <FundingBanner
+        funding={data.funding}
+        onAllocate={() => navigate('/school-admin/subscription/mine')}
+        onTopUp={() => navigate('/school-admin/balance')}
+      />
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {/* "Còn chấm được" thay cho "% hạn mức đã dùng": một tỉ lệ không nói được lúc nào trường bị
-            khoá, mà đó mới là câu hỏi. Ví âm KHÔNG bị trừ vào đây — backend đã áp luật đó một lần. */}
+            khoá, mà đó mới là câu hỏi. Ví âm KHÔNG bị trừ vào đây — backend đã áp luật đó một lần.
+
+            Con số lớn vẫn là TIỀN CÒN LẠI, không trừ phần đã chia cho giáo viên: nó phải khớp với cửa
+            chặn lên lịch kỳ thi, nếu không thẻ này báo hết tiền trong khi hệ thống vẫn cho chi. Phần
+            đã hứa nằm ở dòng thứ hai, nơi nó trả lời một câu hỏi khác — xem CommittedQuotaLine. */}
         <Kpi
           icon={<Wallet aria-hidden="true" className="size-5.5" />}
           label="Còn chấm được"
           sub={
-            <span className="font-semibold text-slate-600">
-              Hạn mức thi còn {formatVndWhole(data.funding.examQuotaRemainingVnd)} · ví{' '}
-              <b className={data.funding.locked ? 'text-red-700' : 'text-slate-900'}>
-                {formatVndWhole(data.funding.balanceVnd)}
-              </b>
-            </span>
+            <>
+              <span className="font-semibold text-slate-600">
+                Hạn mức thi còn {formatVndWhole(data.funding.examQuotaRemainingVnd)} · ví{' '}
+                <b className={data.funding.locked ? 'text-red-700' : 'text-slate-900'}>
+                  {formatVndWhole(data.funding.balanceVnd)}
+                </b>
+              </span>
+              <CommittedQuotaLine funding={data.funding} onAllocate={() => navigate('/school-admin/subscription/mine')} />
+            </>
           }
           tint={data.funding.locked ? { bg: 'bg-red-50', fg: 'text-red-700' } : { bg: 'bg-orange-50', fg: 'text-orange-700' }}
           value={
@@ -1160,8 +1248,13 @@ export function SchoolAdminDashboardPage() {
 
       <SpendingChart monthlySpending={data.monthlySpending} revenue={data.revenue} />
 
+      {/* ĐƠN HÀNG, không phải hóa đơn. Hóa đơn giờ chỉ là chứng từ phát hành SAU khi tiền về — nó
+          không còn mang status/amount/sourceType, nên "hóa đơn đã trả" là một trạng thái không còn
+          tồn tại. Thứ trả lời được "trường đã trả bao nhiêu, cho cái gì" là Order ở trạng thái
+          SUCCESS; xem ViewSchoolAdminDashboardUseCase.fetchPaidOrders và OrderSettlementService. */}
       <div className="text-[13px] text-slate-400">
-        Chỉ tính hóa đơn ở trạng thái <b className="text-slate-600">đã trả</b>.
+        Chỉ tính đơn hàng <b className="text-slate-600">đã thu được tiền</b>, theo số tiền trường thực trả — đã gồm phí
+        dịch vụ và đã trừ khoản bù nâng cấp, nên khớp với sao kê ngân hàng chứ không với giá niêm yết của gói.
       </div>
     </section>
   )

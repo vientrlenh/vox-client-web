@@ -24,12 +24,16 @@ function createDashboard(overrides: Partial<SchoolAdminDashboard> = {}): SchoolA
       total: 12,
     },
     examsAwaitingPublish: [],
+    // Trường chưa chia hạn mức cho ai: đây là mặc định của mọi trường mới, và cũng là trạng thái để
+    // các test khác không phải nghĩ về phần đã hứa. Hai ca có chia nằm ở test riêng bên dưới.
     funding: {
       balanceVnd: '0',
+      committedToUsersVnd: '0',
       examQuotaRemainingVnd: '4900000',
       examQuotaTotalVnd: '12000000',
       locked: false,
       spendableVnd: '4900000',
+      uncommittedVnd: '4900000',
     },
     monthlySpending: [],
     oldestPendingAppealDays: 19,
@@ -107,10 +111,12 @@ describe('SchoolAdminDashboardPage', () => {
       createDashboard({
         funding: {
           balanceVnd: '-1240000',
+          committedToUsersVnd: '0',
           examQuotaRemainingVnd: '0',
           examQuotaTotalVnd: '12000000',
           locked: true,
           spendableVnd: '0',
+          uncommittedVnd: '0',
         },
       }),
     )
@@ -135,16 +141,84 @@ describe('SchoolAdminDashboardPage', () => {
       createDashboard({
         funding: {
           balanceVnd: '0',
+          committedToUsersVnd: '0',
           examQuotaRemainingVnd: '900000',
           examQuotaTotalVnd: '12000000',
           locked: false,
           spendableVnd: '900000',
+          uncommittedVnd: '900000',
         },
       }),
     )
     renderPage()
 
     expect(await screen.findByText('Hạn mức chấm thi sắp hết')).toBeInTheDocument()
+  })
+
+  /**
+   * Chia hạn mức cho giáo viên KHÔNG được làm "Còn chấm được" nhỏ đi.
+   *
+   * Con số lớn đó là vị từ khoá — nó phải khớp với cửa thật sự từ chối lên lịch kỳ thi
+   * (ClassTestTokenQuotaGuardService), nên trừ phần đã hứa vào đó là báo hết tiền trong khi hệ thống
+   * vẫn cho chi. Phần đã hứa đi ra ở dòng thứ hai, trả lời một câu hỏi khác: còn bao nhiêu là phần
+   * trường tự do dùng cho kỳ thi tập trung.
+   */
+  it('hiện phần đã hứa cho giáo viên mà không trừ vào "Còn chấm được"', async () => {
+    mockGraphQL(
+      createDashboard({
+        funding: {
+          balanceVnd: '2000000',
+          committedToUsersVnd: '6000000',
+          examQuotaRemainingVnd: '8000000',
+          examQuotaTotalVnd: '12000000',
+          locked: false,
+          spendableVnd: '10000000',
+          uncommittedVnd: '4000000',
+        },
+      }),
+    )
+    renderPage()
+
+    expect(await screen.findByText('Còn chấm được')).toBeInTheDocument()
+    // Vẫn là TOÀN BỘ số tiền còn lại, không phải 4.000.000 ₫.
+    expect(screen.getByText('10.000.000 ₫')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Đã hứa cho giáo viên 6\.000\.000 ₫ · còn tự do 4\.000\.000 ₫/ }),
+    ).toBeInTheDocument()
+  })
+
+  /** Trường chưa chia cho ai thì không có gì để trừ — một dòng "đã hứa 0 ₫" chỉ làm thẻ dài thêm. */
+  it('không hiện dòng đã hứa khi trường chưa chia hạn mức cho ai', async () => {
+    mockGraphQL()
+    renderPage()
+
+    expect(await screen.findByText('Còn chấm được')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Đã hứa cho giáo viên/ })).not.toBeInTheDocument()
+  })
+
+  /**
+   * Đã chia nhiều hơn số còn lại: trạng thái này đạt tới được mà không ai làm sai (trần phân phối
+   * tính trên TỔNG ví, không trên phần còn lại), và hệ quả không hiện ra ở đâu khác cho tới lúc một
+   * giáo viên bấm publish và bị VÍ TRƯỜNG từ chối trong khi màn hạn mức của họ vẫn báo còn chỗ.
+   */
+  it('cảnh báo khi đã chia cho giáo viên nhiều hơn số tiền trường còn lại', async () => {
+    mockGraphQL(
+      createDashboard({
+        funding: {
+          balanceVnd: '0',
+          committedToUsersVnd: '9000000',
+          examQuotaRemainingVnd: '5000000',
+          examQuotaTotalVnd: '12000000',
+          locked: false,
+          spendableVnd: '5000000',
+          uncommittedVnd: '-4000000',
+        },
+      }),
+    )
+    renderPage()
+
+    expect(await screen.findByText('Đã chia cho giáo viên nhiều hơn số tiền trường còn lại')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Chia lại hạn mức' })).toBeInTheDocument()
   })
 
   /**
