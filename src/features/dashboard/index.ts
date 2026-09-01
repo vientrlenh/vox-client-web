@@ -1,4 +1,5 @@
 export { SchoolAdminDashboardPage } from './pages/SchoolAdminDashboardPage'
+export { SchoolAdminGradingFailuresPage } from './pages/SchoolAdminGradingFailuresPage'
 export { SystemAdminDashboardPage } from './pages/SystemAdminDashboardPage'
 export { SystemAdminGradingFailuresPage } from './pages/SystemAdminGradingFailuresPage'
 export { SystemAdminSchoolsAtRiskPage } from './pages/SystemAdminSchoolsAtRiskPage'

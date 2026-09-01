@@ -54,6 +54,12 @@ const SystemAdminGradingFailuresPage = lazy(() =>
   })),
 );
 
+const SchoolAdminGradingFailuresPage = lazy(() =>
+  import("@/features/dashboard").then((module) => ({
+    default: module.SchoolAdminGradingFailuresPage,
+  })),
+);
+
 const SystemAdminSchoolsAtRiskPage = lazy(() =>
   import("@/features/dashboard").then((module) => ({
     default: module.SystemAdminSchoolsAtRiskPage,
@@ -1177,6 +1183,7 @@ export function AppRoutes() {
             <Route path="school-admin/reevaluation/:requestId" element={<SchoolAdminReevaluationDetailPage />} />
             <Route path="school-admin/reevaluation" element={<SchoolAdminReevaluationPage />} />
             <Route path="school-admin/grading" element={<SchoolAdminGradingPage />} />
+            <Route path="school-admin/grading-failures" element={<SchoolAdminGradingFailuresPage />} />
             <Route path="school-admin/blueprints/:blueprintId/versions/new" element={<SchoolAdminCreateBlueprintVersionPage />} />
             <Route
               path="school-admin/blueprints/:blueprintId/versions/:versionId/edit"

@@ -26,6 +26,38 @@ export type SchoolAdminDashboard = {
     planName: string | null
     status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
   } | null
+  /** Tiền: chuỗi thập phân nguyên vẹn, không phải number — xem toNumber trong balance_school/model. */
+  funding: {
+    balanceVnd: string
+    examQuotaRemainingVnd: string
+    examQuotaTotalVnd: string
+    locked: boolean
+    spendableVnd: string
+  }
+  unscored: {
+    aiFailed: number
+    aiFailedNoRetryLeft: number
+    aiFailedRetryLeft: number
+    assignedInProgress: number
+    assignedOverdue: number
+    awaitingAssignment: number
+    examCount: number
+    /** null = hàng đợi sạch. KHÁC 0, vốn nghĩa là "có bài, vừa nộp hôm nay". */
+    oldestWaitingDays: number | null
+    total: number
+  }
+  examsAwaitingPublish: {
+    aiFailedNoRetryLeft: number
+    aiFailedRetryLeft: number
+    awaitingHumanGrading: number
+    closeAt: string | null
+    code: string
+    examId: string
+    name: string
+    unscoredCount: number
+  }[]
+  /** null = không còn đơn nào chờ. KHÁC 0. */
+  oldestPendingAppealDays: number | null
 }
 
 const SCHOOL_ADMIN_DASHBOARD = `
@@ -60,6 +92,35 @@ const SCHOOL_ADMIN_DASHBOARD = `
         planName
         status
       }
+      funding {
+        balanceVnd
+        examQuotaRemainingVnd
+        examQuotaTotalVnd
+        locked
+        spendableVnd
+      }
+      unscored {
+        aiFailed
+        aiFailedNoRetryLeft
+        aiFailedRetryLeft
+        assignedInProgress
+        assignedOverdue
+        awaitingAssignment
+        examCount
+        oldestWaitingDays
+        total
+      }
+      examsAwaitingPublish {
+        aiFailedNoRetryLeft
+        aiFailedRetryLeft
+        awaitingHumanGrading
+        closeAt
+        code
+        examId
+        name
+        unscoredCount
+      }
+      oldestPendingAppealDays
     }
   }
 `
