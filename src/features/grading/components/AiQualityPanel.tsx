@@ -1,6 +1,7 @@
 import { Bot } from 'lucide-react'
 import { useAiQualityReportQuery } from '../api/useGradingQueries'
 import { avatarClasses, formatPercent, formatScore, initials } from '../types'
+import { Avatar } from '@/shared/ui/Avatar'
 
 type AiQualityPanelProps = {
   examId?: string
@@ -104,11 +105,17 @@ export function AiQualityPanel({ examId }: AiQualityPanelProps) {
                     <tr className="border-b border-slate-100 last:border-b-0" key={row.teacherId ?? name}>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2.5">
-                          <span
-                            className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold ${avatarClasses(name)}`}
-                          >
-                            {initials(name)}
-                          </span>
+                          <Avatar
+                            fallback={
+                              <span
+                                className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold ${avatarClasses(name)}`}
+                              >
+                                {initials(name)}
+                              </span>
+                            }
+                            sizeClassName="size-8"
+                            src={row.teacher?.avatarUrl}
+                          />
                           <span className="text-[13px] font-bold text-slate-800">{name}</span>
                         </div>
                       </td>

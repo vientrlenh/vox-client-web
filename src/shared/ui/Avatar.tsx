@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 /**
  * Ảnh đại diện, tự lùi về ô chữ cái khi không có ảnh.
@@ -8,9 +8,18 @@ import { useState } from 'react'
  */
 
 type AvatarProps = {
-  /** Email dùng để suy ra chữ cái. Chỉ dùng khi không có ảnh. */
+  /** Email dùng để suy ra chữ cái. Chỉ dùng khi không có ảnh và không truyền `fallback`. */
   email?: string | null
-  /** Lớp nền cho ô chữ cái, khác nhau theo vai (indigo cho system admin, cyan cho còn lại). */
+  /**
+   * Đè TOÀN BỘ phần thay thế khi không có ảnh.
+   *
+   * Có mặt vì các danh sách chấm bài dùng ô chữ cái tô màu THEO TÊN (`avatarClasses` trả cả nền lẫn
+   * màu chữ, ví dụ `bg-cyan-100 text-cyan-700`), không hợp với ô chữ trắng của thanh điều hướng.
+   * Nhồi cả hai kiểu vào một bộ prop thì hỏng cả hai; để nơi gọi tự dựng thì phần đáng dùng chung
+   * -- render ảnh và tự lùi khi ảnh hỏng -- vẫn nằm ở một chỗ.
+   */
+  fallback?: ReactNode
+  /** Lớp nền cho ô chữ cái mặc định, khác nhau theo vai (indigo cho system admin, cyan cho còn lại). */
   fallbackClassName?: string
   /** Chữ hiện khi không có cả ảnh lẫn email. */
   fallbackInitials?: string
@@ -41,6 +50,7 @@ function emailInitials(email?: string | null, fallback = 'U') {
 
 export function Avatar({
   email,
+  fallback,
   fallbackClassName = 'bg-slate-600',
   fallbackInitials = 'U',
   sizeClassName = 'size-11',
@@ -61,6 +71,10 @@ export function Avatar({
         src={src}
       />
     )
+  }
+
+  if (fallback) {
+    return <>{fallback}</>
   }
 
   return (

@@ -134,6 +134,11 @@ describe('grading GraphQL queries', () => {
     expect(body.query).toContain('myGradingTasks(')
     // Giáo viên chấm ẩn danh — read model không được kéo tên/ID học sinh.
     expect(body.query).not.toContain('studentName')
+    // Và cũng không được kéo ẢNH. Một khuôn mặt lộ danh tính chắc chắn hơn cái tên, nên phép kiểm
+    // studentName ở trên KHÔNG đủ: `avatarUrl` lọt qua nó dễ dàng. Hàng đợi tập trung hiện không có
+    // studentId để giải ra người dùng — nếu ai đó thêm vào, dòng này là thứ phản đối.
+    expect(body.query).not.toContain('avatarUrl')
+    expect(body.query).not.toContain('studentId')
     expect(body.variables).toMatchObject({
       page: 1,
       roundType: 'APPEAL',

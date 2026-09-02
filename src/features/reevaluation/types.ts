@@ -133,6 +133,8 @@ export type AppealReviewerLite = {
   load: number
   // Đã chấm tay chính bài này ⇒ xung đột lợi ích. Vẫn gán được nhưng phải nêu lý do.
   conflicted: boolean
+  // Ảnh đại diện, nạp qua DataLoader userById ở BE. Chỉ có avatarUrl -- không hỏi thừa field.
+  user?: { avatarUrl?: string | null } | null
 }
 
 export type AppealPage<T> = {

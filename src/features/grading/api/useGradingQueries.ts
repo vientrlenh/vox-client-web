@@ -138,6 +138,7 @@ const GRADING_STATS_QUERY = `
         assigned
         completed
         overdue
+        teacher { avatarUrl }
       }
     }
   }
@@ -279,6 +280,7 @@ const ASSIGNABLE_TEACHERS_QUERY = `
       id
       name
       load
+      user { avatarUrl }
     }
   }
 `
@@ -317,6 +319,7 @@ const AI_QUALITY_REPORT_QUERY = `
         reviewed
         regraded
         averageDelta
+        teacher { avatarUrl }
       }
     }
   }

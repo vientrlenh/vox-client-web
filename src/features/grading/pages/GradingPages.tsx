@@ -92,6 +92,7 @@ import { SetDeadlineDialog } from '../components/SetDeadlineDialog'
 import { SubmitGradingDialog } from '../components/SubmitGradingDialog'
 import { ValidityRulesCard } from '../components/ValidityRulesCard'
 import { QuestionAssetPanel } from '@/features/question/components/QuestionAssetPanel'
+import { Avatar } from '@/shared/ui/Avatar'
 import {
   assignBlockedReason,
   avatarClasses,
@@ -727,11 +728,17 @@ export function SchoolAdminGradingPage({
                             className="flex items-center gap-2.5 rounded-xl border border-slate-200 px-3 py-2.5"
                             key={teacher.teacherId}
                           >
-                            <span
-                              className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${avatarClasses(name)}`}
-                            >
-                              {initials(name)}
-                            </span>
+                            <Avatar
+                              fallback={
+                                <span
+                                  className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${avatarClasses(name)}`}
+                                >
+                                  {initials(name)}
+                                </span>
+                              }
+                              sizeClassName="size-8"
+                              src={teacher.teacher?.avatarUrl}
+                            />
                             <div className="min-w-0 leading-tight">
                               <div className="truncate text-[13px] font-bold text-slate-800">
                                 {name}

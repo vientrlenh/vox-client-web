@@ -120,6 +120,7 @@ const APPEAL_REVIEWERS_QUERY = `
       name
       load
       conflicted
+      user { avatarUrl }
     }
   }
 `

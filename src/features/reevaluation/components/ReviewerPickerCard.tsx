@@ -1,5 +1,6 @@
 import { Check, ClipboardList, TriangleAlert } from 'lucide-react'
 import { avatarClasses, initials, type AppealReviewerLite } from '../types'
+import { Avatar } from '@/shared/ui/Avatar'
 
 type ReviewerPickerCardProps = {
   reviewer: AppealReviewerLite
@@ -42,11 +43,17 @@ export function ReviewerPickerCard({ reviewer, selected, onToggle }: ReviewerPic
       onClick={onToggle}
       type="button"
     >
-      <span
-        className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full text-[15px] font-extrabold ${avatarClasses(reviewer.name)}`}
-      >
-        {initials(reviewer.name)}
-      </span>
+      <Avatar
+        fallback={
+          <span
+            className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full text-[15px] font-extrabold ${avatarClasses(reviewer.name)}`}
+          >
+            {initials(reviewer.name)}
+          </span>
+        }
+        sizeClassName="size-11"
+        src={reviewer.user?.avatarUrl}
+      />
       <div className="min-w-0 flex-1">
         <div className="text-sm font-bold text-slate-900">{reviewer.name}</div>
         <div className="mb-1.5 text-[11.5px] font-medium text-slate-400">Giáo viên trong trường</div>

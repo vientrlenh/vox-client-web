@@ -268,6 +268,7 @@ export type GradingStats = {
     assigned: number
     completed: number
     overdue: number
+    teacher?: { avatarUrl?: string | null } | null
   }>
 }
 
@@ -302,6 +303,8 @@ export type AiQualityReport = {
     reviewed: number
     regraded: number
     averageDelta?: number | null
+    // null khi teacherId null -- BE trả null thay vì để DataLoader ném NPE trên khoá null.
+    teacher?: { avatarUrl?: string | null } | null
   }>
 }
 
@@ -320,6 +323,8 @@ export type AssignableTeacher = {
   id: string
   name?: string | null
   load: number
+  // Ảnh đại diện, nạp qua DataLoader userById ở BE. Chỉ có avatarUrl -- không hỏi thừa field.
+  user?: { avatarUrl?: string | null } | null
 }
 
 /**
