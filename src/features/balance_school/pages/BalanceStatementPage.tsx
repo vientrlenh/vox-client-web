@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ListFilter } from 'lucide-react'
 import { ErrorBanner } from '@/shared/ui/ErrorBanner'
 import { QUOTA_LABELS } from '@/features/subscription_school/model'
-import { thirtyDaysAgoIso, useBalanceEntriesQuery, useBalanceSummaryQuery } from '../api/useBalanceQueries'
+import { useBalanceEntriesQuery, useBalanceSummaryQuery, useThirtyDaysAgoIso } from '../api/useBalanceQueries'
 import { ENTRY_VISUALS, entrySourceLabel } from '../components/EntryLine'
 import { BALANCE_ENTRY_LABELS, formatDateTime, formatVnd, toNumber, type BalanceEntryType } from '../model'
 
@@ -33,7 +33,7 @@ export function BalanceStatementPage() {
   // Ô tổng KHÔNG nhận bộ lọc: nó luôn hiện cả ba nhóm, kể cả khi bảng đang lọc, để người đọc còn
   // thấy mình đang giấu đi cái gì. Và nó cộng trên TOÀN dải chứ không phải trang đang xem -- cộng
   // cột của bảng thì mỗi lần lật trang con số ở đầu trang lại đổi.
-  const summaryQuery = useBalanceSummaryQuery(thirtyDaysAgoIso())
+  const summaryQuery = useBalanceSummaryQuery(useThirtyDaysAgoIso())
 
   const entries = entriesQuery.data?.content ?? []
   const totalPages = entriesQuery.data?.totalPages ?? 0

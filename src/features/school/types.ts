@@ -47,10 +47,15 @@ export type CreateSchoolRequest = {
   studentCount: number
 }
 
-/** Đúng theo @Size của CreateSchoolRequest ở backend — dùng chung cho maxLength lẫn validate. */
+/**
+ * Đúng theo @Size của CreateSchoolRequest ở backend — dùng chung cho maxLength lẫn validate.
+ *
+ * CỐ Ý thiếu adminAvatarUrl dù backend vẫn có @Size(4096) cho nó: URL ảnh không còn do người dùng
+ * gõ tay nữa mà do AvatarUploadField sinh ra sau khi tải ảnh lên Storage, nên không có ô input nào
+ * cần maxLength. Thêm lại vào đây là thêm một hằng số không ai đọc.
+ */
 export const CREATE_SCHOOL_FIELD_LIMITS = {
   adminAddress: 255,
-  adminAvatarUrl: 4096,
   adminEmail: 255,
   adminFullName: 255,
   adminPhone: 20,

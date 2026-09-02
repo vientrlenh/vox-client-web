@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { graphQLRequest, requireSchoolId } from '@/shared/api'
 import type {
@@ -148,9 +149,22 @@ export function useDebtEventsQuery(page: number, size: number) {
   })
 }
 
-/** Mốc "30 ngày qua" cho trang tổng quan. Tính một lần mỗi lần render trang, đủ chính xác cho một mốc thống kê. */
-export function thirtyDaysAgoIso() {
-  const from = new Date()
-  from.setDate(from.getDate() - 30)
-  return from.toISOString()
+/**
+ * Mốc "30 ngày qua", giữ nguyên trong suốt vòng đời component.
+ *
+ * BẮT BUỘC là hook chứ không phải hàm thường, và đây là lý do: giá trị trả về có độ chính xác tới
+ * MILLI GIÂY, mà nó lại là một phần queryKey của useBalanceSummaryQuery. Gọi thẳng trong thân
+ * render thì mỗi lần render sinh một key khác -> React Query coi đó là query MỚI -> fetch -> có dữ
+ * liệu -> render lại -> lại key mới -> fetch... lặp vô hạn, đồng thời phình cache vì mỗi vòng để
+ * lại một entry không bao giờ được dùng lại.
+ *
+ * Đúng lỗi đó đã xảy ra ở trang Sao kê: nó gọi hàm thẳng trong render, còn MyBalancePage thì bọc
+ * useMemo nên không sao. Bọc sẵn vào hook để không còn chỗ nào gọi sai được nữa.
+ */
+export function useThirtyDaysAgoIso() {
+  return useMemo(() => {
+    const from = new Date()
+    from.setDate(from.getDate() - 30)
+    return from.toISOString()
+  }, [])
 }

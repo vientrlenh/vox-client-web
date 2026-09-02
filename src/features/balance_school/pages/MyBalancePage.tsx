@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { FileText, ShieldCheck } from 'lucide-react'
 import { ErrorBanner } from '@/shared/ui/ErrorBanner'
@@ -7,11 +7,11 @@ import { useMySubscriptionQuery } from '@/features/subscription_school/api/useMy
 import { useMySubscriptionUsageQuery } from '@/features/subscription_school/api/useMySubscriptionUsageQuery'
 import { SUBSCRIPTION_PLANS_PATH } from '@/features/subscription_school/routes'
 import {
-  thirtyDaysAgoIso,
   useBalanceEntriesQuery,
   useBalanceSummaryQuery,
   useDebtEventsQuery,
   useSchoolBalanceQuery,
+  useThirtyDaysAgoIso,
 } from '../api/useBalanceQueries'
 import { usePlaceTopUpOrderMutation } from '../api/useTopUpMutation'
 import { BalanceHeroCard } from '../components/BalanceHeroCard'
@@ -36,7 +36,7 @@ export function MyBalancePage() {
   const { feedbackToast, showError } = useFeedbackToast()
   const [isTopUpOpen, setIsTopUpOpen] = useState(false)
 
-  const from = useMemo(() => thirtyDaysAgoIso(), [])
+  const from = useThirtyDaysAgoIso()
 
   const balanceQuery = useSchoolBalanceQuery()
   const summaryQuery = useBalanceSummaryQuery(from)

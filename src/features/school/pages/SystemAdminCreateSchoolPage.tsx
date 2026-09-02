@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { toApiError } from '@/shared/api'
+import { AvatarUploadField } from '@/shared/ui/AvatarUploadField'
 import { useConfirmationDialog } from '@/shared/ui/useConfirmationDialog'
 import { SchoolDirectoryVerifiedBadge } from '@/features/school-directory/components/SchoolDirectoryVerifiedBadge'
 import { formatNullableText } from '@/features/school-directory/types'
@@ -556,15 +557,23 @@ export function SystemAdminCreateSchoolPage() {
               />
             </label>
 
-            <label className="grid gap-1.5 text-sm font-bold text-blue-950 sm:col-span-2">
-              <span>Ảnh đại diện (URL)</span>
-              <input
-                className={inputClassName(false)}
-                maxLength={CREATE_SCHOOL_FIELD_LIMITS.adminAvatarUrl}
-                onChange={(event) => setAdminAvatarUrl(event.target.value)}
-                value={adminAvatarUrl}
+            {/*
+              Trước đây là ô nhập URL thuần: dán được đường dẫn tới BẤT KỲ host nào, và ảnh đó sẽ
+              được tải về trên máy mọi giáo viên mở danh sách chấm. Giờ chỉ nhận ảnh do chính mình
+              tải lên Storage; backend (CreateSchoolUseCase -> AvatarUrlPolicy) từ chối host lạ.
+
+              Quản trị viên CHƯA tồn tại ở bước này nên không có userId để đặt tên thư mục -- dùng
+              uuid ngẫu nhiên, giống cách luồng đăng ký đặt tên tài liệu.
+            */}
+            <div className="grid gap-1.5 text-sm font-bold text-blue-950 sm:col-span-2">
+              <span>Ảnh đại diện</span>
+              <AvatarUploadField
+                disabled={createMutation.isPending}
+                name={adminFullName}
+                onChange={(url) => setAdminAvatarUrl(url ?? '')}
+                value={adminAvatarUrl || null}
               />
-            </label>
+            </div>
           </div>
         </section>
 
