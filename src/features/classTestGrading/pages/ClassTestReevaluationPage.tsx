@@ -17,7 +17,7 @@ import { toApiError } from '@/shared/api'
 import { Pagination } from '@/shared/components/Pagination'
 import { FeedbackToast } from '@/shared/ui/FeedbackToast'
 import { StatusBadge } from '@/shared/ui/StatusBadge'
-import { useClassTestAppealsQuery } from '../api/useClassTestAppealsQuery'
+import { useExamAppealsQuery } from '@/features/reevaluation'
 import { ClaimAppealDialog } from '../components/ClaimAppealDialog'
 
 const PAGE_SIZE = 20
@@ -40,7 +40,7 @@ export function ClassTestReevaluationPage() {
   const [error, setError] = useState<string | null>(null)
 
   const examQuery = useExamQuery(examId || null)
-  const appealsQuery = useClassTestAppealsQuery(examId, page, PAGE_SIZE)
+  const appealsQuery = useExamAppealsQuery(examId, page, PAGE_SIZE)
   const approveAndClaimMutation = useApproveAndClaimMutation()
   const rejectMutation = useRejectMutation()
   const assignMutation = useAssignMutation()

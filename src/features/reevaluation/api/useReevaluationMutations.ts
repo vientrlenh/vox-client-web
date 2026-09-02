@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { classTestAppealKeys } from '@/features/classTestGrading/api/useClassTestAppealsQuery'
+import { examAppealKeys } from './useExamAppealsQuery'
 import { gradingKeys } from '@/features/grading/api/useGradingQueries'
 import { apiClient } from '@/shared/api'
 import { reevaluationKeys } from './useReevaluationQueries'
@@ -55,9 +55,9 @@ function useInvalidateReevaluation() {
     // Giao giám khảo = mở một phân công chấm bài vòng APPEAL, nên hàng chờ bên
     // feature `grading` cũng đổi theo.
     await queryClient.invalidateQueries({ queryKey: gradingKeys.all })
-    // Màn phúc khảo của bài trên lớp đọc qua key riêng (`classTestAppeals`), nên
+    // Bảng đơn theo TỪNG kỳ thi đọc qua key riêng (`examAppeals`), nên
     // reevaluationKeys không chạm tới — thiếu dòng này là bảng đứng im sau khi duyệt.
-    await queryClient.invalidateQueries({ queryKey: classTestAppealKeys.all })
+    await queryClient.invalidateQueries({ queryKey: examAppealKeys.all })
   }
 }
 

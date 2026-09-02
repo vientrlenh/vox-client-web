@@ -21,5 +21,11 @@ export {
   useAssignMutation,
   useRejectMutation,
 } from './api/useReevaluationMutations'
+export {
+  examAppealKeys,
+  fetchExamAppeals,
+  useExamAppealsQuery,
+} from './api/useExamAppealsQuery'
+export type { FetchExamAppealsInput } from './api/useExamAppealsQuery'
 export { ApproveDialog } from './components/ApproveDialog'
 export { RejectDialog } from './components/RejectDialog'

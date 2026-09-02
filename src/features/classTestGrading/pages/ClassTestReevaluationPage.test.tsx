@@ -25,21 +25,21 @@ function appeal(overrides: Partial<AppealSummary> = {}): AppealSummary {
   }
 }
 
-/** Đếm riêng số lần gọi `classTestAppeals` — đó là query nuôi cái bảng. */
+/** Đếm riêng số lần gọi `examAppeals` — đó là query nuôi cái bảng. */
 function appealQueryCallCount() {
   return mockedGraphql.mock.calls.filter((call) =>
-    ((call[1] as { query: string }).query ?? '').includes('classTestAppeals('),
+    ((call[1] as { query: string }).query ?? '').includes('examAppeals('),
   ).length
 }
 
 function givenAppeals(rows: AppealSummary[]) {
   mockedGraphql.mockImplementation((_url, body) => {
     const query = (body as { query: string }).query
-    if (query.includes('classTestAppeals(')) {
+    if (query.includes('examAppeals(')) {
       return Promise.resolve({
         data: {
           data: {
-            classTestAppeals: {
+            examAppeals: {
               content: rows,
               page: 0,
               size: 20,
@@ -114,7 +114,7 @@ describe('ClassTestReevaluationPage', () => {
   })
 
   /**
-   * Hồi quy cho đúng lỗi đang sửa: bảng đọc qua key `class-test-appeals`, mà
+   * Hồi quy cho đúng lỗi đang sửa: bảng đọc qua key `exam-appeals`, mà
    * `useInvalidateReevaluation` trước đây chỉ đụng tới `reevaluation` + `grading` nên
    * hàng đứng im cho tới khi F5.
    */

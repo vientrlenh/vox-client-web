@@ -10,5 +10,4 @@ export {
   useClassTestGradingTasksQuery,
 } from './api/useClassTestGradingQueries'
 export { useClaimClassTestGradingMutation } from './api/useClassTestGradingMutations'
-export { useClassTestAppealsQuery } from './api/useClassTestAppealsQuery'
 export * from './types'

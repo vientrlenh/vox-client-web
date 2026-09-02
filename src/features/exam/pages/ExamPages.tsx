@@ -89,6 +89,7 @@ import {
 import { BlueprintAttachPanel } from '../components/BlueprintAttachPanel'
 import { EditExamModal } from '../components/EditExamModal'
 import { MembersTab } from '../components/MembersTab'
+import { PublishReadinessPanel } from '../components/PublishReadinessPanel'
 import { useExamStatsQuery, useExamsQuery } from '../api/useExamQueries'
 import { useCreateExamMutation, useDeleteExamMutation, useUpdateExamStatusMutation } from '../api/useExamMutations'
 import { EXAM_STREAM_SETUP_PAYLOAD, getExamStatusDisplay, type ExamMemberRole, type ExamStreamSetup } from '../types'
@@ -551,10 +552,8 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
   const myRole = bundleQuery.data?.myRole as ExamMemberRole | null | undefined
   // Quyền không còn suy từ đường dẫn trang mà từ (vai trò toàn cục + vai trò trong chính kỳ thi này):
   // quản trị trường và chủ tịch hội đồng đều chạy trọn quy trình, chỉ khác vài ranh giới nhỏ.
-  const authority = resolveExamAuthority({
-    isSchoolAdmin: currentUser?.roles.includes('SCHOOL_ADMIN') ?? false,
-    myRole,
-  })
+  const isSchoolAdmin = currentUser?.roles.includes('SCHOOL_ADMIN') ?? false
+  const authority = resolveExamAuthority({ isSchoolAdmin, myRole })
   // Cùng query key với ScheduleTab/CandidatesTab nên TanStack dùng chung cache — tab mở ra không refetch.
   // Cần ở đây để tính bước "Xếp học sinh"/"Xếp lịch" và lý do chặn nút lên lịch.
   const schedulesQuery = useExamSchedulesQuery(examId ?? null)
@@ -874,6 +873,13 @@ function ExamDetailPage({ basePath }: ExamDetailPageProps) {
         <div className="mt-3.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-700">
           Chưa lên lịch được kỳ thi: {scheduleReadiness.blockingReason}
         </div>
+      ) : null}
+
+      {/* CLOSED là trạng thái duy nhất nút "Công bố kết quả" hiện ra, nên cũng là chỗ duy nhất cần
+          giải thích vì sao nó chưa bấm được. `canFinalize` bám theo chốt quyền thật của BE: chốt sổ
+          kỳ thi tập trung chỉ school admin làm được, chủ tịch hội đồng thì không. */}
+      {authority.canManageStatus && exam.status === 'CLOSED' ? (
+        <PublishReadinessPanel canFinalize={isSchoolAdmin} examId={exam.id} />
       ) : null}
 
       <WorkflowTrackerCard
