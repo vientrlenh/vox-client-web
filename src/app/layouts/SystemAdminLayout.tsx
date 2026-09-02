@@ -355,7 +355,7 @@ export function SystemAdminLayout() {
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             aria-label="Đóng menu quản trị hệ thống bằng lớp phủ"
-            className="absolute inset-0 bg-slate-950/45"
+            className="absolute inset-0 cursor-default bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />

@@ -37,7 +37,7 @@ export function SchoolDirectoryPickerDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
       <button
         aria-label="Đóng danh mục trường"
-        className="absolute inset-0 bg-slate-950/45"
+        className="absolute inset-0 cursor-default bg-slate-950/45"
         onClick={onClose}
         type="button"
       />

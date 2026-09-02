@@ -166,7 +166,7 @@ export function StudentLayout() {
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             aria-label="Đóng menu học sinh"
-            className="absolute inset-0 bg-slate-950/45"
+            className="absolute inset-0 cursor-default bg-slate-950/45"
             onClick={() => setIsMobileMenuOpen(false)}
             type="button"
           />

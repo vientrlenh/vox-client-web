@@ -32,7 +32,7 @@ export function UserDetailDialog({ isOpen, onClose, userId }: UserDetailDialogPr
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <button
         aria-label="Đóng hộp thoại chi tiết"
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 cursor-default bg-slate-900/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         type="button"
       />

@@ -35,4 +35,18 @@
   select {
     font: inherit;
   }
+
+  /* Tailwind v4 đã bỏ quy tắc `button { cursor: pointer }` của Preflight v3 và
+     không có gì thay thế, nên mọi <button> đều hiện con trỏ mũi tên — trước khi
+     có khối này, chỉ 1/1069 nút trong app có `cursor-pointer`.
+     `:not(:disabled)` là bắt buộc: 222 nút đang dùng `disabled:cursor-not-allowed`
+     và quy tắc này không được đè lên ý đồ đó.
+     Lớp `utilities` xếp sau `base` nên `cursor-default` đặt trên từng phần tử vẫn
+     ghi đè được (thứ tự lớp thắng độ ưu tiên chọn lọc) — xem các nút lớp phủ modal. */
+  button:not(:disabled),
+  summary,
+  select:not(:disabled),
+  input:is([type="checkbox"], [type="radio"], [type="file"]):not(:disabled) {
+    cursor: pointer;
+  }
 }

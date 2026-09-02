@@ -85,22 +85,28 @@ export function PlanCatalogTable({
   return (
     <div className="overflow-x-auto">
       {/*
-        table-fixed + bề rộng chốt cho bốn cột phụ. Để bảng tự chia (auto layout) thì bề rộng mỗi cột
+        table-fixed + bề rộng chốt cho BỐN cột đầu. Để bảng tự chia (auto layout) thì bề rộng mỗi cột
         do NỘI DUNG DÀI NHẤT quyết định -- cột Gói, thứ duy nhất dùng để nhận ra dòng, sẽ bị co lại
-        tùy nội dung các cột khác. Hành động giờ chỉ còn một nút "..." (ActionMenuButton) nên bề rộng
-        cố định nhỏ, không đổi theo số thao tác khả dụng của từng trạng thái gói.
+        tùy nội dung các cột khác.
 
-        Chỉ cột Gói bỏ trống bề rộng nên nó nhận toàn bộ phần dư -- tên gói là thứ đáng được giãn ra
-        khi màn hình rộng, còn "12 tháng" hay một cái pill trạng thái thì không.
+        Cột Gói nay CHỐT ở w-96: tên dài thì xuống dòng cho dòng cao lên, chứ không kéo cột rộng ra.
+        Trước đây Gói là cột duy nhất bỏ trống bề rộng nên nó nuốt toàn bộ phần dư (~1112px ở màn
+        1920) và đẩy bốn cột kia ra sát mép phải, trong khi tên gói chỉ là một hai từ ("Tiêu chuẩn").
+
+        Phần dư giờ dồn vào Hành động -- cột DUY NHẤT còn bỏ trống bề rộng. Đây là chỗ dễ sai: nếu
+        chốt bề rộng cho cả năm cột thì table-fixed rải phần dư theo TỈ LỆ lên mọi cột, Gói lại phình
+        to chứ không đứng yên ở w-96. Spec chỉ định rõ cho trường hợp còn cột auto ("remaining columns
+        equally divide the remaining space"), nên để đúng một cột auto là cách duy nhất chắc chắn.
+        Nút "..." vẫn dính mép phải nhờ text-right + justify-end, nên cột rộng ra cũng không lệch.
       */}
       <table className="w-full min-w-240 table-fixed border-collapse text-left">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500">
-            <th className="px-6 py-3.5" scope="col">Gói</th>
+            <th className="w-96 px-6 py-3.5" scope="col">Gói</th>
             <th className="w-28 px-4 py-3.5" scope="col">Chu kỳ</th>
             <th className="w-40 px-4 py-3.5 text-right" scope="col">Giá</th>
             <th className="w-32 px-4 py-3.5" scope="col">Trạng thái</th>
-            <th className="w-16 px-6 py-3.5 text-right" scope="col">Hành động</th>
+            <th className="px-6 py-3.5 text-right" scope="col">Hành động</th>
           </tr>
         </thead>
         <tbody>
@@ -111,9 +117,14 @@ export function PlanCatalogTable({
               : null
             const isArchived = plan.status === 'ARCHIVED'
 
+            // Dòng "phổ biến" giữ nền indigo cả khi hover (chỉ đậm thêm) thay vì để hover xám đè lên
+            // -- nền chính là thứ duy nhất phân biệt nó ở phía phải bảng, nơi cái pill "Phổ biến"
+            // trong cột Gói đã ở quá xa để nhìn cùng lúc.
             return (
               <tr
-                className={`border-b border-slate-100 last:border-b-0 ${isMostPopular ? 'bg-indigo-50/40' : ''}`}
+                className={`border-b border-slate-100 transition last:border-b-0 ${
+                  isMostPopular ? 'bg-indigo-50/40 hover:bg-indigo-100/50' : 'hover:bg-slate-50'
+                }`}
                 key={plan.id}
               >
                 <td className="px-6 py-4">

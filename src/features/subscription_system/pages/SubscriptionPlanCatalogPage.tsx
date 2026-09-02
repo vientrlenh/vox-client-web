@@ -272,7 +272,11 @@ export function SubscriptionPlanCatalogPage() {
     replacementMutation.isPending
 
   return (
-    <div className="grid gap-6">
+    // Chốt bề rộng như các trang danh sách khác (ExamPages, ClassTestPages, ExamResultPages): <main>
+    // của layout không có max-width, mà bảng lại là table-fixed với mỗi cột Gói bỏ trống bề rộng --
+    // nên mọi phần dư dồn hết vào cột đó (~1112px ở màn 1920). Tên gói chỉ là một hai từ ("Tiêu chuẩn"),
+    // không có gì để giãn, và khoảng trống đó đẩy bốn cột còn lại ra sát mép phải.
+    <div className="mx-auto grid max-w-290 gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="grid gap-1">
           <h1 className="text-3xl font-black tracking-tight text-blue-950">Danh mục gói</h1>
