@@ -20,6 +20,7 @@ import logoImage from '@/assets/images/logo.png'
 import { useAppSelector } from '@/app/store/hooks'
 import { useLogout } from '@/features/auth/session/useLogout'
 import { NotificationBell } from '@/features/notifications'
+import { Avatar } from '@/shared/ui/Avatar'
 import { useProfileQuery } from '@/features/profile'
 import { useQuestionsQuery } from '@/features/question/api/useQuestionsQuery'
 
@@ -113,23 +114,6 @@ const navigationGroups: NavigationGroup[] = [
     ],
   },
 ]
-
-function getEmailInitials(email?: string) {
-  if (!email) {
-    return 'GT'
-  }
-
-  return email
-    .split('@')[0]
-    .split(/[._-]/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-    .padEnd(2, email[0].toUpperCase())
-    .slice(0, 2)
-}
 
 type TeacherSidebarProps = {
   onClose?: () => void
@@ -287,7 +271,6 @@ export function TeacherLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const teacherEmail = user?.email ?? 'unknown'
-  const teacherInitials = getEmailInitials(teacherEmail)
   const { data: profile } = useProfileQuery()
   const reviewQuestionsQuery = useQuestionsQuery('teacher', 'review', 1, 1, {
     keyword: '',
@@ -372,9 +355,12 @@ export function TeacherLayout() {
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
                 type="button"
               >
-                <span className="inline-flex size-11 items-center justify-center rounded-full bg-cyan-600 text-sm font-bold text-white">
-                  {teacherInitials}
-                </span>
+                <Avatar
+                  email={teacherEmail}
+                  fallbackClassName="bg-cyan-600"
+                  fallbackInitials="GT"
+                  src={profile?.avatarUrl}
+                />
                 <span className="hidden max-w-56 sm:block">
                   <span className="block truncate text-sm font-bold text-slate-950">
                     {profile?.fullName}
