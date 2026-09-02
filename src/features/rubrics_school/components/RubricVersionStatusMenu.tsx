@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, RefreshCw } from 'lucide-react';
+import { publishStatusLabel } from '@/shared/lib/publishStatusLabel';
 
 type Props = {
   status: string;
@@ -13,7 +14,7 @@ type Props = {
 const STATUS_BADGE_CLASSNAMES: Record<string, string> = {
   DRAFT: 'bg-yellow-50 text-yellow-800 ring-yellow-600/20',
   PUBLISHED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  ARCHIVED: 'bg-slate-100 text-slate-600 ring-slate-500/20',
+  ARCHIVED: 'bg-amber-50 text-amber-700 ring-amber-700/10',
 };
 
 // DRAFT -> PUBLISHED và PUBLISHED -> ARCHIVED đều là thao tác thủ công của Admin qua 2 API riêng biệt.
@@ -54,7 +55,7 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
   if (!canChangeStatus) {
     return (
       <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${badgeClassName}`}>
-        {status}
+        {publishStatusLabel(status)}
       </span>
     );
   }
@@ -68,7 +69,7 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
         type="button"
       >
         {isPending ? <RefreshCw className="size-3 animate-spin" /> : null}
-        {status}
+        {publishStatusLabel(status)}
         <ChevronDown className="size-3" />
       </button>
 
@@ -80,15 +81,15 @@ export function RubricVersionStatusMenu({ status, onPublish, onArchive, isPendin
               onClick={handlePublishClick}
               type="button"
             >
-              Chuyển sang PUBLISHED
+              Chuyển sang Đã xuất bản
             </button>
           ) : (
             <button
-              className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-slate-600 transition hover:bg-slate-100"
+              className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-bold text-amber-700 transition hover:bg-amber-50"
               onClick={handleArchiveClick}
               type="button"
             >
-              Lưu trữ (ARCHIVE)
+              Lưu Trữ
             </button>
           )}
         </div>

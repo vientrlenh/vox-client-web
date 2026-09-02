@@ -2,6 +2,7 @@
 
 import { Eye, LayoutList, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { ActionMenuButton } from '@/shared/ui/ActionMenuButton';
+import { publishStatusLabel } from '@/shared/lib/publishStatusLabel';
 import { DetailPopoverButton } from './DetailPopoverButton';
 import { formatAssessmentPolicyDate } from '../types';
 import type { AssessmentPolicy } from '../types';
@@ -33,8 +34,8 @@ const statusStyles: Record<string, string> = {
 function PopoverInfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
-      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
-      <span className="text-sm font-semibold text-slate-900">{value}</span>
+      <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="whitespace-nowrap text-right text-sm font-semibold text-slate-900">{value}</span>
     </div>
   );
 }
@@ -138,12 +139,12 @@ export function AssessmentPolicyTable({
                   <DetailPopoverButton
                     ariaLabel={`Chi tiết framework version của policy ${policy.id}`}
                     badgeClassName="bg-blue-50 text-blue-700 ring-blue-700/10 hover:bg-blue-100"
-                    label={`${policy.frameworkVersion.code} (v${policy.frameworkVersion.version})`}
+                    label={policy.frameworkVersion.code}
                   >
                     <PopoverInfoRow label="Mã" value={policy.frameworkVersion.code} />
                     <PopoverInfoRow label="Tên" value={policy.frameworkVersion.name} />
                     <PopoverInfoRow label="Version" value={`v${policy.frameworkVersion.version}`} />
-                    <PopoverInfoRow label="Trạng thái" value={policy.frameworkVersion.status || '—'} />
+                    <PopoverInfoRow label="Trạng thái" value={publishStatusLabel(policy.frameworkVersion.status)} />
                     <PopoverInfoRow
                       label="Hiệu lực"
                       value={`${formatAssessmentPolicyDate(policy.frameworkVersion.effectiveFrom)} – ${formatAssessmentPolicyDate(policy.frameworkVersion.effectiveTo)}`}
@@ -158,12 +159,12 @@ export function AssessmentPolicyTable({
                   <DetailPopoverButton
                     ariaLabel={`Chi tiết rubric version của policy ${policy.id}`}
                     badgeClassName="bg-purple-50 text-purple-700 ring-purple-700/10 hover:bg-purple-100"
-                    label={`${policy.rubricVersion.code} (v${policy.rubricVersion.version})`}
+                    label={policy.rubricVersion.code}
                   >
                     <PopoverInfoRow label="Mã" value={policy.rubricVersion.code} />
                     <PopoverInfoRow label="Tên" value={policy.rubricVersion.name} />
                     <PopoverInfoRow label="Version" value={`v${policy.rubricVersion.version}`} />
-                    <PopoverInfoRow label="Trạng thái" value={policy.rubricVersion.status || '—'} />
+                    <PopoverInfoRow label="Trạng thái" value={publishStatusLabel(policy.rubricVersion.status)} />
                     <PopoverInfoRow
                       label="Hiệu lực"
                       value={`${formatAssessmentPolicyDate(policy.rubricVersion.effectiveFrom)} – ${formatAssessmentPolicyDate(policy.rubricVersion.effectiveTo)}`}
@@ -189,7 +190,7 @@ export function AssessmentPolicyTable({
                     statusStyles[policy.status] || 'bg-slate-100 text-slate-600 ring-slate-500/10'
                   }`}
                 >
-                  {policy.status}
+                  {publishStatusLabel(policy.status)}
                 </span>
               </td>
               <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>

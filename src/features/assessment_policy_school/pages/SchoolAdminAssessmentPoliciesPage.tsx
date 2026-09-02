@@ -8,7 +8,6 @@ import {
   ChevronDown,
   ClipboardCheck,
   Filter,
-  Languages,
   Layers,
   Loader2,
   Plus,
@@ -25,7 +24,6 @@ import { useDeleteSchoolAssessmentPolicyMutation } from '../api/useDeleteSchoolA
 import { useUpdateSchoolAssessmentPolicyMutation } from '../api/useUpdateSchoolAssessmentPolicyMutation';
 import { usePublishSchoolAssessmentPoliciesByRubricVersionMutation } from '../api/usePublishSchoolAssessmentPoliciesByRubricVersionMutation';
 import { usePublishSchoolRubricVersionMutation } from '../api/usePublishSchoolRubricVersionMutation';
-import { useLanguageOptionsQuery } from '../api/useFilterOptionsQuery';
 import { useRubricSearchOptionsQuery, useRubricVersionOptionsQuery } from '../api/useRubricOptionsQuery';
 
 import { useFeedbackToast } from '@/shared/ui/useFeedbackToast';
@@ -35,6 +33,7 @@ import { CreateAssessmentPolicyDialog } from '../components/CreateAssessmentPoli
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
 import { Pagination } from '@/shared/components/Pagination';
 import { useAppSelector } from '@/app/store/hooks';
+import { publishStatusLabel } from '@/shared/lib/publishStatusLabel';
 import type { AssessmentPolicy, CreateAssessmentPolicyPayload, UpdateAssessmentPolicyPayload } from '../types';
 
 const DEFAULT_PAGE = 1;
@@ -52,7 +51,7 @@ function toOffsetDateTime(dateInputValue: string, endOfDay: boolean) {
 type FilterSelectProps = {
   id: string;
   icon: React.ComponentType<{ className?: string }>;
-  label: string;
+  label?: string;
   value: string;
   disabled?: boolean;
   placeholder: string;
@@ -60,12 +59,12 @@ type FilterSelectProps = {
   onChange: (value: string) => void;
 };
 
-// Select filter dùng chung: label phía trên + icon minh hoạ bên trái + chevron bên phải,
-// để 4 dropdown (Trạng thái/Ngôn ngữ/Rubric/Phiên bản) đồng bộ nhau thay vì lặp lại JSX 4 lần.
+// Select filter dùng chung: icon minh hoạ bên trái + chevron bên phải. `label` rỗng khi select
+// nằm trong một nhóm filter đã có label riêng ở ngoài (Rubric + Phiên bản gộp chung 1 khối).
 function FilterSelect({ id, icon: Icon, label, value, disabled, placeholder, options, onChange }: FilterSelectProps) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-semibold text-slate-500" htmlFor={id}>{label}</label>
+      {label && <label className="mb-1.5 block text-xs font-semibold text-slate-500" htmlFor={id}>{label}</label>}
       <div className="relative">
         <Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
         <select
@@ -99,11 +98,9 @@ export function SchoolAdminAssessmentPoliciesPage() {
   const [pageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [selectedLanguageId, setSelectedLanguageId] = useState('');
   const [selectedRubricId, setSelectedRubricId] = useState(navigationState?.rubricId ?? '');
   const [selectedRubricVersionId, setSelectedRubricVersionId] = useState(navigationState?.rubricVersionId ?? '');
   const [effectiveFrom, setEffectiveFrom] = useState('');
-  const [effectiveTo, setEffectiveTo] = useState('');
 
   // Không dọn location.state sau khi đọc: nếu "replace" state về null ngay, bấm back từ trang chi
   // tiết policy sẽ quay lại đúng history entry này nhưng state đã bị null hóa, làm mất filter/tô
@@ -112,8 +109,7 @@ export function SchoolAdminAssessmentPoliciesPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<AssessmentPolicy | null>(null);
 
-  const { data: languages } = useLanguageOptionsQuery();
-  const { data: rubrics } = useRubricSearchOptionsQuery(schoolId, selectedLanguageId || undefined);
+  const { data: rubrics } = useRubricSearchOptionsQuery(schoolId, undefined, false);
   const { data: rubricVersions } = useRubricVersionOptionsQuery(schoolId, selectedRubricId || undefined);
 
   // Dữ liệu riêng cho nút "Xuất bản" nhanh kế bên Import: chỉ fetch khi đã chọn Phiên bản ở bộ lọc
@@ -129,23 +125,19 @@ export function SchoolAdminAssessmentPoliciesPage() {
 
   const filter: SchoolAssessmentPolicyFilter = {
     status: selectedStatus || null,
-    languageId: selectedLanguageId || null,
     rubricVersionId: selectedRubricVersionId || null,
     effectiveFrom: toOffsetDateTime(effectiveFrom, false),
-    effectiveTo: toOffsetDateTime(effectiveTo, true),
   };
 
   const hasActiveFilters = Boolean(
-    selectedStatus || selectedLanguageId || selectedRubricVersionId || effectiveFrom || effectiveTo
+    selectedStatus || selectedRubricVersionId || effectiveFrom
   );
 
   const handleResetFilters = () => {
     setSelectedStatus('');
-    setSelectedLanguageId('');
     setSelectedRubricId('');
     setSelectedRubricVersionId('');
     setEffectiveFrom('');
-    setEffectiveTo('');
     setPage(1);
   };
 
@@ -326,63 +318,56 @@ export function SchoolAdminAssessmentPoliciesPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <FilterSelect
             id="statusFilter"
             icon={Filter}
             label="Trạng thái"
             placeholder="Tất cả trạng thái"
             value={selectedStatus}
-            options={STATUS_OPTIONS.map((status) => ({ value: status, label: status }))}
+            options={STATUS_OPTIONS.map((status) => ({ value: status, label: publishStatusLabel(status) }))}
             onChange={(value) => {
               setSelectedStatus(value);
               setPage(1);
             }}
           />
-          <FilterSelect
-            id="languageFilter"
-            icon={Languages}
-            label="Ngôn ngữ"
-            placeholder="Tất cả ngôn ngữ"
-            value={selectedLanguageId}
-            options={languages?.map((lang) => ({ value: lang.id, label: lang.name })) ?? []}
-            onChange={(value) => {
-              setSelectedLanguageId(value);
-              setSelectedRubricId('');
-              setSelectedRubricVersionId('');
-              setPage(1);
-            }}
-          />
-          <FilterSelect
-            id="rubricFilter"
-            icon={BookOpen}
-            label="Rubric"
-            placeholder={selectedLanguageId ? 'Tất cả rubric' : 'Chọn ngôn ngữ trước'}
-            value={selectedRubricId}
-            disabled={!selectedLanguageId}
-            options={rubrics?.map((rubric) => ({ value: rubric.id, label: `${rubric.code} - ${rubric.name}` })) ?? []}
-            onChange={(value) => {
-              setSelectedRubricId(value);
-              setSelectedRubricVersionId('');
-              setPage(1);
-            }}
-          />
-          <FilterSelect
-            id="rubricVersionFilter"
-            icon={Layers}
-            label="Phiên bản"
-            placeholder={selectedRubricId ? 'Tất cả phiên bản' : 'Chọn rubric trước'}
-            value={selectedRubricVersionId}
-            disabled={!selectedRubricId}
-            options={rubricVersions?.map((rv) => ({
-              value: rv.id,
-              label: `${rv.code} - ${rv.name} (v${rv.version}) · ${rv.status}`,
-            })) ?? []}
-            onChange={(value) => {
-              setSelectedRubricVersionId(value);
-              setPage(1);
-            }}
-          />
+
+          {/* Rubric + Phiên bản gộp chung 1 khối filter: Phiên bản phụ thuộc Rubric đã chọn nên vẫn
+              là 2 select, nhưng gộp lại dưới 1 label để giảm số ô lọc hiển thị trên hàng. */}
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-slate-500">Tiêu Chí &amp; Phiên Bản</span>
+            <div className="grid grid-cols-2 gap-2">
+              <FilterSelect
+                id="rubricFilter"
+                icon={BookOpen}
+                placeholder="Tất cả tiêu chí"
+                value={selectedRubricId}
+                options={rubrics?.map((rubric) => ({ value: rubric.id, label: `${rubric.code} - ${rubric.name}` })) ?? []}
+                onChange={(value) => {
+                  setSelectedRubricId(value);
+                  setSelectedRubricVersionId('');
+                  setPage(1);
+                }}
+              />
+              <FilterSelect
+                id="rubricVersionFilter"
+                icon={Layers}
+                placeholder={selectedRubricId ? 'Tất cả phiên bản' : 'Chọn tiêu chí trước'}
+                value={selectedRubricVersionId}
+                disabled={!selectedRubricId}
+                options={rubricVersions?.map((rv) => ({
+                  value: rv.id,
+                  label: `v${rv.version} · ${publishStatusLabel(rv.status)}`,
+                })) ?? []}
+                onChange={(value) => {
+                  setSelectedRubricVersionId(value);
+                  setPage(1);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Không có "Hiệu lực đến" vì tạo Chính Sách Đánh Giá không bắt buộc nhập ngày hết hạn. */}
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-slate-500" htmlFor="effectiveFromFilter">Hiệu lực từ</label>
             <div className="relative">
@@ -391,26 +376,8 @@ export function SchoolAdminAssessmentPoliciesPage() {
                 id="effectiveFromFilter"
                 type="date"
                 value={effectiveFrom}
-                max={effectiveTo || undefined}
                 onChange={(e) => {
                   setEffectiveFrom(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full rounded-[10px] border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-500" htmlFor="effectiveToFilter">Hiệu lực đến</label>
-            <div className="relative">
-              <Calendar className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="effectiveToFilter"
-                type="date"
-                value={effectiveTo}
-                min={effectiveFrom || undefined}
-                onChange={(e) => {
-                  setEffectiveTo(e.target.value);
                   setPage(1);
                 }}
                 className="w-full rounded-[10px] border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"

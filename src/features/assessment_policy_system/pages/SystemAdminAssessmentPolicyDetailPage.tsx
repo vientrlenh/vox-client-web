@@ -27,6 +27,7 @@ import { useArchiveSystemAssessmentPolicyMutation } from '../api/useArchiveSyste
 import { UpdateAssessmentPolicyDialog } from '../components/UpdateAssessmentPolicyDialog';
 import { formatAssessmentPolicyDate } from '../types';
 import type { UpdateAssessmentPolicyPayload } from '../types';
+import { publishStatusLabel } from '@/shared/lib/publishStatusLabel';
 
 const strictnessLabels: Record<string, string> = {
   LENIENT: 'Lỏng (LENIENT)',
@@ -201,7 +202,7 @@ export function SystemAdminAssessmentPolicyDetailPage() {
                 statusStyles[policy.status] || 'bg-slate-100 text-slate-600'
               }`}
             >
-              {policy.status}
+              {publishStatusLabel(policy.status)}
             </span>
           </InfoField>
           <InfoField label="Phiên bản (version)">{policy.version}</InfoField>

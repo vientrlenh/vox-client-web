@@ -83,7 +83,7 @@ export function DetailPopoverButton({ label, ariaLabel, badgeClassName, children
   const popover = isOpen && position
     ? createPortal(
         <div
-          className="z-50 w-72 rounded-lg border border-slate-200 bg-white p-4 text-left text-sm text-slate-700 shadow-lg shadow-slate-950/10"
+          className="z-50 w-max max-w-[calc(100vw-2rem)] min-w-72 rounded-lg border border-slate-200 bg-white p-4 text-left text-sm text-slate-700 shadow-lg shadow-slate-950/10"
           id={popoverId}
           ref={popoverRef}
           role="dialog"
