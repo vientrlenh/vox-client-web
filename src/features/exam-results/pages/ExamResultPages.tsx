@@ -27,6 +27,7 @@ import {
   isExamResultsFinalized,
   type ExamAttemptSummaryDto,
 } from '@/features/examCore/types'
+import { ProctoringAlertsCard } from '@/features/proctoring-alerts'
 import { Pagination } from '@/shared/components/Pagination'
 import {
   buildValidityRulesForDisplay,
@@ -1212,6 +1213,21 @@ function ExamResultDetailPage({ gradingPath }: { gradingPath: string }) {
           {activeTab === 'overview' ? (
             <div className="mt-4 grid gap-4">
               <SectionOverview result={result} />
+
+              {/* Cảnh báo giám sát -- cùng khung đang dùng ở màn chấm bài
+                  (GradingPages.tsx). Trang kết quả trước đây không có, nên người xem lại bài
+                  đã công bố không biết trong lúc thi có ghi nhận gì bất thường; muốn biết phải
+                  mở màn chấm của đúng bài đó.
+
+                  Dùng CHUNG điều kiện `canViewRecordings` với trình phát bên dưới: cả hai đều
+                  bị backend giới hạn ở SCHOOL_ADMIN/TEACHER (`examSessionProctoringAlerts`
+                  khai @PreAuthorize y hệt `examRecordingPlayback`). Học sinh mà thấy khối này
+                  vừa rỗng vừa gây hiểu nhầm -- cảnh báo là tư liệu để giám khảo tự đánh giá,
+                  không phải kết luận gian lận.
+
+                  Đặt TRÊN trình phát có chủ ý: thấy cảnh báo trước rồi mới tua video đúng mốc
+                  thời gian ghi trong cảnh báo, không phải xem hết rồi mới biết cần tìm gì. */}
+              {canViewRecordings ? <ProctoringAlertsCard sessionId={sessionId ?? null} /> : null}
 
               {/* Bản ghi ca thi -- KHÔNG cho học sinh xem.
                   Backend cũng chặn (query `examRecordingPlayback` chỉ nhận SCHOOL_ADMIN/
