@@ -16,6 +16,23 @@ export type Invoice = {
   issueDate: string
 }
 
+export type PaymentRecordStatus = 'PENDING' | 'PAID' | 'FAILED'
+
+/** Một LẦN THỬ thanh toán cho đơn — một đơn có thể có nhiều dòng nếu trường thử lại sau khi hủy/hết hạn phiên. */
+export type PaymentRecord = {
+  id: string
+  orderId: string
+  amountVnd: number | null
+  method: string | null
+  provider: string | null
+  status: PaymentRecordStatus
+  providerOrderRef: string | null
+  /** Chỉ khác null khi dòng còn PENDING. */
+  checkoutUrl: string | null
+  paidAt: string | null
+  createdAt: string | null
+}
+
 /**
  * Đơn mang BỐN con số tiền: bất biến {@code total = subtotal + fee - discount}.
  *
@@ -38,6 +55,7 @@ export type Order = {
   expiresAt: string | null
   items: OrderItem[] | null
   invoice: Invoice | null
+  payments: PaymentRecord[] | null
 }
 
 export type OrderPage = {

@@ -10,6 +10,7 @@ import { DEFAULT_PAYMENT_METHOD, type PaymentLink, type PaymentMethod } from '@/
 import { useCreateCheckoutUrlMutation } from '../api/useOrderMutations'
 import { useOrderQuery } from '../api/useOrderQueries'
 import { CancelOrderDialog } from '../components/CancelOrderDialog'
+import { PaymentHistoryCard } from '../components/PaymentHistoryCard'
 import { PayosQrPanel } from '../components/PayosQrPanel'
 import { formatDateTime, formatRemaining, formatVnd } from '../format'
 import { getOrderStatusDisplay, getPaidDestination } from '../types'
@@ -118,7 +119,7 @@ export function OrderDetailPage() {
         số ở mép phải, cách nhau cả gang tay — đọc bằng mắt không nối được hai đầu. Đẩy phần siêu dữ
         liệu (mã đơn, mốc thời gian, hóa đơn) sang cột phụ vừa lấp chỗ trống vừa giữ dòng tiền ngắn.
       */}
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="rounded-2xl border border-slate-200 bg-white p-6">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-bold tracking-tight text-blue-950">{order.description ?? 'Đơn hàng'}</h1>
@@ -258,36 +259,30 @@ export function OrderDetailPage() {
         ) : null}
         </div>
 
-        <aside className="grid gap-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <aside className="flex flex-col gap-4">
+          <div className="flex-1 rounded-2xl border border-slate-200 bg-white p-5">
             <h2 className="text-[13px] font-bold text-blue-950">Thông tin đơn</h2>
-            <dl className="mt-3.5 grid gap-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-[12.5px] text-slate-500">Mã đơn</dt>
-                <dd className="font-mono text-[12.5px] font-semibold text-blue-950">#{order.id.slice(0, 8)}</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-[12.5px] text-slate-500">Đặt lúc</dt>
-                <dd className="text-[12.5px] font-semibold text-blue-950 tabular-nums">
-                  {formatDateTime(order.createdAt)}
-                </dd>
-              </div>
+            <dl className="mt-3.5 grid grid-cols-[80px_1fr] items-baseline gap-x-3 gap-y-3">
+              <dt className="text-[12.5px] text-slate-500">Mã đơn</dt>
+              <dd className="justify-self-end font-mono text-[12.5px] font-semibold text-blue-950">#{order.id.slice(0, 8)}</dd>
+
+              <dt className="text-[12.5px] text-slate-500">Đặt lúc</dt>
+              <dd className="justify-self-end text-[12.5px] font-semibold text-blue-950 tabular-nums">
+                {formatDateTime(order.createdAt)}
+              </dd>
 
               {order.invoice ? (
                 <>
-                  <div className="h-px bg-slate-100" />
-                  <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-[12.5px] text-slate-500">Hóa đơn</dt>
-                    <dd className="font-mono text-[12.5px] font-semibold text-blue-950">
-                      {order.invoice.invoiceNumber}
-                    </dd>
-                  </div>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-[12.5px] text-slate-500">Phát hành</dt>
-                    <dd className="text-[12.5px] font-semibold text-blue-950 tabular-nums">
-                      {order.invoice.issueDate}
-                    </dd>
-                  </div>
+                  <div className="col-span-2 h-px bg-slate-100" />
+                  <dt className="text-[12.5px] text-slate-500">Hóa đơn</dt>
+                  <dd className="justify-self-end break-all text-right font-mono text-[12.5px] font-semibold text-blue-950">
+                    {order.invoice.invoiceNumber}
+                  </dd>
+
+                  <dt className="text-[12.5px] text-slate-500">Phát hành</dt>
+                  <dd className="justify-self-end text-[12.5px] font-semibold text-blue-950 tabular-nums">
+                    {formatDateTime(order.invoice.issueDate)}
+                  </dd>
                 </>
               ) : null}
             </dl>
@@ -307,6 +302,8 @@ export function OrderDetailPage() {
           ) : null}
         </aside>
       </div>
+
+      <PaymentHistoryCard payments={order.payments} />
 
       {isCancelOpen ? (
         <CancelOrderDialog
