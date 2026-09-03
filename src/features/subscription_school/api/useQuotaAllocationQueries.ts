@@ -38,6 +38,7 @@ const EXAM_QUERY = `
       distributedAmountVnd
       distributableRatio
       distributableAmountVnd
+      walletBalanceVnd
       page
       size
       totalElements
@@ -69,6 +70,7 @@ const PRACTICE_QUERY = `
       distributedAmountVnd
       distributableRatio
       distributableAmountVnd
+      walletBalanceVnd
       page
       size
       totalElements

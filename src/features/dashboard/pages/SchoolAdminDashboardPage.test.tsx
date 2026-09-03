@@ -25,7 +25,7 @@ function createDashboard(overrides: Partial<SchoolAdminDashboard> = {}): SchoolA
     },
     examsAwaitingPublish: [],
     // Trường chưa chia hạn mức cho ai: đây là mặc định của mọi trường mới, và cũng là trạng thái để
-    // các test khác không phải nghĩ về phần đã hứa. Hai ca có chia nằm ở test riêng bên dưới.
+    // các test khác không phải nghĩ về phần đã phân chia. Hai ca có chia nằm ở test riêng bên dưới.
     funding: {
       balanceVnd: '0',
       committedToUsersVnd: '0',
@@ -159,11 +159,11 @@ describe('SchoolAdminDashboardPage', () => {
    * Chia hạn mức cho giáo viên KHÔNG được làm "Còn chấm được" nhỏ đi.
    *
    * Con số lớn đó là vị từ khoá — nó phải khớp với cửa thật sự từ chối lên lịch kỳ thi
-   * (ClassTestTokenQuotaGuardService), nên trừ phần đã hứa vào đó là báo hết tiền trong khi hệ thống
-   * vẫn cho chi. Phần đã hứa đi ra ở dòng thứ hai, trả lời một câu hỏi khác: còn bao nhiêu là phần
-   * trường tự do dùng cho kỳ thi tập trung.
+   * (ClassTestTokenQuotaGuardService), nên trừ phần đã phân chia vào đó là báo hết tiền trong khi hệ
+   * thống vẫn cho chi. Phần đã phân chia đi ra ở dòng thứ hai, trả lời một câu hỏi khác: còn bao
+   * nhiêu là phần trường tự do dùng cho kỳ thi tập trung.
    */
-  it('hiện phần đã hứa cho giáo viên mà không trừ vào "Còn chấm được"', async () => {
+  it('hiện phần đã phân chia cho giáo viên mà không trừ vào "Còn chấm được"', async () => {
     mockGraphQL(
       createDashboard({
         funding: {
@@ -183,17 +183,17 @@ describe('SchoolAdminDashboardPage', () => {
     // Vẫn là TOÀN BỘ số tiền còn lại, không phải 4.000.000 ₫.
     expect(screen.getByText('10.000.000 ₫')).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: /Đã hứa cho giáo viên 6\.000\.000 ₫ · còn tự do 4\.000\.000 ₫/ }),
+      screen.getByRole('button', { name: /Đã phân chia cho giáo viên 6\.000\.000 ₫ · còn tự do 4\.000\.000 ₫/ }),
     ).toBeInTheDocument()
   })
 
-  /** Trường chưa chia cho ai thì không có gì để trừ — một dòng "đã hứa 0 ₫" chỉ làm thẻ dài thêm. */
-  it('không hiện dòng đã hứa khi trường chưa chia hạn mức cho ai', async () => {
+  /** Trường chưa chia cho ai thì không có gì để trừ — một dòng "đã phân chia 0 ₫" chỉ làm thẻ dài thêm. */
+  it('không hiện dòng đã phân chia khi trường chưa chia hạn mức cho ai', async () => {
     mockGraphQL()
     renderPage()
 
     expect(await screen.findByText('Còn chấm được')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Đã hứa cho giáo viên/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Đã phân chia cho giáo viên/ })).not.toBeInTheDocument()
   })
 
   /**
