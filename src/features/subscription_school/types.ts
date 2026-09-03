@@ -97,7 +97,7 @@ export type QuotaUserAllocationPage = {
 
 export type UserQuotaAmount = {
   userId: string
-  amount: number
+  amountVnd: number
 }
 
 export type AllocateQuotaPayload = {

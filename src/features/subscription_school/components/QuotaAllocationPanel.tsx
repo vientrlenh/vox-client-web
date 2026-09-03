@@ -75,7 +75,7 @@ export function QuotaAllocationPanel({
     }
     // Gửi ĐÚNG một người. Backend tự cộng thêm phần của những người không có trong yêu cầu khi kiểm
     // tổng, nên phân bổ từng phần là hợp lệ -- xem computeManualAmounts.
-    onSubmit({ allocations: [{ amount: amountVnd, userId: editing.userId }], mode: 'MANUAL' })
+    onSubmit({ allocations: [{ amountVnd, userId: editing.userId }], mode: 'MANUAL' })
     setEditing(null)
   }
 

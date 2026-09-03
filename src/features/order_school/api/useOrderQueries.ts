@@ -32,6 +32,18 @@ const ORDER_FIELDS = `
     invoiceNumber
     issueDate
   }
+  payments {
+    id
+    orderId
+    amountVnd
+    method
+    provider
+    status
+    providerOrderRef
+    checkoutUrl
+    paidAt
+    createdAt
+  }
 `
 
 // myOrders GỒM CẢ đơn PENDING và đó là bắt buộc: đặt đơn đăng ký mới bị từ chối khi trường còn một
