@@ -65,7 +65,18 @@ export type DistributionMode = 'AUTO' | 'MANUAL'
  */
 export type QuotaUserAllocation = {
   userId: string
-  allocatedAmountVnd: number
+  /**
+   * null = CHƯA CHIA (không có dòng trong DB), khác hẳn 0 -- hai trạng thái này cho hành vi NGƯỢC
+   * NHAU ở backend:
+   *
+   * - chưa chia: giáo viên KHÔNG bị chặn theo cá nhân (tiêu thoải mái trong ví trường), còn học sinh
+   *   thì ngược lại -- không luyện được lượt nào.
+   * - có dòng và bằng 0: bị chặn hẳn, ở cả hai loại.
+   *
+   * Nên phải hiện thành hai nhãn khác nhau. Hiện cả hai là "0 ₫" sẽ giấu mất việc nửa số giáo viên
+   * của trường đang không có trần chi nào.
+   */
+  allocatedAmountVnd: number | null
   usedAmountVnd: number
   user: { id: string; fullName: string | null; email: string | null } | null
 }
@@ -78,7 +89,14 @@ export type QuotaUserAllocation = {
  */
 export type QuotaUserAllocationPage = {
   pool: SubscriptionQuotaRecord
+  /** Tổng đã chia cho những người CÒN đủ điều kiện. Người đã nghỉ/ra trường nằm ở `orphanedAmountVnd`. */
   distributedAmountVnd: number
+  /**
+   * Phần đang đứng tên những người KHÔNG còn đủ điều kiện. Không tính vào trần và không hiện ở bất kỳ
+   * trang nào của bảng -- phải nói thành lời, nếu không thì tổng trên màn hình và tổng các dòng lệch
+   * nhau mà không ai giải thích được. Thường là 0.
+   */
+  orphanedAmountVnd: number
   /** Trần phân phối của trường cho loại hạn mức này, 0..1. Mặc định 1 = chia được toàn bộ ví. */
   distributableRatio: number
   /**
@@ -88,6 +106,14 @@ export type QuotaUserAllocationPage = {
    * là một cơ hội để hai bên lệch nhau vài phần triệu đồng rồi báo lỗi ở chỗ không ai hiểu nổi.
    */
   distributableAmountVnd: number
+  /**
+   * Số tiền trường THẬT SỰ còn trả được = hạn mức kèm gói còn lại + số dư ví tự nạp (đã kẹp 0).
+   *
+   * KHÁC HẲN `distributableAmountVnd`: trần đó tính trên `totalAllocatedAmountVnd` và không nhỏ đi
+   * khi ví bị tiêu, nên một trường đã tiêu cạn ví vẫn chia tiếp được tới hết trần. Dùng để CẢNH BÁO,
+   * không phải để chặn -- backend cũng không chặn ở bước chia.
+   */
+  spendableFundsVnd: number
   /**
    * Phần ví TỰ NẠP của trường CÓ THỂ ăn thêm ngoài distributableAmountVnd khi nới trần cá nhân của
    * MỘT người -- không phải một túi tiền dành riêng, và dùng CHUNG cho cả EXAM lẫn PRACTICE. Đã kẹp
@@ -99,6 +125,13 @@ export type QuotaUserAllocationPage = {
   size: number
   totalElements: number
   totalPages: number
+}
+
+/** Kết quả một lần nạp tiền từ ví tự nạp vào ví hạn mức -- cả hai phía của phép chuyển. */
+export type QuotaFundingResult = {
+  pool: SubscriptionQuotaRecord
+  fundedAmountVnd: number
+  balanceAfterVnd: number
 }
 
 export type UserQuotaAmount = {

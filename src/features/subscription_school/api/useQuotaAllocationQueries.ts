@@ -34,10 +34,13 @@ const EXAM_QUERY = `
         quotaType
         totalAllocatedAmountVnd
         usedAmountVnd
+        fundedFromBalanceVnd
       }
       distributedAmountVnd
+      orphanedAmountVnd
       distributableRatio
       distributableAmountVnd
+      spendableFundsVnd
       walletBalanceVnd
       page
       size
@@ -66,10 +69,13 @@ const PRACTICE_QUERY = `
         quotaType
         totalAllocatedAmountVnd
         usedAmountVnd
+        fundedFromBalanceVnd
       }
       distributedAmountVnd
+      orphanedAmountVnd
       distributableRatio
       distributableAmountVnd
+      spendableFundsVnd
       walletBalanceVnd
       page
       size

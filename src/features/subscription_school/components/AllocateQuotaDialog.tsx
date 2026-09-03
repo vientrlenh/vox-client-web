@@ -11,6 +11,8 @@ type AllocateQuotaDialogProps = {
   /** needsWalletConfirm = số nhập vượt phần pool, sẽ ăn vào ví tự nạp của trường. */
   onSubmit: (amountVnd: number, needsWalletConfirm: boolean) => void
   poolTotalVnd: number
+  /** Quyết định ý nghĩa của lần chia ĐẦU TIÊN, và hai loại ngược nhau -- xem isFirstAllocation. */
+  quotaType: 'EXAM' | 'PRACTICE'
   /** Phần ví tự nạp CÓ THỂ ăn thêm ngoài pool -- xem QuotaUserAllocationPage.walletBalanceVnd. */
   walletBalanceVnd: number
 }
@@ -38,14 +40,20 @@ export function AllocateQuotaDialog({
   onClose,
   onSubmit,
   poolTotalVnd,
+  quotaType,
   walletBalanceVnd,
 }: AllocateQuotaDialogProps) {
-  const [amount, setAmount] = useState(allocation.allocatedAmountVnd)
+  // null = chưa có dòng phân bổ. Ô nhập bắt đầu từ 0, nhưng đó KHÔNG phải giá trị hiện tại của họ --
+  // xem cảnh báo isFirstAllocation bên dưới.
+  const currentAllocatedVnd = allocation.allocatedAmountVnd ?? 0
+  const isFirstAllocation = allocation.allocatedAmountVnd === null
+
+  const [amount, setAmount] = useState(currentAllocatedVnd)
 
   // Trần cho riêng người này TRONG PHẦN POOL = phần ví chưa chia + phần đang đứng tên họ. Không lấy
   // nguyên poolTotalVnd: backend từ chối khi tổng phân bổ vượt pool LẪN ví tự nạp, nên để người dùng
   // gõ một số chắc chắn bị từ chối là bắt họ đoán luật.
-  const poolAvailableVnd = Math.max(0, poolTotalVnd - distributedVnd + allocation.allocatedAmountVnd)
+  const poolAvailableVnd = Math.max(0, poolTotalVnd - distributedVnd + currentAllocatedVnd)
   // Trần MỞ RỘNG = phần pool còn chia được + ví tự nạp của trường. Vượt phần pool nhưng còn trong
   // trần này là ĂN VÀO VÍ CHUNG (dùng chung cho cả thi lẫn luyện tập) -- không chặn nữa, chỉ cảnh báo
   // và cần xác nhận (needsWalletConfirm) trước khi gửi lên backend.
@@ -87,6 +95,34 @@ export function AllocateQuotaDialog({
         </div>
 
         <div className="mt-5 flex flex-col gap-4">
+          {/*
+            Lần chia ĐẦU TIÊN đổi hành vi theo hai chiều ngược nhau, nên không thể dùng chung một câu.
+            Với giáo viên đây là việc DỰNG LÊN một giới hạn chưa từng có (và hệ thống chưa có đường gỡ
+            trần, chỉ nâng lên được); với học sinh thì ngược lại, đây chính là thao tác MỞ KHOÁ.
+          */}
+          {isFirstAllocation ? (
+            <p
+              className={`rounded-xl border px-4 py-3 text-[12px] leading-relaxed ${
+                quotaType === 'EXAM'
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              }`}
+            >
+              {quotaType === 'EXAM' ? (
+                <>
+                  <strong className="font-bold">Người này hiện chưa có trần chi riêng</strong> — đang tiêu trong ví
+                  chung của trường mà không bị chặn theo cá nhân. Lưu một con số ở đây là đặt ra giới hạn chưa từng
+                  có, và sau đó chỉ nâng lên được chứ không gỡ bỏ được.
+                </>
+              ) : (
+                <>
+                  <strong className="font-bold">Người này chưa luyện tập được lượt nào</strong> — học sinh không có
+                  trần chi riêng thì bị chặn hẳn. Lưu hạn mức ở đây là thao tác mở khoá cho em.
+                </>
+              )}
+            </p>
+          ) : null}
+
           <div className="flex flex-col gap-2">
             <label className="text-[12.5px] font-bold text-blue-950" htmlFor="allocate-amount">
               Hạn mức được cấp

@@ -18,6 +18,8 @@ import {
   useAllocatePracticeQuotaMutation,
 } from '../api/useQuotaAllocationMutations'
 import { useSetQuotaPolicyMutation } from '../api/useQuotaPolicyMutation'
+import { useFundQuotaMutation } from '../api/useQuotaFundingMutation'
+import { formatVnd } from '../types'
 import { MyPlanCard } from '../components/MyPlanCard'
 import { PlanRenewalDialog } from '../components/PlanRenewalDialog'
 import { QuotaAllocationPanel } from '../components/QuotaAllocationPanel'
@@ -59,8 +61,35 @@ export function MySubscriptionPage() {
   const allocateExamQuotaMutation = useAllocateExamQuotaMutation()
   const allocatePracticeQuotaMutation = useAllocatePracticeQuotaMutation()
   const setQuotaPolicyMutation = useSetQuotaPolicyMutation()
+  const fundQuotaMutation = useFundQuotaMutation()
 
   const subscription = mySubscriptionQuery.data ?? null
+
+  /**
+   * Nạp tiền từ ví tự nạp vào ví hạn mức. Xác nhận thêm một lần ở đây dù hộp thoại đã cảnh báo: đây
+   * là thao tác KHÔNG hoàn lại được và backend chưa có khoá idempotency, nên bước xác nhận vừa chống
+   * bấm nhầm vừa chống bấm đúp.
+   */
+  async function handleFundQuota(quotaType: 'EXAM' | 'PRACTICE', amountVnd: number, reason: string) {
+    const confirmed = await confirm({
+      confirmLabel: 'Nạp ngay',
+      message: `Chuyển ${formatVnd(amountVnd)} từ ví tự nạp sang ví ${
+        quotaType === 'EXAM' ? 'Thi & kiểm tra' : 'Luyện tập'
+      }. Tiền đã chuyển không quay lại ví tự nạp và không chuyển sang ví còn lại.`,
+      title: 'Xác nhận nạp vào ví hạn mức',
+    })
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      const result = await fundQuotaMutation.mutateAsync({ amountVnd, quotaType, reason })
+      showSuccess(`Đã nạp ${formatVnd(result.fundedAmountVnd)} vào ví hạn mức. Ví tự nạp còn ${formatVnd(result.balanceAfterVnd)}.`)
+    } catch (error) {
+      showError(getErrorMessage(error) ?? 'Không thể nạp tiền vào ví hạn mức.')
+    }
+  }
 
   async function handleSetCap(quotaType: 'EXAM' | 'PRACTICE', percent: number) {
     try {
@@ -166,9 +195,16 @@ export function MySubscriptionPage() {
         <div className="grid gap-4">
           <div>
             <h2 className="text-[17px] font-bold text-blue-950">Phân bổ hạn mức</h2>
+            {/*
+              Câu cũ ("không có tên ở đây nghĩa là không bị chặn riêng") chỉ đúng với giáo viên và
+              nói ngược hẳn với học sinh: học sinh chưa được chia thì không luyện được lượt nào. Nói
+              một luật chung cho hai ví có luật ngược nhau là cách chắc chắn để một nửa số người đọc
+              hiểu sai -- nên câu chung giờ chỉ nói phần thật sự chung, phần khác nhau để mỗi tab tự
+              nói (xem QuotaAllocationPanel.unallocatedMeaning).
+            */}
             <p className="mt-1 text-sm text-slate-500">
-              Chia hạn mức của trường thành trần chi cho từng người. Không có tên ở đây nghĩa là không bị chặn riêng, chỉ hạn mức
-              của trường áp dụng.
+              Chia hạn mức của trường thành trần chi cho từng người. Trần chi không giữ tiền — nó chỉ giới hạn ai
+              được tiêu bao nhiêu từ ví chung của trường.
             </p>
           </div>
 
@@ -187,8 +223,13 @@ export function MySubscriptionPage() {
               isError={examQuotaQuery.isError}
               isFetching={examQuotaQuery.isFetching}
               isLoading={examQuotaQuery.isLoading}
-              isSubmitting={allocateExamQuotaMutation.isPending || setQuotaPolicyMutation.isPending}
+              isSubmitting={
+                allocateExamQuotaMutation.isPending
+                || setQuotaPolicyMutation.isPending
+                || fundQuotaMutation.isPending
+              }
               key="teachers"
+              onFund={(amountVnd, reason) => void handleFundQuota('EXAM', amountVnd, reason)}
               onPageChange={setExamPage}
               onSearchChange={(value) => {
                 setExamSearch(value)
@@ -197,6 +238,7 @@ export function MySubscriptionPage() {
               onSetCap={(percent) => void handleSetCap('EXAM', percent)}
               onSubmit={(payload) => void handleAllocateExamQuota(payload)}
               page={examPage}
+              quotaType="EXAM"
               search={examSearch}
               summary={examQuotaQuery.data}
               userLabel="giáo viên"
@@ -207,8 +249,13 @@ export function MySubscriptionPage() {
               isError={practiceQuotaQuery.isError}
               isFetching={practiceQuotaQuery.isFetching}
               isLoading={practiceQuotaQuery.isLoading}
-              isSubmitting={allocatePracticeQuotaMutation.isPending || setQuotaPolicyMutation.isPending}
+              isSubmitting={
+                allocatePracticeQuotaMutation.isPending
+                || setQuotaPolicyMutation.isPending
+                || fundQuotaMutation.isPending
+              }
               key="students"
+              onFund={(amountVnd, reason) => void handleFundQuota('PRACTICE', amountVnd, reason)}
               onPageChange={setPracticePage}
               onSearchChange={(value) => {
                 setPracticeSearch(value)
@@ -217,6 +264,7 @@ export function MySubscriptionPage() {
               onSetCap={(percent) => void handleSetCap('PRACTICE', percent)}
               onSubmit={(payload) => void handleAllocatePracticeQuota(payload)}
               page={practicePage}
+              quotaType="PRACTICE"
               search={practiceSearch}
               summary={practiceQuotaQuery.data}
               userLabel="học sinh"

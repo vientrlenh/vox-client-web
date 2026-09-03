@@ -86,6 +86,13 @@ export type SubscriptionQuotaRecord = {
   quotaType: QuotaType
   totalAllocatedAmountVnd: number
   usedAmountVnd: number
+  /**
+   * Phần của `totalAllocatedAmountVnd` do trường tự nạp từ ví sang, thay vì do gói cấp.
+   *
+   * Tuỳ chọn vì không phải truy vấn nào cũng chọn trường này -- màn chia hạn mức cần nó để nói "gói
+   * cho bao nhiêu, mình bỏ thêm bao nhiêu", còn thẻ tổng quan gói thì không.
+   */
+  fundedFromBalanceVnd?: number
 }
 
 const PERIOD_LABELS: Record<SubscriptionPlanPeriod, string> = {
