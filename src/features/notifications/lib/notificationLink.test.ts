@@ -94,8 +94,8 @@ describe('resolveNotificationLink', () => {
       target: 'EXAM_HUMAN_GRADING_REQUIRED',
     }
 
-    expect(link(payload, ['SCHOOL_ADMIN'])).toBe('/school-admin/grading')
-    expect(link(payload, ['TEACHER'])).toBe('/teacher/grading')
+    expect(link(payload, ['SCHOOL_ADMIN'])).toBe('/school-admin/exam-results?examId=exam-1')
+    expect(link(payload, ['TEACHER'])).toBe('/teacher/exam-results?examId=exam-1')
   })
 
   it('đưa nhắc chấm bài trên lớp về hàng đợi của đúng bài đó', () => {
@@ -118,7 +118,7 @@ describe('resolveNotificationLink', () => {
         { examId: 'exam-1', examKind: 'CENTRALIZED', target: 'EXAM_HUMAN_GRADING_REQUIRED' },
         ['TEACHER', 'SCHOOL_ADMIN'],
       ),
-    ).toBe('/school-admin/grading')
+    ).toBe('/school-admin/exam-results?examId=exam-1')
   })
 
   /** Học sinh không có vai trò nào trong bảng của target này -- không cho bấm. */

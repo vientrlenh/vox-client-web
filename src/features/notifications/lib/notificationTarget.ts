@@ -67,14 +67,14 @@ const ROUTE_BY_TARGET: Record<NotificationTarget, TargetRoute> = {
       toPath: ({ examId, examKind }) =>
         examKind === 'CLASS_TEST' && examId
           ? `/school-admin/class-tests/${examId}/grading`
-          : '/school-admin/grading',
+          : `/school-admin/exam-results?examId=${examId}`,
     },
     {
       role: 'TEACHER',
       toPath: ({ examId, examKind }) =>
         examKind === 'CLASS_TEST' && examId
           ? `/teacher/class-tests/${examId}/grading`
-          : '/teacher/grading',
+          : `/teacher/exam-results?examId=${examId}`,
     },
   ],
   EXAM_RESULT_DETAIL: [
