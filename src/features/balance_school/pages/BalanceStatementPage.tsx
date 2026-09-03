@@ -15,6 +15,7 @@ const ENTRY_FILTERS: Array<{ label: string; value: EntryFilter }> = [
   { label: 'Nạp thêm', value: 'TOP_UP' },
   { label: 'Trừ vượt hạn mức', value: 'OVERAGE_CHARGE' },
   { label: 'Hoàn tiền', value: 'REFUND' },
+  { label: 'Cấp/hoàn hạn mức cá nhân', value: 'ALLOCATION_DRAW' },
   { label: 'Điều chỉnh thủ công', value: 'ADJUSTMENT' },
 ]
 

@@ -19,7 +19,7 @@ export type SchoolBalance = {
   updatedAt: string | null
 }
 
-export type BalanceEntryType = 'TOP_UP' | 'OVERAGE_CHARGE' | 'REFUND' | 'ADJUSTMENT'
+export type BalanceEntryType = 'TOP_UP' | 'OVERAGE_CHARGE' | 'REFUND' | 'ADJUSTMENT' | 'ALLOCATION_DRAW'
 
 export type SchoolBalanceEntry = {
   id: string
@@ -36,6 +36,8 @@ export type SchoolBalanceEntry = {
   fxRateUsed: string | null
   reason: string | null
   actorId: string | null
+  /** ALLOCATION_DRAW: người được cấp/hạ hạn mức cá nhân. null với mọi loại còn lại. */
+  targetUserId: string | null
 }
 
 export type SchoolBalanceEntryPage = {
@@ -79,6 +81,7 @@ export type SchoolDebtEventPage = {
 
 export const BALANCE_ENTRY_LABELS: Record<BalanceEntryType, string> = {
   ADJUSTMENT: 'Điều chỉnh thủ công',
+  ALLOCATION_DRAW: 'Cấp/hoàn hạn mức cá nhân',
   OVERAGE_CHARGE: 'Trừ vượt hạn mức',
   REFUND: 'Hoàn tiền',
   TOP_UP: 'Nạp thêm',

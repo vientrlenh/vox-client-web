@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, PenLine, RotateCcw } from 'lucide-react'
+import { ArrowDown, ArrowUp, PenLine, RotateCcw, Users } from 'lucide-react'
 import { QUOTA_LABELS } from '@/features/subscription_school/model'
 import { BALANCE_ENTRY_LABELS, shortId, type BalanceEntryType, type SchoolBalanceEntry } from '../model'
 
@@ -17,6 +17,15 @@ export const ENTRY_VISUALS: Record<BalanceEntryType, EntryVisual> = {
     bubble: 'bg-slate-100',
     icon: PenLine,
     iconClass: 'text-slate-600',
+  },
+  ALLOCATION_DRAW: {
+    // Dấu tự do (cấp = trừ, hoàn = cộng) nên không cố định amountClass theo dấu như OVERAGE_CHARGE --
+    // để nguyên màu trung tính, số tiền tự nói lên chiều qua dấu +/-.
+    amountClass: 'text-indigo-700',
+    badge: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+    bubble: 'bg-indigo-50',
+    icon: Users,
+    iconClass: 'text-indigo-700',
   },
   OVERAGE_CHARGE: {
     amountClass: 'text-amber-700',
@@ -58,6 +67,8 @@ export function entrySourceLabel(entry: SchoolBalanceEntry) {
   if (entry.orderId) {
     return `Đơn hàng ${shortId(entry.orderId)}`
   }
+  // ALLOCATION_DRAW: KHÔNG hiện targetUserId ở đây -- backend đã chốt sẵn email người được cấp/hạ
+  // hạn mức ngay trong "reason" lúc ghi (trường không cần nhìn UUID), lặp lại id ở dòng này là thừa.
   if (entry.actorId) {
     return `Quản trị hệ thống ${shortId(entry.actorId)}`
   }

@@ -50,6 +50,7 @@ const ENTRIES_QUERY = `
         fxRateUsed
         reason
         actorId
+        targetUserId
       }
     }
   }
