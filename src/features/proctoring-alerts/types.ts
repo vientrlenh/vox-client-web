@@ -96,7 +96,7 @@ export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay
       return {
         className: 'border-red-200 bg-red-50 text-red-700',
         label: 'Nhiều người trong khung hình',
-        severity: 'critical',
+        severity: 'warning',
       }
     case 'PROHIBITED_OBJECT':
       return {
