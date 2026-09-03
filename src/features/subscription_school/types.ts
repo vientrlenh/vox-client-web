@@ -88,6 +88,12 @@ export type QuotaUserAllocationPage = {
    * là một cơ hội để hai bên lệch nhau vài phần triệu đồng rồi báo lỗi ở chỗ không ai hiểu nổi.
    */
   distributableAmountVnd: number
+  /**
+   * Phần ví TỰ NẠP của trường CÓ THỂ ăn thêm ngoài distributableAmountVnd khi nới trần cá nhân của
+   * MỘT người -- không phải một túi tiền dành riêng, và dùng CHUNG cho cả EXAM lẫn PRACTICE. Đã kẹp
+   * về 0 ở backend, âm là nợ chứ không phải phần chia được thêm.
+   */
+  walletBalanceVnd: number
   content: QuotaUserAllocation[]
   page: number
   size: number
@@ -103,6 +109,8 @@ export type UserQuotaAmount = {
 export type AllocateQuotaPayload = {
   mode: DistributionMode
   allocations: UserQuotaAmount[]
+  /** true = quản trị viên đã xác nhận phần vượt pool sẽ ăn vào ví tự nạp của trường. */
+  confirmWalletDraw: boolean
 }
 
 export type MutationResult<TData> = {

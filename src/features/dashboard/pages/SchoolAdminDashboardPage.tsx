@@ -144,7 +144,7 @@ function FundingBanner({
   }
 
   /*
-   * Đã hứa cho giáo viên nhiều hơn số tiền còn lại.
+   * Đã phân chia cho giáo viên nhiều hơn số tiền còn lại.
    *
    * KHÔNG phải lỗi nhập liệu: DistributeQuotaToUsersService chặn tổng phân bổ theo TỔNG ví nhân trần
    * phân phối, không theo phần CÒN LẠI — nên một trường chia hết hạn mức từ đầu kỳ rồi mở vài kỳ thi
@@ -186,7 +186,7 @@ function FundingBanner({
 }
 
 /**
- * Dòng "đã hứa cho giáo viên" dưới thẻ "Còn chấm được".
+ * Dòng "đã phân chia cho giáo viên" dưới thẻ "Còn chấm được".
  *
  * Trần chi cá nhân KHÔNG giữ tiền (xem QuotaType phía backend): nó chỉ cho phép một người tiêu tới
  * đó, tiền vẫn nằm chung một ví. Nên "Còn chấm được" không giảm đi khi trường chia hạn mức — đúng về
@@ -194,7 +194,7 @@ function FundingBanner({
  * trị trường đang thật sự hỏi lúc sắp mở một kỳ thi tập trung: trong chỗ đó, bao nhiêu là phần mình
  * còn được đụng vào.
  *
- * Không hiện gì khi trường chưa chia cho ai: một dòng "đã hứa 0 ₫" chỉ làm thẻ dài thêm.
+ * Không hiện gì khi trường chưa chia cho ai: một dòng "đã phân chia 0 ₫" chỉ làm thẻ dài thêm.
  */
 function CommittedQuotaLine({ funding, onAllocate }: { funding: SchoolAdminDashboard['funding']; onAllocate: () => void }) {
   if (toNumber(funding.committedToUsersVnd) <= 0) {
@@ -208,7 +208,7 @@ function CommittedQuotaLine({ funding, onAllocate }: { funding: SchoolAdminDashb
       onClick={onAllocate}
       type="button"
     >
-      Đã hứa cho giáo viên {formatVndWhole(funding.committedToUsersVnd)} · còn tự do{' '}
+      Đã phân chia cho giáo viên {formatVndWhole(funding.committedToUsersVnd)} · còn tự do{' '}
       <b className={overCommitted ? 'text-red-700' : 'text-slate-900'}>{formatVndWhole(funding.uncommittedVnd)}</b>
     </button>
   )
@@ -1137,7 +1137,7 @@ export function SchoolAdminDashboardPage() {
 
             Con số lớn vẫn là TIỀN CÒN LẠI, không trừ phần đã chia cho giáo viên: nó phải khớp với cửa
             chặn lên lịch kỳ thi, nếu không thẻ này báo hết tiền trong khi hệ thống vẫn cho chi. Phần
-            đã hứa nằm ở dòng thứ hai, nơi nó trả lời một câu hỏi khác — xem CommittedQuotaLine. */}
+            đã phân chia nằm ở dòng thứ hai, nơi nó trả lời một câu hỏi khác — xem CommittedQuotaLine. */}
         <Kpi
           icon={<Wallet aria-hidden="true" className="size-5.5" />}
           label="Còn chấm được"

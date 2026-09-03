@@ -45,6 +45,7 @@ export function QuotaAllocationPanel({
   const poolTotalVnd = summary?.pool?.totalAllocatedAmountVnd ?? 0
   const distributedVnd = summary?.distributedAmountVnd ?? 0
   const totalPages = summary?.totalPages ?? 0
+  const walletBalanceVnd = Math.max(0, summary?.walletBalanceVnd ?? 0)
 
   // Trần phân phối: phần ví trường CHO PHÉP chia ra. Phần còn lại là dự phòng, để dành cấp thêm
   // giữa kỳ. Lấy con số đã tính sẵn từ backend chứ không nhân lại -- đó là con số dùng để từ chối.
@@ -66,16 +67,33 @@ export function QuotaAllocationPanel({
       return
     }
 
-    onSubmit({ allocations: [], mode: 'AUTO' })
+    onSubmit({ allocations: [], confirmWalletDraw: false, mode: 'AUTO' })
   }
 
-  function handleSaveOne(amountVnd: number) {
+  async function handleSaveOne(amountVnd: number, needsWalletConfirm: boolean) {
     if (!editing) {
       return
     }
+
+    if (needsWalletConfirm) {
+      const confirmed = await confirm({
+        confirmLabel: 'Xác nhận trích ví',
+        message: `Hạn mức mới vượt phần chia từ gói, phần dư sẽ trích từ ví tự nạp của trường (đang còn ${formatVnd(walletBalanceVnd)}). Ví này dùng chung cho cả thi lẫn luyện tập. Bạn có chắc chắn muốn tiếp tục?`,
+        title: 'Xác nhận rút ví tự nạp của trường',
+      })
+
+      if (!confirmed) {
+        return
+      }
+    }
+
     // Gửi ĐÚNG một người. Backend tự cộng thêm phần của những người không có trong yêu cầu khi kiểm
     // tổng, nên phân bổ từng phần là hợp lệ -- xem computeManualAmounts.
-    onSubmit({ allocations: [{ amountVnd, userId: editing.userId }], mode: 'MANUAL' })
+    onSubmit({
+      allocations: [{ amountVnd, userId: editing.userId }],
+      confirmWalletDraw: needsWalletConfirm,
+      mode: 'MANUAL',
+    })
     setEditing(null)
   }
 
@@ -266,8 +284,9 @@ export function QuotaAllocationPanel({
           distributedVnd={distributedVnd}
           isSubmitting={isSubmitting}
           onClose={() => setEditing(null)}
-          onSubmit={handleSaveOne}
+          onSubmit={(amountVnd, needsWalletConfirm) => void handleSaveOne(amountVnd, needsWalletConfirm)}
           poolTotalVnd={distributableVnd}
+          walletBalanceVnd={walletBalanceVnd}
         />
       ) : null}
 

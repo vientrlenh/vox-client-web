@@ -8,8 +8,11 @@ type AllocateQuotaDialogProps = {
   distributedVnd: number
   isSubmitting: boolean
   onClose: () => void
-  onSubmit: (amountVnd: number) => void
+  /** needsWalletConfirm = số nhập vượt phần pool, sẽ ăn vào ví tự nạp của trường. */
+  onSubmit: (amountVnd: number, needsWalletConfirm: boolean) => void
   poolTotalVnd: number
+  /** Phần ví tự nạp CÓ THỂ ăn thêm ngoài pool -- xem QuotaUserAllocationPage.walletBalanceVnd. */
+  walletBalanceVnd: number
 }
 
 function parseAmount(raw: string) {
@@ -35,17 +38,23 @@ export function AllocateQuotaDialog({
   onClose,
   onSubmit,
   poolTotalVnd,
+  walletBalanceVnd,
 }: AllocateQuotaDialogProps) {
   const [amount, setAmount] = useState(allocation.allocatedAmountVnd)
 
-  // Trần cho riêng người này = phần ví chưa chia + phần đang đứng tên họ. Không lấy nguyên
-  // poolTotalVnd: backend từ chối khi tổng phân bổ vượt ví ("Tổng hạn mức phân bổ vượt quá hạn mức
-  // của trường"), nên để người dùng gõ một số chắc chắn bị từ chối là bắt họ đoán luật.
-  const availableVnd = Math.max(0, poolTotalVnd - distributedVnd + allocation.allocatedAmountVnd)
-  const isOverAvailable = amount > availableVnd
+  // Trần cho riêng người này TRONG PHẦN POOL = phần ví chưa chia + phần đang đứng tên họ. Không lấy
+  // nguyên poolTotalVnd: backend từ chối khi tổng phân bổ vượt pool LẪN ví tự nạp, nên để người dùng
+  // gõ một số chắc chắn bị từ chối là bắt họ đoán luật.
+  const poolAvailableVnd = Math.max(0, poolTotalVnd - distributedVnd + allocation.allocatedAmountVnd)
+  // Trần MỞ RỘNG = phần pool còn chia được + ví tự nạp của trường. Vượt phần pool nhưng còn trong
+  // trần này là ĂN VÀO VÍ CHUNG (dùng chung cho cả thi lẫn luyện tập) -- không chặn nữa, chỉ cảnh báo
+  // và cần xác nhận (needsWalletConfirm) trước khi gửi lên backend.
+  const extendedAvailableVnd = poolAvailableVnd + Math.max(0, walletBalanceVnd)
+  const isOverExtended = amount > extendedAvailableVnd
+  const needsWalletConfirm = !isOverExtended && amount > poolAvailableVnd
   // Hạ hạn mức xuống dưới mức ĐÃ TIÊU là dựng sẵn một dòng mà chính backend cũng coi là bất thường.
   const isBelowUsed = amount < allocation.usedAmountVnd
-  const canSubmit = !isOverAvailable && !isBelowUsed && !isSubmitting
+  const canSubmit = !isOverExtended && !isBelowUsed && !isSubmitting
 
   const name = allocation.user?.fullName?.trim()
 
@@ -84,9 +93,11 @@ export function AllocateQuotaDialog({
             </label>
             <div
               className={`flex h-12 items-center gap-2.5 rounded-xl border bg-white px-4 transition ${
-                isOverAvailable || isBelowUsed
+                isOverExtended || isBelowUsed
                   ? 'border-red-300 ring-4 ring-red-50'
-                  : 'border-slate-200 focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50'
+                  : needsWalletConfirm
+                    ? 'border-amber-300 ring-4 ring-amber-50'
+                    : 'border-slate-200 focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50'
               }`}
             >
               <input
@@ -98,9 +109,16 @@ export function AllocateQuotaDialog({
               />
               <span className="text-base font-bold text-slate-400">₫</span>
             </div>
-            {isOverAvailable ? (
+            {isOverExtended ? (
               <p className="text-[12px] font-semibold text-red-600">
-                Vượt phần ví còn chia được ({formatVnd(availableVnd)}).
+                Vượt cả phần pool ({formatVnd(poolAvailableVnd)}) lẫn ví tự nạp còn lại của trường
+                ({formatVnd(walletBalanceVnd)}).
+              </p>
+            ) : needsWalletConfirm ? (
+              <p className="text-[12px] font-semibold text-amber-700">
+                Vượt phần chia từ gói ({formatVnd(poolAvailableVnd)}), phần dư {formatVnd(amount - poolAvailableVnd)}{' '}
+                sẽ trích từ ví tự nạp của trường (đang còn {formatVnd(walletBalanceVnd)}). Ví này dùng chung cho cả
+                thi lẫn luyện tập.
               </p>
             ) : null}
             {isBelowUsed ? (
@@ -119,7 +137,13 @@ export function AllocateQuotaDialog({
             </div>
             <div className="flex items-baseline justify-between gap-4">
               <dt className="text-[12.5px] text-slate-600">Ví trường còn chia được</dt>
-              <dd className="text-[13px] font-semibold text-blue-950 tabular-nums">{formatVnd(availableVnd)}</dd>
+              <dd className="text-[13px] font-semibold text-blue-950 tabular-nums">{formatVnd(poolAvailableVnd)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="text-[12.5px] text-slate-600">Ví tự nạp còn (dùng chung EXAM/PRACTICE)</dt>
+              <dd className="text-[13px] font-semibold text-blue-950 tabular-nums">
+                {formatVnd(Math.max(0, walletBalanceVnd))}
+              </dd>
             </div>
           </dl>
 
@@ -139,7 +163,7 @@ export function AllocateQuotaDialog({
             <button
               className="inline-flex h-11 items-center rounded-lg bg-indigo-600 px-5 text-sm font-bold text-white transition hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
               disabled={!canSubmit}
-              onClick={() => onSubmit(amount)}
+              onClick={() => onSubmit(amount, needsWalletConfirm)}
               type="button"
             >
               {isSubmitting ? 'Đang lưu...' : 'Lưu hạn mức'}
