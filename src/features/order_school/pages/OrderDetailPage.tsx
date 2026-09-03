@@ -10,7 +10,7 @@ import { DEFAULT_PAYMENT_METHOD, type PaymentLink, type PaymentMethod } from '@/
 import { useCreateCheckoutUrlMutation } from '../api/useOrderMutations'
 import { useOrderQuery } from '../api/useOrderQueries'
 import { CancelOrderDialog } from '../components/CancelOrderDialog'
-import { PaymentHistoryCard } from '../components/PaymentHistoryCard'
+import { PaymentInfoCard } from '../components/PaymentInfoCard'
 import { PayosQrPanel } from '../components/PayosQrPanel'
 import { formatDateTime, formatRemaining, formatVnd } from '../format'
 import { getOrderStatusDisplay, getPaidDestination } from '../types'
@@ -103,6 +103,11 @@ export function OrderDetailPage() {
   const paidDestination = getPaidDestination(order.type)
   const showFee = (order.chargedFeeVnd ?? 0) > 0
   const showDiscount = (order.discountAmountVnd ?? 0) > 0
+  // Đơn chỉ có tối đa 1 dòng PAID (ràng buộc DB), nên khi có invoice, dòng PAID trong payments
+  // chính là lần thanh toán mà invoice đó đại diện — không cần BE trỏ paymentId riêng.
+  const invoicePayment = order.invoice
+    ? (order.payments ?? []).find((payment) => payment.status === 'PAID') ?? null
+    : null
 
   return (
     <section className="mx-auto grid max-w-300 gap-4">
@@ -288,6 +293,8 @@ export function OrderDetailPage() {
             </dl>
           </div>
 
+          {invoicePayment ? <PaymentInfoCard payment={invoicePayment} /> : null}
+
           {isPending && remaining ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
               <div className="flex items-center gap-2 text-amber-800">
@@ -302,8 +309,6 @@ export function OrderDetailPage() {
           ) : null}
         </aside>
       </div>
-
-      <PaymentHistoryCard payments={order.payments} />
 
       {isCancelOpen ? (
         <CancelOrderDialog
