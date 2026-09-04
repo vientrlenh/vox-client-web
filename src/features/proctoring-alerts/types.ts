@@ -92,9 +92,24 @@ export function getAlertSeverity(
  * Nhãn + màu theo LOẠI cảnh báo. `severity` trả về ở đây chỉ là mức mặc định của loại đó, dùng khi
  * bản ghi không mang `level`; nơi nào có bản ghi thật thì gọi `getAlertSeverity` để lấy mức đã lưu.
  *
- * <p>Màu (`className`) cố ý KHÔNG đi theo mức mà đi theo BẢN CHẤT sự việc, vì đó là hai trục khác
- * nhau: đỏ cho nghi vấn gian lận, hổ phách cho hành vi thi, xám cho sự cố kỹ thuật. Một luồng rớt
- * và một chiếc điện thoại đều đáng chú ý, nhưng chúng đòi hai loại phản ứng khác hẳn nhau.
+ * <p>Ba kênh màu, và chúng nói VIỆC CẦN LÀM chứ không nói mức độ nặng nhẹ của hành vi:
+ *
+ * <ul>
+ *   <li><b>đỏ</b> -- giám thị cần can thiệp NGAY, khớp đúng mức CRITICAL của vox-streaming
+ *       (`DefaultAlertLevel`): hiện chỉ còn điện thoại và vật thể cấm.</li>
+ *   <li><b>hổ phách</b> -- để mắt thêm, xem lại lúc chấm; mức WARNING.</li>
+ *   <li><b>xám</b> -- sự cố kỹ thuật. Tách riêng dù phần lớn cũng là WARNING, vì trong những giây
+ *       đầu thì rút cáp cố ý và cáp lỏng không phân biệt được: màu không được kết luận hộ người
+ *       chấm.</li>
+ * </ul>
+ *
+ * <p>MULTIPLE_PERSONS chuyển từ đỏ sang hổ phách khi vox-streaming hạ nó xuống WARNING (`4cc6598`).
+ * Đổi màu là đổi mức độ KHẨN, không phải đổi đánh giá về liêm chính: hai người trong khung vẫn là
+ * nghi vấn "ai đang trả lời", chỉ là nó không đòi giám thị bỏ chỗ chạy tới giữa ca thi.
+ *
+ * <p><b>Đừng đọc màu này để suy ra bài có bị đẩy sang người soát hay không.</b> Cửa đó hỏi theo LOẠI
+ * cảnh báo (`ExamProctoringAlert.INTEGRITY_ALERT_TYPES` phía Java) và vẫn tính MULTIPLE_PERSONS đủ.
+ * Chính vì hai thứ này từng dính vào nhau qua `level` mà một lần đổi màu đã lặng lẽ tắt mất luật soát.
  */
 export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay {
   switch (alertType) {
@@ -104,9 +119,11 @@ export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay
         label: 'Phát hiện điện thoại',
         severity: 'critical',
       }
+    // Hổ phách chứ không đỏ, theo đúng mức WARNING của nó -- xem đoạn về ba kênh màu ở javadoc trên.
+    // Vẫn nằm trong INTEGRITY_ALERT_TYPES phía Java: màu nhạt đi không có nghĩa là bài hết bị soát.
     case 'MULTIPLE_PERSONS':
       return {
-        className: 'border-red-200 bg-red-50 text-red-700',
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
         label: 'Nhiều người trong khung hình',
         severity: 'warning',
       }
