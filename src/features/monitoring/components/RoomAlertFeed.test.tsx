@@ -50,10 +50,10 @@ describe('RoomAlertFeed colours', () => {
    * cho cùng một sự việc.
    */
   it.each([
-    ['CRITICAL', 'bản ghi trước 4cc6598'],
-    ['WARNING', 'bản ghi sau 4cc6598'],
-    [undefined, 'bản vox-streaming cũ không gửi level'],
-  ])('renders the same amber whatever level the record carries: %s (%s)', (level) => {
+    { level: 'CRITICAL', when: 'bản ghi trước 4cc6598' },
+    { level: 'WARNING', when: 'bản ghi sau 4cc6598' },
+    { level: undefined, when: 'bản vox-streaming cũ không gửi level' },
+  ])('renders the same amber whatever level the record carries: $level ($when)', ({ level }) => {
     renderFeed([createAlert({ level })])
 
     expect(alertTile('Nhiều người trong khung hình')).toHaveClass('bg-amber-50')
