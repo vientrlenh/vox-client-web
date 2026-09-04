@@ -7,12 +7,15 @@ jest.mock('@/features/auth/api/refreshAuthTokens', () => ({
   refreshAuthTokens: jest.fn(),
 }))
 
-function createAccessToken() {
+const TEACHER_USER_ID = '6f5b4f6a-2d70-4f18-9a1f-6b2f4c9d1e77'
+const OTHER_USER_ID = 'b1c2d3e4-5f60-4718-9a1f-0011223344ff'
+
+function createAccessToken(userId = TEACHER_USER_ID) {
   const payload = {
     email: 'teacher@vox.edu.vn',
     exp: Math.floor(Date.now() / 1000) + 900,
     roles: ['TEACHER'],
-    userId: '6f5b4f6a-2d70-4f18-9a1f-6b2f4c9d1e77',
+    userId,
   }
   const encodedPayload = btoa(JSON.stringify(payload))
     .replace(/\+/g, '-')
@@ -128,5 +131,84 @@ describe('AuthProvider', () => {
     expect(await screen.findByText('nội dung ứng dụng')).toBeInTheDocument()
     expect(refreshAuthTokens).not.toHaveBeenCalled()
     expect(store.getState().auth.status).toBe('authenticated')
+  })
+
+  /**
+   * Ca đã báo lỗi: đăng xuất rồi đăng nhập bằng tài khoản khác, thanh tài khoản vẫn hiện TÊN người
+   * cũ kèm VAI TRÒ người mới. Vai trò đọc từ JWT nên đổi ngay; tên đọc từ `useProfileQuery`, khoá
+   * `['profile','me']` không mang userId và `staleTime` 5 phút, nên React Query phục vụ thẳng bản
+   * của người trước.
+   *
+   * Đăng xuất/đăng nhập chỉ là điều hướng trong SPA nên không có lần tải trang nào dọn hộ cache.
+   */
+  it('drops the previous account cached data when a different user signs in', async () => {
+    localStorage.setItem('vox.accessToken', createAccessToken())
+    const { queryClient, store } = renderAuthProvider()
+    await waitFor(() =>
+      expect(store.getState().auth.status).toBe('authenticated'),
+    )
+
+    queryClient.setQueryData(['profile', 'me'], { fullName: 'Người dùng cũ' })
+
+    const otherTab = new BroadcastChannel('vox.auth')
+    otherTab.postMessage({
+      accessToken: createAccessToken(OTHER_USER_ID),
+      type: 'authenticated',
+    })
+
+    await waitFor(() =>
+      expect(store.getState().auth.user?.userId).toBe(OTHER_USER_ID),
+    )
+    await waitFor(() =>
+      expect(queryClient.getQueryData(['profile', 'me'])).toBeUndefined(),
+    )
+    otherTab.close()
+  })
+
+  /**
+   * Không riêng hồ sơ cá nhân: mọi thứ người trước đã tải đều phải đi, vì máy dùng chung ở phòng
+   * lab là đúng ca mà cache còn sót trở thành chuyện rò rỉ dữ liệu chứ không phải chuyện hiển thị.
+   */
+  it('empties the whole cache on logout, not just the profile entry', async () => {
+    localStorage.setItem('vox.accessToken', createAccessToken())
+    const { queryClient, store } = renderAuthProvider()
+    await waitFor(() =>
+      expect(store.getState().auth.status).toBe('authenticated'),
+    )
+
+    queryClient.setQueryData(['profile', 'me'], { fullName: 'Người dùng cũ' })
+    queryClient.setQueryData(['balance', 'entries'], [{ id: 'bút toán cũ' }])
+
+    const otherTab = new BroadcastChannel('vox.auth')
+    otherTab.postMessage({ type: 'anonymous' })
+
+    await waitFor(() => expect(store.getState().auth.status).toBe('anonymous'))
+    await waitFor(() => expect(queryClient.getQueryCache().getAll()).toHaveLength(0))
+    otherTab.close()
+  })
+
+  /**
+   * Vế còn lại: cache CHỈ được vứt khi danh tính đổi. Xoá nhầm ở mỗi lần render là biến mọi thay
+   * đổi state không liên quan thành một lượt nạp lại toàn bộ màn hình.
+   */
+  it('keeps the cache when the same user stays signed in', async () => {
+    localStorage.setItem('vox.accessToken', createAccessToken())
+    const { queryClient, store } = renderAuthProvider()
+    await waitFor(() =>
+      expect(store.getState().auth.status).toBe('authenticated'),
+    )
+
+    queryClient.setQueryData(['profile', 'me'], { fullName: 'Người dùng hiện tại' })
+
+    const sameTab = new BroadcastChannel('vox.auth')
+    sameTab.postMessage({ accessToken: createAccessToken(), type: 'authenticated' })
+
+    await waitFor(() =>
+      expect(store.getState().auth.user?.userId).toBe(TEACHER_USER_ID),
+    )
+    expect(queryClient.getQueryData(['profile', 'me'])).toEqual({
+      fullName: 'Người dùng hiện tại',
+    })
+    sameTab.close()
   })
 })

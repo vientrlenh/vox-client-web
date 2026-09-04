@@ -59,6 +59,18 @@ export type ProctoringAlertDto = {
  *
  * <p>Rơi về bảng theo loại chỉ khi `level` trống (bản ghi cũ, hoặc bản vox-streaming cũ hơn không
  * gửi trường này) -- vẫn tốt hơn là hiện mọi thứ thành INFO.
+ *
+ * <p><b>Hệ quả: hai bản ghi CÙNG LOẠI có thể hiện hai màu khác nhau, và đó không phải lỗi.</b>
+ * `level` được đóng dấu lúc GHI và không bao giờ tính lại, nên khi vox-streaming đổi mức của một
+ * loại thì bản ghi cũ giữ mức cũ mãi mãi. Ca đang thấy trên màn hình: MULTIPLE_PERSONS bị hạ từ
+ * CRITICAL xuống WARNING (`4cc6598`), nên phiên thi cũ hiện đỏ "Nghiêm trọng" còn phiên mới hiện
+ * "Cảnh báo" cho đúng một sự việc -- và `ProctoringAlertsCard` xếp critical lên đầu nên bản ghi cũ
+ * còn nằm trên cùng.
+ *
+ * <p>Giữ nguyên là CỐ Ý: mức đã lưu là điều hệ thống thật sự nói với giám thị lúc đó, và sổ bằng
+ * chứng thì không viết lại. Cái phải sửa là đừng để quyết định nào QUAN TRỌNG bám vào con số này --
+ * cửa đẩy bài sang người soát đã chuyển sang hỏi theo LOẠI cảnh báo (xem
+ * `ExamProctoringAlert.INTEGRITY_ALERT_TYPES` phía Java), nên nó không còn lệch theo ngày deploy nữa.
  */
 export function getAlertSeverity(
   alertType?: string | null,
@@ -162,8 +174,11 @@ export function getAlertTypeDisplay(alertType?: string | null): AlertTypeDisplay
 
     // Tên cũ, chỉ còn trong dữ liệu lịch sử -- không nguồn nào phát chúng nữa. Giữ lại vì sổ bằng
     // chứng thì KHÔNG đổi tên bản ghi đã lưu: tên là thứ hệ thống thật sự đã ghi lúc đó, và sửa nó
-    // là viết lại lịch sử. Chỉ mức độ được nâng lại bằng migration, vì INFO ở đó là lỗi ghi chép
-    // (nhánh "không nhận ra loại này") chứ không phải một đánh giá có chủ ý.
+    // là viết lại lịch sử.
+    //
+    // Mức đã lưu cũng không sửa, và KHÔNG có migration nào đụng tới `exam_proctoring_alerts` --
+    // dòng chú trước đây nói ngược lại, mô tả một migration chưa từng được viết. Bản ghi cũ giữ
+    // nguyên mức cũ; `severity` dưới đây chỉ dùng khi bản ghi không mang `level`.
     case 'CRITICAL_VIOLATION':
       return {
         className: 'border-amber-200 bg-amber-50 text-amber-700',

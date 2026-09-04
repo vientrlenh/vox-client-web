@@ -19,7 +19,11 @@ export type SchoolBalance = {
   updatedAt: string | null
 }
 
-export type BalanceEntryType = 'TOP_UP' | 'OVERAGE_CHARGE' | 'REFUND' | 'ADJUSTMENT'
+/**
+ * Phải khớp ĐÚNG enum SchoolBalanceEntryType của backend, kể cả loại client chưa vẽ giao diện riêng:
+ * thiếu một giá trị ở đây thì `ENTRY_VISUALS[entry.entryType]` ra undefined và cả bảng sao kê đổ.
+ */
+export type BalanceEntryType = 'TOP_UP' | 'OVERAGE_CHARGE' | 'QUOTA_FUNDING' | 'REFUND' | 'ADJUSTMENT'
 
 export type SchoolBalanceEntry = {
   id: string
@@ -46,9 +50,15 @@ export type SchoolBalanceEntryPage = {
   totalPages: number
 }
 
+/**
+ * Bốn nhóm phủ HẾT năm loại bút toán (nạp và hoàn gộp làm một) -- đó là điều kiện để ô tổng giải
+ * thích được mọi thay đổi của số dư trong dải. Thêm loại bút toán mới thì phải thêm nhóm ở đây.
+ */
 export type SchoolBalanceSummary = {
   creditedVnd: string
   overageChargedVnd: string
+  /** QUOTA_FUNDING. Âm, nhưng KHÔNG phải tiền đã tiêu -- tiền chuyển sang ví hạn mức của trường. */
+  quotaFundedVnd: string
   adjustedVnd: string
 }
 
@@ -80,6 +90,9 @@ export type SchoolDebtEventPage = {
 export const BALANCE_ENTRY_LABELS: Record<BalanceEntryType, string> = {
   ADJUSTMENT: 'Điều chỉnh thủ công',
   OVERAGE_CHARGE: 'Trừ vượt hạn mức',
+  // "Chuyển" chứ không phải "Trừ": tiền rời ví nhưng vẫn là tiền của trường, chỉ nằm ở túi khác.
+  // Gọi là trừ thì hiệu trưởng đọc sao kê sẽ tưởng mình vừa tiêu mất khoản đó.
+  QUOTA_FUNDING: 'Chuyển vào hạn mức',
   REFUND: 'Hoàn tiền',
   TOP_UP: 'Nạp thêm',
 }

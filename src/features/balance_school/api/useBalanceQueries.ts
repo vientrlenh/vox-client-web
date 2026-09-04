@@ -60,6 +60,7 @@ const SUMMARY_QUERY = `
     schoolBalanceSummary(schoolId: $schoolId, from: $from, to: $to) {
       creditedVnd
       overageChargedVnd
+      quotaFundedVnd
       adjustedVnd
     }
   }

@@ -14,6 +14,7 @@ const ENTRY_FILTERS: Array<{ label: string; value: EntryFilter }> = [
   { label: 'Mọi loại bút toán', value: 'ALL' },
   { label: 'Nạp thêm', value: 'TOP_UP' },
   { label: 'Trừ vượt hạn mức', value: 'OVERAGE_CHARGE' },
+  { label: 'Chuyển vào hạn mức', value: 'QUOTA_FUNDING' },
   { label: 'Hoàn tiền', value: 'REFUND' },
   { label: 'Điều chỉnh thủ công', value: 'ADJUSTMENT' },
 ]
@@ -57,7 +58,12 @@ export function BalanceStatementPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/*
+        Bốn ô, phủ hết bốn nhóm bút toán -- cộng lại đúng bằng phần số dư đã đổi trong dải. Ba ô thì
+        một ví chuyển tiền vào hạn mức sẽ tụt đi mà không ô nào nói vì sao, trên đúng trang lập ra để
+        đối soát.
+      */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
           <p className="text-[11.5px] font-semibold text-emerald-700">Nạp và hoàn tiền · 30 ngày</p>
           <p className="mt-1 text-lg font-extrabold tracking-tight text-emerald-700 tabular-nums">
@@ -69,6 +75,18 @@ export function BalanceStatementPage() {
           <p className="mt-1 text-lg font-extrabold tracking-tight text-amber-700 tabular-nums">
             {formatVnd(summaryQuery.data?.overageChargedVnd)}
           </p>
+        </div>
+        {/*
+          Ô DUY NHẤT có dòng chú: ba nhóm kia đều là tiền vào hoặc tiền mất hẳn, còn nhóm này âm mà
+          không phải khoản chi. Không nói ra thì con số âm nằm cạnh "Trừ vượt hạn mức" sẽ được đọc
+          thành tiền đã tiêu.
+        */}
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3.5">
+          <p className="text-[11.5px] font-semibold text-sky-700">Chuyển vào hạn mức · 30 ngày</p>
+          <p className="mt-1 text-lg font-extrabold tracking-tight text-sky-700 tabular-nums">
+            {formatVnd(summaryQuery.data?.quotaFundedVnd)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-sky-700/70">Vẫn là tiền của trường, ở ví hạn mức</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-3.5">
           <p className="text-[11.5px] font-semibold text-slate-500">Điều chỉnh thủ công · 30 ngày</p>

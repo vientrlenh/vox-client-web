@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, PenLine, RotateCcw } from 'lucide-react'
+import { ArrowDown, ArrowRightLeft, ArrowUp, PenLine, RotateCcw } from 'lucide-react'
 import { QUOTA_LABELS } from '@/features/subscription_school/model'
 import { BALANCE_ENTRY_LABELS, shortId, type BalanceEntryType, type SchoolBalanceEntry } from '../model'
 
@@ -24,6 +24,15 @@ export const ENTRY_VISUALS: Record<BalanceEntryType, EntryVisual> = {
     bubble: 'bg-amber-50',
     icon: ArrowDown,
     iconClass: 'text-amber-700',
+  },
+  // Mũi tên HAI CHIỀU, không phải mũi tên xuống như OVERAGE_CHARGE: đây là chuyển túi, không phải
+  // tiêu mất. Màu sky để không đụng chip indigo của cột "Loại hạn mức" ngay bên cạnh.
+  QUOTA_FUNDING: {
+    amountClass: 'text-sky-700',
+    badge: 'border-sky-200 bg-sky-50 text-sky-700',
+    bubble: 'bg-sky-50',
+    icon: ArrowRightLeft,
+    iconClass: 'text-sky-700',
   },
   REFUND: {
     amountClass: 'text-emerald-700',
@@ -57,6 +66,12 @@ export function entrySourceLabel(entry: SchoolBalanceEntry) {
   }
   if (entry.orderId) {
     return `Đơn hàng ${shortId(entry.orderId)}`
+  }
+  // Rẽ theo entryType TRƯỚC nhánh actorId chung: cả ADJUSTMENT lẫn QUOTA_FUNDING đều có actorId,
+  // nhưng một bên là quản trị hệ thống sửa sổ, bên kia là chính nhà trường bấm chuyển tiền của mình.
+  // Đọc mỗi "actorId != null" là gán nhầm việc của trường cho quản trị hệ thống.
+  if (entry.entryType === 'QUOTA_FUNDING') {
+    return entry.actorId ? `Quản trị trường ${shortId(entry.actorId)}` : ''
   }
   if (entry.actorId) {
     return `Quản trị hệ thống ${shortId(entry.actorId)}`

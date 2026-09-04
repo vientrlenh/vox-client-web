@@ -222,7 +222,12 @@ export function getReviewReasonLabel(code?: string | null) {
     LLM_UNSTABLE_COHERENCE: 'Chấm coherence chưa ổn định',
     LLM_UNSTABLE_GRAMMAR: 'Chấm grammar chưa ổn định',
     LLM_UNSTABLE_VOCABULARY: 'Chấm vocabulary chưa ổn định',
+    CONFIDENCE_BELOW_THRESHOLD: 'Độ tin cậy dưới ngưỡng nhà trường đặt',
     LOW_CONFIDENCE: 'Độ tin cậy AI thấp',
+    // Mã CŨ, chỉ còn trên bản ghi lưu trước khi cửa soát chuyển sang hỏi theo LOẠI cảnh báo thay vì
+    // theo mức. Giữ lại vì bản ghi đã lưu thì không viết lại -- xem RecordExamAttemptEvaluationUseCase.
+    PROCTORING_CRITICAL: 'Có cảnh báo giám sát nghiêm trọng',
+    PROCTORING_INTEGRITY: 'Có cảnh báo giám sát về liêm chính bài thi',
     REFERENCE_DRIFT: 'Reference transcript chưa ổn định',
     VALIDITY_FLAGGED: 'Có cảnh báo validity cần giáo viên xem lại',
   }
